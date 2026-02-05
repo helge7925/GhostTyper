@@ -1,9 +1,9 @@
-# Transkriptions-WebApp Projektplan
+# Transkriptions-WebApp Projektplan (Erweitert)
 
 ## Übersicht
-Dieses Dokument beschreibt den Projektplan für die Entwicklung einer Transkriptions-WebApp mit Mistral Voxtral als Transkriptionsmodell. Die Anwendung soll auf einem Virtual Private Server (VPS) in einem Docker-Container laufen und über die Subdomain `transkription.helgeroos.de` erreichbar sein.
+Dieses Dokument beschreibt den Projektplan für die Entwicklung einer Transkriptions-WebApp mit dynamischer Audio-Analyse. Die Anwendung nutzt Mistral Voxtral für die Transkription und Mistral Large für die kontextsensitive Analyse von Audioaufnahmen. Das Projekt wird in einen bestehenden Docker-Container auf einem VPS integriert.
 
-## Technologiestack
+## Technologiestack (erweitert)
 
 ### Frontend
 - **Framework**: Next.js (für Server-Side Rendering und mobile Optimierung)
@@ -17,12 +17,17 @@ Dieses Dokument beschreibt den Projektplan für die Entwicklung einer Transkript
 - **Authentifizierung**: NextAuth.js mit JWT
 - **Dateiupload**: Multer für lokale Speicherung oder AWS S3 für Skalierbarkeit
 
-### Infrastruktur
-- **Containerisierung**: Docker
-- **Webserver**: Nginx als Reverse Proxy
-- **Deployment**: VPS mit Docker Compose
+### KI-Integration
+- **Mistral Voxtral**: Für Rohtranskription mit Metadaten
+- **Mistral Large**: Für dynamische kontextsensitive Analyse
+- **Prompt-Engineering**: Dynamische Prompt-Generierung basierend auf Audio-Charakteristika
 
-## Funktionen
+### Infrastruktur
+- **Containerisierung**: Integration in bestehenden Docker-Container
+- **Webserver**: Nginx als Reverse Proxy (bereits vorhanden)
+- **Deployment**: VPS mit Docker Compose (bestehende Umgebung)
+
+## Funktionen (erweitert)
 
 ### 1. Benutzerauthentifizierung
 - **Anmeldung und Registrierung**: Benutzer können sich registrieren und anmelden
@@ -44,57 +49,337 @@ Dieses Dokument beschreibt den Projektplan für die Entwicklung einer Transkript
 - **Integration der Mistral Voxtral API**: Verarbeitung der Audiodatei und Rückgabe des transkribierten Textes
 - **Datenaufbereitung**: Formatierung der transkribierten Daten basierend auf dem Template
 
-### 5. Mobile Optimierung
+### 5. Dynamische Audio-Analyse
+- **Zweistufige Verarbeitung**: Voxtral → Large
+- **Kontextadaptive Ausgabe**: Automatische Anpassung der Ausgabe an Komplexität
+- **Relevanzfilterung**: Priorisierung wichtiger Informationen
+- **Plausibilitätsprüfung**: Automatische Validierung von Messwerten
+
+### 6. Meeting-Analyse
+- **Dynamische Strukturierung**: Von einfachen Zusammenfassungen bis zu thematischen Hierarchien
+- **To-Do Extraktion**: Mit Priorisierung und Verantwortlichen
+- **Entscheidungsprotokollierung**: Automatische Identifikation von Beschlüssen
+- **Widerspruchserkennung**: Markierung von Inkonsistenzen
+
+### 7. Aufmaß-Analyse
+- **Hierarchische Strukturierung**: Nach Räumen und Elementen
+- **Einheiten-Normalisierung**: Automatische Einheitenerkennung und -konvertierung
+- **Plausibilitätswarnungen**: Für unrealistische Messwerte
+- **Flexible Ausgabeformate**: Von einfachen Listen bis zu komplexen Hierarchien
+
+### 8. Mobile Optimierung
 - **Responsives Design**: Optimierung der Benutzeroberfläche für mobile Geräte
 - **PWA**: Progressive Web App für bessere mobile Nutzung und Offline-Fähigkeit
 
-## Implementierungsplan
+## Implementierungsplan (angepasst für bestehende Docker-Umgebung)
 
-### Schritt 1: Projektinitialisierung
-- Erstellen eines neuen Next.js-Projekts
-- Einrichtung der Docker-Dateien für Frontend, Backend und Datenbank
-- Konfiguration von Nginx für die Subdomain `transkription.helgeroos.de`
+### Phase 1: Umgebunganalyse (1-2 Tage)
+- Prüfung der bestehenden Docker-Compose-Datei
+- Identifikation verfügbarer Ressourcen (Ports, Volumes, Netzwerke)
+- Analyse der Nginx-Konfiguration für Subdomain-Integration
+- Abstimmung der Integrationsstrategie
 
-### Schritt 2: Authentifizierung und Benutzerverwaltung
-- Einrichtung von NextAuth.js mit PostgreSQL als Datenbank
-- Implementierung der Benutzerregistrierung und -anmeldung
-- Erstellen des Admin-Dashboards für die Benutzerverwaltung
-- Implementierung der rollenbasierten Zugriffskontrolle
+### Phase 2: Frontend-Integration (3-5 Tage)
+- Anpassung des Next.js-Frontends für Subroute-Betrieb
+- Konfiguration der API-Endpoints
+- Testing der Integration in bestehende Umgebung
 
-### Schritt 3: API-Key-Management
-- Erstellen einer Tabelle für API-Keys in der Datenbank
-- Implementierung der API-Key-Verwaltung im Benutzerprofil
-- Integration der API-Keys in die Transkriptionsanfragen
+### Phase 3: Backend-Integration (5-7 Tage)
+- Anpassung der API-Routes für bestehende Nginx-Konfiguration
+- Datenbank-Integration (Nutzung bestehender PostgreSQL oder neues Schema)
+- AI-API-Anbindung (Mistral Voxtral & Large)
 
-### Schritt 4: Dateiupload und mobile Integration
-- Implementierung des Dateiuploads mit Multer oder AWS S3
-- Einrichtung der File Access API für direkten Zugriff auf den Handyspeicher
-- Implementierung der Share Target API für das Teilen von Audiodateien
-- Konfiguration der PWA für bessere mobile Nutzung
+### Phase 4: AI-Integration (3-5 Tage)
+- Implementierung der Mistral-API-Aufrufe
+- Prompt-Management-System
+- Ergebnisverarbeitung und Validierung
 
-### Schritt 5: Template-Management
-- Erstellen der Datenbanktabellen für Templates
-- Implementierung des Template-Editors
-- Erstellen der Template-Auswahl-Komponente
-- Implementierung der Template-Formatierungsfunktionen
+### Phase 5: Dynamische Analyse-Module (5-7 Tage)
+- Meeting-Analyse-Pipeline
+- Aufmaß-Analyse-Pipeline
+- Validierungslogik und Plausibilitätsprüfung
 
-### Schritt 6: Transkription und Datenaufbereitung
-- Integration der Mistral Voxtral API
-- Implementierung der Transkriptionslogik
-- Verarbeitung der Audiodatei und Rückgabe des transkribierten Textes
-- Anwendung der Template-Formatierung auf den transkribierten Text
+### Phase 6: Docker-Integration (2-3 Tage)
+- Erstellung minimaler Docker-Konfiguration für neue Komponenten
+- Anpassung an bestehendes Docker-Netzwerk
+- Health-Check-Implementierung
 
-### Schritt 7: Benutzeroberfläche und mobile Optimierung
-- Erstellen von UI-Komponenten für die verschiedenen Seiten
-- Implementierung von responsivem Design mit Tailwind CSS
-- Optimierung der Benutzeroberfläche für mobile Geräte
-- Implementierung von Navigationsmenüs und Benutzerfeedback
+### Phase 7: Testing & Deployment (2-3 Tage)
+- Integrationstests in der bestehenden Umgebung
+- Performance-Tests
+- Rollout-Strategie mit minimaler Downtime
 
-### Schritt 8: Docker und Deployment
-- Erstellen der Docker-Dateien für Frontend, Backend und Datenbank
-- Konfiguration von Docker Compose für die lokale Entwicklung
-- Einrichtung des VPS für die Produktion
-- Deployment der Anwendung auf dem VPS
+### Phase 8: Monitoring & Wartung
+- Integration in bestehende Monitoring-Tools
+- Log-Integration in bestehende Systeme
+- Health-Check-Endpoints
+
+## Docker-Integration in bestehende Umgebung
+
+### Container-Struktur
+```
+Bestehender VPS-Container
+├── Bestehende Services
+│   ├── Nginx (bereits konfiguriert)
+│   ├── Datenbank (PostgreSQL, falls vorhanden)
+│   └── Andere Dienste
+│
+└── Neue Transkriptions-Komponenten
+    ├── Frontend (Next.js) - als Subroute /transkription
+    ├── Backend (Node.js) - als API-Endpoint /api/transkription
+    └── AI-Worker (Python) - optional als separater Service
+```
+
+### Docker-Compose-Erweiterung
+```yaml
+# Ergänzung zur bestehenden docker-compose.yml
+services:
+  transkription-frontend:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./transkription/frontend:/app
+      - /app/node_modules
+    command: sh -c "yarn install && yarn build && yarn start"
+    environment:
+      - NEXT_PUBLIC_API_URL=/api/transkription
+      - NODE_ENV=production
+    networks:
+      - existing_network  # Nutzung des bestehenden Netzwerks
+    restart: unless-stopped
+
+  transkription-backend:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./transkription/backend:/app
+      - /app/node_modules
+    command: sh -c "yarn install && yarn start"
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@existing_db:5432/${DB_NAME}
+      - JWT_SECRET=${JWT_SECRET}
+      - MISTRAL_VOXTRAL_API_KEY=${MISTRAL_VOXTRAL_KEY}
+      - MISTRAL_LARGE_API_KEY=${MISTRAL_LARGE_KEY}
+    networks:
+      - existing_network
+    restart: unless-stopped
+```
+
+### Nginx-Konfiguration (Erweiterung)
+```nginx
+# Ergänzung zur bestehenden Nginx-Konfiguration
+location /transkription {
+    proxy_pass http://transkription-frontend:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location /api/transkription {
+    proxy_pass http://transkription-backend:5000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+## Datenbank-Integration
+
+### Option A: Nutzung bestehender PostgreSQL
+```sql
+-- Erstellung eines neuen Schemas für die Transkriptions-Anwendung
+CREATE SCHEMA transkription;
+
+-- Benutzerverwaltung
+CREATE TABLE transkription.users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(255),
+    role VARCHAR(50) DEFAULT 'user',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- API-Key-Verwaltung
+CREATE TABLE transkription.api_keys (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES transkription.users(id) ON DELETE CASCADE,
+    key VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Transkriptions-Jobs
+CREATE TABLE transkription.jobs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES transkription.users(id) ON DELETE CASCADE,
+    status VARCHAR(50) DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Option B: Separate Datenbank-Instanz
+Falls keine bestehende PostgreSQL verfügbar ist, kann eine separate Instanz im bestehenden Docker-Netzwerk eingerichtet werden.
+
+## AI-Integration
+
+### Direkte API-Nutzung (empfohlen)
+```javascript
+// Beispiel: Backend-Integration der Mistral-APIs
+const { MistralClient } = require('@mistralai/mistralai');
+
+class AIService {
+    constructor() {
+        this.voxtalClient = new MistralClient(process.env.MISTRAL_VOXTRAL_API_KEY);
+        this.largeClient = new MistralClient(process.env.MISTRAL_LARGE_API_KEY);
+    }
+
+    async transcribeAudio(audioBuffer) {
+        // Mistral Voxtral für Rohtranskription
+        const transcription = await this.voxtalClient.transcribe(audioBuffer);
+        return transcription;
+    }
+
+    async analyzeTranscription(transcription, context) {
+        // Dynamische Prompt-Generierung
+        const prompt = this.generatePrompt(transcription, context);
+        
+        // Mistral Large für Analyse
+        const analysis = await this.largeClient.analyze(prompt);
+        return analysis;
+    }
+
+    generatePrompt(transcription, context) {
+        // Dynamische Prompt-Erstellung basierend auf Kontext
+        if (context.type === 'meeting') {
+            return this.generateMeetingPrompt(transcription);
+        } else if (context.type === 'aufmass') {
+            return this.generateAufmassPrompt(transcription);
+        }
+    }
+}
+```
+
+## Beispiel-Prompts
+
+### Meeting-Analyse-Prompt
+```plaintext
+Analysiere das folgende Meeting-Transkript und passe die Ausgabe dynamisch an:
+
+1. Bei kurzen/unklaren Meetings:
+   - Kurzzusammenfassung (3-5 Sätze)
+   - Explizite To-Dos mit Priorität
+   - Hinweis auf fehlende Entscheidungen
+
+2. Bei langen/strukturierten Meetings:
+   - Ausführliche Zusammenfassung
+   - Thematische Gruppierung
+   - Priorisierte To-Dos mit Verantwortlichen und Deadlines
+   - Entscheidungsprotokoll
+   - Unklarheiten und Widersprüche markieren
+
+3. Immer:
+   - Prüfe auf zeitliche Widersprüche
+   - Markiere Unklarheiten mit "uncertain: true"
+   - Identifiziere die 3 wichtigsten Punkte
+
+Transkript: ${transcription}
+Kontext: ${context}
+```
+
+### Aufmaß-Analyse-Prompt
+```plaintext
+Analysiere die folgenden Aufmaß-Daten und strukturiere sie dynamisch:
+
+1. Bei einfachen Aufmaßen (1-2 Elemente):
+   - Flache Liste mit Messwerten
+   - Standard-Einheiten annehmen
+   - Einfache Notizen
+
+2. Bei komplexen Aufmaßen (mehrere Räume/Elemente):
+   - Hierarchische Struktur nach Räumen
+   - Gruppierung nach Elementtypen
+   - Warnungen für unrealistische Werte
+   - Einheiten-Normalisierung
+
+3. Immer:
+   - Plausibilitätsprüfung (z.B. Raumhöhe > 1.5m)
+   - Fehlende Einheiten → Standard annehmen + Hinweis
+   - Konsistenzprüfung zwischen Messwerten
+
+Daten: ${measurementData}
+Kontext: ${context}
+```
+
+## Deployment-Strategie
+
+### 1. Vorbereitung
+```bash
+# Auf dem VPS
+mkdir -p transkription/{frontend,backend}
+cd transkription
+```
+
+### 2. Erstes Deployment
+```bash
+# Kopieren der Projektdateien
+scp -r lokaler_pfad/transkription/* user@vps:transkription/
+
+# Container starten
+docker-compose up -d --build
+```
+
+### 3. Updates
+```bash
+# Nur geänderte Services neu starten
+docker-compose up -d --no-deps --build transkription-frontend
+```
+
+### 4. Rollback
+```bash
+# Bei Problemen: Zurück zum vorherigen Zustand
+git checkout stable-version
+docker-compose up -d --build
+```
+
+## Monitoring & Wartung
+
+### Health-Check-Endpoints
+- `/api/transkription/health` - Backend-Status
+- `/transkription/api/health` - Frontend-Status
+- `/api/transkription/ai/health` - AI-Service-Status
+
+### Logging
+- Integration in bestehende Log-Management-Systeme
+- Strukturierte Logs für einfache Analyse
+- Fehler-Tracking für AI-Analysen
+
+## Nächste Schritte
+
+1. **Umgebungsanalyse**:
+   - Bereitstellung der bestehenden Docker-Compose-Datei
+   - Klärung der Datenbank-Situation
+   - Festlegung der gewünschten Subdomain/Route
+
+2. **Technische Entscheidungen**:
+   - AI-Integration: Direkt im Backend oder separater Worker?
+   - Datenbank: Nutzung bestehender Instanz oder separate?
+   - Authentifizierung: Integration in bestehendes System oder separates?
+
+3. **Priorisierung**:
+   - Soll zuerst das Frontend, Backend oder die AI-Integration umgesetzt werden?
+   - Welche Funktionen haben höchste Priorität?
+
+4. **Zeitplan**:
+   - Festlegung von Meilensteinen
+   - Ressourcenplanung
+   - Testphase und Benutzer-Feedback
+
+Dieser aktualisierte Plan berücksichtigt die Integration in die bestehende Docker-Umgebung und enthält alle Erweiterungen für die dynamische Audio-Analyse mit Mistral Voxtral & Large. Die Implementierung erfolgt schrittweise mit minimalem Eingriff in das bestehende System.
 
 ## Beispielcode
 
