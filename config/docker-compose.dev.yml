@@ -2,9 +2,7 @@ version: '3.8'
 
 services:
   transkription-webapp:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: transkription-webapp
     container_name: transkription-webapp
     restart: unless-stopped
     networks:
@@ -15,9 +13,8 @@ services:
       - "traefik.http.routers.transkription.entrypoints=websecure"
       - "traefik.http.routers.transkription.tls.certresolver=letsencrypt"
       - "traefik.http.services.transkription.loadbalancer.server.port=3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
+    ports:
+      - "3000:3000"   
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=http://localhost:3000/api
