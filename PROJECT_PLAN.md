@@ -731,14 +731,172 @@ server {
 }
 ```
 
+## Dokumentation
+
+### 1. Umgebungsanalyse
+- **Status**: Abgeschlossen ✅
+- **Datei**: `docs/umgebungsanalyse.md`
+- **Inhalt**: Komplette Analyse der VPS-Umgebung mit Docker, Netzwerk, Datenbanken und Integrationsstrategie
+
+### 2. API-Spezifikation
+- **Status**: Initialentwurf ✅
+- **Datei**: `docs/api-specification.md`
+- **Inhalt**: Komplette API-Definition mit Endpunkten, Authentifizierung und Beispielen
+
+### 3. Projektplan
+- **Status**: Aktualisiert ✅
+- **Datei**: `PROJECT_PLAN.md`
+- **Inhalt**: Enthält nun Docker-Integration, AI-Analyse und Priorisierung
+
 ## Nächste Schritte
 
-1. **Projektinitialisierung**: Erstellen des Next.js-Projekts und Einrichtung der Docker-Dateien
-2. **Authentifizierung**: Implementierung der Benutzerauthentifizierung und API-Key-Verwaltung
-3. **Dateiupload**: Implementierung des Dateiuploads und der mobilen Integration
-4. **Template-Management**: Implementierung des Template-Editors und der Template-Auswahl
-5. **Transkription**: Integration der Mistral Voxtral API und Implementierung der Transkriptionslogik
-6. **Benutzeroberfläche**: Erstellen der UI-Komponenten und Optimierung für mobile Geräte
-7. **Deployment**: Einrichtung des VPS und Deployment der Anwendung
+### 1. Docker-Konfiguration (Hoch)
+- **Ziel**: Lokale Entwicklungsumgebung einrichten
+- **Aufgaben**:
+  - `config/docker-compose.dev.yml` erstellen
+  - `config/docker-compose.prod.yml` erstellen
+  - Dockerfiles für Frontend/Backend
+  - **Branch**: `chore/docker-setup`
 
-Sobald Sie bereit sind, können wir mit der Implementierung beginnen. Lassen Sie mich wissen, ob Sie Änderungen oder Ergänzungen an diesem Plan haben, oder ob wir direkt mit der Umsetzung starten sollen.
+### 2. Authentifizierung (Hoch)
+- **Ziel**: Benutzerverwaltung und API-Key-System
+- **Aufgaben**:
+  - NextAuth.js Konfiguration
+  - JWT-Authentifizierung
+  - API-Key-Management
+  - **Branch**: `feature/authentication`
+
+### 3. CI/CD-Pipeline (Mittel)
+- **Ziel**: Automatische Tests und Deployment
+- **Aufgaben**:
+  - GitHub Actions für Tests
+  - Docker-Build-Pipeline
+  - Deployment-Skript für VPS
+  - **Branch**: `chore/ci-cd-pipeline`
+
+### 4. Audio-Upload (Mittel)
+- **Ziel**: Dateiupload und Job-Queue
+- **Aufgaben**:
+  - Upload-Endpoint
+  - Dateivalidierung
+  - Job-Verwaltung
+  - **Branch**: `feature/audio-upload`
+
+### 5. AI-Integration (Mittel)
+- **Ziel**: Mistral-API-Anbindung
+- **Aufgaben**:
+  - Mistral Voxtral Integration
+  - Mistral Large Analyse
+  - Prompt-Management
+  - **Branch**: `feature/ai-integration`
+
+## Priorisierte Implementierungsreihenfolge
+
+1. **Docker-Setup** (1-2 Tage)
+   - Lokale Entwicklungsumgebung
+   - Produktionskonfiguration
+   - Test der Container
+
+2. **Authentifizierung** (3-5 Tage)
+   - Benutzerverwaltung
+   - API-Key-System
+   - Tests implementieren
+
+3. **CI/CD-Pipeline** (2 Tage)
+   - Test-Pipeline
+   - Build-Pipeline
+   - Deployment-Skript
+
+4. **Audio-Upload** (3 Tage)
+   - Upload-Endpoint
+   - Job-Queue
+   - Dateivalidierung
+
+5. **AI-Integration** (5 Tage)
+   - Mistral-API-Anbindung
+   - Analyse-Logik
+   - Template-System
+
+## Offene Entscheidungen
+
+1. **Datenbank-Strategie**
+   - [ ] Nutzung der Paperless-DB
+   - [ ] Separate Datenbank-Instanz
+
+2. **AI-Integration**
+   - [ ] Direkt im Backend
+   - [ ] Separater Container
+
+3. **Deployment-Strategie**
+   - [ ] Manuell
+   - [ ] Vollautomatisch
+
+## Zeitplan (Vorschlag)
+
+| Phase | Dauer | Meilenstein |
+|-------|-------|-------------|
+| 1. Setup | 1 Woche | Docker + CI/CD funktioniert |
+| 2. Auth | 2 Wochen | Benutzerverwaltung fertig |
+| 3. Upload | 1 Woche | Dateiupload funktioniert |
+| 4. AI | 2 Wochen | Transkription funktioniert |
+| 5. Testing | 1 Woche | Alle Tests erfolgreich |
+| 6. Deployment | 1 Tag | Auf VPS deployed |
+
+## Ressourcen
+
+### Team
+- **Helge**: Projektleitung, Backend
+- **Teammitglied**: Frontend, Tests
+
+### Tools
+- **GitHub**: Code, Issues, CI/CD
+- **Docker**: Containerisierung
+- **Traefik**: Reverse Proxy
+- **Mistral**: AI-APIs
+
+## Risiken
+
+1. **Speicherplatz**: VPS hat nur 6.7GB frei
+   - **Lösung**: Alte Docker-Objekte bereinigen
+
+2. **AI-API-Kosten**: Mistral-Nutzung
+   - **Lösung**: Rate-Limiting implementieren
+
+3. **Komplexität**: Dynamische Analyse
+   - **Lösung**: Iterative Entwicklung
+
+## Nächste konkrete Aktionen
+
+1. **Docker-Setup starten**
+   ```bash
+   git checkout chore/docker-setup
+   mkdir -p config
+   touch config/docker-compose.dev.yml
+   ```
+
+2. **Authentifizierung vorbereiten**
+   ```bash
+   git checkout feature/authentication
+   mkdir -p frontend/components/auth
+   ```
+
+3. **CI/CD einrichten**
+   ```bash
+   git checkout chore/ci-cd-pipeline
+   mkdir -p .github/workflows
+   ```
+
+## Entscheidungen
+
+Bitte treffe folgende Entscheidungen:
+1. Datenbank-Strategie (Paperless-DB oder separate?)
+2. AI-Integration (direkt oder separater Container?)
+3. Deployment-Strategie (manuell oder automatisch?)
+
+Nach diesen Entscheidungen können wir mit der Implementierung beginnen.
+
+---
+
+**Letzte Aktualisierung**: 05.02.2026
+**Verantwortlich**: Helge Roos
+**Status**: Dokumentation abgeschlossen, Implementierung vorbereitet
