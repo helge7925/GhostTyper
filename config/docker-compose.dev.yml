@@ -2,6 +2,9 @@ version: '3.8'
 
 services:
   transkription-webapp:
+    build:
+      context: ..
+      dockerfile: Dockerfile
     image: transkription-webapp
     container_name: transkription-webapp
     restart: unless-stopped
@@ -14,22 +17,24 @@ services:
       - "traefik.http.routers.transkription.tls.certresolver=letsencrypt"
       - "traefik.http.services.transkription.loadbalancer.server.port=3000"
     ports:
-      - "3000:3000"   
+      - "3000:3000"
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:3000/api
-      - DATABASE_URL=postgresql://postgres:postgres@paperless-db:5432/transkription
+      - NEXT_PUBLIC_API_URL=/api
+      - DATABASE_URL=postgresql://postgres:postgres@transkription-db:5432/transkription
+      - NEXTAUTH_SECRET=change-me-in-production
+      - NEXTAUTH_URL=http://localhost:3000
     depends_on:
-      - paperless-db
+      - transkription-db
 
-  paperless-db:
+  transkription-db:
     image: postgres:13
-    container_name: paperless-db
+    container_name: transkription-db
     restart: unless-stopped
     networks:
       - web
     volumes:
-      - paperless-db-data:/var/lib/postgresql/data
+      - transkription-db-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -45,4 +50,4 @@ networks:
     external: true
 
 volumes:
-  paperless-db-data:
+  transkription-db-data:
