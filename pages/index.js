@@ -1,45 +1,59 @@
-import Head from 'next/head'
-import styles from '../styles/Home.module.css'
+import Head from 'next/head';
+import Link from 'next/link';
 
 export default function Home() {
   return (
-    <div className={styles.container}>
+    <>
       <Head>
         <title>Transkription WebApp</title>
-        <meta name="description" content="Transkriptions-WebApp mit dynamischer Audio-Analyse" />
-        <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main className={styles.main}>
-        <h1 className={styles.title}>
+      <div className="flex flex-col items-center text-center py-12">
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">
           Willkommen bei der Transkription WebApp
         </h1>
-
-        <p className={styles.description}>
+        <p className="text-lg text-gray-600 mb-12 max-w-xl">
           Eine moderne Webanwendung für Audio-Transkription und Analyse
         </p>
 
-        <div className={styles.grid}>
-          <a href="/upload" className={styles.card}>
-            <h2>Audio hochladen &rarr;</h2>
-            <p>Laden Sie Audio-Dateien für die Transkription hoch.</p>
-          </a>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-3xl">
+          <Link
+            href="/upload"
+            className="border border-gray-200 rounded-lg p-6 text-left hover:border-blue-500 hover:shadow-md transition-all"
+          >
+            <h2 className="text-xl font-semibold mb-2">
+              Audio hochladen &rarr;
+            </h2>
+            <p className="text-gray-600">
+              Laden Sie Audio-Dateien für die Transkription hoch.
+            </p>
+          </Link>
 
-          <a href="/transcriptions" className={styles.card}>
-            <h2>Transkriptionen &rarr;</h2>
-            <p>Verwalten Sie Ihre Transkriptionen und Analysen.</p>
-          </a>
+          <Link
+            href="/transcriptions"
+            className="border border-gray-200 rounded-lg p-6 text-left hover:border-blue-500 hover:shadow-md transition-all"
+          >
+            <h2 className="text-xl font-semibold mb-2">
+              Transkriptionen &rarr;
+            </h2>
+            <p className="text-gray-600">
+              Verwalten Sie Ihre Transkriptionen und Analysen.
+            </p>
+          </Link>
 
-          <a href="/settings" className={styles.card}>
-            <h2>Einstellungen &rarr;</h2>
-            <p>Konfigurieren Sie Ihre Benutzereinstellungen.</p>
-          </a>
+          <Link
+            href="/settings"
+            className="border border-gray-200 rounded-lg p-6 text-left hover:border-blue-500 hover:shadow-md transition-all"
+          >
+            <h2 className="text-xl font-semibold mb-2">
+              Einstellungen &rarr;
+            </h2>
+            <p className="text-gray-600">
+              Konfigurieren Sie Ihre Benutzereinstellungen.
+            </p>
+          </Link>
         </div>
-      </main>
-
-      <footer className={styles.footer}>
-        <p>© {new Date().getFullYear()} Transkription WebApp</p>
-      </footer>
-    </div>
-  )
+      </div>
+    </>
+  );
 }
