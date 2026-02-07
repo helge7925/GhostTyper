@@ -4,6 +4,7 @@ import { uploadAudio } from '../lib/api';
 
 export default function AudioUploadForm({ onSuccess }) {
   const [file, setFile] = useState(null);
+  const [template, setTemplate] = useState('meeting');
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -38,21 +39,6 @@ export default function AudioUploadForm({ onSuccess }) {
     }
   }
 
-  function handleDragOver(e) {
-    e.preventDefault();
-    setDragActive(true);
-  }
-
-  function handleDragLeave() {
-    setDragActive(false);
-  }
-
-  function handleChange(e) {
-    if (e.target.files?.[0]) {
-      handleFile(e.target.files[0]);
-    }
-  }
-
   async function handleSubmit(e) {
     e.preventDefault();
     if (!file) return;
@@ -62,12 +48,11 @@ export default function AudioUploadForm({ onSuccess }) {
     setProgress(0);
 
     try {
-      // Simulate progress since fetch doesn't support progress natively
       const progressInterval = setInterval(() => {
         setProgress((prev) => Math.min(prev + 10, 90));
       }, 200);
 
-      const result = await uploadAudio(file);
+      const result = await uploadAudio(file, template);
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -81,16 +66,16 @@ export default function AudioUploadForm({ onSuccess }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div
         onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
+        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+        onDragLeave={() => setDragActive(false)}
         onClick={() => inputRef.current?.click()}
         className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
           dragActive
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-300 hover:border-gray-400'
+            ? 'border-google-blue bg-blue-50'
+            : 'border-google-gray-300 hover:border-google-gray-400'
         }`}
       >
         <input
@@ -98,39 +83,55 @@ export default function AudioUploadForm({ onSuccess }) {
           type="file"
           accept="audio/*"
           capture="environment"
-          onChange={handleChange}
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
           className="hidden"
         />
         {file ? (
-          <p className="text-gray-700">
+          <p className="text-sm text-google-gray-700">
             <span className="font-medium">{file.name}</span>{' '}
-            <span className="text-gray-500">
+            <span className="text-google-gray-500">
               ({(file.size / 1024 / 1024).toFixed(1)} MB)
             </span>
           </p>
         ) : (
           <div>
-            <svg className="mx-auto w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="mx-auto w-10 h-10 text-google-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <p className="text-gray-600">
-              Audio-Datei hierher ziehen oder <span className="text-blue-600 font-medium">durchsuchen</span>
+            <p className="text-sm text-google-gray-600">
+              Audio-Datei hierher ziehen oder <span className="text-google-blue font-medium">durchsuchen</span>
             </p>
-            <p className="text-sm text-gray-400 mt-1">MP3, WAV, OGG, FLAC, M4A (max. 50 MB)</p>
+            <p className="text-xs text-google-gray-400 mt-1">MP3, WAV, OGG, FLAC, M4A (max. 50 MB)</p>
           </div>
         )}
       </div>
 
+      <div>
+        <label htmlFor="upload-template" className="block text-sm font-medium text-google-gray-700 mb-1.5">
+          Analyse-Template
+        </label>
+        <select
+          id="upload-template"
+          value={template}
+          onChange={(e) => setTemplate(e.target.value)}
+          className="w-full border border-google-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-google-blue focus:border-google-blue outline-none bg-white"
+        >
+          <option value="meeting">Meeting-Protokoll</option>
+          <option value="aufmass">Aufmaß</option>
+          <option value="generic">Allgemein</option>
+        </select>
+      </div>
+
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+        <div className="bg-red-50 border border-red-200 text-google-red px-4 py-3 rounded-lg text-sm">
           {error}
         </div>
       )}
 
       {uploading && (
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="w-full bg-google-gray-200 rounded-full h-1.5">
           <div
-            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            className="bg-google-blue h-1.5 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -139,9 +140,9 @@ export default function AudioUploadForm({ onSuccess }) {
       <button
         type="submit"
         disabled={!file || uploading}
-        className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+        className="w-full bg-google-blue text-white py-2.5 rounded-full text-sm font-medium hover:bg-google-blue-hover disabled:bg-google-gray-300 disabled:cursor-not-allowed transition-colors"
       >
-        {uploading ? 'Wird hochgeladen...' : 'Hochladen'}
+        {uploading ? 'Wird hochgeladen...' : 'Hochladen und transkribieren'}
       </button>
     </form>
   );

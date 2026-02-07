@@ -1,121 +1,219 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 import { useState, useEffect } from 'react';
 import StatusBadge from '../../components/StatusBadge';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import { getTranscription } from '../../lib/api';
+import { getTranscription, deleteTranscription } from '../../lib/api';
 import { STATUS } from '../../lib/constants';
-
-const MOCK_DETAIL = {
-  '1': {
-    id: '1',
-    filename: 'interview_2024.mp3',
-    status: STATUS.COMPLETED,
-    createdAt: '2024-01-15T10:30:00Z',
-    text: 'Dies ist ein Beispiel-Transkriptionstext. In einem echten Szenario würde hier der vollständige transkribierte Text der Audio-Datei stehen. Der Text kann mehrere Absätze umfassen und verschiedene Sprecher enthalten.',
-    analysis: 'Zusammenfassung: Das Interview behandelt die Themen Digitalisierung und Künstliche Intelligenz im Arbeitsalltag. Hauptthemen: Automatisierung, Effizienzsteigerung, Datenschutz.',
-  },
-  '2': {
-    id: '2',
-    filename: 'meeting_notes.wav',
-    status: STATUS.PROCESSING,
-    createdAt: '2024-01-16T14:00:00Z',
-    text: null,
-    analysis: null,
-  },
-  '3': {
-    id: '3',
-    filename: 'podcast_episode.ogg',
-    status: STATUS.PENDING,
-    createdAt: '2024-01-17T09:15:00Z',
-    text: null,
-    analysis: null,
-  },
-};
 
 export default function TranscriptionDetail() {
   const router = useRouter();
   const { id } = router.query;
+  const { data: session, status: authStatus } = useSession();
   const [transcription, setTranscription] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
+    if (authStatus === 'unauthenticated') {
+      router.push('/login');
+      return;
+    }
+    if (!id || authStatus !== 'authenticated') return;
+
     getTranscription(id)
       .then(setTranscription)
-      .catch(() => setTranscription(MOCK_DETAIL[id] || null))
+      .catch(() => setTranscription(null))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, authStatus, router]);
 
-  if (loading) return <LoadingSpinner />;
+  // Poll for updates if processing
+  useEffect(() => {
+    if (!transcription || transcription.status !== STATUS.PROCESSING) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const updated = await getTranscription(id);
+        setTranscription(updated);
+        if (updated.status !== STATUS.PROCESSING) {
+          clearInterval(interval);
+        }
+      } catch {}
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [transcription?.status, id]);
+
+  async function handleDelete() {
+    if (!confirm('Transkription wirklich löschen?')) return;
+    setDeleting(true);
+    try {
+      await deleteTranscription(id);
+      router.push('/transcriptions');
+    } catch {
+      setDeleting(false);
+    }
+  }
+
+  if (authStatus === 'loading' || loading) return <LoadingSpinner />;
 
   if (!transcription) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500 text-lg">Transkription nicht gefunden.</p>
-        <Link href="/transcriptions" className="text-blue-600 hover:underline mt-4 inline-block">
+      <div className="bg-white rounded-lg shadow-card p-12 text-center">
+        <p className="text-google-gray-700 font-medium mb-2">Transkription nicht gefunden</p>
+        <Link href="/transcriptions" className="text-google-blue text-sm font-medium hover:underline">
           Zurück zur Übersicht
         </Link>
       </div>
     );
   }
 
+  const analysis = transcription.analysis;
+
   return (
     <>
       <Head>
-        <title>{transcription.filename} - Transkription WebApp</title>
+        <title>{transcription.original_name} - Transkription</title>
       </Head>
 
-      <Link href="/transcriptions" className="text-blue-600 hover:underline text-sm mb-4 inline-block">
-        &larr; Zurück zur Übersicht
+      <Link href="/transcriptions" className="text-google-blue text-sm font-medium hover:underline inline-flex items-center gap-1 mb-6">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Zurück
       </Link>
 
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {transcription.filename}
-          </h1>
-          <StatusBadge status={transcription.status} />
+      <div className="bg-white rounded-lg shadow-card p-6 mb-4">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h1 className="text-xl font-semibold text-google-gray-900">
+              {transcription.original_name}
+            </h1>
+            <p className="text-sm text-google-gray-500 mt-1">
+              {new Date(transcription.created_at).toLocaleDateString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+              {transcription.template && (
+                <span className="ml-2 text-google-gray-400">
+                  Template: {transcription.template}
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <StatusBadge status={transcription.status} />
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="text-sm text-google-gray-500 hover:text-google-red transition-colors"
+            >
+              Löschen
+            </button>
+          </div>
         </div>
 
-        <p className="text-sm text-gray-500">
-          Erstellt am{' '}
-          {new Date(transcription.createdAt).toLocaleDateString('de-DE', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </p>
+        {transcription.status === STATUS.PROCESSING && (
+          <div className="flex items-center gap-3 bg-blue-50 rounded-lg p-4 text-sm text-google-blue">
+            <div className="w-5 h-5 border-2 border-google-blue border-t-transparent rounded-full animate-spin" />
+            Transkription wird verarbeitet...
+          </div>
+        )}
 
-        <section>
-          <h2 className="text-lg font-semibold text-gray-800 mb-2">Transkription</h2>
-          {transcription.text ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-4 whitespace-pre-wrap text-gray-700">
-              {transcription.text}
-            </div>
-          ) : (
-            <p className="text-gray-400 italic">
-              {transcription.status === STATUS.PROCESSING
-                ? 'Transkription wird verarbeitet...'
-                : 'Noch keine Transkription verfügbar.'}
-            </p>
-          )}
-        </section>
-
-        <section>
-          <h2 className="text-lg font-semibold text-gray-800 mb-2">Analyse</h2>
-          {transcription.analysis ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-4 text-gray-700">
-              {transcription.analysis}
-            </div>
-          ) : (
-            <p className="text-gray-400 italic">Noch keine Analyse verfügbar.</p>
-          )}
-        </section>
+        {transcription.status === STATUS.ERROR && (
+          <div className="bg-red-50 rounded-lg p-4 text-sm text-google-red">
+            Fehler: {transcription.error || 'Unbekannter Fehler'}
+          </div>
+        )}
       </div>
+
+      {transcription.text && (
+        <div className="bg-white rounded-lg shadow-card p-6 mb-4">
+          <h2 className="text-base font-medium text-google-gray-900 mb-3">Transkription</h2>
+          <div className="whitespace-pre-wrap text-sm text-google-gray-700 leading-relaxed">
+            {transcription.text}
+          </div>
+        </div>
+      )}
+
+      {analysis && typeof analysis === 'object' && (
+        <div className="bg-white rounded-lg shadow-card p-6">
+          <h2 className="text-base font-medium text-google-gray-900 mb-3">Analyse</h2>
+
+          {analysis.zusammenfassung && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-google-gray-700 mb-1">Zusammenfassung</h3>
+              <p className="text-sm text-google-gray-600">{analysis.zusammenfassung}</p>
+            </div>
+          )}
+
+          {analysis.todos && analysis.todos.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-google-gray-700 mb-2">To-Dos</h3>
+              <div className="space-y-2">
+                {analysis.todos.map((todo, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm">
+                    <span className={`inline-block mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
+                      todo.prioritaet === 'hoch' ? 'bg-google-red' :
+                      todo.prioritaet === 'mittel' ? 'bg-google-yellow' : 'bg-google-green'
+                    }`} />
+                    <div>
+                      <span className="text-google-gray-800">{todo.aufgabe}</span>
+                      {todo.verantwortlich && todo.verantwortlich !== 'unbekannt' && (
+                        <span className="text-google-gray-500 ml-1">({todo.verantwortlich})</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {analysis.entscheidungen && analysis.entscheidungen.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-google-gray-700 mb-2">Entscheidungen</h3>
+              <ul className="list-disc list-inside text-sm text-google-gray-600 space-y-1">
+                {analysis.entscheidungen.map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {analysis.raeume && analysis.raeume.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-google-gray-700 mb-2">Räume</h3>
+              {analysis.raeume.map((raum, i) => (
+                <div key={i} className="mb-3">
+                  <p className="text-sm font-medium text-google-gray-800">{raum.name}</p>
+                  {raum.elemente?.map((el, j) => (
+                    <p key={j} className="text-sm text-google-gray-600 ml-4">
+                      {el.typ}: {el.masse?.breite}x{el.masse?.hoehe}m
+                      {el.anzahl > 1 && ` (${el.anzahl}x)`}
+                    </p>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {analysis.warnungen && analysis.warnungen.length > 0 && (
+            <div className="bg-yellow-50 rounded-lg p-3">
+              <h3 className="text-sm font-medium text-yellow-800 mb-1">Warnungen</h3>
+              <ul className="text-sm text-yellow-700 space-y-1">
+                {analysis.warnungen.map((w, i) => <li key={i}>{w}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {analysis.raw && (
+            <pre className="text-sm text-google-gray-600 whitespace-pre-wrap">{analysis.raw}</pre>
+          )}
+        </div>
+      )}
     </>
   );
 }

@@ -1,33 +1,78 @@
 import Head from 'next/head';
+import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 import { useState } from 'react';
 import AudioUploadForm from '../components/AudioUploadForm';
 
 export default function Upload() {
-  const [success, setSuccess] = useState(null);
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [result, setResult] = useState(null);
 
-  function handleSuccess(result) {
-    setSuccess('Audio-Datei wurde erfolgreich hochgeladen!');
-    setTimeout(() => setSuccess(null), 5000);
+  if (status === 'loading') return null;
+  if (!session) {
+    router.push('/login');
+    return null;
+  }
+
+  async function handleSuccess(uploadResult) {
+    setResult(uploadResult);
+
+    // Trigger transcription processing
+    try {
+      await fetch(`/api/transcriptions/${uploadResult.id}/process`, {
+        method: 'POST',
+      });
+    } catch {
+      // Processing started in background
+    }
   }
 
   return (
     <>
       <Head>
-        <title>Audio hochladen - Transkription WebApp</title>
+        <title>Hochladen - Transkription</title>
       </Head>
 
       <div className="max-w-xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">
+        <h1 className="text-2xl font-semibold text-google-gray-900 mb-2">
           Audio hochladen
         </h1>
+        <p className="text-sm text-google-gray-600 mb-6">
+          Laden Sie eine Audiodatei hoch. Die Transkription und Analyse startet automatisch.
+        </p>
 
-        {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm mb-4">
-            {success}
+        {result ? (
+          <div className="bg-white rounded-lg shadow-card p-6 text-center">
+            <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-google-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-medium text-google-gray-900 mb-1">Hochgeladen</h2>
+            <p className="text-sm text-google-gray-600 mb-4">
+              {result.original_name} wird jetzt transkribiert.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => router.push(`/transcriptions/${result.id}`)}
+                className="bg-google-blue text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-google-blue-hover transition-colors"
+              >
+                Zur Transkription
+              </button>
+              <button
+                onClick={() => setResult(null)}
+                className="border border-google-gray-300 text-google-gray-700 px-5 py-2 rounded-full text-sm font-medium hover:bg-google-gray-50 transition-colors"
+              >
+                Weitere hochladen
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow-card p-6">
+            <AudioUploadForm onSuccess={handleSuccess} />
           </div>
         )}
-
-        <AudioUploadForm onSuccess={handleSuccess} />
       </div>
     </>
   );
