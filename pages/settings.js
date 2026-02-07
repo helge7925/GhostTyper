@@ -10,6 +10,7 @@ export default function Settings() {
   const [apiKey, setApiKey] = useState('');
   const [defaultTemplate, setDefaultTemplate] = useState('meeting');
   const [language, setLanguage] = useState('de');
+  const [contextBias, setContextBias] = useState('');
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -27,6 +28,7 @@ export default function Settings() {
         setApiKeyConfigured(data.apiKeyConfigured);
         setDefaultTemplate(data.defaultTemplate || 'meeting');
         setLanguage(data.language || 'de');
+        setContextBias(data.contextBias || '');
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -42,6 +44,7 @@ export default function Settings() {
         mistralApiKey: apiKey || undefined,
         defaultTemplate,
         language,
+        contextBias,
       });
       setSaved(true);
       if (apiKey) {
@@ -134,6 +137,28 @@ export default function Settings() {
               <option value="de">Deutsch</option>
               <option value="en">Englisch</option>
             </select>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-card p-6">
+          <h2 className="text-base font-medium text-google-gray-900 mb-4">Kontextwörter</h2>
+
+          <div>
+            <label htmlFor="contextBias" className="block text-sm font-medium text-google-gray-700 mb-1.5">
+              Begriffe für bessere Erkennung
+            </label>
+            <textarea
+              id="contextBias"
+              value={contextBias}
+              onChange={(e) => setContextBias(e.target.value)}
+              placeholder="z.B. Fachbegriffe, Namen, Firmennamen (kommagetrennt)"
+              rows={3}
+              className="w-full border border-google-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-google-blue focus:border-google-blue outline-none resize-none"
+            />
+            <p className="text-xs text-google-gray-500 mt-1.5">
+              Kommagetrennte Liste von Wörtern, die bei der Transkription bevorzugt erkannt werden sollen.
+              Hilfreich für Fachbegriffe, Eigennamen oder Abkürzungen.
+            </p>
           </div>
         </div>
 

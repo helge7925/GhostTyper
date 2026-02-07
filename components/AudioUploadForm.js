@@ -5,6 +5,8 @@ import { uploadAudio } from '../lib/api';
 export default function AudioUploadForm({ onSuccess }) {
   const [file, setFile] = useState(null);
   const [template, setTemplate] = useState('meeting');
+  const [diarize, setDiarize] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -52,7 +54,7 @@ export default function AudioUploadForm({ onSuccess }) {
         setProgress((prev) => Math.min(prev + 10, 90));
       }, 200);
 
-      const result = await uploadAudio(file, template);
+      const result = await uploadAudio(file, { template, diarize, customPrompt });
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -120,6 +122,36 @@ export default function AudioUploadForm({ onSuccess }) {
           <option value="aufmass">Aufmaß</option>
           <option value="generic">Allgemein</option>
         </select>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <input
+          id="upload-diarize"
+          type="checkbox"
+          checked={diarize}
+          onChange={(e) => setDiarize(e.target.checked)}
+          className="w-4 h-4 text-google-blue border-google-gray-300 rounded focus:ring-google-blue"
+        />
+        <label htmlFor="upload-diarize" className="text-sm text-google-gray-700">
+          Sprechererkennung aktivieren
+          <span className="block text-xs text-google-gray-500">
+            Erkennt verschiedene Sprecher und ermöglicht Namenszuweisung vor der Analyse
+          </span>
+        </label>
+      </div>
+
+      <div>
+        <label htmlFor="upload-prompt" className="block text-sm font-medium text-google-gray-700 mb-1.5">
+          Zusätzlicher Kontext <span className="font-normal text-google-gray-400">(optional)</span>
+        </label>
+        <textarea
+          id="upload-prompt"
+          value={customPrompt}
+          onChange={(e) => setCustomPrompt(e.target.value)}
+          placeholder="z.B. Teilnehmer, Projektname, besondere Hinweise für die Analyse..."
+          rows={3}
+          className="w-full border border-google-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-google-blue focus:border-google-blue outline-none resize-none"
+        />
       </div>
 
       {error && (
