@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  transkription-webapp:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: transkription-webapp
+    container_name: transkription-webapp
+    restart: unless-stopped
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.transkription.rule=Host(`transkription.helgeroos.de`)"
+      - "traefik.http.routers.transkription.entrypoints=websecure"
+      - "traefik.http.routers.transkription.tls.certresolver=letsencrypt"
+      - "traefik.http.services.transkription.loadbalancer.server.port=3000"
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=/api
+      - DATABASE_URL=postgresql://postgres:postgres@transkription-db:5432/transkription
+      - NEXTAUTH_SECRET=change-me-in-production
+      - NEXTAUTH_URL=http://localhost:3000
+    depends_on:
+      - transkription-db
+
+  transkription-db:
+    image: postgres:13
+    container_name: transkription-db
+    restart: unless-stopped
+    networks:
+      - web
+    volumes:
+      - transkription-db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=transkription
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+networks:
+  web:
+    external: true
+
+volumes:
+  transkription-db-data:
