@@ -1,0 +1,27 @@
+{
+  "name": "transkription-webapp",
+  "version": "1.0.0",
+  "description": "Transkriptions-WebApp mit dynamischer Audio-Analyse",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^13.4.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "next-auth": "^4.22.1",
+    "pg": "^8.11.0",
+    "axios": "^1.4.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.14",
+    "eslint": "^8.40.0",
+    "eslint-config-next": "^13.4.0",
+    "postcss": "^8.4.24",
+    "tailwindcss": "^3.3.2"
+  }
+}
