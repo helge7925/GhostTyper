@@ -1,35 +1,24 @@
-export default function handler(req, res) {
-  switch (req.method) {
-    case 'GET':
-      // Stub: return mock transcription list
-      return res.status(200).json([
-        {
-          id: '1',
-          filename: 'interview_2024.mp3',
-          status: 'completed',
-          createdAt: '2024-01-15T10:30:00Z',
-        },
-        {
-          id: '2',
-          filename: 'meeting_notes.wav',
-          status: 'processing',
-          createdAt: '2024-01-16T14:00:00Z',
-        },
-        {
-          id: '3',
-          filename: 'podcast_episode.ogg',
-          status: 'pending',
-          createdAt: '2024-01-17T09:15:00Z',
-        },
-      ]);
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../auth/[...nextauth]';
+import { query } from '../../../lib/db';
 
-    case 'POST':
-      // Stub: create transcription
-      return res.status(201).json({
-        id: 'stub-' + Date.now(),
-        message: 'Transcription created (stub)',
-        status: 'pending',
-      });
+export default async function handler(req, res) {
+  const session = await getServerSession(req, res, authOptions);
+  if (!session) {
+    return res.status(401).json({ message: 'Nicht authentifiziert' });
+  }
+
+  switch (req.method) {
+    case 'GET': {
+      const result = await query(
+        `SELECT id, original_name, status, template, created_at, updated_at
+         FROM transcriptions
+         WHERE user_id = $1
+         ORDER BY created_at DESC`,
+        [session.user.id]
+      );
+      return res.status(200).json(result.rows);
+    }
 
     default:
       return res.status(405).json({ message: 'Method not allowed' });
