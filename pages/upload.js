@@ -52,6 +52,7 @@ export default function Upload() {
             <h2 className="text-lg font-medium text-google-gray-900 mb-1">Hochgeladen</h2>
             <p className="text-sm text-google-gray-600 mb-4">
               {result.original_name} wird jetzt transkribiert.
+              {result.diarize && ' Nach der Transkription können Sie Sprechernamen zuweisen.'}
             </p>
             <div className="flex gap-3 justify-center">
               <button

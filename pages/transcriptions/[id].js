@@ -2,10 +2,10 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import StatusBadge from '../../components/StatusBadge';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import { getTranscription, deleteTranscription } from '../../lib/api';
+import { getTranscription, deleteTranscription, updateSpeakers, startAnalysis } from '../../lib/api';
 import { STATUS } from '../../lib/constants';
 
 export default function TranscriptionDetail() {
@@ -15,6 +15,9 @@ export default function TranscriptionDetail() {
   const [transcription, setTranscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [speakerNames, setSpeakerNames] = useState({});
+  const [savingSpeakers, setSavingSpeakers] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
@@ -24,20 +27,26 @@ export default function TranscriptionDetail() {
     if (!id || authStatus !== 'authenticated') return;
 
     getTranscription(id)
-      .then(setTranscription)
+      .then((data) => {
+        setTranscription(data);
+        if (data.speakers) setSpeakerNames(data.speakers);
+      })
       .catch(() => setTranscription(null))
       .finally(() => setLoading(false));
   }, [id, authStatus, router]);
 
-  // Poll for updates if processing
+  // Poll for updates if processing or analyzing
   useEffect(() => {
-    if (!transcription || transcription.status !== STATUS.PROCESSING) return;
+    if (!transcription) return;
+    const pollingStatuses = [STATUS.PROCESSING, STATUS.ANALYZING];
+    if (!pollingStatuses.includes(transcription.status)) return;
 
     const interval = setInterval(async () => {
       try {
         const updated = await getTranscription(id);
         setTranscription(updated);
-        if (updated.status !== STATUS.PROCESSING) {
+        if (updated.speakers) setSpeakerNames(updated.speakers);
+        if (!pollingStatuses.includes(updated.status)) {
           clearInterval(interval);
         }
       } catch {}
@@ -45,6 +54,13 @@ export default function TranscriptionDetail() {
 
     return () => clearInterval(interval);
   }, [transcription?.status, id]);
+
+  // Extract unique speaker IDs from segments
+  const speakerIds = useMemo(() => {
+    if (!transcription?.segments) return [];
+    const ids = new Set(transcription.segments.map(s => s.speaker_id).filter(Boolean));
+    return [...ids];
+  }, [transcription?.segments]);
 
   async function handleDelete() {
     if (!confirm('Transkription wirklich löschen?')) return;
@@ -54,6 +70,28 @@ export default function TranscriptionDetail() {
       router.push('/transcriptions');
     } catch {
       setDeleting(false);
+    }
+  }
+
+  async function handleSaveSpeakers() {
+    setSavingSpeakers(true);
+    try {
+      await updateSpeakers(id, speakerNames);
+    } catch {
+      // handled silently
+    } finally {
+      setSavingSpeakers(false);
+    }
+  }
+
+  async function handleStartAnalysis() {
+    setAnalyzing(true);
+    try {
+      await updateSpeakers(id, speakerNames);
+      await startAnalysis(id);
+      setTranscription((prev) => ({ ...prev, status: STATUS.ANALYZING }));
+    } catch {
+      setAnalyzing(false);
     }
   }
 
@@ -104,6 +142,11 @@ export default function TranscriptionDetail() {
                   Template: {transcription.template}
                 </span>
               )}
+              {transcription.diarize && (
+                <span className="ml-2 text-google-gray-400">
+                  Sprechererkennung
+                </span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -125,12 +168,63 @@ export default function TranscriptionDetail() {
           </div>
         )}
 
+        {transcription.status === STATUS.ANALYZING && (
+          <div className="flex items-center gap-3 bg-blue-50 rounded-lg p-4 text-sm text-google-blue">
+            <div className="w-5 h-5 border-2 border-google-blue border-t-transparent rounded-full animate-spin" />
+            Analyse läuft...
+          </div>
+        )}
+
         {transcription.status === STATUS.ERROR && (
           <div className="bg-red-50 rounded-lg p-4 text-sm text-google-red">
             Fehler: {transcription.error || 'Unbekannter Fehler'}
           </div>
         )}
       </div>
+
+      {/* Speaker assignment UI — shown when status is 'transcribed' */}
+      {transcription.status === STATUS.TRANSCRIBED && speakerIds.length > 0 && (
+        <div className="bg-white rounded-lg shadow-card p-6 mb-4">
+          <h2 className="text-base font-medium text-google-gray-900 mb-1">Sprecher zuweisen</h2>
+          <p className="text-sm text-google-gray-500 mb-4">
+            Weisen Sie den erkannten Sprechern Namen zu, bevor die Analyse gestartet wird.
+          </p>
+
+          <div className="space-y-3 mb-5">
+            {speakerIds.map((speakerId) => (
+              <div key={speakerId} className="flex items-center gap-3">
+                <span className="text-sm text-google-gray-500 w-24 flex-shrink-0">{speakerId}</span>
+                <input
+                  type="text"
+                  value={speakerNames[speakerId] || ''}
+                  onChange={(e) =>
+                    setSpeakerNames((prev) => ({ ...prev, [speakerId]: e.target.value }))
+                  }
+                  placeholder="Name eingeben"
+                  className="flex-1 border border-google-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-google-blue focus:border-google-blue outline-none"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleSaveSpeakers}
+              disabled={savingSpeakers}
+              className="border border-google-gray-300 text-google-gray-700 px-5 py-2 rounded-full text-sm font-medium hover:bg-google-gray-50 transition-colors disabled:opacity-50"
+            >
+              {savingSpeakers ? 'Wird gespeichert...' : 'Namen speichern'}
+            </button>
+            <button
+              onClick={handleStartAnalysis}
+              disabled={analyzing}
+              className="bg-google-blue text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-google-blue-hover transition-colors disabled:opacity-50"
+            >
+              {analyzing ? 'Analyse startet...' : 'Analyse starten'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {transcription.text && (
         <div className="bg-white rounded-lg shadow-card p-6 mb-4">
