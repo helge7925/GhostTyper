@@ -12,6 +12,9 @@ out
 # Docker (volumes, data)
 docker-data/
 
+# Uploads
+uploads/
+
 # IDE
 .idea
 .vscode
