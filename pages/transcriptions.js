@@ -1,62 +1,72 @@
 import Head from 'next/head';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 import { useState, useEffect } from 'react';
 import TranscriptionCard from '../components/TranscriptionCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { getTranscriptions } from '../lib/api';
-import { STATUS } from '../lib/constants';
-
-const MOCK_DATA = [
-  {
-    id: '1',
-    filename: 'interview_2024.mp3',
-    status: STATUS.COMPLETED,
-    createdAt: '2024-01-15T10:30:00Z',
-  },
-  {
-    id: '2',
-    filename: 'meeting_notes.wav',
-    status: STATUS.PROCESSING,
-    createdAt: '2024-01-16T14:00:00Z',
-  },
-  {
-    id: '3',
-    filename: 'podcast_episode.ogg',
-    status: STATUS.PENDING,
-    createdAt: '2024-01-17T09:15:00Z',
-  },
-];
 
 export default function Transcriptions() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [transcriptions, setTranscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+      return;
+    }
+    if (status !== 'authenticated') return;
+
     getTranscriptions()
       .then(setTranscriptions)
-      .catch(() => setTranscriptions(MOCK_DATA))
+      .catch(() => setTranscriptions([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [status, router]);
+
+  if (status === 'loading' || (status === 'unauthenticated')) return null;
 
   return (
     <>
       <Head>
-        <title>Transkriptionen - Transkription WebApp</title>
+        <title>Transkriptionen - Transkription</title>
       </Head>
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">
-        Transkriptionen
-      </h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-semibold text-google-gray-900">
+          Transkriptionen
+        </h1>
+        <Link
+          href="/upload"
+          className="bg-google-blue text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-google-blue-hover transition-colors"
+        >
+          Neue Transkription
+        </Link>
+      </div>
 
       {loading ? (
         <LoadingSpinner />
       ) : transcriptions.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">
-            Noch keine Transkriptionen vorhanden.
+        <div className="bg-white rounded-lg shadow-card p-12 text-center">
+          <div className="w-16 h-16 bg-google-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-google-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <p className="text-google-gray-700 font-medium mb-1">
+            Noch keine Transkriptionen
           </p>
-          <p className="text-gray-400 mt-2">
-            Laden Sie eine Audio-Datei hoch, um zu beginnen.
+          <p className="text-sm text-google-gray-500 mb-4">
+            Laden Sie eine Audiodatei hoch, um zu beginnen.
           </p>
+          <Link
+            href="/upload"
+            className="inline-block bg-google-blue text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-google-blue-hover transition-colors"
+          >
+            Audio hochladen
+          </Link>
         </div>
       ) : (
         <div className="space-y-3">
