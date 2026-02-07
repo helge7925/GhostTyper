@@ -64,12 +64,14 @@ export default async function handler(req, res) {
     await rename(file.filepath, filePath);
 
     const template = fields.template?.[0] || fields.template || 'meeting';
+    const diarize = (fields.diarize?.[0] || fields.diarize) === 'true';
+    const customPrompt = fields.customPrompt?.[0] || fields.customPrompt || null;
 
     const result = await query(
-      `INSERT INTO transcriptions (user_id, filename, original_name, file_path, file_size, mime_type, template, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
-       RETURNING id, filename, original_name, status, template, created_at`,
-      [session.user.id, filename, file.originalFilename, filePath, file.size, file.mimetype, template]
+      `INSERT INTO transcriptions (user_id, filename, original_name, file_path, file_size, mime_type, template, diarize, custom_prompt, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
+       RETURNING id, filename, original_name, status, template, diarize, created_at`,
+      [session.user.id, filename, file.originalFilename, filePath, file.size, file.mimetype, template, diarize, customPrompt]
     );
 
     return res.status(201).json(result.rows[0]);

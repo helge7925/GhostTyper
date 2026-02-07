@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { query } from '../../../../lib/db';
-import { transcribeAudio, analyzeTranscription } from '../../../../lib/ai-service';
+import { transcribeAudio, analyzeTranscription, buildTextWithSpeakers } from '../../../../lib/ai-service';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   const { id } = req.query;
 
   const transcription = await query(
-    'SELECT id, file_path, template, status FROM transcriptions WHERE id = $1 AND user_id = $2',
+    'SELECT id, file_path, template, diarize, custom_prompt, status FROM transcriptions WHERE id = $1 AND user_id = $2',
     [id, session.user.id]
   );
 
@@ -30,12 +30,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: `Transkription hat Status "${job.status}" und kann nicht erneut gestartet werden` });
   }
 
-  // Get user's Mistral API key or fall back to server key
+  // Get user's settings (API key + context_bias)
   const settingsResult = await query(
-    'SELECT mistral_api_key FROM settings WHERE user_id = $1',
+    'SELECT mistral_api_key, context_bias FROM settings WHERE user_id = $1',
     [session.user.id]
   );
   const apiKey = settingsResult.rows[0]?.mistral_api_key || process.env.MISTRAL_API_KEY;
+  const contextBias = settingsResult.rows[0]?.context_bias
+    ? settingsResult.rows[0].context_bias.split(',').map(s => s.trim()).filter(Boolean)
+    : [];
 
   if (!apiKey) {
     return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert. Bitte in den Einstellungen hinterlegen.' });
@@ -52,13 +55,32 @@ export default async function handler(req, res) {
 
   // Process in background
   try {
-    const text = await transcribeAudio(job.file_path, apiKey);
-    const analysis = await analyzeTranscription(text, job.template, apiKey);
+    const { text, segments } = await transcribeAudio(job.file_path, apiKey, {
+      diarize: job.diarize,
+      contextBias,
+      language: 'de',
+    });
 
-    await query(
-      "UPDATE transcriptions SET status = 'completed', text = $1, analysis = $2, updated_at = NOW() WHERE id = $3",
-      [text, JSON.stringify(analysis), id]
-    );
+    if (job.diarize && segments.length > 0) {
+      // Two-step workflow: stop at 'transcribed' so user can assign speaker names
+      await query(
+        "UPDATE transcriptions SET status = 'transcribed', text = $1, segments = $2, updated_at = NOW() WHERE id = $3",
+        [text, JSON.stringify(segments), id]
+      );
+    } else {
+      // No diarization: go straight to analysis
+      await query(
+        "UPDATE transcriptions SET status = 'analyzing', text = $1, updated_at = NOW() WHERE id = $2",
+        [text, id]
+      );
+
+      const analysis = await analyzeTranscription(text, job.template, apiKey, job.custom_prompt || '');
+
+      await query(
+        "UPDATE transcriptions SET status = 'completed', analysis = $1, updated_at = NOW() WHERE id = $2",
+        [JSON.stringify(analysis), id]
+      );
+    }
   } catch (error) {
     console.error(`Transcription ${id} failed:`, error);
     await query(

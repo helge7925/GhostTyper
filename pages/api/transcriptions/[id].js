@@ -14,7 +14,8 @@ export default async function handler(req, res) {
   switch (req.method) {
     case 'GET': {
       const result = await query(
-        `SELECT id, original_name, filename, status, template, text, analysis, error, created_at, updated_at
+        `SELECT id, original_name, filename, status, template, diarize, custom_prompt,
+                text, segments, speakers, analysis, error, created_at, updated_at
          FROM transcriptions
          WHERE id = $1 AND user_id = $2`,
         [id, session.user.id]
@@ -25,6 +26,34 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json(result.rows[0]);
+    }
+
+    case 'PATCH': {
+      const { speakers } = req.body;
+
+      if (!speakers || typeof speakers !== 'object') {
+        return res.status(400).json({ message: 'speakers-Objekt fehlt' });
+      }
+
+      const existing = await query(
+        'SELECT id, status FROM transcriptions WHERE id = $1 AND user_id = $2',
+        [id, session.user.id]
+      );
+
+      if (existing.rows.length === 0) {
+        return res.status(404).json({ message: 'Transkription nicht gefunden' });
+      }
+
+      if (existing.rows[0].status !== 'transcribed') {
+        return res.status(400).json({ message: 'Sprechernamen können nur im Status "transcribed" zugewiesen werden' });
+      }
+
+      await query(
+        'UPDATE transcriptions SET speakers = $1, updated_at = NOW() WHERE id = $2',
+        [JSON.stringify(speakers), id]
+      );
+
+      return res.status(200).json({ message: 'Sprechernamen gespeichert' });
     }
 
     case 'DELETE': {
