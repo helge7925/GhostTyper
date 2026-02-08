@@ -31,39 +31,33 @@ export default function Transcriptions() {
   return (
     <>
       <Head>
-        <title>Transkriptionen - Transkription</title>
+        <title>Historie - GhostTyper</title>
       </Head>
 
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-google-gray-900">
-          Transkriptionen
+        <h1 className="text-2xl font-semibold text-text-primary">
+          Historie
         </h1>
-        <Link
-          href="/upload"
-          className="bg-google-blue text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-google-blue-hover transition-colors"
-        >
-          Neue Transkription
-        </Link>
       </div>
 
       {loading ? (
         <LoadingSpinner />
       ) : transcriptions.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-card p-12 text-center">
-          <div className="w-16 h-16 bg-google-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-google-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-dark-card border border-white/[0.06] rounded-xl p-12 text-center">
+          <div className="w-16 h-16 bg-white/[0.06] rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <p className="text-google-gray-700 font-medium mb-1">
+          <p className="text-text-primary font-medium mb-1">
             Noch keine Transkriptionen
           </p>
-          <p className="text-sm text-google-gray-500 mb-4">
+          <p className="text-sm text-text-secondary mb-4">
             Laden Sie eine Audiodatei hoch, um zu beginnen.
           </p>
           <Link
             href="/upload"
-            className="inline-block bg-google-blue text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-google-blue-hover transition-colors"
+            className="inline-block gradient-accent text-white px-5 py-2 rounded-full text-sm font-medium transition-colors"
           >
             Audio hochladen
           </Link>

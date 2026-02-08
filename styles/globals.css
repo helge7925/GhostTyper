@@ -6,6 +6,21 @@
 
 @layer base {
   body {
-    @apply text-google-gray-900 bg-google-gray-50 antialiased;
+    @apply text-text-primary bg-dark-bg antialiased;
+  }
+}
+
+@layer utilities {
+  .gradient-accent {
+    background: linear-gradient(135deg, #6c5ce7, #00cec9);
+  }
+  .gradient-accent-hover {
+    background: linear-gradient(135deg, #7d6ff0, #1ad8d3);
+  }
+  .border-glow {
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+  .border-glow-hover {
+    border-color: rgba(255, 255, 255, 0.12);
   }
 }

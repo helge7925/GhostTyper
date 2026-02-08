@@ -99,9 +99,9 @@ export default function TranscriptionDetail() {
 
   if (!transcription) {
     return (
-      <div className="bg-white rounded-lg shadow-card p-12 text-center">
-        <p className="text-google-gray-700 font-medium mb-2">Transkription nicht gefunden</p>
-        <Link href="/transcriptions" className="text-google-blue text-sm font-medium hover:underline">
+      <div className="bg-dark-card border border-white/[0.06] rounded-xl p-12 text-center">
+        <p className="text-text-primary font-medium mb-2">Transkription nicht gefunden</p>
+        <Link href="/transcriptions" className="text-accent-purple text-sm font-medium hover:underline">
           Zurück zur Übersicht
         </Link>
       </div>
@@ -113,23 +113,23 @@ export default function TranscriptionDetail() {
   return (
     <>
       <Head>
-        <title>{transcription.original_name} - Transkription</title>
+        <title>{transcription.original_name} - GhostTyper</title>
       </Head>
 
-      <Link href="/transcriptions" className="text-google-blue text-sm font-medium hover:underline inline-flex items-center gap-1 mb-6">
+      <Link href="/transcriptions" className="text-accent-purple text-sm font-medium hover:underline inline-flex items-center gap-1 mb-6">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
         Zurück
       </Link>
 
-      <div className="bg-white rounded-lg shadow-card p-6 mb-4">
+      <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6 mb-4">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h1 className="text-xl font-semibold text-google-gray-900">
+            <h1 className="text-xl font-semibold text-text-primary">
               {transcription.original_name}
             </h1>
-            <p className="text-sm text-google-gray-500 mt-1">
+            <p className="text-sm text-text-secondary mt-1">
               {new Date(transcription.created_at).toLocaleDateString('de-DE', {
                 day: '2-digit',
                 month: '2-digit',
@@ -138,12 +138,12 @@ export default function TranscriptionDetail() {
                 minute: '2-digit',
               })}
               {transcription.template && (
-                <span className="ml-2 text-google-gray-400">
+                <span className="ml-2 text-text-secondary/60">
                   Template: {transcription.template}
                 </span>
               )}
               {transcription.diarize && (
-                <span className="ml-2 text-google-gray-400">
+                <span className="ml-2 text-text-secondary/60">
                   Sprechererkennung
                 </span>
               )}
@@ -154,7 +154,7 @@ export default function TranscriptionDetail() {
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="text-sm text-google-gray-500 hover:text-google-red transition-colors"
+              className="text-sm text-text-secondary hover:text-accent-red transition-colors"
             >
               Löschen
             </button>
@@ -162,21 +162,21 @@ export default function TranscriptionDetail() {
         </div>
 
         {transcription.status === STATUS.PROCESSING && (
-          <div className="flex items-center gap-3 bg-blue-50 rounded-lg p-4 text-sm text-google-blue">
-            <div className="w-5 h-5 border-2 border-google-blue border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center gap-3 bg-accent-purple/10 rounded-lg p-4 text-sm text-accent-purple">
+            <div className="w-5 h-5 border-2 border-accent-purple border-t-transparent rounded-full animate-spin" />
             Transkription wird verarbeitet...
           </div>
         )}
 
         {transcription.status === STATUS.ANALYZING && (
-          <div className="flex items-center gap-3 bg-blue-50 rounded-lg p-4 text-sm text-google-blue">
-            <div className="w-5 h-5 border-2 border-google-blue border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center gap-3 bg-accent-purple/10 rounded-lg p-4 text-sm text-accent-purple">
+            <div className="w-5 h-5 border-2 border-accent-purple border-t-transparent rounded-full animate-spin" />
             Analyse läuft...
           </div>
         )}
 
         {transcription.status === STATUS.ERROR && (
-          <div className="bg-red-50 rounded-lg p-4 text-sm text-google-red">
+          <div className="bg-accent-red/10 rounded-lg p-4 text-sm text-accent-red">
             Fehler: {transcription.error || 'Unbekannter Fehler'}
           </div>
         )}
@@ -184,16 +184,16 @@ export default function TranscriptionDetail() {
 
       {/* Speaker assignment UI — shown when status is 'transcribed' */}
       {transcription.status === STATUS.TRANSCRIBED && speakerIds.length > 0 && (
-        <div className="bg-white rounded-lg shadow-card p-6 mb-4">
-          <h2 className="text-base font-medium text-google-gray-900 mb-1">Sprecher zuweisen</h2>
-          <p className="text-sm text-google-gray-500 mb-4">
+        <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6 mb-4">
+          <h2 className="text-base font-medium text-text-primary mb-1">Sprecher zuweisen</h2>
+          <p className="text-sm text-text-secondary mb-4">
             Weisen Sie den erkannten Sprechern Namen zu, bevor die Analyse gestartet wird.
           </p>
 
           <div className="space-y-3 mb-5">
             {speakerIds.map((speakerId) => (
               <div key={speakerId} className="flex items-center gap-3">
-                <span className="text-sm text-google-gray-500 w-24 flex-shrink-0">{speakerId}</span>
+                <span className="text-sm text-text-secondary w-24 flex-shrink-0">{speakerId}</span>
                 <input
                   type="text"
                   value={speakerNames[speakerId] || ''}
@@ -201,7 +201,7 @@ export default function TranscriptionDetail() {
                     setSpeakerNames((prev) => ({ ...prev, [speakerId]: e.target.value }))
                   }
                   placeholder="Name eingeben"
-                  className="flex-1 border border-google-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-google-blue focus:border-google-blue outline-none"
+                  className="flex-1 bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
                 />
               </div>
             ))}
@@ -211,14 +211,14 @@ export default function TranscriptionDetail() {
             <button
               onClick={handleSaveSpeakers}
               disabled={savingSpeakers}
-              className="border border-google-gray-300 text-google-gray-700 px-5 py-2 rounded-full text-sm font-medium hover:bg-google-gray-50 transition-colors disabled:opacity-50"
+              className="border border-white/[0.12] text-text-secondary px-5 py-2 rounded-full text-sm font-medium hover:bg-white/[0.06] transition-colors disabled:opacity-50"
             >
               {savingSpeakers ? 'Wird gespeichert...' : 'Namen speichern'}
             </button>
             <button
               onClick={handleStartAnalysis}
               disabled={analyzing}
-              className="bg-google-blue text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-google-blue-hover transition-colors disabled:opacity-50"
+              className="gradient-accent text-white px-5 py-2 rounded-full text-sm font-medium transition-colors disabled:opacity-50"
             >
               {analyzing ? 'Analyse startet...' : 'Analyse starten'}
             </button>
@@ -227,39 +227,39 @@ export default function TranscriptionDetail() {
       )}
 
       {transcription.text && (
-        <div className="bg-white rounded-lg shadow-card p-6 mb-4">
-          <h2 className="text-base font-medium text-google-gray-900 mb-3">Transkription</h2>
-          <div className="whitespace-pre-wrap text-sm text-google-gray-700 leading-relaxed">
+        <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6 mb-4">
+          <h2 className="text-base font-medium text-text-primary mb-3">Transkription</h2>
+          <div className="whitespace-pre-wrap text-sm text-text-secondary leading-relaxed">
             {transcription.text}
           </div>
         </div>
       )}
 
       {analysis && typeof analysis === 'object' && (
-        <div className="bg-white rounded-lg shadow-card p-6">
-          <h2 className="text-base font-medium text-google-gray-900 mb-3">Analyse</h2>
+        <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6">
+          <h2 className="text-base font-medium text-text-primary mb-3">Analyse</h2>
 
           {analysis.zusammenfassung && (
             <div className="mb-4">
-              <h3 className="text-sm font-medium text-google-gray-700 mb-1">Zusammenfassung</h3>
-              <p className="text-sm text-google-gray-600">{analysis.zusammenfassung}</p>
+              <h3 className="text-sm font-medium text-text-secondary mb-1">Zusammenfassung</h3>
+              <p className="text-sm text-text-secondary/80">{analysis.zusammenfassung}</p>
             </div>
           )}
 
           {analysis.todos && analysis.todos.length > 0 && (
             <div className="mb-4">
-              <h3 className="text-sm font-medium text-google-gray-700 mb-2">To-Dos</h3>
+              <h3 className="text-sm font-medium text-text-secondary mb-2">To-Dos</h3>
               <div className="space-y-2">
                 {analysis.todos.map((todo, i) => (
                   <div key={i} className="flex items-start gap-2 text-sm">
                     <span className={`inline-block mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
-                      todo.prioritaet === 'hoch' ? 'bg-google-red' :
-                      todo.prioritaet === 'mittel' ? 'bg-google-yellow' : 'bg-google-green'
+                      todo.prioritaet === 'hoch' ? 'bg-accent-red' :
+                      todo.prioritaet === 'mittel' ? 'bg-accent-yellow' : 'bg-accent-green'
                     }`} />
                     <div>
-                      <span className="text-google-gray-800">{todo.aufgabe}</span>
+                      <span className="text-text-primary">{todo.aufgabe}</span>
                       {todo.verantwortlich && todo.verantwortlich !== 'unbekannt' && (
-                        <span className="text-google-gray-500 ml-1">({todo.verantwortlich})</span>
+                        <span className="text-text-secondary ml-1">({todo.verantwortlich})</span>
                       )}
                     </div>
                   </div>
@@ -270,8 +270,8 @@ export default function TranscriptionDetail() {
 
           {analysis.entscheidungen && analysis.entscheidungen.length > 0 && (
             <div className="mb-4">
-              <h3 className="text-sm font-medium text-google-gray-700 mb-2">Entscheidungen</h3>
-              <ul className="list-disc list-inside text-sm text-google-gray-600 space-y-1">
+              <h3 className="text-sm font-medium text-text-secondary mb-2">Entscheidungen</h3>
+              <ul className="list-disc list-inside text-sm text-text-secondary/80 space-y-1">
                 {analysis.entscheidungen.map((e, i) => <li key={i}>{e}</li>)}
               </ul>
             </div>
@@ -279,12 +279,12 @@ export default function TranscriptionDetail() {
 
           {analysis.raeume && analysis.raeume.length > 0 && (
             <div className="mb-4">
-              <h3 className="text-sm font-medium text-google-gray-700 mb-2">Räume</h3>
+              <h3 className="text-sm font-medium text-text-secondary mb-2">Räume</h3>
               {analysis.raeume.map((raum, i) => (
                 <div key={i} className="mb-3">
-                  <p className="text-sm font-medium text-google-gray-800">{raum.name}</p>
+                  <p className="text-sm font-medium text-text-primary">{raum.name}</p>
                   {raum.elemente?.map((el, j) => (
-                    <p key={j} className="text-sm text-google-gray-600 ml-4">
+                    <p key={j} className="text-sm text-text-secondary ml-4">
                       {el.typ}: {el.masse?.breite}x{el.masse?.hoehe}m
                       {el.anzahl > 1 && ` (${el.anzahl}x)`}
                     </p>
@@ -295,16 +295,16 @@ export default function TranscriptionDetail() {
           )}
 
           {analysis.warnungen && analysis.warnungen.length > 0 && (
-            <div className="bg-yellow-50 rounded-lg p-3">
-              <h3 className="text-sm font-medium text-yellow-800 mb-1">Warnungen</h3>
-              <ul className="text-sm text-yellow-700 space-y-1">
+            <div className="bg-accent-yellow/10 rounded-lg p-3">
+              <h3 className="text-sm font-medium text-accent-yellow mb-1">Warnungen</h3>
+              <ul className="text-sm text-accent-yellow/80 space-y-1">
                 {analysis.warnungen.map((w, i) => <li key={i}>{w}</li>)}
               </ul>
             </div>
           )}
 
           {analysis.raw && (
-            <pre className="text-sm text-google-gray-600 whitespace-pre-wrap">{analysis.raw}</pre>
+            <pre className="text-sm text-text-secondary whitespace-pre-wrap">{analysis.raw}</pre>
           )}
         </div>
       )}
