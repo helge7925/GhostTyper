@@ -1,7 +1,7 @@
 {
-  "name": "transkription-webapp",
+  "name": "ghosttyper",
   "version": "1.0.0",
-  "description": "Transkriptions-WebApp mit dynamischer Audio-Analyse",
+  "description": "GhostTyper - Audio-Transkription und KI-Analyse",
   "main": "index.js",
   "scripts": {
     "dev": "next dev",

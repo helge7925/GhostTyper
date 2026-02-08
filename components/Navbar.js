@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 const NAV_LINKS = [
   { href: '/upload', label: 'Hochladen' },
-  { href: '/transcriptions', label: 'Transkriptionen' },
+  { href: '/transcriptions', label: 'Historie' },
   { href: '/settings', label: 'Einstellungen' },
 ];
 
@@ -15,13 +15,13 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <nav className="bg-white border-b border-google-gray-200 sticky top-0 z-50">
+    <nav className="backdrop-blur-xl bg-dark-bg/80 border-b border-white/[0.06] sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
         <Link href="/" className="flex items-center gap-2">
-          <svg className="w-7 h-7 text-google-blue" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="w-7 h-7 text-accent-purple" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 3a1 1 0 0 1 .707.293l7 7a1 1 0 0 1-1.414 1.414L13 6.414V20a1 1 0 1 1-2 0V6.414l-5.293 5.293a1 1 0 0 1-1.414-1.414l7-7A1 1 0 0 1 12 3z" />
           </svg>
-          <span className="text-lg font-semibold text-google-gray-900">Transkription</span>
+          <span className="text-lg font-semibold text-text-primary">GhostTyper</span>
         </Link>
 
         {session && (
@@ -32,8 +32,8 @@ export default function Navbar() {
                 href={href}
                 className={`px-3 py-2 rounded-full text-sm font-medium transition-colors ${
                   router.pathname === href || router.pathname.startsWith(href + '/')
-                    ? 'bg-blue-50 text-google-blue'
-                    : 'text-google-gray-700 hover:bg-google-gray-100'
+                    ? 'bg-accent-purple/20 text-accent-purple'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-white/[0.06]'
                 }`}
               >
                 {label}
@@ -45,12 +45,12 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           {session ? (
             <>
-              <span className="hidden sm:block text-sm text-google-gray-600">
+              <span className="hidden sm:block text-sm text-text-secondary">
                 {session.user.email}
               </span>
               <button
                 onClick={() => signOut({ callbackUrl: '/login' })}
-                className="text-sm font-medium text-google-gray-700 hover:bg-google-gray-100 px-3 py-2 rounded-full transition-colors"
+                className="text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-white/[0.06] px-3 py-2 rounded-full transition-colors"
               >
                 Abmelden
               </button>
@@ -58,7 +58,7 @@ export default function Navbar() {
           ) : (
             <Link
               href="/login"
-              className="text-sm font-medium bg-google-blue text-white px-5 py-2 rounded-full hover:bg-google-blue-hover transition-colors"
+              className="text-sm font-medium gradient-accent text-white px-5 py-2 rounded-full hover:gradient-accent-hover transition-colors"
             >
               Anmelden
             </Link>
@@ -67,7 +67,7 @@ export default function Navbar() {
           {/* Mobile hamburger */}
           {session && (
             <button
-              className="md:hidden p-2 rounded-full text-google-gray-600 hover:bg-google-gray-100"
+              className="md:hidden p-2 rounded-full text-text-secondary hover:bg-white/[0.06]"
               onClick={() => setMenuOpen(!menuOpen)}
               aria-label="Menü"
             >
@@ -85,15 +85,15 @@ export default function Navbar() {
 
       {/* Mobile nav */}
       {menuOpen && session && (
-        <div className="md:hidden border-t border-google-gray-200 bg-white">
+        <div className="md:hidden border-t border-white/[0.06] bg-dark-bg/95 backdrop-blur-xl">
           {NAV_LINKS.map(({ href, label }) => (
             <Link
               key={href}
               href={href}
               className={`block px-6 py-3 text-sm font-medium ${
                 router.pathname === href
-                  ? 'text-google-blue bg-blue-50'
-                  : 'text-google-gray-700 hover:bg-google-gray-50'
+                  ? 'text-accent-purple bg-accent-purple/10'
+                  : 'text-text-secondary hover:bg-white/[0.06]'
               }`}
               onClick={() => setMenuOpen(false)}
             >

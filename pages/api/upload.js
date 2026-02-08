@@ -1,5 +1,5 @@
 import formidable from 'formidable';
-import { rename, mkdir } from 'fs/promises';
+import { copyFile, unlink, mkdir } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { getServerSession } from 'next-auth/next';
@@ -61,7 +61,8 @@ export default async function handler(req, res) {
     const filename = `${randomUUID()}${ext}`;
     const filePath = path.join(UPLOAD_DIR, filename);
 
-    await rename(file.filepath, filePath);
+    await copyFile(file.filepath, filePath);
+    await unlink(file.filepath).catch(() => {});
 
     const template = fields.template?.[0] || fields.template || 'meeting';
     const diarize = (fields.diarize?.[0] || fields.diarize) === 'true';

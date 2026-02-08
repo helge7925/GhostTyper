@@ -14,6 +14,8 @@ services:
       - DATABASE_URL=postgresql://transkription:transkription@transkription-db:5432/transkription
       - NEXTAUTH_SECRET=dev-secret-change-in-production
       - NEXTAUTH_URL=http://localhost:3000
+    volumes:
+      - transkription-uploads:/app/uploads
     depends_on:
       transkription-db:
         condition: service_healthy
@@ -38,3 +40,4 @@ services:
 
 volumes:
   transkription-db-data:
+  transkription-uploads:

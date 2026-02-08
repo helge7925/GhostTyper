@@ -63,17 +63,17 @@ export default function Settings() {
   return (
     <>
       <Head>
-        <title>Einstellungen - Transkription</title>
+        <title>Einstellungen - GhostTyper</title>
       </Head>
 
-      <h1 className="text-2xl font-semibold text-google-gray-900 mb-6">Einstellungen</h1>
+      <h1 className="text-2xl font-semibold text-text-primary mb-6">Einstellungen</h1>
 
       <form onSubmit={handleSave} className="max-w-lg space-y-6">
-        <div className="bg-white rounded-lg shadow-card p-6">
-          <h2 className="text-base font-medium text-google-gray-900 mb-4">Mistral API</h2>
+        <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6">
+          <h2 className="text-base font-medium text-text-primary mb-4">Mistral API</h2>
 
           <div className="mb-4">
-            <label htmlFor="apiKey" className="block text-sm font-medium text-google-gray-700 mb-1.5">
+            <label htmlFor="apiKey" className="block text-sm font-medium text-text-secondary mb-1.5">
               API-Key
             </label>
             <input
@@ -82,17 +82,17 @@ export default function Settings() {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder={apiKeyConfigured ? 'Gespeichert (zum Ändern neuen Key eingeben)' : 'Mistral API-Key eingeben'}
-              className="w-full border border-google-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-google-blue focus:border-google-blue outline-none transition-shadow"
+              className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none transition-shadow"
             />
-            <p className="text-xs text-google-gray-500 mt-1.5">
+            <p className="text-xs text-text-secondary mt-1.5">
               Wird für die Transkription (Voxtral) und Analyse (Mistral Large) benötigt.
               Ihren Key finden Sie unter{' '}
-              <a href="https://console.mistral.ai/api-keys/" target="_blank" rel="noopener noreferrer" className="text-google-blue hover:underline">
+              <a href="https://console.mistral.ai/api-keys/" target="_blank" rel="noopener noreferrer" className="text-accent-purple hover:underline">
                 console.mistral.ai
               </a>.
             </p>
             {apiKeyConfigured && (
-              <p className="text-xs text-google-green mt-1 flex items-center gap-1">
+              <p className="text-xs text-accent-green mt-1 flex items-center gap-1">
                 <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
@@ -102,37 +102,37 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-card p-6">
-          <h2 className="text-base font-medium text-google-gray-900 mb-4">Voreinstellungen</h2>
+        <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6">
+          <h2 className="text-base font-medium text-text-primary mb-4">Voreinstellungen</h2>
 
           <div className="mb-4">
-            <label htmlFor="template" className="block text-sm font-medium text-google-gray-700 mb-1.5">
+            <label htmlFor="template" className="block text-sm font-medium text-text-secondary mb-1.5">
               Standard-Template
             </label>
             <select
               id="template"
               value={defaultTemplate}
               onChange={(e) => setDefaultTemplate(e.target.value)}
-              className="w-full border border-google-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-google-blue focus:border-google-blue outline-none bg-white"
+              className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
             >
               <option value="meeting">Meeting-Protokoll</option>
               <option value="aufmass">Aufmaß</option>
               <option value="generic">Allgemein</option>
             </select>
-            <p className="text-xs text-google-gray-500 mt-1.5">
+            <p className="text-xs text-text-secondary mt-1.5">
               Bestimmt, wie die Analyse strukturiert wird.
             </p>
           </div>
 
           <div>
-            <label htmlFor="language" className="block text-sm font-medium text-google-gray-700 mb-1.5">
+            <label htmlFor="language" className="block text-sm font-medium text-text-secondary mb-1.5">
               Sprache
             </label>
             <select
               id="language"
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="w-full border border-google-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-google-blue focus:border-google-blue outline-none bg-white"
+              className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
             >
               <option value="de">Deutsch</option>
               <option value="en">Englisch</option>
@@ -140,11 +140,11 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-card p-6">
-          <h2 className="text-base font-medium text-google-gray-900 mb-4">Kontextwörter</h2>
+        <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6">
+          <h2 className="text-base font-medium text-text-primary mb-4">Kontextwörter</h2>
 
           <div>
-            <label htmlFor="contextBias" className="block text-sm font-medium text-google-gray-700 mb-1.5">
+            <label htmlFor="contextBias" className="block text-sm font-medium text-text-secondary mb-1.5">
               Begriffe für bessere Erkennung
             </label>
             <textarea
@@ -153,9 +153,9 @@ export default function Settings() {
               onChange={(e) => setContextBias(e.target.value)}
               placeholder="z.B. Fachbegriffe, Namen, Firmennamen (kommagetrennt)"
               rows={3}
-              className="w-full border border-google-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-google-blue focus:border-google-blue outline-none resize-none"
+              className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none resize-none"
             />
-            <p className="text-xs text-google-gray-500 mt-1.5">
+            <p className="text-xs text-text-secondary mt-1.5">
               Kommagetrennte Liste von Wörtern, die bei der Transkription bevorzugt erkannt werden sollen.
               Hilfreich für Fachbegriffe, Eigennamen oder Abkürzungen.
             </p>
@@ -163,18 +163,18 @@ export default function Settings() {
         </div>
 
         {saved && (
-          <div className="bg-green-50 border border-green-200 text-google-green px-4 py-3 rounded-lg text-sm">
+          <div className="bg-accent-green/10 border border-accent-green/20 text-accent-green px-4 py-3 rounded-lg text-sm">
             Einstellungen gespeichert.
           </div>
         )}
 
         {error && (
-          <p className="text-sm text-google-red">{error}</p>
+          <p className="text-sm text-accent-red">{error}</p>
         )}
 
         <button
           type="submit"
-          className="bg-google-blue text-white py-2.5 px-6 rounded-full text-sm font-medium hover:bg-google-blue-hover transition-colors"
+          className="gradient-accent text-white py-2.5 px-6 rounded-full text-sm font-medium transition-colors"
         >
           Speichern
         </button>

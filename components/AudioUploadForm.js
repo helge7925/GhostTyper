@@ -76,8 +76,8 @@ export default function AudioUploadForm({ onSuccess }) {
         onClick={() => inputRef.current?.click()}
         className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
           dragActive
-            ? 'border-google-blue bg-blue-50'
-            : 'border-google-gray-300 hover:border-google-gray-400'
+            ? 'border-accent-purple bg-accent-purple/10'
+            : 'border-white/[0.12] hover:border-white/[0.2]'
         }`}
       >
         <input
@@ -89,34 +89,34 @@ export default function AudioUploadForm({ onSuccess }) {
           className="hidden"
         />
         {file ? (
-          <p className="text-sm text-google-gray-700">
+          <p className="text-sm text-text-primary">
             <span className="font-medium">{file.name}</span>{' '}
-            <span className="text-google-gray-500">
+            <span className="text-text-secondary">
               ({(file.size / 1024 / 1024).toFixed(1)} MB)
             </span>
           </p>
         ) : (
           <div>
-            <svg className="mx-auto w-10 h-10 text-google-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="mx-auto w-10 h-10 text-text-secondary mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <p className="text-sm text-google-gray-600">
-              Audio-Datei hierher ziehen oder <span className="text-google-blue font-medium">durchsuchen</span>
+            <p className="text-sm text-text-secondary">
+              Audio-Datei hierher ziehen oder <span className="text-accent-purple font-medium">durchsuchen</span>
             </p>
-            <p className="text-xs text-google-gray-400 mt-1">MP3, WAV, OGG, FLAC, M4A (max. 50 MB)</p>
+            <p className="text-xs text-text-secondary/60 mt-1">MP3, WAV, OGG, FLAC, M4A (max. 50 MB)</p>
           </div>
         )}
       </div>
 
       <div>
-        <label htmlFor="upload-template" className="block text-sm font-medium text-google-gray-700 mb-1.5">
+        <label htmlFor="upload-template" className="block text-sm font-medium text-text-secondary mb-1.5">
           Analyse-Template
         </label>
         <select
           id="upload-template"
           value={template}
           onChange={(e) => setTemplate(e.target.value)}
-          className="w-full border border-google-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-google-blue focus:border-google-blue outline-none bg-white"
+          className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
         >
           <option value="meeting">Meeting-Protokoll</option>
           <option value="aufmass">Aufmaß</option>
@@ -130,19 +130,19 @@ export default function AudioUploadForm({ onSuccess }) {
           type="checkbox"
           checked={diarize}
           onChange={(e) => setDiarize(e.target.checked)}
-          className="w-4 h-4 text-google-blue border-google-gray-300 rounded focus:ring-google-blue"
+          className="w-4 h-4 text-accent-purple bg-dark-input border-white/[0.2] rounded focus:ring-accent-purple"
         />
-        <label htmlFor="upload-diarize" className="text-sm text-google-gray-700">
+        <label htmlFor="upload-diarize" className="text-sm text-text-secondary">
           Sprechererkennung aktivieren
-          <span className="block text-xs text-google-gray-500">
+          <span className="block text-xs text-text-secondary/60">
             Erkennt verschiedene Sprecher und ermöglicht Namenszuweisung vor der Analyse
           </span>
         </label>
       </div>
 
       <div>
-        <label htmlFor="upload-prompt" className="block text-sm font-medium text-google-gray-700 mb-1.5">
-          Zusätzlicher Kontext <span className="font-normal text-google-gray-400">(optional)</span>
+        <label htmlFor="upload-prompt" className="block text-sm font-medium text-text-secondary mb-1.5">
+          Zusätzlicher Kontext <span className="font-normal text-text-secondary/60">(optional)</span>
         </label>
         <textarea
           id="upload-prompt"
@@ -150,20 +150,20 @@ export default function AudioUploadForm({ onSuccess }) {
           onChange={(e) => setCustomPrompt(e.target.value)}
           placeholder="z.B. Teilnehmer, Projektname, besondere Hinweise für die Analyse..."
           rows={3}
-          className="w-full border border-google-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-google-blue focus:border-google-blue outline-none resize-none"
+          className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none resize-none"
         />
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-google-red px-4 py-3 rounded-lg text-sm">
+        <div className="bg-accent-red/10 border border-accent-red/20 text-accent-red px-4 py-3 rounded-lg text-sm">
           {error}
         </div>
       )}
 
       {uploading && (
-        <div className="w-full bg-google-gray-200 rounded-full h-1.5">
+        <div className="w-full bg-white/[0.06] rounded-full h-1.5">
           <div
-            className="bg-google-blue h-1.5 rounded-full transition-all duration-300"
+            className="gradient-accent h-1.5 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -172,7 +172,7 @@ export default function AudioUploadForm({ onSuccess }) {
       <button
         type="submit"
         disabled={!file || uploading}
-        className="w-full bg-google-blue text-white py-2.5 rounded-full text-sm font-medium hover:bg-google-blue-hover disabled:bg-google-gray-300 disabled:cursor-not-allowed transition-colors"
+        className="w-full gradient-accent text-white py-2.5 rounded-full text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       >
         {uploading ? 'Wird hochgeladen...' : 'Hochladen und transkribieren'}
       </button>
