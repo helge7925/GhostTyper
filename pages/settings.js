@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getSettings, updateSettings } from '../lib/api';
 
 export default function Settings() {
@@ -11,10 +11,12 @@ export default function Settings() {
   const [defaultTemplate, setDefaultTemplate] = useState('meeting');
   const [language, setLanguage] = useState('de');
   const [contextBias, setContextBias] = useState('');
+  const [preferredModel, setPreferredModel] = useState('mistral-large-latest');
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [usage, setUsage] = useState(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -29,9 +31,15 @@ export default function Settings() {
         setDefaultTemplate(data.defaultTemplate || 'meeting');
         setLanguage(data.language || 'de');
         setContextBias(data.contextBias || '');
+        setPreferredModel(data.preferredModel || 'mistral-large-latest');
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    fetch('/api/usage')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setUsage(data); })
+      .catch(() => {});
   }, [status, router]);
 
   async function handleSave(e) {
@@ -45,6 +53,7 @@ export default function Settings() {
         defaultTemplate,
         language,
         contextBias,
+        preferredModel,
       });
       setSaved(true);
       if (apiKey) {
@@ -124,7 +133,7 @@ export default function Settings() {
             </p>
           </div>
 
-          <div>
+          <div className="mb-4">
             <label htmlFor="language" className="block text-sm font-medium text-text-secondary mb-1.5">
               Sprache
             </label>
@@ -137,6 +146,25 @@ export default function Settings() {
               <option value="de">Deutsch</option>
               <option value="en">Englisch</option>
             </select>
+          </div>
+
+          <div>
+            <label htmlFor="preferredModel" className="block text-sm font-medium text-text-secondary mb-1.5">
+              Analyse-Modell
+            </label>
+            <select
+              id="preferredModel"
+              value={preferredModel}
+              onChange={(e) => setPreferredModel(e.target.value)}
+              className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
+            >
+              <option value="mistral-large-latest">Mistral Large (beste Qualität)</option>
+              <option value="mistral-medium-latest">Mistral Medium (ausgewogen)</option>
+              <option value="mistral-small-latest">Mistral Small (schnell & günstig)</option>
+            </select>
+            <p className="text-xs text-text-secondary mt-1.5">
+              Wird für die Analyse verwendet. Transkription nutzt immer Voxtral Mini.
+            </p>
           </div>
         </div>
 
@@ -179,6 +207,69 @@ export default function Settings() {
           Speichern
         </button>
       </form>
+
+      {usage && (
+        <div className="max-w-lg mt-8">
+          <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6">
+            <h2 className="text-base font-medium text-text-primary mb-4">
+              Nutzung im {new Date().toLocaleString('de', { month: 'long', year: 'numeric' })}
+            </h2>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-xs text-text-secondary">Anfragen</p>
+                <p className="text-lg font-semibold text-text-primary">{usage.totalRequests}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary">Geschätzte Kosten</p>
+                <p className="text-lg font-semibold text-text-primary">{usage.totalCost.toFixed(4)} EUR</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary">Input-Tokens</p>
+                <p className="text-sm text-text-primary">{usage.totalInputTokens.toLocaleString('de')}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary">Output-Tokens</p>
+                <p className="text-sm text-text-primary">{usage.totalOutputTokens.toLocaleString('de')}</p>
+              </div>
+            </div>
+
+            {usage.costLimit && (
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-text-secondary mb-1">
+                  <span>Kostenlimit</span>
+                  <span>{usage.totalCost.toFixed(2)} / {usage.costLimit.toFixed(2)} EUR</span>
+                </div>
+                <div className="w-full bg-white/[0.06] rounded-full h-2">
+                  <div
+                    className="h-2 rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, (usage.totalCost / usage.costLimit) * 100)}%`,
+                      background: usage.totalCost / usage.costLimit > 0.9
+                        ? 'var(--accent-red, #ff6b6b)'
+                        : usage.totalCost / usage.costLimit > 0.7
+                          ? 'var(--accent-yellow, #feca57)'
+                          : 'var(--accent-green, #00cec9)',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {usage.byOperation.length > 0 && (
+              <div className="mt-4 border-t border-white/[0.06] pt-3">
+                <p className="text-xs text-text-secondary mb-2">Nach Typ</p>
+                {usage.byOperation.map((op) => (
+                  <div key={op.operation} className="flex justify-between text-sm py-1">
+                    <span className="text-text-secondary capitalize">{op.operation}</span>
+                    <span className="text-text-primary">{op.requests}x — {op.cost.toFixed(4)} EUR</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }

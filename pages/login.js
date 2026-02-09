@@ -1,5 +1,4 @@
 import Head from 'next/head';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
@@ -92,10 +91,7 @@ export default function Login() {
             </form>
 
             <p className="text-sm text-text-secondary text-center mt-6">
-              Noch kein Konto?{' '}
-              <Link href="/register" className="text-accent-purple font-medium hover:underline">
-                Registrieren
-              </Link>
+              Kein Konto? Wenden Sie sich an den Administrator.
             </p>
           </div>
         </div>

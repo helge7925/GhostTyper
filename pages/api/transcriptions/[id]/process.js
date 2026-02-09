@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { query } from '../../../../lib/db';
 import { transcribeAudio, analyzeTranscription, buildTextWithSpeakers } from '../../../../lib/ai-service';
+import { logUsage, checkCostLimit } from '../../../../lib/usage';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -32,16 +33,25 @@ export default async function handler(req, res) {
 
   // Get user's settings (API key + context_bias)
   const settingsResult = await query(
-    'SELECT mistral_api_key, context_bias FROM settings WHERE user_id = $1',
+    'SELECT mistral_api_key, context_bias, preferred_model FROM settings WHERE user_id = $1',
     [session.user.id]
   );
   const apiKey = settingsResult.rows[0]?.mistral_api_key || process.env.MISTRAL_API_KEY;
+  const preferredModel = settingsResult.rows[0]?.preferred_model || null;
   const contextBias = settingsResult.rows[0]?.context_bias
     ? settingsResult.rows[0].context_bias.split(',').map(s => s.trim()).filter(Boolean)
     : [];
 
   if (!apiKey) {
     return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert. Bitte in den Einstellungen hinterlegen.' });
+  }
+
+  // Check cost limit
+  const costCheck = await checkCostLimit(session.user.id);
+  if (!costCheck.allowed) {
+    return res.status(429).json({
+      message: `Monatliches Kostenlimit erreicht (${costCheck.currentCost.toFixed(2)} / ${costCheck.limit.toFixed(2)} EUR)`,
+    });
   }
 
   // Set status to processing
@@ -55,11 +65,14 @@ export default async function handler(req, res) {
 
   // Process in background
   try {
-    const { text, segments } = await transcribeAudio(job.file_path, apiKey, {
+    const { text, segments, usage: transcriptionUsage, model: transcriptionModel } = await transcribeAudio(job.file_path, apiKey, {
       diarize: job.diarize,
       contextBias,
       language: 'de',
     });
+
+    // Log transcription usage
+    await logUsage(session.user.id, transcriptionModel, 'transcription', transcriptionUsage);
 
     if (job.diarize && segments.length > 0) {
       // Two-step workflow: stop at 'transcribed' so user can assign speaker names
@@ -74,7 +87,10 @@ export default async function handler(req, res) {
         [text, id]
       );
 
-      const analysis = await analyzeTranscription(text, job.template, apiKey, job.custom_prompt || '');
+      const { analysis, usage: analysisUsage, model: analysisModel } = await analyzeTranscription(text, job.template, apiKey, job.custom_prompt || '', preferredModel);
+
+      // Log analysis usage
+      await logUsage(session.user.id, analysisModel, 'analysis', analysisUsage);
 
       await query(
         "UPDATE transcriptions SET status = 'completed', analysis = $1, updated_at = NOW() WHERE id = $2",

@@ -7,6 +7,7 @@ const NAV_LINKS = [
   { href: '/upload', label: 'Hochladen' },
   { href: '/transcriptions', label: 'Historie' },
   { href: '/settings', label: 'Einstellungen' },
+  { href: '/admin/users', label: 'Admin', adminOnly: true },
 ];
 
 export default function Navbar() {
@@ -26,7 +27,7 @@ export default function Navbar() {
 
         {session && (
           <div className="hidden md:flex items-center gap-1">
-            {NAV_LINKS.map(({ href, label }) => (
+            {NAV_LINKS.filter(link => !link.adminOnly || session.user.role === 'admin').map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
@@ -86,7 +87,7 @@ export default function Navbar() {
       {/* Mobile nav */}
       {menuOpen && session && (
         <div className="md:hidden border-t border-white/[0.06] bg-dark-bg/95 backdrop-blur-xl">
-          {NAV_LINKS.map(({ href, label }) => (
+          {NAV_LINKS.filter(link => !link.adminOnly || session.user.role === 'admin').map(({ href, label }) => (
             <Link
               key={href}
               href={href}
