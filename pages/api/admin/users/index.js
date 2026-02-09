@@ -1,0 +1,62 @@
+import bcrypt from 'bcryptjs';
+import { requireAdmin } from '../../../../lib/admin';
+import { query } from '../../../../lib/db';
+
+export default async function handler(req, res) {
+  const session = await requireAdmin(req, res);
+  if (!session) return;
+
+  switch (req.method) {
+    case 'GET': {
+      try {
+        const result = await query(
+          `SELECT u.id, u.email, u.name, u.role, u.created_at,
+                  s.mistral_api_key IS NOT NULL AS api_key_configured,
+                  s.preferred_model, s.cost_limit
+           FROM users u
+           LEFT JOIN settings s ON s.user_id = u.id
+           ORDER BY u.created_at DESC`
+        );
+        return res.status(200).json(result.rows);
+      } catch (error) {
+        console.error('Admin users list error:', error);
+        return res.status(500).json({ message: 'Fehler beim Laden der User-Liste' });
+      }
+    }
+
+    case 'POST': {
+      const { email, name, password, role } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: 'Email und Passwort sind erforderlich' });
+      }
+
+      if (password.length < 8) {
+        return res.status(400).json({ message: 'Passwort muss mindestens 8 Zeichen lang sein' });
+      }
+
+      try {
+        const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
+        if (existing.rows.length > 0) {
+          return res.status(409).json({ message: 'Ein Konto mit dieser Email existiert bereits' });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 12);
+        const userRole = role === 'admin' ? 'admin' : 'user';
+
+        const result = await query(
+          'INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role',
+          [email, name || null, passwordHash, userRole]
+        );
+
+        return res.status(201).json(result.rows[0]);
+      } catch (error) {
+        console.error('Admin create user error:', error);
+        return res.status(500).json({ message: 'User-Erstellung fehlgeschlagen' });
+      }
+    }
+
+    default:
+      return res.status(405).json({ message: 'Method not allowed' });
+  }
+}

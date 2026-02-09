@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { query } from '../../../../lib/db';
 import { analyzeTranscription, buildTextWithSpeakers } from '../../../../lib/ai-service';
+import { logUsage, checkCostLimit } from '../../../../lib/usage';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -30,15 +31,24 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: `Analyse kann nur im Status "transcribed" gestartet werden (aktuell: "${job.status}")` });
   }
 
-  // Get user's API key
+  // Get user's API key + preferred model
   const settingsResult = await query(
-    'SELECT mistral_api_key FROM settings WHERE user_id = $1',
+    'SELECT mistral_api_key, preferred_model FROM settings WHERE user_id = $1',
     [session.user.id]
   );
   const apiKey = settingsResult.rows[0]?.mistral_api_key || process.env.MISTRAL_API_KEY;
+  const preferredModel = settingsResult.rows[0]?.preferred_model || null;
 
   if (!apiKey) {
     return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert' });
+  }
+
+  // Check cost limit
+  const costCheck = await checkCostLimit(session.user.id);
+  if (!costCheck.allowed) {
+    return res.status(429).json({
+      message: `Monatliches Kostenlimit erreicht (${costCheck.currentCost.toFixed(2)} / ${costCheck.limit.toFixed(2)} EUR)`,
+    });
   }
 
   // Set status to analyzing
@@ -67,7 +77,10 @@ export default async function handler(req, res) {
       );
     }
 
-    const analysis = await analyzeTranscription(analysisText, job.template, apiKey, job.custom_prompt || '');
+    const { analysis, usage: analysisUsage, model: analysisModel } = await analyzeTranscription(analysisText, job.template, apiKey, job.custom_prompt || '', preferredModel);
+
+    // Log analysis usage
+    await logUsage(session.user.id, analysisModel, 'analysis', analysisUsage);
 
     await query(
       "UPDATE transcriptions SET status = 'completed', analysis = $1, updated_at = NOW() WHERE id = $2",

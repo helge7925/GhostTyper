@@ -1,5 +1,4 @@
 import Head from 'next/head';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useState, useEffect } from 'react';
@@ -52,15 +51,9 @@ export default function Transcriptions() {
           <p className="text-text-primary font-medium mb-1">
             Noch keine Transkriptionen
           </p>
-          <p className="text-sm text-text-secondary mb-4">
+          <p className="text-sm text-text-secondary">
             Laden Sie eine Audiodatei hoch, um zu beginnen.
           </p>
-          <Link
-            href="/upload"
-            className="inline-block gradient-accent text-white px-5 py-2 rounded-full text-sm font-medium transition-colors"
-          >
-            Audio hochladen
-          </Link>
         </div>
       ) : (
         <div className="space-y-3">
