@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useState, useEffect, useMemo } from 'react';
 import StatusBadge from '../../components/StatusBadge';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import Toast from '../../components/Toast';
 import { getTranscription, deleteTranscription, updateSpeakers, startAnalysis } from '../../lib/api';
 import { STATUS } from '../../lib/constants';
 
@@ -18,6 +19,7 @@ export default function TranscriptionDetail() {
   const [speakerNames, setSpeakerNames] = useState({});
   const [savingSpeakers, setSavingSpeakers] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
@@ -44,6 +46,19 @@ export default function TranscriptionDetail() {
     const interval = setInterval(async () => {
       try {
         const updated = await getTranscription(id);
+        // Detect status change to 'transcribed'
+        if (transcription.status === STATUS.PROCESSING && updated.status === STATUS.TRANSCRIBED) {
+          const hasSpeakers = updated.diarize && updated.segments?.length > 0;
+          setToast({
+            message: hasSpeakers
+              ? 'Transkription abgeschlossen! Bitte Sprecher zuweisen.'
+              : 'Transkription abgeschlossen! Sie können nun die Analyse starten.',
+            type: 'success',
+          });
+          setTimeout(() => {
+            document.getElementById('speaker-assignment')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 500);
+        }
         setTranscription(updated);
         if (updated.speakers) setSpeakerNames(updated.speakers);
         if (!pollingStatuses.includes(updated.status)) {
@@ -182,47 +197,65 @@ export default function TranscriptionDetail() {
         )}
       </div>
 
-      {/* Speaker assignment UI — shown when status is 'transcribed' */}
-      {transcription.status === STATUS.TRANSCRIBED && speakerIds.length > 0 && (
-        <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6 mb-4">
-          <h2 className="text-base font-medium text-text-primary mb-1">Sprecher zuweisen</h2>
-          <p className="text-sm text-text-secondary mb-4">
-            Weisen Sie den erkannten Sprechern Namen zu, bevor die Analyse gestartet wird.
-          </p>
+      {/* Speaker assignment or analyze prompt — shown when status is 'transcribed' */}
+      {transcription.status === STATUS.TRANSCRIBED && (
+        <div id="speaker-assignment" className="bg-dark-card border border-white/[0.06] rounded-xl p-6 mb-4">
+          {transcription.diarize && speakerIds.length > 0 ? (
+            <>
+              <h2 className="text-base font-medium text-text-primary mb-1">Sprecher zuweisen</h2>
+              <p className="text-sm text-text-secondary mb-4">
+                Weisen Sie den erkannten Sprechern Namen zu, bevor die Analyse gestartet wird.
+              </p>
 
-          <div className="space-y-3 mb-5">
-            {speakerIds.map((speakerId) => (
-              <div key={speakerId} className="flex items-center gap-3">
-                <span className="text-sm text-text-secondary w-24 flex-shrink-0">{speakerId}</span>
-                <input
-                  type="text"
-                  value={speakerNames[speakerId] || ''}
-                  onChange={(e) =>
-                    setSpeakerNames((prev) => ({ ...prev, [speakerId]: e.target.value }))
-                  }
-                  placeholder="Name eingeben"
-                  className="flex-1 bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
-                />
+              <div className="space-y-3 mb-5">
+                {speakerIds.map((speakerId) => (
+                  <div key={speakerId} className="flex items-center gap-3">
+                    <span className="text-sm text-text-secondary w-24 flex-shrink-0">{speakerId}</span>
+                    <input
+                      type="text"
+                      value={speakerNames[speakerId] || ''}
+                      onChange={(e) =>
+                        setSpeakerNames((prev) => ({ ...prev, [speakerId]: e.target.value }))
+                      }
+                      placeholder="Name eingeben"
+                      className="flex-1 bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={handleSaveSpeakers}
-              disabled={savingSpeakers}
-              className="border border-white/[0.12] text-text-secondary px-5 py-2 rounded-full text-sm font-medium hover:bg-white/[0.06] transition-colors disabled:opacity-50"
-            >
-              {savingSpeakers ? 'Wird gespeichert...' : 'Namen speichern'}
-            </button>
-            <button
-              onClick={handleStartAnalysis}
-              disabled={analyzing}
-              className="gradient-accent text-white px-5 py-2 rounded-full text-sm font-medium transition-colors disabled:opacity-50"
-            >
-              {analyzing ? 'Analyse startet...' : 'Analyse starten'}
-            </button>
-          </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSaveSpeakers}
+                  disabled={savingSpeakers}
+                  className="border border-white/[0.12] text-text-secondary px-5 py-2 rounded-full text-sm font-medium hover:bg-white/[0.06] transition-colors disabled:opacity-50"
+                >
+                  {savingSpeakers ? 'Wird gespeichert...' : 'Namen speichern'}
+                </button>
+                <button
+                  onClick={handleStartAnalysis}
+                  disabled={analyzing}
+                  className="gradient-accent text-white px-5 py-2 rounded-full text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {analyzing ? 'Analyse startet...' : 'Analyse starten'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-base font-medium text-text-primary mb-1">Transkription abgeschlossen</h2>
+              <p className="text-sm text-text-secondary mb-4">
+                Die Transkription wurde erfolgreich erstellt. Sie können nun die Analyse starten.
+              </p>
+              <button
+                onClick={handleStartAnalysis}
+                disabled={analyzing}
+                className="gradient-accent text-white px-5 py-2 rounded-full text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {analyzing ? 'Analyse startet...' : 'Analyse starten'}
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -239,10 +272,19 @@ export default function TranscriptionDetail() {
         <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6">
           <h2 className="text-base font-medium text-text-primary mb-3">Analyse</h2>
 
-          {analysis.zusammenfassung && (
+          {(analysis.zusammenfassung || analysis.summary) && (
             <div className="mb-4">
-              <h3 className="text-sm font-medium text-text-secondary mb-1">Zusammenfassung</h3>
-              <p className="text-sm text-text-secondary/80">{analysis.zusammenfassung}</p>
+              <h3 className="text-sm font-medium text-text-secondary mb-1">{analysis.summary ? 'Summary' : 'Zusammenfassung'}</h3>
+              <p className="text-sm text-text-secondary/80">{analysis.zusammenfassung || analysis.summary}</p>
+            </div>
+          )}
+
+          {((analysis.themen && analysis.themen.length > 0) || (analysis.topics && analysis.topics.length > 0)) && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-text-secondary mb-2">{analysis.topics ? 'Topics' : 'Themen'}</h3>
+              <ul className="list-disc list-inside text-sm text-text-secondary/80 space-y-1">
+                {(analysis.themen || analysis.topics).map((t, i) => <li key={i}>{t}</li>)}
+              </ul>
             </div>
           )}
 
@@ -253,13 +295,13 @@ export default function TranscriptionDetail() {
                 {analysis.todos.map((todo, i) => (
                   <div key={i} className="flex items-start gap-2 text-sm">
                     <span className={`inline-block mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
-                      todo.prioritaet === 'hoch' ? 'bg-accent-red' :
-                      todo.prioritaet === 'mittel' ? 'bg-accent-yellow' : 'bg-accent-green'
+                      (todo.prioritaet || todo.priority) === 'hoch' || (todo.priority) === 'high' ? 'bg-accent-red' :
+                      (todo.prioritaet || todo.priority) === 'mittel' || (todo.priority) === 'medium' ? 'bg-accent-yellow' : 'bg-accent-green'
                     }`} />
                     <div>
-                      <span className="text-text-primary">{todo.aufgabe}</span>
-                      {todo.verantwortlich && todo.verantwortlich !== 'unbekannt' && (
-                        <span className="text-text-secondary ml-1">({todo.verantwortlich})</span>
+                      <span className="text-text-primary">{todo.aufgabe || todo.task}</span>
+                      {(todo.verantwortlich || todo.responsible) && (todo.verantwortlich || todo.responsible) !== 'unbekannt' && (todo.verantwortlich || todo.responsible) !== 'unknown' && (
+                        <span className="text-text-secondary ml-1">({todo.verantwortlich || todo.responsible})</span>
                       )}
                     </div>
                   </div>
@@ -268,25 +310,59 @@ export default function TranscriptionDetail() {
             </div>
           )}
 
-          {analysis.entscheidungen && analysis.entscheidungen.length > 0 && (
+          {((analysis.entscheidungen && analysis.entscheidungen.length > 0) || (analysis.decisions && analysis.decisions.length > 0)) && (
             <div className="mb-4">
-              <h3 className="text-sm font-medium text-text-secondary mb-2">Entscheidungen</h3>
+              <h3 className="text-sm font-medium text-text-secondary mb-2">{analysis.decisions ? 'Decisions' : 'Entscheidungen'}</h3>
               <ul className="list-disc list-inside text-sm text-text-secondary/80 space-y-1">
-                {analysis.entscheidungen.map((e, i) => <li key={i}>{e}</li>)}
+                {(analysis.entscheidungen || analysis.decisions).map((e, i) => <li key={i}>{e}</li>)}
               </ul>
             </div>
           )}
 
-          {analysis.raeume && analysis.raeume.length > 0 && (
+          {((analysis.offene_punkte && analysis.offene_punkte.length > 0) || (analysis.open_items && analysis.open_items.length > 0)) && (
             <div className="mb-4">
-              <h3 className="text-sm font-medium text-text-secondary mb-2">Räume</h3>
-              {analysis.raeume.map((raum, i) => (
+              <h3 className="text-sm font-medium text-text-secondary mb-2">{analysis.open_items ? 'Open Items' : 'Offene Punkte'}</h3>
+              <ul className="list-disc list-inside text-sm text-text-secondary/80 space-y-1">
+                {(analysis.offene_punkte || analysis.open_items).map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {((analysis.naechste_schritte && analysis.naechste_schritte.length > 0) || (analysis.next_steps && analysis.next_steps.length > 0)) && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-text-secondary mb-2">{analysis.next_steps ? 'Next Steps' : 'Nächste Schritte'}</h3>
+              <ul className="list-disc list-inside text-sm text-text-secondary/80 space-y-1">
+                {(analysis.naechste_schritte || analysis.next_steps).map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {((analysis.kernpunkte && analysis.kernpunkte.length > 0) || (analysis.key_points && analysis.key_points.length > 0)) && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-text-secondary mb-2">{analysis.key_points ? 'Key Points' : 'Kernpunkte'}</h3>
+              <ul className="list-disc list-inside text-sm text-text-secondary/80 space-y-1">
+                {(analysis.kernpunkte || analysis.key_points).map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {analysis.details && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-text-secondary mb-1">Details</h3>
+              <p className="text-sm text-text-secondary/80 whitespace-pre-wrap">{analysis.details}</p>
+            </div>
+          )}
+
+          {((analysis.raeume && analysis.raeume.length > 0) || (analysis.rooms && analysis.rooms.length > 0)) && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-text-secondary mb-2">{analysis.rooms ? 'Rooms' : 'Räume'}</h3>
+              {(analysis.raeume || analysis.rooms).map((raum, i) => (
                 <div key={i} className="mb-3">
                   <p className="text-sm font-medium text-text-primary">{raum.name}</p>
-                  {raum.elemente?.map((el, j) => (
+                  {(raum.elemente || raum.elements)?.map((el, j) => (
                     <p key={j} className="text-sm text-text-secondary ml-4">
-                      {el.typ}: {el.masse?.breite}x{el.masse?.hoehe}m
-                      {el.anzahl > 1 && ` (${el.anzahl}x)`}
+                      {el.typ || el.type}: {(el.masse || el.dimensions)?.breite || (el.masse || el.dimensions)?.width}x{(el.masse || el.dimensions)?.hoehe || (el.masse || el.dimensions)?.height}m
+                      {(el.anzahl || el.count) > 1 && ` (${el.anzahl || el.count}x)`}
                     </p>
                   ))}
                 </div>
@@ -294,11 +370,11 @@ export default function TranscriptionDetail() {
             </div>
           )}
 
-          {analysis.warnungen && analysis.warnungen.length > 0 && (
+          {((analysis.warnungen && analysis.warnungen.length > 0) || (analysis.warnings && analysis.warnings.length > 0)) && (
             <div className="bg-accent-yellow/10 rounded-lg p-3">
-              <h3 className="text-sm font-medium text-accent-yellow mb-1">Warnungen</h3>
+              <h3 className="text-sm font-medium text-accent-yellow mb-1">{analysis.warnings ? 'Warnings' : 'Warnungen'}</h3>
               <ul className="text-sm text-accent-yellow/80 space-y-1">
-                {analysis.warnungen.map((w, i) => <li key={i}>{w}</li>)}
+                {(analysis.warnungen || analysis.warnings).map((w, i) => <li key={i}>{w}</li>)}
               </ul>
             </div>
           )}
@@ -307,6 +383,14 @@ export default function TranscriptionDetail() {
             <pre className="text-sm text-text-secondary whitespace-pre-wrap">{analysis.raw}</pre>
           )}
         </div>
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </>
   );

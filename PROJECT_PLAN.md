@@ -25,7 +25,7 @@ Web-Anwendung für Audio-Transkription, OCR/Document AI und KI-gestützte Analys
 transkription_webapp/
 ├── components/          # React-Komponenten
 │   ├── AudioUploadForm  # Drag-Drop Upload mit Optionen
-│   ├── AudioRecorder    # In-App Audio-Aufnahme (geplant)
+│   ├── AudioRecorder    # In-App Audio-Aufnahme (MediaRecorder API)
 │   ├── Layout           # Seitenlayout mit Sidebar (Dark Theme)
 │   ├── Sidebar          # Vertikale Navigation (geplant, ersetzt Navbar)
 │   ├── StatusBadge      # Farbkodierte Status-Badges
@@ -41,7 +41,8 @@ transkription_webapp/
 │   ├── constants.js     # Status-Konstanten, Dateitypen
 │   ├── db.js            # PostgreSQL Connection Pool
 │   ├── db-init.js       # Datenbankschema
-│   └── admin.js         # Admin-Middleware (geplant)
+│   ├── admin.js         # Admin-Middleware
+│   └── usage.js         # Token/Kosten-Tracking
 ├── pages/
 │   ├── api/
 │   │   ├── auth/[...nextauth].js  # NextAuth-Konfiguration
@@ -51,7 +52,7 @@ transkription_webapp/
 │   │   ├── translate.js           # Übersetzungs-API (geplant)
 │   │   ├── ocr.js                 # OCR-API (geplant)
 │   │   ├── settings.js            # Benutzer-Einstellungen
-│   │   ├── admin/                 # Admin-API-Routes (geplant)
+│   │   ├── admin/                 # Admin-API-Routes (users, usage, seed)
 │   │   ├── health.js              # Health-Check
 │   │   └── db-init.js             # Schema-Initialisierung
 │   ├── login.js
@@ -61,7 +62,7 @@ transkription_webapp/
 │   ├── transcriptions.js
 │   ├── transcriptions/[id].js
 │   ├── settings.js
-│   ├── admin/                     # Admin-Seiten (geplant)
+│   ├── admin/                     # Admin-Seiten (users)
 │   └── index.js
 └── styles/globals.css
 ```
@@ -74,10 +75,9 @@ users           (id, email, name, password_hash, role, created_at, updated_at)
 api_keys        (id, user_id, key, name, created_at, expires_at)
 transcriptions  (id, user_id, filename, original_name, file_path, file_size,
                  mime_type, status, template, diarize, custom_prompt,
-                 output_language, skip_analysis,
+                 auto_analyze,
                  text, segments, speakers, analysis, error, created_at, updated_at)
-                -- output_language: 'de'/'en' — Sprache des Analyse-Dokuments
-                -- skip_analysis: true = nur Transkription/OCR, keine LLM-Analyse
+                -- auto_analyze: false = nur Transkription, keine automatische LLM-Analyse
 settings        (id, user_id, mistral_api_key, default_template, language,
                  preferred_model, cost_limit, context_bias, updated_at)
                 -- preferred_model: 'mistral-large-latest'/'mistral-medium-latest'/'mistral-small-latest'
@@ -107,9 +107,10 @@ Upload/Aufnahme → pending → processing (Voxtral) → transcribed
   → analyzing (Mistral Large mit Sprechernamen) → completed
 ```
 
-#### Nur Transkription (skip_analysis=true)
+#### Nur Transkription (auto_analyze=false)
 ```
-Upload/Aufnahme → pending → processing (Voxtral) → completed (nur Rohtext)
+Upload/Aufnahme → pending → processing (Voxtral) → transcribed (nur Rohtext)
+  → Optional: Benutzer startet Analyse manuell → analyzing → completed
 ```
 
 ### OCR/Document AI
@@ -175,57 +176,63 @@ Text eingeben → Quellsprache + Zielsprache wählen → Mistral Large → Über
 - Dark Theme (#0a0a0f bg, #6c5ce7 accent-purple, #00cec9 accent-cyan)
 - Responsive Layout, Card-basierte Darstellung
 
-### Geplant
-
 #### 8. Ausgabesprache für Analyse-Dokumente (F2)
-- Vor der Transkription wählbar: Deutsch oder Englisch
+- In Settings wählbar: Deutsch oder Englisch
 - Betrifft die Sprache des Analyse-Prompts an Mistral Large (nicht die Audiosprache bei Voxtral)
-- Dropdown im Upload-Formular, Parameter an `analyzeTranscription()` übergeben
+- System-Prompt und alle Template-Prompts dynamisch DE/EN
+- Analyse-Anzeige rendert sowohl deutsche als auch englische JSON-Keys
 
 #### 9. Trennung Transkription/Weiterverarbeitung (F5)
-- Optional nur Transkription (Voxtral) ohne anschließende Analyse (Mistral Large)
-- Ebenso bei OCR: nur Text extrahieren ohne LLM-Verarbeitung
-- Toggle im Upload-Formular ("Nur Transkription" vs. "Transkription + Analyse")
+- Checkbox "Direkt analysieren" im Upload-Formular (Default: an)
+- Bei Deaktivierung: Nur Transkription, Status bleibt bei `transcribed`
+- Detail-Seite zeigt "Analyse starten"-Button für manuelle Analyse
 
 #### 10. In-App Audio-Aufnahme (F6)
-- Direkt in der App Audio aufnehmen statt nur hochladen
-- `MediaRecorder` Web API, funktioniert in allen modernen Browsern + Mobile
-- Neue Komponente `AudioRecorder.js` mit Start/Stop/Pause, Timer
-- Erzeugt WebM/OGG Blob → wird wie normaler Upload behandelt
+- Tab-System im Upload-Formular: "Datei hochladen" / "Aufnehmen"
+- `MediaRecorder` Web API mit Start/Pause/Resume/Stop und Timer
+- Audio-Preview nach Aufnahme, Blob→File Konvertierung
+- Format: WebM/Opus (Fallback: WebM)
 
-#### 11. Übersetzungs-Modul (F3)
+#### 11. Toast-Notification für Sprecherzuweisung (B4)
+- Toast-Komponente mit Auto-Hide, Close-Button, Dark-Theme-Styling
+- Polling erkennt Statuswechsel `processing` → `transcribed`
+- Kontextabhängige Nachricht (Diarization vs. Transkription-only)
+- Auto-Scroll zur Speaker-Assignment-Sektion
+
+#### 12. Admin-System (F7, F8)
+- Admin-User wird einmalig per Seed-Route erstellt
+- Keine Selbstregistrierung — nur Admin kann User anlegen
+- Admin-Seiten: `/admin/users` (Liste, Erstellen, Bearbeiten, Löschen)
+- Admin kann pro User: Name, E-Mail, Passwort, Rolle, API-Key, Kostenlimit setzen
+- Middleware `requireAdmin()` für Admin-API-Routes
+
+#### 13. Token/Kostenzähler mit Limit (F9)
+- Tracking der API-Nutzung pro User (Tokens, geschätzte Kosten)
+- DB-Tabelle `usage_log`, Mistral `usage`-Feld aus Responses
+- Kosten pro Modell berechnen (Preisliste Mistral)
+- Admin kann monatliche Limits pro User setzen (429 bei Überschreitung)
+- User sieht eigene Kosten in Settings, Admin sieht alle
+
+#### 14. Modellauswahl (F10)
+- User kann in Einstellungen zwischen Mistral Large, Medium und Small wählen
+- Feld `preferred_model` in Settings-Tabelle
+- Betrifft Analyse und Übersetzung (nicht Transkription — bleibt Voxtral)
+
+### Geplant
+
+#### 15. Übersetzungs-Modul (F3)
 - Separater Tab/Seite (`/translate`)
 - Text direkt einfügen, Quellsprache + Zielsprache auswählen
 - Übersetzung via Mistral Large `/chat/completions`
 
-#### 12. OCR/Document AI (F4)
+#### 16. OCR/Document AI (F4)
 - Separater Tab/Seite (`/ocr`)
 - Zwei Eingabemodi: Datei-Upload (PDF, DOCX, Bilder) und Kamera-Foto (Mobilgerät)
 - Workflow: Upload → Mistral Files API → Signed URL → `mistral-ocr-latest` → Markdown
 - Trennung OCR (nur Text) vs. LLM-Verarbeitung (Analyse/Zusammenfassung)
 - Tabellen-Format konfigurierbar (null/markdown/html)
 
-#### 13. Admin-System (F7, F8)
-- Admin-User wird einmalig per Seed-Script erstellt
-- Keine Selbstregistrierung — nur Admin kann User anlegen
-- Admin-Seiten: `/admin/users` (Liste, Erstellen, Bearbeiten, Löschen)
-- Admin kann pro User: Name, E-Mail, Passwort, Rolle, API-Key setzen
-- Middleware `requireAdmin()` für Admin-API-Routes
-
-#### 14. Token/Kostenzähler mit Limit (F9)
-- Tracking der API-Nutzung pro User (Tokens, geschätzte Kosten)
-- Neue DB-Tabelle `usage_log`
-- Mistral `usage`-Feld aus Responses auswerten
-- Kosten pro Modell berechnen (Preisliste Mistral)
-- Admin kann monatliche Limits pro User setzen
-- User sieht eigene Kosten, Admin sieht alle
-
-#### 15. Modellauswahl (F10)
-- User kann in Einstellungen zwischen Mistral Large, Medium und Small wählen
-- Neues Feld `preferred_model` in Settings-Tabelle
-- Betrifft Analyse und Übersetzung (nicht Transkription — bleibt Voxtral)
-
-#### 16. Individuelle Verarbeitungsvorlagen (F11)
+#### 17. Individuelle Verarbeitungsvorlagen (F11)
 - User kann eigene Formatierungs-/Verarbeitungsvorlagen in den Einstellungen anlegen und bearbeiten
 - Vorlagen enthalten Name und Prompt-Text (z.B. für Aufmaß, Meeting, Bauabnahme, Arztbericht etc.)
 - Neue DB-Tabelle `templates` (id, user_id, name, prompt_text, created_at, updated_at)
@@ -235,14 +242,14 @@ Text eingeben → Quellsprache + Zielsprache wählen → Mistral Large → Über
 - Gewählte Vorlage wird als System-Prompt an Mistral Large/Medium/Small gesendet
 - Die bisherigen 3 Standard-Templates (Meeting, Aufmaß, Allgemein) bleiben als nicht-löschbare Defaults bestehen
 
-#### 17. Logo-Integration (F12)
+#### 18. Logo-Integration (F12)
 - Zwei PNG-Dateien vorhanden: Logo mit Schriftzug und Logo ohne Schriftzug
 - Logo ohne Schriftzug in der Sidebar/Navbar verwenden
 - Logo mit Schriftzug auf der Login-Seite und Landing Page verwenden
 - **WICHTIG**: Logo-Hintergrund muss transparent sein oder zu `#0a0a0f` passen (aktuell ~#3a3a44, zu hell)
 - Logos in `/public/` ablegen als `logo.png` und `logo-text.png`
 
-#### 18. Vertikale Sidebar-Navigation (F13)
+#### 19. Vertikale Sidebar-Navigation (F13)
 - Navigation von horizontaler Tab-Leiste auf vertikale Sidebar links umstellen
 - **Desktop**: Permanente Sidebar (~240px breit) mit Logo, Nav-Links, User-Info, Abmelden
 - **Mobile**: Off-Canvas-Sidebar, per Swipe-Right einblendbar (Touch-Events: touchstart/touchmove/touchend)
@@ -267,6 +274,13 @@ Text eingeben → Quellsprache + Zielsprache wählen → Mistral Large → Über
 | POST | `/api/transcriptions/[id]/process` | Transkription starten |
 | POST | `/api/transcriptions/[id]/analyze` | Analyse starten |
 | GET/PUT | `/api/settings` | Benutzer-Einstellungen |
+| GET | `/api/usage` | Eigene Kostenübersicht |
+| GET | `/api/admin/users` | User-Liste (nur Admin) |
+| POST | `/api/admin/users` | User erstellen (nur Admin) |
+| PUT | `/api/admin/users/[id]` | User bearbeiten (nur Admin) |
+| DELETE | `/api/admin/users/[id]` | User löschen (nur Admin) |
+| POST | `/api/admin/seed` | Initialen Admin-User erstellen |
+| GET | `/api/admin/usage` | Kostenübersicht aller User (nur Admin) |
 | GET | `/api/health` | Health-Check |
 | POST | `/api/db-init` | Datenbankschema initialisieren |
 
@@ -279,12 +293,6 @@ Text eingeben → Quellsprache + Zielsprache wählen → Mistral Large → Über
 | POST | `/api/templates` | Neue Vorlage erstellen |
 | PUT | `/api/templates/[id]` | Vorlage bearbeiten |
 | DELETE | `/api/templates/[id]` | Vorlage löschen |
-| GET | `/api/admin/users` | User-Liste (nur Admin) |
-| POST | `/api/admin/users` | User erstellen (nur Admin) |
-| PUT | `/api/admin/users/[id]` | User bearbeiten (nur Admin) |
-| DELETE | `/api/admin/users/[id]` | User löschen (nur Admin) |
-| GET | `/api/admin/usage` | Kostenübersicht aller User (nur Admin) |
-| GET | `/api/usage` | Eigene Kostenübersicht |
 
 ## Implementierungsfortschritt
 
@@ -326,15 +334,15 @@ Text eingeben → Quellsprache + Zielsprache wählen → Mistral Large → Über
 - [x] F10: Modellauswahl (Mistral Large/Medium/Small) in Settings + DB + API + Backend
 
 ### Phase 6: Admin & Auth — Abgeschlossen
-- [x] F7: Admin-System (Seed-Script, Admin-Seiten, Middleware, Selbstregistrierung deaktiviert)
+- [x] F7: Admin-System (Seed-Route, Admin-Seiten, Middleware, Selbstregistrierung deaktiviert)
 - [x] F8: Admin kann API-Keys + Kostenlimits pro User hinterlegen
 - [x] F9: Token/Kostenzähler (usage_log Tabelle, Tracking, Limits, User + Admin Dashboard)
 
-### Phase 7: Audio-Erweiterungen — Ausstehend
-- [ ] F2: Ausgabesprache (DE/EN) für Analyse-Dokumente
-- [ ] F5: Trennung Transkription/Weiterverarbeitung (nur Transkript ohne Analyse)
-- [ ] F6: In-App Audio-Aufnahme (MediaRecorder API)
-- [ ] B4: Speaker Assignment Popup/Benachrichtigung
+### Phase 7: Audio-Erweiterungen — Abgeschlossen
+- [x] F2: Ausgabesprache (DE/EN) für Analyse-Dokumente (dynamische Prompts, Fallback-Keys in UI)
+- [x] F5: Trennung Transkription/Weiterverarbeitung (auto_analyze Checkbox, manueller Analyse-Start)
+- [x] F6: In-App Audio-Aufnahme (AudioRecorder Komponente, Tab-System, MediaRecorder API)
+- [x] B4: Toast-Notification für Sprecherzuweisung (Polling-Detection, Auto-Scroll)
 
 ### Phase 8: UI-Überarbeitung & Logo — Ausstehend
 - [ ] F13: Vertikale Sidebar-Navigation (Desktop permanent, Mobile Swipe-Geste)
@@ -372,5 +380,5 @@ Text eingeben → Quellsprache + Zielsprache wählen → Mistral Large → Über
 
 ---
 
-**Letzte Aktualisierung**: 09.02.2026
-**Status**: Phase 1–6 abgeschlossen, Phase 7–11 ausstehend (1 Bug, 7 Features geplant)
+**Letzte Aktualisierung**: 10.02.2026
+**Status**: Phase 1–7 abgeschlossen, Phase 8–11 ausstehend (6 Features geplant)

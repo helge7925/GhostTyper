@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const { id } = req.query;
 
   const transcription = await query(
-    'SELECT id, file_path, template, diarize, custom_prompt, status FROM transcriptions WHERE id = $1 AND user_id = $2',
+    'SELECT id, file_path, template, diarize, custom_prompt, auto_analyze, status FROM transcriptions WHERE id = $1 AND user_id = $2',
     [id, session.user.id]
   );
 
@@ -33,11 +33,12 @@ export default async function handler(req, res) {
 
   // Get user's settings (API key + context_bias)
   const settingsResult = await query(
-    'SELECT mistral_api_key, context_bias, preferred_model FROM settings WHERE user_id = $1',
+    'SELECT mistral_api_key, context_bias, preferred_model, language FROM settings WHERE user_id = $1',
     [session.user.id]
   );
   const apiKey = settingsResult.rows[0]?.mistral_api_key || process.env.MISTRAL_API_KEY;
   const preferredModel = settingsResult.rows[0]?.preferred_model || null;
+  const language = settingsResult.rows[0]?.language || 'de';
   const contextBias = settingsResult.rows[0]?.context_bias
     ? settingsResult.rows[0].context_bias.split(',').map(s => s.trim()).filter(Boolean)
     : [];
@@ -68,7 +69,7 @@ export default async function handler(req, res) {
     const { text, segments, usage: transcriptionUsage, model: transcriptionModel } = await transcribeAudio(job.file_path, apiKey, {
       diarize: job.diarize,
       contextBias,
-      language: 'de',
+      language,
     });
 
     // Log transcription usage
@@ -80,14 +81,20 @@ export default async function handler(req, res) {
         "UPDATE transcriptions SET status = 'transcribed', text = $1, segments = $2, updated_at = NOW() WHERE id = $3",
         [text, JSON.stringify(segments), id]
       );
+    } else if (!job.auto_analyze) {
+      // Transcription-only mode: stop at 'transcribed' without analysis
+      await query(
+        "UPDATE transcriptions SET status = 'transcribed', text = $1, updated_at = NOW() WHERE id = $2",
+        [text, id]
+      );
     } else {
-      // No diarization: go straight to analysis
+      // Auto-analyze: go straight to analysis
       await query(
         "UPDATE transcriptions SET status = 'analyzing', text = $1, updated_at = NOW() WHERE id = $2",
         [text, id]
       );
 
-      const { analysis, usage: analysisUsage, model: analysisModel } = await analyzeTranscription(text, job.template, apiKey, job.custom_prompt || '', preferredModel);
+      const { analysis, usage: analysisUsage, model: analysisModel } = await analyzeTranscription(text, job.template, apiKey, job.custom_prompt || '', preferredModel, language);
 
       // Log analysis usage
       await logUsage(session.user.id, analysisModel, 'analysis', analysisUsage);
