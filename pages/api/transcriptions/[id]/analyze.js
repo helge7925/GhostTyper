@@ -33,11 +33,12 @@ export default async function handler(req, res) {
 
   // Get user's API key + preferred model
   const settingsResult = await query(
-    'SELECT mistral_api_key, preferred_model FROM settings WHERE user_id = $1',
+    'SELECT mistral_api_key, preferred_model, language FROM settings WHERE user_id = $1',
     [session.user.id]
   );
   const apiKey = settingsResult.rows[0]?.mistral_api_key || process.env.MISTRAL_API_KEY;
   const preferredModel = settingsResult.rows[0]?.preferred_model || null;
+  const language = settingsResult.rows[0]?.language || 'de';
 
   if (!apiKey) {
     return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert' });
@@ -77,7 +78,7 @@ export default async function handler(req, res) {
       );
     }
 
-    const { analysis, usage: analysisUsage, model: analysisModel } = await analyzeTranscription(analysisText, job.template, apiKey, job.custom_prompt || '', preferredModel);
+    const { analysis, usage: analysisUsage, model: analysisModel } = await analyzeTranscription(analysisText, job.template, apiKey, job.custom_prompt || '', preferredModel, language);
 
     // Log analysis usage
     await logUsage(session.user.id, analysisModel, 'analysis', analysisUsage);

@@ -1,12 +1,15 @@
 import { useState, useRef } from 'react';
 import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE } from '../lib/constants';
 import { uploadAudio } from '../lib/api';
+import AudioRecorder from './AudioRecorder';
 
 export default function AudioUploadForm({ onSuccess }) {
   const [file, setFile] = useState(null);
   const [template, setTemplate] = useState('meeting');
   const [diarize, setDiarize] = useState(false);
+  const [autoAnalyze, setAutoAnalyze] = useState(true);
   const [customPrompt, setCustomPrompt] = useState('');
+  const [uploadMode, setUploadMode] = useState('file');
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -41,6 +44,13 @@ export default function AudioUploadForm({ onSuccess }) {
     }
   }
 
+  function handleRecordingComplete(blob) {
+    const ext = blob.type.includes('webm') ? 'webm' : 'wav';
+    const recordedFile = new File([blob], `aufnahme-${Date.now()}.${ext}`, { type: blob.type });
+    setFile(recordedFile);
+    setUploadMode('file');
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!file) return;
@@ -54,7 +64,7 @@ export default function AudioUploadForm({ onSuccess }) {
         setProgress((prev) => Math.min(prev + 10, 90));
       }, 200);
 
-      const result = await uploadAudio(file, { template, diarize, customPrompt });
+      const result = await uploadAudio(file, { template, diarize, customPrompt, autoAnalyze });
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -69,44 +79,81 @@ export default function AudioUploadForm({ onSuccess }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div
-        onDrop={handleDrop}
-        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-        onDragLeave={() => setDragActive(false)}
-        onClick={() => inputRef.current?.click()}
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-          dragActive
-            ? 'border-accent-purple bg-accent-purple/10'
-            : 'border-white/[0.12] hover:border-white/[0.2]'
-        }`}
-      >
-        <input
-          ref={inputRef}
-          type="file"
-          accept="audio/*"
-          capture="environment"
-          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-          className="hidden"
-        />
-        {file ? (
-          <p className="text-sm text-text-primary">
-            <span className="font-medium">{file.name}</span>{' '}
-            <span className="text-text-secondary">
-              ({(file.size / 1024 / 1024).toFixed(1)} MB)
-            </span>
-          </p>
-        ) : (
-          <div>
-            <svg className="mx-auto w-10 h-10 text-text-secondary mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            <p className="text-sm text-text-secondary">
-              Audio-Datei hierher ziehen oder <span className="text-accent-purple font-medium">durchsuchen</span>
-            </p>
-            <p className="text-xs text-text-secondary/60 mt-1">MP3, WAV, OGG, FLAC, M4A (max. 50 MB)</p>
-          </div>
-        )}
+      <div className="border-b border-white/[0.1] -mx-6 px-6 mb-1">
+        <div className="flex gap-6">
+          <button
+            type="button"
+            onClick={() => setUploadMode('file')}
+            className={`pb-3 text-sm font-medium transition-colors relative ${
+              uploadMode === 'file'
+                ? 'text-accent-purple'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Datei hochladen
+            {uploadMode === 'file' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent-purple to-accent-cyan" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setUploadMode('record')}
+            className={`pb-3 text-sm font-medium transition-colors relative ${
+              uploadMode === 'record'
+                ? 'text-accent-purple'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Aufnehmen
+            {uploadMode === 'record' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent-purple to-accent-cyan" />
+            )}
+          </button>
+        </div>
       </div>
+
+      {uploadMode === 'file' ? (
+        <div
+          onDrop={handleDrop}
+          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+          onDragLeave={() => setDragActive(false)}
+          onClick={() => inputRef.current?.click()}
+          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+            dragActive
+              ? 'border-accent-purple bg-accent-purple/10'
+              : 'border-white/[0.12] hover:border-white/[0.2]'
+          }`}
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            accept="audio/*"
+            capture="environment"
+            onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+            className="hidden"
+          />
+          {file ? (
+            <p className="text-sm text-text-primary">
+              <span className="font-medium">{file.name}</span>{' '}
+              <span className="text-text-secondary">
+                ({(file.size / 1024 / 1024).toFixed(1)} MB)
+              </span>
+            </p>
+          ) : (
+            <div>
+              <svg className="mx-auto w-10 h-10 text-text-secondary mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <p className="text-sm text-text-secondary">
+                Audio-Datei hierher ziehen oder <span className="text-accent-purple font-medium">durchsuchen</span>
+              </p>
+              <p className="text-xs text-text-secondary/60 mt-1">MP3, WAV, OGG, FLAC, M4A, WebM (max. 50 MB)</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <AudioRecorder onRecordingComplete={handleRecordingComplete} />
+      )}
 
       <div>
         <label htmlFor="upload-template" className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -136,6 +183,22 @@ export default function AudioUploadForm({ onSuccess }) {
           Sprechererkennung aktivieren
           <span className="block text-xs text-text-secondary/60">
             Erkennt verschiedene Sprecher und ermöglicht Namenszuweisung vor der Analyse
+          </span>
+        </label>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <input
+          id="upload-auto-analyze"
+          type="checkbox"
+          checked={autoAnalyze}
+          onChange={(e) => setAutoAnalyze(e.target.checked)}
+          className="w-4 h-4 text-accent-purple bg-dark-input border-white/[0.2] rounded focus:ring-accent-purple"
+        />
+        <label htmlFor="upload-auto-analyze" className="text-sm text-text-secondary">
+          Direkt analysieren
+          <span className="block text-xs text-text-secondary/60">
+            Deaktivieren für reine Transkription ohne automatische Analyse
           </span>
         </label>
       </div>

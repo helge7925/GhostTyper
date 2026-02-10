@@ -53,6 +53,7 @@ export default function Upload() {
             <p className="text-sm text-text-secondary mb-4">
               {result.original_name} wird jetzt transkribiert.
               {result.diarize && ' Nach der Transkription können Sie Sprechernamen zuweisen.'}
+              {!result.diarize && !result.auto_analyze && ' Sie können die Analyse später manuell starten.'}
             </p>
             <div className="flex gap-3 justify-center">
               <button
