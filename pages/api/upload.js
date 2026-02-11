@@ -65,15 +65,16 @@ export default async function handler(req, res) {
     await unlink(file.filepath).catch(() => {});
 
     const template = fields.template?.[0] || fields.template || 'meeting';
+    const model = fields.model?.[0] || fields.model || 'mistral-large-latest';
     const diarize = (fields.diarize?.[0] || fields.diarize) === 'true';
     const customPrompt = fields.customPrompt?.[0] || fields.customPrompt || null;
     const autoAnalyze = (fields.autoAnalyze?.[0] || fields.autoAnalyze) !== 'false';
 
     const result = await query(
-      `INSERT INTO transcriptions (user_id, filename, original_name, file_path, file_size, mime_type, template, diarize, custom_prompt, auto_analyze, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')
-       RETURNING id, filename, original_name, status, template, diarize, auto_analyze, created_at`,
-      [session.user.id, filename, file.originalFilename, filePath, file.size, file.mimetype, template, diarize, customPrompt, autoAnalyze]
+      `INSERT INTO transcriptions (user_id, filename, original_name, file_path, file_size, mime_type, template, model, diarize, custom_prompt, auto_analyze, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending')
+       RETURNING id, filename, original_name, status, template, model, diarize, auto_analyze, created_at`,
+      [session.user.id, filename, file.originalFilename, filePath, file.size, file.mimetype, template, model, diarize, customPrompt, autoAnalyze]
     );
 
     return res.status(201).json(result.rows[0]);

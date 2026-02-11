@@ -7,7 +7,7 @@ export default function Toast({ message, type = 'info', duration = 5000, onClose
   }, [duration, onClose]);
 
   const styles = {
-    info: 'bg-accent-purple/20 border-accent-purple/40 text-accent-purple',
+    info: 'bg-accent-orange/20 border-accent-orange/40 text-accent-orange',
     success: 'bg-green-500/20 border-green-500/40 text-green-400',
     error: 'bg-accent-red/20 border-accent-red/40 text-accent-red',
   };

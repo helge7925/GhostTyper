@@ -18,10 +18,18 @@ export const authOptions = {
         );
 
         const user = result.rows[0];
-        if (!user) return null;
+        console.log('Authorize: User found in DB:', user ? { id: user.id, email: user.email, role: user.role } : 'None');
+        if (!user) {
+          console.log('Authorize: User not found for email:', credentials.email);
+          return null;
+        }
 
         const valid = await bcrypt.compare(credentials.password, user.password_hash);
-        if (!valid) return null;
+        console.log('Authorize: Password comparison result:', valid);
+        if (!valid) {
+          console.log('Authorize: Invalid password for user:', credentials.email);
+          return null;
+        }
 
         return {
           id: user.id,

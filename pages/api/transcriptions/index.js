@@ -11,10 +11,10 @@ export default async function handler(req, res) {
   switch (req.method) {
     case 'GET': {
       const result = await query(
-        `SELECT id, original_name, status, template, created_at, updated_at
+        `SELECT id, original_name, status, template, mime_type, folder_id, is_favorite, created_at, updated_at
          FROM transcriptions
          WHERE user_id = $1
-         ORDER BY created_at DESC`,
+         ORDER BY is_favorite DESC, created_at DESC`,
         [session.user.id]
       );
       return res.status(200).json(result.rows);

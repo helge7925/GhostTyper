@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
-import { query } from '../../../../lib/db';
+import { query, resolveTemplate } from '../../../../lib/db';
 import { analyzeTranscription, buildTextWithSpeakers } from '../../../../lib/ai-service';
 import { logUsage, checkCostLimit } from '../../../../lib/usage';
 
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const { id } = req.query;
 
   const result = await query(
-    'SELECT id, text, segments, speakers, template, custom_prompt, status FROM transcriptions WHERE id = $1 AND user_id = $2',
+    'SELECT id, text, segments, speakers, template, model, custom_prompt, status FROM transcriptions WHERE id = $1 AND user_id = $2',
     [id, session.user.id]
   );
 
@@ -31,13 +31,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: `Analyse kann nur im Status "transcribed" gestartet werden (aktuell: "${job.status}")` });
   }
 
-  // Get user's API key + preferred model
+  // Get user's API key + settings
   const settingsResult = await query(
     'SELECT mistral_api_key, preferred_model, language FROM settings WHERE user_id = $1',
     [session.user.id]
   );
   const apiKey = settingsResult.rows[0]?.mistral_api_key || process.env.MISTRAL_API_KEY;
-  const preferredModel = settingsResult.rows[0]?.preferred_model || null;
+  const preferredModelFallback = settingsResult.rows[0]?.preferred_model || 'mistral-large-latest';
   const language = settingsResult.rows[0]?.language || 'de';
 
   if (!apiKey) {
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
   const costCheck = await checkCostLimit(session.user.id);
   if (!costCheck.allowed) {
     return res.status(429).json({
-      message: `Monatliches Kostenlimit erreicht (${costCheck.currentCost.toFixed(2)} / ${costCheck.limit.toFixed(2)} EUR)`,
+      message: `Monatliches Kostenlimit erreicht (${costCheck.currentCost.toFixed(2)} / ${costCheck.limit.toFixed(2)} €)`,
     });
   }
 
@@ -78,7 +78,15 @@ export default async function handler(req, res) {
       );
     }
 
-    const { analysis, usage: analysisUsage, model: analysisModel } = await analyzeTranscription(analysisText, job.template, apiKey, job.custom_prompt || '', preferredModel, language);
+    const resolvedTemplate = await resolveTemplate(job.template, session.user.id);
+    const { analysis, usage: analysisUsage, model: analysisModel } = await analyzeTranscription(
+      analysisText, 
+      resolvedTemplate, 
+      apiKey, 
+      job.custom_prompt || '', 
+      job.model || preferredModelFallback, 
+      language
+    );
 
     // Log analysis usage
     await logUsage(session.user.id, analysisModel, 'analysis', analysisUsage);

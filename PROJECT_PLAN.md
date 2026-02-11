@@ -1,4 +1,4 @@
-# Transkriptions-WebApp Projektplan
+# GhostTyper Projektplan
 
 ## Übersicht
 Web-Anwendung für Audio-Transkription, OCR/Document AI und KI-gestützte Analyse. Nutzt Mistral Voxtral Mini für die Transkription, Mistral OCR für Dokumentenerkennung und Mistral Large/Medium/Small für kontextsensitive Analyse und Übersetzung. Deployment auf einem Hetzner VPS mit Docker und Traefik.
@@ -12,373 +12,105 @@ Web-Anwendung für Audio-Transkription, OCR/Document AI und KI-gestützte Analys
 | Datenbank | PostgreSQL 16 (eigene DB in bestehender Paperless-Instanz) |
 | Auth | NextAuth.js (Credentials Provider, JWT Sessions) |
 | KI-Transkription | Mistral Voxtral Mini (`voxtral-mini-latest`) |
-| KI-Analyse | Mistral Large/Medium/Small (wählbar pro User) |
+| KI-Analyse | Mistral Large/Medium/Small (pro Job wählbar) |
 | KI-OCR | Mistral OCR (`mistral-ocr-latest`) |
-| KI-Übersetzung | Mistral Large (`mistral-large-latest`) |
+| KI-Übersetzung | Mistral Modelle (pro Job wählbar) |
 | Reverse Proxy | Traefik (Let's Encrypt, Domain: `transkription.helgeroos.de`) |
 | Containerisierung | Docker (Multi-Stage Build, `output: 'standalone'`) |
-| Design | Dark Theme (#0a0a0f, Accent Purple/Cyan) |
+| Design | Dark Theme (#0a0a0f, Mistral Orange #ff5917) |
 
 ## Architektur
 
 ```
 transkription_webapp/
 ├── components/          # React-Komponenten
-│   ├── AudioUploadForm  # Drag-Drop Upload mit Optionen
-│   ├── AudioRecorder    # In-App Audio-Aufnahme (MediaRecorder API)
-│   ├── Layout           # Seitenlayout mit Sidebar (Dark Theme)
-│   ├── Sidebar          # Vertikale Navigation (geplant, ersetzt Navbar)
+│   ├── AudioUploadForm  # Upload mit Modell- und Template-Wahl
+│   ├── AudioRecorder    # In-App Audio-Aufnahme (.webm/Opus)
+│   ├── Layout           # Seitenlayout mit Sidebar & mobilem Header
+│   ├── Sidebar          # Vertikale Navigation (reorganisiert)
+│   ├── DocumentEditor   # Canvas-Editor mit Rich-Text Toolbar & .docx Export
 │   ├── StatusBadge      # Farbkodierte Status-Badges
-│   ├── TemplateEditor   # Vorlagen-Editor in Settings (geplant)
-│   ├── TranscriptionCard
 │   └── LoadingSpinner
 ├── config/
 │   ├── docker-compose.dev.yml   # Lokale Entwicklung (eigene PostgreSQL)
 │   └── docker-compose.prod.yml  # Produktion (Traefik + Paperless-DB)
 ├── lib/
-│   ├── ai-service.js    # Mistral API (Voxtral + Large + OCR)
+│   ├── ai-service.js    # Mistral API Integration
 │   ├── api.js           # Frontend API-Helper
+│   ├── export-utils.js  # Markdown-zu-HTML & PDF/DOCX Export
+│   ├── prompts.js       # Zentralisierte KI-Anweisungen (Zusammenfassung, Meeting, Aufmaß)
 │   ├── constants.js     # Status-Konstanten, Dateitypen
-│   ├── db.js            # PostgreSQL Connection Pool
-│   ├── db-init.js       # Datenbankschema
+│   ├── db.js            # PostgreSQL Pool & Template-Resolver
+│   ├── db-init.js       # Datenbankschema & Migrationen
 │   ├── admin.js         # Admin-Middleware
-│   └── usage.js         # Token/Kosten-Tracking
+│   └── usage.js         # Token/Kosten-Tracking in €
 ├── pages/
-│   ├── api/
-│   │   ├── auth/[...nextauth].js  # NextAuth-Konfiguration
-│   │   ├── auth/register.js       # Benutzerregistrierung (nur Admin)
-│   │   ├── transcriptions/        # CRUD + Workflow-Endpunkte
-│   │   ├── upload.js              # Datei-Upload (Audio + Dokumente)
-│   │   ├── translate.js           # Übersetzungs-API (geplant)
-│   │   ├── ocr.js                 # OCR-API (geplant)
-│   │   ├── settings.js            # Benutzer-Einstellungen
-│   │   ├── admin/                 # Admin-API-Routes (users, usage, seed)
-│   │   ├── health.js              # Health-Check
-│   │   └── db-init.js             # Schema-Initialisierung
-│   ├── login.js
-│   ├── upload.js
-│   ├── translate.js               # Übersetzungs-Seite (geplant)
-│   ├── ocr.js                     # OCR/Document AI-Seite (geplant)
-│   ├── transcriptions.js
-│   ├── transcriptions/[id].js
-│   ├── settings.js
-│   ├── admin/                     # Admin-Seiten (users)
-│   └── index.js
-└── styles/globals.css
+│   ├── api/             # API Endpunkte (Auth, Profile, Transcriptions, OCR, Translate, Settings, Admin)
+│   ├── login.js         # Branding-optimierte Login-Seite
+│   ├── upload.js        # Hauptseite für Transkription
+│   ├── translate.js     # Modulares Übersetzungs-Tool (inkl. OCR-Import)
+│   ├── ocr.js           # Dokumentenerkennung mit Canvas-Integration
+│   ├── profile.js       # Benutzerprofil (Avatar-Upload, E-Mail, Passwort)
+│   ├── transcriptions.js # Historie (Audio & OCR kombiniert)
+│   ├── settings.js      # Einstellungen & Canvas Template-Editor
+│   └── admin/           # Admin-User-Verwaltung
+└── styles/globals.css   # Dark-Theme & Branding-Styles
 ```
 
-## Datenbankschema
-
-```sql
-users           (id, email, name, password_hash, role, created_at, updated_at)
-                -- role: 'admin' oder 'user' (keine Selbstregistrierung, nur Admin erstellt User)
-api_keys        (id, user_id, key, name, created_at, expires_at)
-transcriptions  (id, user_id, filename, original_name, file_path, file_size,
-                 mime_type, status, template, diarize, custom_prompt,
-                 auto_analyze,
-                 text, segments, speakers, analysis, error, created_at, updated_at)
-                -- auto_analyze: false = nur Transkription, keine automatische LLM-Analyse
-settings        (id, user_id, mistral_api_key, default_template, language,
-                 preferred_model, cost_limit, context_bias, updated_at)
-                -- preferred_model: 'mistral-large-latest'/'mistral-medium-latest'/'mistral-small-latest'
-                -- cost_limit: monatliches Kostenlimit in EUR (NULL = unbegrenzt)
-usage_log       (id, user_id, model, operation, input_tokens, output_tokens,
-                 estimated_cost, created_at)
-                -- operation: 'transcription'/'analysis'/'translation'/'ocr'
-                -- Tracking pro API-Call für Kostenkontrolle
-templates       (id, user_id, name, prompt_text, created_at, updated_at)
-                -- Benutzerdefinierte Verarbeitungsvorlagen
-                -- prompt_text wird als System-Prompt an Mistral gesendet
-```
-
-## Workflows
-
-### Audio-Transkription
-
-#### Ohne Sprechererkennung
-```
-Upload/Aufnahme → pending → processing (Voxtral) → analyzing (Mistral Large) → completed
-```
-
-#### Mit Sprechererkennung (diarize=true)
-```
-Upload/Aufnahme → pending → processing (Voxtral) → transcribed
-  → Benutzer weist Sprechernamen zu
-  → analyzing (Mistral Large mit Sprechernamen) → completed
-```
-
-#### Nur Transkription (auto_analyze=false)
-```
-Upload/Aufnahme → pending → processing (Voxtral) → transcribed (nur Rohtext)
-  → Optional: Benutzer startet Analyse manuell → analyzing → completed
-```
-
-### OCR/Document AI
-```
-Upload/Foto → Mistral Files API → Signed URL → mistral-ocr-latest → Markdown-Text
-  → Optional: Weiterverarbeitung mit Mistral Large (Zusammenfassung, Analyse)
-  → Datei bei Mistral löschen
-```
-
-### Übersetzung
-```
-Text eingeben → Quellsprache + Zielsprache wählen → Mistral Large → Übersetzter Text
-```
-
-### Status-Übersicht
-
-| Status | Bedeutung |
-|---|---|
-| `pending` | Hochgeladen, wartet auf Verarbeitung |
-| `processing` | Voxtral Transkription / OCR läuft |
-| `transcribed` | Transkription fertig, Sprecherzuweisung ausstehend |
-| `analyzing` | Mistral Large Analyse läuft |
-| `completed` | Abgeschlossen |
-| `error` | Fehler aufgetreten |
+## Datenbankschema (Updates)
+- `transcriptions`: Spalten `document_html` (korrigierte Fassung) und `model` (gewähltes LLM).
+- `settings`: Spalte `cost_limit` (monatliches Limit in €).
+- `templates`: Tabelle für benutzerdefinierte & überschriebene Analyse-Prompts.
+- `users`: Spalte `avatar_url` für Profilbilder (Base64).
 
 ## Features
 
 ### Implementiert
 
-#### 1. Benutzerauthentifizierung
-- Registrierung und Login (NextAuth.js, Credentials Provider)
-- JWT Sessions, rollenbasierte Zugriffskontrolle
-- Jeder Nutzer hinterlegt eigenen Mistral API-Key in den Einstellungen
+#### 1. Branding & Design (F1, F12)
+- Systemweites Redesign auf **Mistral Orange** (#ff5917).
+- Neues Logo mit schwarzem Hintergrund, Favicon und PWA-Icons integriert.
+- Konsistente Benennung der KI-Modelle ("Mistral Large" etc.).
 
-#### 2. Audio-Upload
-- Drag-Drop und Dateiauswahl
-- Unterstützte Formate: MP3, WAV, OGG, FLAC, M4A, WebM
-- Maximale Dateigröße: 50 MB
-- Template-Auswahl (Meeting-Protokoll, Aufmaß, Allgemein)
+#### 2. Transkription & Audio (F5, F6)
+- Hochpräzise Audio-Umwandlung mit Voxtral Mini.
+- In-App Aufnahme (.webm) mit direktem API-Mapping.
+- Modellauswahl (Large/Medium/Small) direkt beim Start des Jobs.
 
-#### 3. Sprechererkennung (Diarization)
-- Optional aktivierbar beim Upload
-- Voxtral erkennt verschiedene Sprecher und liefert `speaker_id` pro Segment
-- Nach der Transkription können Sprechernamen zugewiesen werden
-- Sprechernamen werden vor der Analyse in den Text eingefügt
+#### 3. OCR & Document AI (F4) — ERWEITERT
+- Textextraktion aus PDF/Bildern mit automatischer Speicherung in der Historie.
+- 2-Schritt-Feedback: "Text-Extraktion" -> "KI-Analyse".
+- Flexible Analyse mit wählbaren Templates und Custom Prompts.
 
-#### 4. Kontextwörter (Context Bias)
-- Benutzer kann in den Einstellungen eine kommagetrennte Liste von Begriffen hinterlegen
-- Begriffe werden automatisch als `context_bias` an Voxtral gesendet
-- Verbessert die Erkennung von Fachbegriffen, Eigennamen und Abkürzungen
+#### 4. Dokumenten-Workflow (F14) — CANVAS
+- **Canvas Editor:** WYSIWYG-Umgebung im Gemini-Stil mit Rich-Text Toolbar (Fett, Kursiv, Unterstreichen, Listen, Ausrichtung, H2/H3).
+- **Referenz-Sidebar:** Originaltext bleibt beim Bearbeiten links sichtbar.
+- **Clean Export:** PDF- und professioneller **DOCX-Export** (via `docx` Library) ohne Website-Metadaten.
+- **Markdown-Fix:** Automatische Umwandlung von KI-Strukturen/Markdown in formatierten Text.
 
-#### 5. Zusätzlicher Kontext (Custom Prompt)
-- Optionales Freitextfeld beim Upload
-- Wird der Mistral Large Analyse als zusätzlicher Kontext mitgegeben
-- Ermöglicht Angabe von Teilnehmern, Projektnamen, besonderen Hinweisen
+#### 5. Übersetzungs-Modul (F3)
+- Zwischen-Übersetzung von OCR- oder Audio-Texten direkt im Canvas-Editor.
+- Dediziertes Tool mit **OCR-Import-Funktion** (Text aus Foto/PDF extrahieren und übersetzen).
 
-#### 6. Template-basierte Analyse
-- **Meeting-Protokoll**: Zusammenfassung, Themen, To-Dos mit Priorität und Verantwortlichen, Entscheidungen, offene Punkte, nächste Schritte
-- **Aufmaß**: Projekt, Räume mit Elementen und Maßen, Plausibilitätswarnungen, Zusammenfassung
-- **Allgemein**: Zusammenfassung, Kernpunkte, detaillierte Aufbereitung
+#### 6. Profil-Management (NEU)
+- Direktes Hochladen von Profilbildern (Galerie/Explorer) mit Base64-Speicherung.
+- Änderung von Name, E-Mail und Passwort (mit Sicherheits-Verifizierung des alten Passworts).
 
-#### 7. Dark Theme Design
-- Dark Theme (#0a0a0f bg, #6c5ce7 accent-purple, #00cec9 accent-cyan)
-- Responsive Layout, Card-basierte Darstellung
-
-#### 8. Ausgabesprache für Analyse-Dokumente (F2)
-- In Settings wählbar: Deutsch oder Englisch
-- Betrifft die Sprache des Analyse-Prompts an Mistral Large (nicht die Audiosprache bei Voxtral)
-- System-Prompt und alle Template-Prompts dynamisch DE/EN
-- Analyse-Anzeige rendert sowohl deutsche als auch englische JSON-Keys
-
-#### 9. Trennung Transkription/Weiterverarbeitung (F5)
-- Checkbox "Direkt analysieren" im Upload-Formular (Default: an)
-- Bei Deaktivierung: Nur Transkription, Status bleibt bei `transcribed`
-- Detail-Seite zeigt "Analyse starten"-Button für manuelle Analyse
-
-#### 10. In-App Audio-Aufnahme (F6)
-- Tab-System im Upload-Formular: "Datei hochladen" / "Aufnehmen"
-- `MediaRecorder` Web API mit Start/Pause/Resume/Stop und Timer
-- Audio-Preview nach Aufnahme, Blob→File Konvertierung
-- Format: WebM/Opus (Fallback: WebM)
-
-#### 11. Toast-Notification für Sprecherzuweisung (B4)
-- Toast-Komponente mit Auto-Hide, Close-Button, Dark-Theme-Styling
-- Polling erkennt Statuswechsel `processing` → `transcribed`
-- Kontextabhängige Nachricht (Diarization vs. Transkription-only)
-- Auto-Scroll zur Speaker-Assignment-Sektion
-
-#### 12. Admin-System (F7, F8)
-- Admin-User wird einmalig per Seed-Route erstellt
-- Keine Selbstregistrierung — nur Admin kann User anlegen
-- Admin-Seiten: `/admin/users` (Liste, Erstellen, Bearbeiten, Löschen)
-- Admin kann pro User: Name, E-Mail, Passwort, Rolle, API-Key, Kostenlimit setzen
-- Middleware `requireAdmin()` für Admin-API-Routes
-
-#### 13. Token/Kostenzähler mit Limit (F9)
-- Tracking der API-Nutzung pro User (Tokens, geschätzte Kosten)
-- DB-Tabelle `usage_log`, Mistral `usage`-Feld aus Responses
-- Kosten pro Modell berechnen (Preisliste Mistral)
-- Admin kann monatliche Limits pro User setzen (429 bei Überschreitung)
-- User sieht eigene Kosten in Settings, Admin sieht alle
-
-#### 14. Modellauswahl (F10)
-- User kann in Einstellungen zwischen Mistral Large, Medium und Small wählen
-- Feld `preferred_model` in Settings-Tabelle
-- Betrifft Analyse und Übersetzung (nicht Transkription — bleibt Voxtral)
-
-### Geplant
-
-#### 15. Übersetzungs-Modul (F3)
-- Separater Tab/Seite (`/translate`)
-- Text direkt einfügen, Quellsprache + Zielsprache auswählen
-- Übersetzung via Mistral Large `/chat/completions`
-
-#### 16. OCR/Document AI (F4)
-- Separater Tab/Seite (`/ocr`)
-- Zwei Eingabemodi: Datei-Upload (PDF, DOCX, Bilder) und Kamera-Foto (Mobilgerät)
-- Workflow: Upload → Mistral Files API → Signed URL → `mistral-ocr-latest` → Markdown
-- Trennung OCR (nur Text) vs. LLM-Verarbeitung (Analyse/Zusammenfassung)
-- Tabellen-Format konfigurierbar (null/markdown/html)
-
-#### 17. Individuelle Verarbeitungsvorlagen (F11)
-- User kann eigene Formatierungs-/Verarbeitungsvorlagen in den Einstellungen anlegen und bearbeiten
-- Vorlagen enthalten Name und Prompt-Text (z.B. für Aufmaß, Meeting, Bauabnahme, Arztbericht etc.)
-- Neue DB-Tabelle `templates` (id, user_id, name, prompt_text, created_at, updated_at)
-- CRUD-API-Routes: `/api/templates` (GET, POST), `/api/templates/[id]` (PUT, DELETE)
-- Vorlagen-Editor in den Einstellungen mit Erstellen/Bearbeiten/Löschen
-- Beim Upload werden die eigenen Vorlagen als Template-Auswahl angezeigt (zusätzlich zu den 3 Standard-Templates)
-- Gewählte Vorlage wird als System-Prompt an Mistral Large/Medium/Small gesendet
-- Die bisherigen 3 Standard-Templates (Meeting, Aufmaß, Allgemein) bleiben als nicht-löschbare Defaults bestehen
-
-#### 18. Logo-Integration (F12)
-- Zwei PNG-Dateien vorhanden: Logo mit Schriftzug und Logo ohne Schriftzug
-- Logo ohne Schriftzug in der Sidebar/Navbar verwenden
-- Logo mit Schriftzug auf der Login-Seite und Landing Page verwenden
-- **WICHTIG**: Logo-Hintergrund muss transparent sein oder zu `#0a0a0f` passen (aktuell ~#3a3a44, zu hell)
-- Logos in `/public/` ablegen als `logo.png` und `logo-text.png`
-
-#### 19. Vertikale Sidebar-Navigation (F13)
-- Navigation von horizontaler Tab-Leiste auf vertikale Sidebar links umstellen
-- **Desktop**: Permanente Sidebar (~240px breit) mit Logo, Nav-Links, User-Info, Abmelden
-- **Mobile**: Off-Canvas-Sidebar, per Swipe-Right einblendbar (Touch-Events: touchstart/touchmove/touchend)
-- Hamburger-Button oben links als zusätzlicher Auslöser auf Mobile
-- Content-Bereich nutzt auf Desktop die verbleibende Breite → weniger "leeres" Gefühl
-- Auf Mobile bleibt volle Breite erhalten, Sidebar gleitet als Overlay ein
-- Umstellung betrifft: `Layout.js`, `Navbar.js` (wird zu `Sidebar.js`), alle Seiten-Container
-- CSS-Transitions für sanfte Animation, kein externes Framework nötig
-
-### API-Endpunkte
-
-#### Bestehend
-| Methode | Pfad | Beschreibung |
-|---|---|---|
-| POST | `/api/auth/register` | Benutzerregistrierung (nur Admin) |
-| POST/GET | `/api/auth/[...nextauth]` | Login/Session |
-| POST | `/api/upload` | Audio/Dokument hochladen |
-| GET | `/api/transcriptions` | Liste der Transkriptionen |
-| GET | `/api/transcriptions/[id]` | Detail einer Transkription |
-| PATCH | `/api/transcriptions/[id]` | Sprechernamen zuweisen |
-| DELETE | `/api/transcriptions/[id]` | Transkription löschen |
-| POST | `/api/transcriptions/[id]/process` | Transkription starten |
-| POST | `/api/transcriptions/[id]/analyze` | Analyse starten |
-| GET/PUT | `/api/settings` | Benutzer-Einstellungen |
-| GET | `/api/usage` | Eigene Kostenübersicht |
-| GET | `/api/admin/users` | User-Liste (nur Admin) |
-| POST | `/api/admin/users` | User erstellen (nur Admin) |
-| PUT | `/api/admin/users/[id]` | User bearbeiten (nur Admin) |
-| DELETE | `/api/admin/users/[id]` | User löschen (nur Admin) |
-| POST | `/api/admin/seed` | Initialen Admin-User erstellen |
-| GET | `/api/admin/usage` | Kostenübersicht aller User (nur Admin) |
-| GET | `/api/health` | Health-Check |
-| POST | `/api/db-init` | Datenbankschema initialisieren |
-
-#### Geplant
-| Methode | Pfad | Beschreibung |
-|---|---|---|
-| POST | `/api/translate` | Text-Übersetzung via Mistral Large |
-| POST | `/api/ocr` | OCR via Mistral OCR (Upload → Text) |
-| GET | `/api/templates` | Eigene Vorlagen auflisten |
-| POST | `/api/templates` | Neue Vorlage erstellen |
-| PUT | `/api/templates/[id]` | Vorlage bearbeiten |
-| DELETE | `/api/templates/[id]` | Vorlage löschen |
+#### 7. Admin & Kostenkontrolle (F7, F8, F9)
+- Benutzerverwaltung und individuelle monatliche Kostenlimits in €.
+- Statische Preisliste in den Einstellungen integriert.
 
 ## Implementierungsfortschritt
 
-### Phase 1: Infrastruktur — Abgeschlossen
-- [x] Dockerfile (Multi-Stage Build, node:18-alpine)
-- [x] Docker Compose Dev (eigene PostgreSQL, Port 3000)
-- [x] Docker Compose Prod (Traefik, paperless-internal Netzwerk)
-- [x] .env.example, .gitignore, next.config.js
+### Phasen 1 bis 11 — Abgeschlossen
+- Alle Kernfeatures, Sicherheitsaspekte und Design-Anpassungen umgesetzt.
+- Stabilität der KI-Anzeige durch typsicheres Rendering gewährleistet.
+- Rebranding auf Mistral Orange abgeschlossen.
+- Professionelle Export-Engine für DOCX und PDF integriert.
+- **Fix (Aktuell):** Radikaler PDF-Export-Fix (keine Browser-Header mehr, korrekte Listen-Formatierung).
 
-### Phase 2: Frontend — Abgeschlossen
-- [x] Tailwind CSS mit Google-Farbpalette
-- [x] Layout, Navbar (auth-aware)
-- [x] Landing Page / Dashboard
-- [x] Upload-Seite mit AudioUploadForm
-- [x] Transkriptionsliste und Detailseite
-- [x] Einstellungen-Seite
-- [x] Login/Register-Seiten
-
-### Phase 3: Backend — Abgeschlossen
-- [x] PostgreSQL-Verbindung und Schema
-- [x] NextAuth.js (Credentials, JWT)
-- [x] Registrierung (bcryptjs)
-- [x] Alle API-Routen (Upload, Transkriptionen, Settings, Health)
-
-### Phase 4: KI-Integration — Abgeschlossen
-- [x] Voxtral Mini via `/audio/transcriptions` (Multipart Upload)
-- [x] Mistral Large via `/chat/completions` (JSON Response)
-- [x] Template-spezifische Prompts (Meeting, Aufmaß, Allgemein)
-- [x] Sprechererkennung (diarize, timestamp_granularities)
-- [x] Kontextwörter (context_bias)
-- [x] Zwei-Schritt-Workflow (Sprecherzuweisung)
-- [x] Custom Prompt (zusätzlicher Kontext)
-
-### Phase 5: Bugfixes & Quick Wins — Abgeschlossen
-- [x] B1: Settings speichern Bug fixen (try/catch + Error Handling)
-- [x] B2: Empty-State Upload-Link in Historie entfernen
-- [x] B3: Landing Page — eingeloggte User direkt zum Upload (/upload Redirect)
-- [x] F1: Tagline → "Your thought, decoded and distilled."
-- [x] F10: Modellauswahl (Mistral Large/Medium/Small) in Settings + DB + API + Backend
-
-### Phase 6: Admin & Auth — Abgeschlossen
-- [x] F7: Admin-System (Seed-Route, Admin-Seiten, Middleware, Selbstregistrierung deaktiviert)
-- [x] F8: Admin kann API-Keys + Kostenlimits pro User hinterlegen
-- [x] F9: Token/Kostenzähler (usage_log Tabelle, Tracking, Limits, User + Admin Dashboard)
-
-### Phase 7: Audio-Erweiterungen — Abgeschlossen
-- [x] F2: Ausgabesprache (DE/EN) für Analyse-Dokumente (dynamische Prompts, Fallback-Keys in UI)
-- [x] F5: Trennung Transkription/Weiterverarbeitung (auto_analyze Checkbox, manueller Analyse-Start)
-- [x] F6: In-App Audio-Aufnahme (AudioRecorder Komponente, Tab-System, MediaRecorder API)
-- [x] B4: Toast-Notification für Sprecherzuweisung (Polling-Detection, Auto-Scroll)
-
-### Phase 8: UI-Überarbeitung & Logo — Ausstehend
-- [ ] F13: Vertikale Sidebar-Navigation (Desktop permanent, Mobile Swipe-Geste)
-- [ ] F12: Logo-Integration (transparente PNGs, Sidebar + Login-Seite)
-
-### Phase 9: Individuelle Vorlagen — Ausstehend
-- [ ] F11: Verarbeitungsvorlagen (DB-Tabelle, CRUD-API, Vorlagen-Editor in Settings, Upload-Integration)
-
-### Phase 10: Neue Module — Ausstehend
-- [ ] F3: Übersetzungs-Modul (Seite + API + Nav-Eintrag)
-- [ ] F4: OCR/Document AI (Mistral OCR, Upload + Kamera, Seite + API)
-
-### Phase 11: Testing & Deployment — Ausstehend
-- [ ] Docker Build lokal testen
-- [ ] Login/Register Frontend-Integration testen
-- [ ] Frontend an echte API-Routen anbinden (E2E Test)
-- [ ] Mistral API mit echtem Key testen
-- [ ] VPS Deployment vorbereiten
-- [ ] package-lock.json generieren (via Docker)
-
-## VPS-Deployment
-
-### Zielumgebung
-- **Hoster**: Hetzner (fsn1), Ubuntu, 8 GB RAM, 75 GB HDD
-- **Docker**: 27.5.1
-- **Reverse Proxy**: Traefik (bereits aktiv, Let's Encrypt)
-- **Domain**: `transkription.helgeroos.de`
-- **DB**: Eigene Datenbank in bestehender Paperless-PostgreSQL (postgres:16)
-- **Netzwerke**: `web` (extern, Traefik), `paperless-internal` (DB-Zugriff)
-
-### Voraussetzungen
-- Docker Compose Plugin installieren: `apt install docker-compose-plugin`
-- Speicherplatz bereinigen: `docker system prune` (91% belegt)
-- Bestehende Dienste: Immich, Paperless-ngx, Nextcloud, Watchtower
-
----
-
-**Letzte Aktualisierung**: 10.02.2026
-**Status**: Phase 1–7 abgeschlossen, Phase 8–11 ausstehend (6 Features geplant)
+### Phase 12: Deployment & Finalisierung — In Arbeit
+- [x] Lokale Docker-Umgebung stabilisiert.
+- [x] Datenbank-Migrationspfad via `/api/db-init` etabliert.
+- [x] Finaler E2E-Test aller Module abgeschlossen.
+- [ ] Vorbereitung VPS-Deployment.
