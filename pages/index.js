@@ -26,17 +26,15 @@ export default function Home() {
 
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="text-center max-w-lg">
-          <h1 className="text-4xl font-semibold text-text-primary mb-4">
-            GhostTyper
-          </h1>
-          <p className="text-lg text-text-secondary mb-8">
-            Your thought, decoded and distilled.
+          <img src="/logo-text.png" alt="GhostTyper" className="h-16 mx-auto mb-6" />
+          <p className="text-xl text-text-secondary mb-10 leading-relaxed">
+            Your thoughts, decoded and distilled.
           </p>
           <Link
             href="/login"
-            className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium hover:gradient-accent-hover transition-colors"
+            className="gradient-accent text-white px-8 py-3 rounded-full text-base font-medium hover:gradient-accent-hover transition-all shadow-lg hover:shadow-accent-orange/20"
           >
-            Anmelden
+            Jetzt starten
           </Link>
         </div>
       </div>

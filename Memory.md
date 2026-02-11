@@ -1,79 +1,50 @@
-# GhostTyper (ehemals Transkription WebApp) - Project Memory
+# GhostTyper - Project Memory
 
 ## Project Setup
-- **App-Name:** GhostTyper (Rebranding abgeschlossen)
-- **Framework:** Next.js 13 (Pages Router), React 18
-- **Styling:** Tailwind CSS 3, Dark Theme (#0a0a0f bg, #6c5ce7 accent-purple, #00cec9 accent-cyan)
-- **DB:** PostgreSQL (via Docker Compose)
-- **Auth:** NextAuth mit Credentials Provider, JWT Sessions
-- **Dependencies:** axios, pg, next-auth, bcryptjs, formidable
-- **PWA:** manifest.json + Icons vorhanden
+- **App-Name:** GhostTyper
+- **Status:** Funktionsfähig & Vollständig (Phasen 1-11 abgeschlossen)
+- **Framework:** Next.js 13 (Pages Router), React 18, Tailwind CSS 3
+- **DB:** PostgreSQL 16 (via Docker)
+- **Auth:** NextAuth mit Credentials Provider, Admin-only User-Creation
 
-## Environment (lokal)
-- Node.js/npm is NOT installed — builds/npm install via Docker (`node:18-alpine`)
-- Docker setup uses multi-stage build with `output: 'standalone'`
-- **Git Push:** Keine Authentifizierung für Claude — User pushed selbst
+## Core Features
+- **Audio:** Transkription (Voxtral Mini), Diarization, In-App Aufnahme (.webm).
+- **Analysis:** Mistral Large/Medium/Small (pro Job wählbar), Custom Templates, Custom Prompts.
+- **Document Workflow:** Canvas WYSIWYG Editor mit Rich-Text Toolbar, Export als PDF & professionelles **DOCX**.
+- **OCR:** Mistral OCR für PDF & Bilder, inkl. Kamera-Integration und automatischer Historien-Speicherung.
+- **Translation:** Dediziertes Modul mit OCR-Import & In-Editor Live-Übersetzung.
+- **Admin:** Kosten-Tracking in €, monatliche Limits pro User, Preisliste.
 
-## VPS Deployment (docs/umgebungsanalyse.md)
-- **Hoster:** Hetzner (fsn1), Ubuntu, 8GB RAM, 75GB HDD
-- **Docker:** 27.5.1 — Docker Compose via Plugin
-- **Reverse Proxy:** Traefik, Let's Encrypt, externes Netzwerk `web`
-- **Domain:** `transkription.helgeroos.de` (via Traefik-Labels)
-- **DB-Plan:** Eigene DB in bestehender Paperless-PostgreSQL-Instanz (postgres:16)
+## UI & UX
+- **Design:** Dark Theme (#0a0a0f), Mistral Orange Akzente (#ff5917).
+- **Navigation:** Vertikale Sidebar (Reorganisiert: Transkription -> Übersetzung -> OCR -> Historie).
+- **Branding:** Neues Logo (schwarzer Hintergrund), Favicon, PWA-Icons.
+- **Profil:** Manueller Avatar-Upload (Galerie/Explorer), Passwort-Sicherheitscheck (Alt-Passwort erforderlich).
 
-## Architecture
-- `pages/` for routing (Pages Router, not App Router)
-- `components/` for reusable UI components
-- `lib/` for utilities (db.js, ai-service.js, api.js, constants.js)
-- `config/` for Docker Compose files (dev + prod)
-- `pages/api/` for backend API routes
+## Technical Details
+- **Export:** `lib/export-utils.js` nutzt die `docx` Bibliothek für echte Word-Files. 
+- **PDF-Fix:** Radikale CSS-Isolation im Druckmodus (`margin: 0` in @page) eliminiert Domain/Datum-Header; CSS-Padding simuliert Seitenränder.
+- **Stability:** Typsicheres Rendering in `TranscriptionDetail` und `OCR` verhindert Abstürze bei unvollständigem KI-JSON.
+- **Audio Fix:** Erzwingung von `audio/webm` und korrektem Mime-Mapping für Mistral API.
+- **Database:** Migrationspfad via `lib/db-init.js` (model, document_html, avatar_url hinzugefügt).
 
-## AI Models (IMPORTANT)
-- **Transcription:** `voxtral-mini-latest` via `/audio/transcriptions` (multipart form upload)
-- **Analysis:** `mistral-large-latest` (oder medium/small per User-Setting) via `/chat/completions`
-- **OCR:** `mistral-ocr-latest` via Files API + `/ocr/process` (geplant)
-- NEVER use pixtral — that's for vision, not audio
+## Feature Requests (14) — ALLE UMGESETZT
+- ~~F1: Tagline & Rebranding GhostTyper~~
+- ~~F2: Ausgabesprache DE/EN für Analyse~~
+- ~~F3: Übersetzungs-Modul (Workflow-integriert + OCR Import)~~
+- ~~F4: OCR / Document AI (Mistral OCR + Historie)~~
+- ~~F5: Trennung Transkription/Weiterverarbeitung~~
+- ~~F6: In-App Audio-Aufnahme~~
+- ~~F7: Admin-System (User-Verwaltung)~~
+- ~~F8: Admin kann API-Keys für Nutzer hinterlegen~~
+- ~~F9: Token/Kostenzähler in € mit Limit~~
+- ~~F10: Modellauswahl (pro Job wählbar)~~
+- ~~F11: Individuelle Verarbeitungsvorlagen (Bearbeitbare Standard-Templates)~~
+- ~~F12: Logo-Integration & Branding (Mistral Orange)~~
+- ~~F13: Vertikale Sidebar-Navigation (Reorganisiert)~~
+- ~~F14: Dokumenten-Editor & PDF/DOCX Export~~
 
-## Key Files
-- `lib/db.js` — PostgreSQL connection pool
-- `lib/db-init.js` — Schema (users, api_keys, transcriptions, settings, usage_log)
-- `lib/ai-service.js` — Mistral API (Transcription + Analysis, DE/EN Prompts)
-- `lib/api.js` — Frontend helpers
-- `lib/admin.js` — Admin-Middleware (requireAdmin)
-- `lib/usage.js` — Token/Kosten-Tracking
-- `pages/api/settings.js` — GET/PUT for user settings
-- `components/AudioUploadForm.js` — Upload + Aufnahme (Tab-System)
-- `components/AudioRecorder.js` — MediaRecorder API Komponente
-- `components/Toast.js` — Toast-Notification Komponente
-
-## Known Bugs / Open Issues (see bugs.md for full details)
-
-### Bugs (4) — alle behoben
-- ~~B1: Settings speichern wirft Fehler (API-Key + Einstellungen)~~ — Phase 5
-- ~~B2: Historie zeigt noch Upload-Button (Empty-State CTA)~~ — Phase 5
-- ~~B3: Landing Page zeigt Dashboard-Cards statt direkt Upload~~ — Phase 5
-- ~~B4: Kein Popup/Benachrichtigung für Sprecherzuweisung~~ — Phase 7
-
-### Feature Requests (13) — 10 umgesetzt, 6 geplant
-- ~~F1: Tagline → "Your thought, decoded and distilled."~~ — Phase 5
-- ~~F2: Ausgabesprache DE/EN für Analyse-Dokumente~~ — Phase 7
-- F3: Übersetzungs-Reiter (Text → Mistral Large → Übersetzung)
-- F4: OCR/Document AI (Mistral OCR, Upload + Kamera)
-- ~~F5: Trennung Transkription/Weiterverarbeitung~~ — Phase 7
-- ~~F6: In-App Audio-Aufnahme (MediaRecorder API)~~ — Phase 7
-- ~~F7: Admin-System (User-Verwaltung, keine Selbstregistrierung)~~ — Phase 6
-- ~~F8: Admin kann API-Keys für Nutzer hinterlegen~~ — Phase 6
-- ~~F9: Token/Kostenzähler mit Limit~~ — Phase 6
-- ~~F10: Modellauswahl (Mistral Large/Medium/Small)~~ — Phase 5
-- F11: Individuelle Verarbeitungsvorlagen (DB `templates`, CRUD, Settings-Editor)
-- F12: Logo-Integration (PNGs mit/ohne Schriftzug, Hintergrund muss passen)
-- F13: Vertikale Sidebar-Navigation (Desktop permanent, Mobile Swipe-Right)
-
-### Phasen-Plan
-- **Phase 5**: B1, B2, B3, F1, F10 — Bugfixes & Quick Wins — **ABGESCHLOSSEN**
-- **Phase 6**: F7, F8, F9 — Admin & Auth — **ABGESCHLOSSEN**
-- **Phase 7**: F2, F5, F6, B4 — Audio-Erweiterungen — **ABGESCHLOSSEN**
-- **Phase 8**: F13, F12 — UI-Überarbeitung & Logo
-- **Phase 9**: F11 — Individuelle Vorlagen
-- **Phase 10**: F3, F4 — Neue Module (Übersetzung, OCR)
-- **Phase 11**: Testing & Deployment
+## Deployment Info
+- **Environment:** Docker Compose (dev/prod).
+- **Reverse Proxy:** Traefik mit Let's Encrypt.
+- **Secret:** `NEXTAUTH_SECRET` aus Docker-Config verwenden für DB-Init.

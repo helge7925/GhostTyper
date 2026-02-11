@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     case 'GET': {
       const result = await query(
         `SELECT id, original_name, filename, status, template, diarize, custom_prompt,
-                text, segments, speakers, analysis, error, created_at, updated_at
+                text, segments, speakers, analysis, error, folder_id, is_favorite, created_at, updated_at
          FROM transcriptions
          WHERE id = $1 AND user_id = $2`,
         [id, session.user.id]
@@ -29,11 +29,7 @@ export default async function handler(req, res) {
     }
 
     case 'PATCH': {
-      const { speakers } = req.body;
-
-      if (!speakers || typeof speakers !== 'object') {
-        return res.status(400).json({ message: 'speakers-Objekt fehlt' });
-      }
+      const { speakers, text, documentHtml, folderId, isFavorite } = req.body;
 
       const existing = await query(
         'SELECT id, status FROM transcriptions WHERE id = $1 AND user_id = $2',
@@ -44,16 +40,45 @@ export default async function handler(req, res) {
         return res.status(404).json({ message: 'Transkription nicht gefunden' });
       }
 
-      if (existing.rows[0].status !== 'transcribed') {
-        return res.status(400).json({ message: 'Sprechernamen können nur im Status "transcribed" zugewiesen werden' });
+      if (speakers) {
+        if (typeof speakers !== 'object') {
+          return res.status(400).json({ message: 'speakers-Objekt muss ein Objekt sein' });
+        }
+        await query(
+          'UPDATE transcriptions SET speakers = $1, updated_at = NOW() WHERE id = $2',
+          [JSON.stringify(speakers), id]
+        );
       }
 
-      await query(
-        'UPDATE transcriptions SET speakers = $1, updated_at = NOW() WHERE id = $2',
-        [JSON.stringify(speakers), id]
-      );
+      if (text) {
+        await query(
+          'UPDATE transcriptions SET text = $1, updated_at = NOW() WHERE id = $2',
+          [text, id]
+        );
+      }
 
-      return res.status(200).json({ message: 'Sprechernamen gespeichert' });
+      if (documentHtml !== undefined) {
+        await query(
+          'UPDATE transcriptions SET document_html = $1, updated_at = NOW() WHERE id = $2',
+          [documentHtml, id]
+        );
+      }
+
+      if (folderId !== undefined) {
+        await query(
+          'UPDATE transcriptions SET folder_id = $1, updated_at = NOW() WHERE id = $2',
+          [folderId, id]
+        );
+      }
+
+      if (isFavorite !== undefined) {
+        await query(
+          'UPDATE transcriptions SET is_favorite = $1, updated_at = NOW() WHERE id = $2',
+          [isFavorite, id]
+        );
+      }
+
+      return res.status(200).json({ message: 'Gespeichert' });
     }
 
     case 'DELETE': {

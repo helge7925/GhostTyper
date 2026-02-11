@@ -13,7 +13,7 @@ module.exports = {
           input: '#1e1e2e',
         },
         accent: {
-          purple: '#6c5ce7',
+          orange: '#ff5917',
           cyan: '#00cec9',
           green: '#00b894',
           yellow: '#fdcb6e',

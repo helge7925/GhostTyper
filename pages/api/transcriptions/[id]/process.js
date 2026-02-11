@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
-import { query } from '../../../../lib/db';
+import { query, resolveTemplate } from '../../../../lib/db';
 import { transcribeAudio, analyzeTranscription, buildTextWithSpeakers } from '../../../../lib/ai-service';
 import { logUsage, checkCostLimit } from '../../../../lib/usage';
 
@@ -94,7 +94,8 @@ export default async function handler(req, res) {
         [text, id]
       );
 
-      const { analysis, usage: analysisUsage, model: analysisModel } = await analyzeTranscription(text, job.template, apiKey, job.custom_prompt || '', preferredModel, language);
+      const resolvedTemplate = await resolveTemplate(job.template, session.user.id);
+      const { analysis, usage: analysisUsage, model: analysisModel } = await analyzeTranscription(text, resolvedTemplate, apiKey, job.custom_prompt || '', preferredModel, language);
 
       // Log analysis usage
       await logUsage(session.user.id, analysisModel, 'analysis', analysisUsage);

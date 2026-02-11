@@ -207,7 +207,7 @@ export default function AdminUsers() {
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="Max Mustermann"
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
+                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
                 />
               </div>
 
@@ -218,7 +218,7 @@ export default function AdminUsers() {
                   value={formEmail}
                   onChange={(e) => setFormEmail(e.target.value)}
                   required
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
+                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
                 />
               </div>
 
@@ -232,7 +232,7 @@ export default function AdminUsers() {
                   onChange={(e) => setFormPassword(e.target.value)}
                   required={!editingUser}
                   placeholder={editingUser ? 'Neues Passwort eingeben' : 'Mindestens 8 Zeichen'}
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
+                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
                 />
               </div>
 
@@ -241,7 +241,7 @@ export default function AdminUsers() {
                 <select
                   value={formRole}
                   onChange={(e) => setFormRole(e.target.value)}
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
+                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
                 >
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
@@ -260,13 +260,13 @@ export default function AdminUsers() {
                     value={formApiKey}
                     onChange={(e) => setFormApiKey(e.target.value)}
                     placeholder={editingUser.api_key_configured ? 'Neuen Key eingeben zum Ändern' : 'API-Key eingeben'}
-                    className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
+                    className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                    Monatliches Kostenlimit (EUR)
+                    Monatliches Kostenlimit (€)
                   </label>
                   <input
                     type="number"
@@ -275,7 +275,7 @@ export default function AdminUsers() {
                     value={formCostLimit}
                     onChange={(e) => setFormCostLimit(e.target.value)}
                     placeholder="Unbegrenzt"
-                    className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
+                    className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
                   />
                 </div>
               </div>
@@ -314,7 +314,7 @@ export default function AdminUsers() {
                   {user.name || user.email}
                 </span>
                 {user.role === 'admin' && (
-                  <span className="text-xs bg-accent-purple/20 text-accent-purple px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-accent-orange/20 text-accent-orange px-2 py-0.5 rounded-full">
                     Admin
                   </span>
                 )}
@@ -325,7 +325,7 @@ export default function AdminUsers() {
                 )}
                 {user.cost_limit && (
                   <span className="text-xs bg-accent-yellow/20 text-accent-yellow px-2 py-0.5 rounded-full">
-                    Limit: {user.cost_limit} EUR
+                    Limit: {user.cost_limit} €
                   </span>
                 )}
               </div>

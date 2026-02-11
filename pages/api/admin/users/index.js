@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { requireAdmin } from '../../../../lib/admin';
 import { query } from '../../../../lib/db';
+import { validatePassword } from '../../../../lib/constants';
 
 export default async function handler(req, res) {
   const session = await requireAdmin(req, res);
@@ -31,8 +32,9 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'Email und Passwort sind erforderlich' });
       }
 
-      if (password.length < 8) {
-        return res.status(400).json({ message: 'Passwort muss mindestens 8 Zeichen lang sein' });
+      const passwordError = validatePassword(password);
+      if (passwordError) {
+        return res.status(400).json({ message: passwordError });
       }
 
       try {

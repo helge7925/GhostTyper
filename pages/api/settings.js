@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     switch (req.method) {
       case 'GET': {
         const result = await query(
-          'SELECT mistral_api_key, default_template, language, context_bias, preferred_model FROM settings WHERE user_id = $1',
+          'SELECT mistral_api_key, default_template, language, context_bias, preferred_model, cost_limit FROM settings WHERE user_id = $1',
           [session.user.id]
         );
 
@@ -23,6 +23,7 @@ export default async function handler(req, res) {
             language: 'de',
             contextBias: '',
             preferredModel: 'mistral-large-latest',
+            costLimit: null,
           });
         }
 
@@ -33,23 +34,25 @@ export default async function handler(req, res) {
           language: settings.language,
           contextBias: settings.context_bias || '',
           preferredModel: settings.preferred_model || 'mistral-large-latest',
+          costLimit: settings.cost_limit,
         });
       }
 
       case 'PUT': {
-        const { mistralApiKey, defaultTemplate, language, contextBias, preferredModel } = req.body;
+        const { mistralApiKey, defaultTemplate, language, contextBias, preferredModel, costLimit } = req.body;
 
         await query(
-          `INSERT INTO settings (user_id, mistral_api_key, default_template, language, context_bias, preferred_model, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, NOW())
+          `INSERT INTO settings (user_id, mistral_api_key, default_template, language, context_bias, preferred_model, cost_limit, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
            ON CONFLICT (user_id) DO UPDATE SET
              mistral_api_key = COALESCE($2, settings.mistral_api_key),
              default_template = COALESCE($3, settings.default_template),
              language = COALESCE($4, settings.language),
              context_bias = $5,
              preferred_model = COALESCE($6, settings.preferred_model),
+             cost_limit = $7,
              updated_at = NOW()`,
-          [session.user.id, mistralApiKey || null, defaultTemplate || null, language || null, contextBias ?? null, preferredModel || null]
+          [session.user.id, mistralApiKey || null, defaultTemplate || null, language || null, contextBias ?? null, preferredModel || null, costLimit !== undefined ? costLimit : null]
         );
 
         return res.status(200).json({ message: 'Einstellungen gespeichert' });

@@ -7,19 +7,25 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "seed-admin": "node scripts/seed-admin.js"
   },
   "dependencies": {
-    "next": "^13.4.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "next-auth": "^4.22.1",
-    "pg": "^8.11.0",
     "axios": "^1.4.0",
     "bcryptjs": "^2.4.3",
-    "formidable": "^3.5.1"
+    "docx": "^8.2.2",
+    "dompurify": "^3.3.1",
+    "file-saver": "^2.0.5",
+    "formidable": "^3.5.1",
+    "marked": "^17.0.1",
+    "next": "^13.4.0",
+    "next-auth": "^4.22.1",
+    "pg": "^8.11.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
     "autoprefixer": "^10.4.14",
     "eslint": "^8.40.0",
     "eslint-config-next": "^13.4.0",

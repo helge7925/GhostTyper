@@ -2,12 +2,44 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import StatusBadge from '../../components/StatusBadge';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Toast from '../../components/Toast';
+import DocumentEditor from '../../components/DocumentEditor';
 import { getTranscription, deleteTranscription, updateSpeakers, startAnalysis } from '../../lib/api';
 import { STATUS } from '../../lib/constants';
+import { analysisToHtml } from '../../lib/export-utils';
+
+const LANGUAGES = [
+  { code: 'German', label: 'Deutsch' },
+  { code: 'English', label: 'Englisch' },
+  { code: 'French', label: 'Französisch' },
+  { code: 'Spanish', label: 'Spanisch' },
+  { code: 'Chinese', label: 'Chinesisch' },
+];
+
+/**
+ * Optimized Speaker Input component to prevent full page re-renders on every keystroke
+ */
+function SpeakerInput({ sid, value, onChange }) {
+  const [localValue, setLocalValue] = useState(value);
+  
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  return (
+    <input 
+      type="text" 
+      value={localValue || ''} 
+      onChange={e => setLocalValue(e.target.value)}
+      onBlur={() => onChange(sid, localValue)}
+      placeholder={sid} 
+      className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-1.5 text-xs text-text-primary outline-none focus:ring-1 focus:ring-accent-orange" 
+    />
+  );
+}
 
 export default function TranscriptionDetail() {
   const router = useRouter();
@@ -21,6 +53,14 @@ export default function TranscriptionDetail() {
   const [analyzing, setAnalyzing] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // Translation state
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [targetLang, setTargetLang] = useState('German');
+
+  // Editor state
+  const [showEditor, setShowEditor] = useState(false);
+  const [editorHtml, setEditorHtml] = useState('');
+
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
       router.push('/login');
@@ -32,6 +72,7 @@ export default function TranscriptionDetail() {
       .then((data) => {
         setTranscription(data);
         if (data.speakers) setSpeakerNames(data.speakers);
+        if (data.document_html) setEditorHtml(data.document_html);
       })
       .catch(() => setTranscription(null))
       .finally(() => setLoading(false));
@@ -46,352 +87,216 @@ export default function TranscriptionDetail() {
     const interval = setInterval(async () => {
       try {
         const updated = await getTranscription(id);
-        // Detect status change to 'transcribed'
         if (transcription.status === STATUS.PROCESSING && updated.status === STATUS.TRANSCRIBED) {
-          const hasSpeakers = updated.diarize && updated.segments?.length > 0;
-          setToast({
-            message: hasSpeakers
-              ? 'Transkription abgeschlossen! Bitte Sprecher zuweisen.'
-              : 'Transkription abgeschlossen! Sie können nun die Analyse starten.',
-            type: 'success',
-          });
-          setTimeout(() => {
-            document.getElementById('speaker-assignment')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 500);
+          setToast({ message: 'Transkription fertig!', type: 'success' });
         }
         setTranscription(updated);
-        if (updated.speakers) setSpeakerNames(updated.speakers);
-        if (!pollingStatuses.includes(updated.status)) {
-          clearInterval(interval);
-        }
+        if (updated.document_html) setEditorHtml(updated.document_html);
+        if (!pollingStatuses.includes(updated.status)) clearInterval(interval);
       } catch {}
     }, 5000);
-
     return () => clearInterval(interval);
   }, [transcription?.status, id]);
 
-  // Extract unique speaker IDs from segments
   const speakerIds = useMemo(() => {
     if (!transcription?.segments) return [];
-    const ids = new Set(transcription.segments.map(s => s.speaker_id).filter(Boolean));
-    return [...ids];
+    return [...new Set(transcription.segments.map(s => s.speaker_id).filter(Boolean))];
   }, [transcription?.segments]);
 
-  async function handleDelete() {
-    if (!confirm('Transkription wirklich löschen?')) return;
-    setDeleting(true);
-    try {
-      await deleteTranscription(id);
-      router.push('/transcriptions');
-    } catch {
-      setDeleting(false);
-    }
-  }
-
-  async function handleSaveSpeakers() {
-    setSavingSpeakers(true);
-    try {
-      await updateSpeakers(id, speakerNames);
-    } catch {
-      // handled silently
-    } finally {
-      setSavingSpeakers(false);
-    }
-  }
-
-  async function handleStartAnalysis() {
+  const handleStartAnalysis = useCallback(async () => {
     setAnalyzing(true);
     try {
       await updateSpeakers(id, speakerNames);
       await startAnalysis(id);
-      setTranscription((prev) => ({ ...prev, status: STATUS.ANALYZING }));
+      setTranscription(prev => ({ ...prev, status: STATUS.ANALYZING }));
     } catch {
       setAnalyzing(false);
     }
-  }
+  }, [id, speakerNames]);
+
+  const handleTranslate = useCallback(async () => {
+    if (!transcription?.text || isTranslating) return;
+    setIsTranslating(true);
+    try {
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: transcription.text, targetLanguage: targetLang }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      const newText = data.translatedText;
+      setTranscription(prev => ({ ...prev, text: newText }));
+      await fetch(`/api/transcriptions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: newText }),
+      });
+      setToast({ message: 'Text übersetzt.', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message, type: 'error' });
+    } finally {
+      setIsTranslating(false);
+    }
+  }, [id, transcription?.text, targetLang, isTranslating]);
+
+  const handleSaveDocument = useCallback(async (html) => {
+    setEditorHtml(html);
+    try {
+      await fetch(`/api/transcriptions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentHtml: html }),
+      });
+      setToast({ message: 'Dokument gespeichert.', type: 'success' });
+    } catch {
+      setToast({ message: 'Fehler beim Speichern.', type: 'error' });
+    }
+  }, [id]);
+
+  const handleSpeakerChange = useCallback((sid, name) => {
+    setSpeakerNames(prev => ({ ...prev, [sid]: name }));
+  }, []);
+
+  const transcriptionHtml = useMemo(() => {
+    if (!transcription) return '';
+    return editorHtml || analysisToHtml(transcription);
+  }, [transcription, editorHtml]);
 
   if (authStatus === 'loading' || loading) return <LoadingSpinner />;
+  if (!transcription) return null;
 
-  if (!transcription) {
-    return (
-      <div className="bg-dark-card border border-white/[0.06] rounded-xl p-12 text-center">
-        <p className="text-text-primary font-medium mb-2">Transkription nicht gefunden</p>
-        <Link href="/transcriptions" className="text-accent-purple text-sm font-medium hover:underline">
-          Zurück zur Übersicht
-        </Link>
-      </div>
-    );
-  }
-
-  const analysis = transcription.analysis;
+  const isOCR = transcription.mime_type?.startsWith('image/') || transcription.mime_type === 'application/pdf';
+  const typeLabel = isOCR ? 'Dokument' : 'Transkription';
+  const rawTextLabel = isOCR ? 'Extrahierter Text' : 'Transkription';
 
   return (
     <>
-      <Head>
-        <title>{transcription.original_name} - GhostTyper</title>
-      </Head>
+      <Head><title>{transcription.original_name} - GhostTyper</title></Head>
 
-      <Link href="/transcriptions" className="text-accent-purple text-sm font-medium hover:underline inline-flex items-center gap-1 mb-6">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Zurück
-      </Link>
+      {!showEditor ? (
+        <div className="max-w-5xl mx-auto animate-fade-in pb-20">
+          <button onClick={() => router.push('/transcriptions')} className="text-text-secondary hover:text-text-primary text-xs flex items-center gap-1 mb-6">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></svg>
+            Zurück zur Historie
+          </button>
 
-      <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6 mb-4">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-xl font-semibold text-text-primary">
-              {transcription.original_name}
-            </h1>
-            <p className="text-sm text-text-secondary mt-1">
-              {new Date(transcription.created_at).toLocaleDateString('de-DE', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-              {transcription.template && (
-                <span className="ml-2 text-text-secondary/60">
-                  Template: {transcription.template}
-                </span>
-              )}
-              {transcription.diarize && (
-                <span className="ml-2 text-text-secondary/60">
-                  Sprechererkennung
-                </span>
-              )}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <StatusBadge status={transcription.status} />
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="text-sm text-text-secondary hover:text-accent-red transition-colors"
-            >
-              Löschen
-            </button>
-          </div>
-        </div>
-
-        {transcription.status === STATUS.PROCESSING && (
-          <div className="flex items-center gap-3 bg-accent-purple/10 rounded-lg p-4 text-sm text-accent-purple">
-            <div className="w-5 h-5 border-2 border-accent-purple border-t-transparent rounded-full animate-spin" />
-            Transkription wird verarbeitet...
-          </div>
-        )}
-
-        {transcription.status === STATUS.ANALYZING && (
-          <div className="flex items-center gap-3 bg-accent-purple/10 rounded-lg p-4 text-sm text-accent-purple">
-            <div className="w-5 h-5 border-2 border-accent-purple border-t-transparent rounded-full animate-spin" />
-            Analyse läuft...
-          </div>
-        )}
-
-        {transcription.status === STATUS.ERROR && (
-          <div className="bg-accent-red/10 rounded-lg p-4 text-sm text-accent-red">
-            Fehler: {transcription.error || 'Unbekannter Fehler'}
-          </div>
-        )}
-      </div>
-
-      {/* Speaker assignment or analyze prompt — shown when status is 'transcribed' */}
-      {transcription.status === STATUS.TRANSCRIBED && (
-        <div id="speaker-assignment" className="bg-dark-card border border-white/[0.06] rounded-xl p-6 mb-4">
-          {transcription.diarize && speakerIds.length > 0 ? (
-            <>
-              <h2 className="text-base font-medium text-text-primary mb-1">Sprecher zuweisen</h2>
-              <p className="text-sm text-text-secondary mb-4">
-                Weisen Sie den erkannten Sprechern Namen zu, bevor die Analyse gestartet wird.
-              </p>
-
-              <div className="space-y-3 mb-5">
-                {speakerIds.map((speakerId) => (
-                  <div key={speakerId} className="flex items-center gap-3">
-                    <span className="text-sm text-text-secondary w-24 flex-shrink-0">{speakerId}</span>
-                    <input
-                      type="text"
-                      value={speakerNames[speakerId] || ''}
-                      onChange={(e) =>
-                        setSpeakerNames((prev) => ({ ...prev, [speakerId]: e.target.value }))
-                      }
-                      placeholder="Name eingeben"
-                      className="flex-1 bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none"
-                    />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left: Info & Actions */}
+            <div className="lg:col-span-1 space-y-6">
+              <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
+                <StatusBadge status={transcription.status} />
+                <h1 className="text-lg font-semibold text-text-primary mt-3 truncate">{transcription.original_name}</h1>
+                <p className="text-[10px] text-text-secondary uppercase tracking-widest mt-1">
+                  {new Date(transcription.created_at).toLocaleDateString('de-DE')} &bull; {typeLabel}
+                </p>
+                
+                {/* Context & Settings */}
+                <div className="mt-6 pt-6 border-t border-white/[0.06] space-y-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-text-secondary uppercase opacity-50">Analyse-Modus</label>
+                    <p className="text-sm text-text-primary capitalize">{transcription.template === 'generic' ? 'Zusammenfassung' : transcription.template}</p>
                   </div>
-                ))}
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleSaveSpeakers}
-                  disabled={savingSpeakers}
-                  className="border border-white/[0.12] text-text-secondary px-5 py-2 rounded-full text-sm font-medium hover:bg-white/[0.06] transition-colors disabled:opacity-50"
-                >
-                  {savingSpeakers ? 'Wird gespeichert...' : 'Namen speichern'}
-                </button>
-                <button
-                  onClick={handleStartAnalysis}
-                  disabled={analyzing}
-                  className="gradient-accent text-white px-5 py-2 rounded-full text-sm font-medium transition-colors disabled:opacity-50"
-                >
-                  {analyzing ? 'Analyse startet...' : 'Analyse starten'}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <h2 className="text-base font-medium text-text-primary mb-1">Transkription abgeschlossen</h2>
-              <p className="text-sm text-text-secondary mb-4">
-                Die Transkription wurde erfolgreich erstellt. Sie können nun die Analyse starten.
-              </p>
-              <button
-                onClick={handleStartAnalysis}
-                disabled={analyzing}
-                className="gradient-accent text-white px-5 py-2 rounded-full text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                {analyzing ? 'Analyse startet...' : 'Analyse starten'}
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {transcription.text && (
-        <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6 mb-4">
-          <h2 className="text-base font-medium text-text-primary mb-3">Transkription</h2>
-          <div className="whitespace-pre-wrap text-sm text-text-secondary leading-relaxed">
-            {transcription.text}
-          </div>
-        </div>
-      )}
-
-      {analysis && typeof analysis === 'object' && (
-        <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6">
-          <h2 className="text-base font-medium text-text-primary mb-3">Analyse</h2>
-
-          {(analysis.zusammenfassung || analysis.summary) && (
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-text-secondary mb-1">{analysis.summary ? 'Summary' : 'Zusammenfassung'}</h3>
-              <p className="text-sm text-text-secondary/80">{analysis.zusammenfassung || analysis.summary}</p>
-            </div>
-          )}
-
-          {((analysis.themen && analysis.themen.length > 0) || (analysis.topics && analysis.topics.length > 0)) && (
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-text-secondary mb-2">{analysis.topics ? 'Topics' : 'Themen'}</h3>
-              <ul className="list-disc list-inside text-sm text-text-secondary/80 space-y-1">
-                {(analysis.themen || analysis.topics).map((t, i) => <li key={i}>{t}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {analysis.todos && analysis.todos.length > 0 && (
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-text-secondary mb-2">To-Dos</h3>
-              <div className="space-y-2">
-                {analysis.todos.map((todo, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm">
-                    <span className={`inline-block mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
-                      (todo.prioritaet || todo.priority) === 'hoch' || (todo.priority) === 'high' ? 'bg-accent-red' :
-                      (todo.prioritaet || todo.priority) === 'mittel' || (todo.priority) === 'medium' ? 'bg-accent-yellow' : 'bg-accent-green'
-                    }`} />
+                  {transcription.custom_prompt && (
                     <div>
-                      <span className="text-text-primary">{todo.aufgabe || todo.task}</span>
-                      {(todo.verantwortlich || todo.responsible) && (todo.verantwortlich || todo.responsible) !== 'unbekannt' && (todo.verantwortlich || todo.responsible) !== 'unknown' && (
-                        <span className="text-text-secondary ml-1">({todo.verantwortlich || todo.responsible})</span>
-                      )}
+                      <label className="text-[10px] font-bold text-text-secondary uppercase opacity-50">Anweisung</label>
+                      <p className="text-xs text-text-secondary italic">"{transcription.custom_prompt}"</p>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {((analysis.entscheidungen && analysis.entscheidungen.length > 0) || (analysis.decisions && analysis.decisions.length > 0)) && (
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-text-secondary mb-2">{analysis.decisions ? 'Decisions' : 'Entscheidungen'}</h3>
-              <ul className="list-disc list-inside text-sm text-text-secondary/80 space-y-1">
-                {(analysis.entscheidungen || analysis.decisions).map((e, i) => <li key={i}>{e}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {((analysis.offene_punkte && analysis.offene_punkte.length > 0) || (analysis.open_items && analysis.open_items.length > 0)) && (
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-text-secondary mb-2">{analysis.open_items ? 'Open Items' : 'Offene Punkte'}</h3>
-              <ul className="list-disc list-inside text-sm text-text-secondary/80 space-y-1">
-                {(analysis.offene_punkte || analysis.open_items).map((e, i) => <li key={i}>{e}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {((analysis.naechste_schritte && analysis.naechste_schritte.length > 0) || (analysis.next_steps && analysis.next_steps.length > 0)) && (
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-text-secondary mb-2">{analysis.next_steps ? 'Next Steps' : 'Nächste Schritte'}</h3>
-              <ul className="list-disc list-inside text-sm text-text-secondary/80 space-y-1">
-                {(analysis.naechste_schritte || analysis.next_steps).map((e, i) => <li key={i}>{e}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {((analysis.kernpunkte && analysis.kernpunkte.length > 0) || (analysis.key_points && analysis.key_points.length > 0)) && (
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-text-secondary mb-2">{analysis.key_points ? 'Key Points' : 'Kernpunkte'}</h3>
-              <ul className="list-disc list-inside text-sm text-text-secondary/80 space-y-1">
-                {(analysis.kernpunkte || analysis.key_points).map((e, i) => <li key={i}>{e}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {analysis.details && (
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-text-secondary mb-1">Details</h3>
-              <p className="text-sm text-text-secondary/80 whitespace-pre-wrap">{analysis.details}</p>
-            </div>
-          )}
-
-          {((analysis.raeume && analysis.raeume.length > 0) || (analysis.rooms && analysis.rooms.length > 0)) && (
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-text-secondary mb-2">{analysis.rooms ? 'Rooms' : 'Räume'}</h3>
-              {(analysis.raeume || analysis.rooms).map((raum, i) => (
-                <div key={i} className="mb-3">
-                  <p className="text-sm font-medium text-text-primary">{raum.name}</p>
-                  {(raum.elemente || raum.elements)?.map((el, j) => (
-                    <p key={j} className="text-sm text-text-secondary ml-4">
-                      {el.typ || el.type}: {(el.masse || el.dimensions)?.breite || (el.masse || el.dimensions)?.width}x{(el.masse || el.dimensions)?.hoehe || (el.masse || el.dimensions)?.height}m
-                      {(el.anzahl || el.count) > 1 && ` (${el.anzahl || el.count}x)`}
-                    </p>
-                  ))}
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
 
-          {((analysis.warnungen && analysis.warnungen.length > 0) || (analysis.warnings && analysis.warnings.length > 0)) && (
-            <div className="bg-accent-yellow/10 rounded-lg p-3">
-              <h3 className="text-sm font-medium text-accent-yellow mb-1">{analysis.warnings ? 'Warnings' : 'Warnungen'}</h3>
-              <ul className="text-sm text-accent-yellow/80 space-y-1">
-                {(analysis.warnungen || analysis.warnings).map((w, i) => <li key={i}>{w}</li>)}
-              </ul>
-            </div>
-          )}
+                <div className="mt-8 flex flex-col gap-2">
+                  <button 
+                    onClick={() => {
+                      setShowEditor(true);
+                    }}
+                    disabled={!transcription.text && !transcription.analysis}
+                    className="gradient-accent text-white py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent-orange/20 transition-all hover:scale-[1.02] active:scale-100 disabled:opacity-30"
+                  >
+                    Im Editor öffnen
+                  </button>
+                  <button onClick={() => { if(confirm(`${typeLabel} wirklich löschen?`)) deleteTranscription(id).then(() => router.push('/transcriptions')) }} className="text-text-secondary hover:text-accent-red py-2 text-xs transition-colors">
+                    {typeLabel} löschen
+                  </button>
+                </div>
+              </div>
 
-          {analysis.raw && (
-            <pre className="text-sm text-text-secondary whitespace-pre-wrap">{analysis.raw}</pre>
-          )}
+              {/* Speaker Assignment */}
+              {transcription.status === STATUS.TRANSCRIBED && speakerIds.length > 0 && !isOCR && (
+                <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
+                  <h3 className="text-xs font-bold text-text-primary uppercase mb-4">Sprecher</h3>
+                  <div className="space-y-3">
+                    {speakerIds.map(sid => (
+                      <SpeakerInput 
+                        key={sid} 
+                        sid={sid} 
+                        value={speakerNames[sid]} 
+                        onChange={handleSpeakerChange} 
+                      />
+                    ))}
+                  </div>
+                  <button onClick={handleStartAnalysis} disabled={analyzing} className="w-full mt-4 bg-white/5 hover:bg-white/10 text-text-primary py-2 rounded-xl text-xs font-bold border border-white/[0.06] transition-all">
+                    {analyzing ? 'Analyse läuft...' : 'Analyse starten'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Preview Area */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Raw Text with Translation */}
+              <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xs font-bold text-text-primary uppercase tracking-widest opacity-50">{rawTextLabel}</h2>
+                  {transcription.text && transcription.status === STATUS.TRANSCRIBED && (
+                    <div className="flex items-center gap-2">
+                      <select value={targetLang} onChange={e => setTargetLang(e.target.value)} className="bg-white/5 border border-white/[0.1] text-[10px] text-text-primary rounded px-1 py-0.5 outline-none">
+                        {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+                      </select>
+                      <button onClick={handleTranslate} disabled={isTranslating} className="text-[10px] text-accent-orange hover:underline underline-offset-2">
+                        {isTranslating ? 'Übersetze...' : 'Übersetzen'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap max-h-[400px] overflow-y-auto pr-2 custom-scrollbar font-mono opacity-80">
+                  {transcription.text || 'Warte auf Text...'}
+                </div>
+              </div>
+
+              {/* Analysis Preview */}
+              {transcription.analysis && (
+                <div className="bg-dark-card border border-accent-orange/20 rounded-2xl p-6 shadow-2xl shadow-accent-orange/5">
+                  <h2 className="text-xs font-bold text-accent-orange uppercase tracking-widest mb-4">KI-Ergebnis</h2>
+                  <div className="space-y-4">
+                    {transcription.analysis.zusammenfassung && (
+                      <p className="text-sm text-text-primary leading-relaxed italic border-l-2 border-accent-orange/30 pl-4">{transcription.analysis.zusammenfassung}</p>
+                    )}
+                    <button 
+                      onClick={() => {
+                        setShowEditor(true);
+                      }}
+                      className="text-xs text-accent-orange hover:text-accent-cyan transition-colors font-bold flex items-center gap-1"
+                    >
+                      Vollständige Analyse im Editor bearbeiten &rarr;
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      )}
-
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
+      ) : (
+        <DocumentEditor 
+          initialHtml={transcriptionHtml}
+          filename={transcription.original_name}
+          sidebarContent={transcription.text}
+          onSave={handleSaveDocument}
+          onCancel={() => setShowEditor(false)}
         />
       )}
+
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </>
   );
 }

@@ -38,14 +38,13 @@ export default function Login() {
 
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="w-full max-w-sm">
-          <div className="bg-dark-card border border-white/[0.06] rounded-xl p-8">
-            <div className="text-center mb-8">
-              <h1 className="text-2xl font-semibold text-text-primary">Anmelden</h1>
-              <p className="text-sm text-text-secondary mt-1">
-                Bei GhostTyper anmelden
-              </p>
-            </div>
-
+          <div className="text-center mb-8">
+            <img src="/logo-text.png" alt="GhostTyper" className="h-12 mx-auto mb-2" />
+            <p className="text-sm text-text-secondary">
+              Your thought, decoded and distilled.
+            </p>
+          </div>
+          <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-8 shadow-2xl">
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -58,7 +57,7 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoFocus
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none transition-shadow"
+                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none transition-shadow"
                   placeholder="name@beispiel.de"
                 />
               </div>
@@ -73,7 +72,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-purple focus:border-accent-purple outline-none transition-shadow"
+                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none transition-shadow"
                 />
               </div>
 

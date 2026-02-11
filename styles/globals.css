@@ -12,10 +12,10 @@
 
 @layer utilities {
   .gradient-accent {
-    background: linear-gradient(135deg, #6c5ce7, #00cec9);
+    background: linear-gradient(135deg, #ff5917, #ff8c00);
   }
   .gradient-accent-hover {
-    background: linear-gradient(135deg, #7d6ff0, #1ad8d3);
+    background: linear-gradient(135deg, #ff7043, #ffa000);
   }
   .border-glow {
     border-color: rgba(255, 255, 255, 0.06);
