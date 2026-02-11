@@ -1,12 +1,35 @@
 import { initDatabase } from '../../lib/db-init';
+import { checkRateLimit, applyRateLimitHeaders } from '../../lib/rate-limit';
+import { logApiError, serverError } from '../../lib/api-utils';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  const rate = checkRateLimit(req, {
+    keyPrefix: 'db-init',
+    limit: 5,
+    windowMs: 60_000,
+  });
+  applyRateLimitHeaders(res, rate);
+  if (!rate.allowed) {
+    return res.status(429).json({ message: 'Zu viele Anfragen. Bitte später erneut versuchen.' });
+  }
+
+  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_DB_INIT_API !== 'true') {
+    return res.status(404).json({ message: 'Not found' });
+  }
+
+  const configuredSecret =
+    process.env.DB_INIT_SECRET ||
+    (process.env.NODE_ENV !== 'production' ? process.env.NEXTAUTH_SECRET : null);
+  if (!configuredSecret) {
+    return serverError(res, 'DB-Initialisierung ist nicht konfiguriert');
+  }
+
   const initSecret = req.headers['x-init-secret'];
-  if (initSecret !== process.env.NEXTAUTH_SECRET) {
+  if (initSecret !== configuredSecret) {
     return res.status(403).json({ message: 'Forbidden' });
   }
 
@@ -14,7 +37,7 @@ export default async function handler(req, res) {
     await initDatabase();
     return res.status(200).json({ message: 'Database initialized' });
   } catch (error) {
-    console.error('DB init error:', error);
-    return res.status(500).json({ message: 'Database initialization failed' });
+    logApiError('DB init error', error);
+    return serverError(res, 'Database initialization failed');
   }
 }

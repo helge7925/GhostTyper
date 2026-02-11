@@ -6,23 +6,39 @@ import { getSettings, updateSettings, getTemplates, createTemplate, updateTempla
 import { DEFAULT_PROMPTS, getPrompt } from '../lib/prompts';
 
 const PRICE_LIST = [
-  { model: 'Mistral Large', input: '2,00 €', output: '6,00 €', note: 'Höchste Qualität' },
+  { model: 'Mistral Large', input: '2,00 €', output: '6,00 €', note: 'Umfangreich' },
   { model: 'Mistral Medium', input: '0,75 €', output: '2,25 €', note: 'Ausgewogen' },
-  { model: 'Mistral Small', input: '0,20 €', output: '0,60 €', note: 'Schnell' },
-  { model: 'Voxtral Mini', input: '0,01 €', output: '0,01 €', note: 'Transkription' },
+  { model: 'Mistral Small', input: '0,20 €', output: '0,60 €', note: 'Kompakt' },
+  { model: 'Mistral Voxtral Mini', input: '0,01 €', output: '0,01 €', note: 'Transkription' },
 ];
+
+function normalizeDefaultTemplate(value) {
+  if (typeof value !== 'string') return 'generic';
+  const template = value.trim();
+  if (!template) return 'generic';
+
+  if (template === 'generic') return 'generic';
+  if (template.startsWith('custom-')) return template;
+  return 'generic';
+}
 
 export default function Settings() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [apiKey, setApiKey] = useState('');
-  const [defaultTemplate, setDefaultTemplate] = useState('meeting');
+  const [defaultTemplate, setDefaultTemplate] = useState('generic');
   const [language, setLanguage] = useState('de');
   const [contextBias, setContextBias] = useState('');
   const [costLimit, setCostLimit] = useState('');
   const [preferredModel, setPreferredModel] = useState('mistral-large-latest');
   const [defaultTranslateLanguage, setDefaultTranslateLanguage] = useState('en');
   const [ocrModel, setOcrModel] = useState('mistral-ocr-latest');
+  const [pdfPremiumEnabledDefault, setPdfPremiumEnabledDefault] = useState(false);
+  const [pdfPremiumCompany, setPdfPremiumCompany] = useState('');
+  const [pdfPremiumName, setPdfPremiumName] = useState('');
+  const [pdfPremiumRole, setPdfPremiumRole] = useState('');
+  const [pdfPremiumContact, setPdfPremiumContact] = useState('');
+  const [pdfPremiumFooter, setPdfPremiumFooter] = useState('');
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -59,13 +75,19 @@ export default function Settings() {
         ]);
 
         setApiKeyConfigured(settingsData.apiKeyConfigured);
-        setDefaultTemplate(settingsData.defaultTemplate || 'meeting');
+        setDefaultTemplate(normalizeDefaultTemplate(settingsData.defaultTemplate));
         setLanguage(settingsData.language || 'de');
         setContextBias(settingsData.contextBias || '');
-        setCostLimit(settingsData.costLimit || '');
+        setCostLimit(settingsData.costLimit ?? '');
         setPreferredModel(settingsData.preferredModel || 'mistral-large-latest');
         setDefaultTranslateLanguage(settingsData.defaultTranslateLanguage || 'en');
         setOcrModel(settingsData.ocrModel || 'mistral-ocr-latest');
+        setPdfPremiumEnabledDefault(Boolean(settingsData.pdfPremiumEnabledDefault));
+        setPdfPremiumCompany(settingsData.pdfPremiumCompany || '');
+        setPdfPremiumName(settingsData.pdfPremiumName || '');
+        setPdfPremiumRole(settingsData.pdfPremiumRole || '');
+        setPdfPremiumContact(settingsData.pdfPremiumContact || '');
+        setPdfPremiumFooter(settingsData.pdfPremiumFooter || '');
         setTemplates(templatesData);
         setTextTasks(tasksData);
       } catch (err) {
@@ -91,13 +113,19 @@ export default function Settings() {
     try {
       await updateSettings({
         mistralApiKey: apiKey || undefined,
-        defaultTemplate,
+        defaultTemplate: normalizeDefaultTemplate(defaultTemplate),
         language,
         contextBias,
         costLimit: costLimit === '' ? null : parseFloat(costLimit),
         preferredModel,
         defaultTranslateLanguage,
-        ocrModel
+        ocrModel,
+        pdfPremiumEnabledDefault,
+        pdfPremiumCompany,
+        pdfPremiumName,
+        pdfPremiumRole,
+        pdfPremiumContact,
+        pdfPremiumFooter,
       });
       setSaved(true);
       if (apiKey) {
@@ -283,7 +311,7 @@ export default function Settings() {
                 <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl opacity-60">
                   <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-widest mb-4">Modell-Info</h3>
                   <p className="text-xs text-text-secondary leading-relaxed">
-                    Für die Transkription wird aktuell standardmäßig das <strong>Mistral Voxtral Mini</strong> Modell verwendet. Es bietet eine hervorragende Balance zwischen Geschwindigkeit und Genauigkeit.
+                    Für die Transkription wird standardmäßig <strong>Mistral Voxtral Mini</strong> verwendet.
                   </p>
                 </div>
                 <button onClick={handleSaveSettings} className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent-orange/20 transition-all hover:scale-[1.01]">
@@ -446,6 +474,72 @@ export default function Settings() {
                     </div>
                   </div>
                 </div>
+                <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
+                  <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest mb-6">PDF-Kopfbereich</h2>
+                  <div className="space-y-4">
+                    <label className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
+                      <span className="text-xs font-medium text-text-primary">Kopfbereich standardmäßig aktivieren</span>
+                      <input
+                        type="checkbox"
+                        checked={pdfPremiumEnabledDefault}
+                        onChange={(e) => setPdfPremiumEnabledDefault(e.target.checked)}
+                        className="h-4 w-4 accent-accent-orange"
+                      />
+                    </label>
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1.5">Projekt</label>
+                      <input
+                        type="text"
+                        value={pdfPremiumCompany}
+                        onChange={(e) => setPdfPremiumCompany(e.target.value)}
+                        placeholder="z. B. Produktionsdaten Q2"
+                        className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-text-secondary mb-1.5">Name</label>
+                        <input
+                          type="text"
+                          value={pdfPremiumName}
+                          onChange={(e) => setPdfPremiumName(e.target.value)}
+                          placeholder="Vorname Nachname"
+                          className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-text-secondary mb-1.5">Rolle</label>
+                        <input
+                          type="text"
+                          value={pdfPremiumRole}
+                          onChange={(e) => setPdfPremiumRole(e.target.value)}
+                          placeholder="z. B. Projektleitung"
+                          className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1.5">Kontakt</label>
+                      <input
+                        type="text"
+                        value={pdfPremiumContact}
+                        onChange={(e) => setPdfPremiumContact(e.target.value)}
+                        placeholder="E-Mail, Telefon oder Website"
+                        className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1.5">Fußzeile</label>
+                      <input
+                        type="text"
+                        value={pdfPremiumFooter}
+                        onChange={(e) => setPdfPremiumFooter(e.target.value)}
+                        placeholder="z. B. Vertraulich - nur für den internen Gebrauch"
+                        className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
                 <button onClick={handleSaveSettings} className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent-orange/20 transition-all hover:scale-[1.01]">
                   Speichern
                 </button>
@@ -552,7 +646,7 @@ export default function Settings() {
               <div className="mb-8 bg-dark-card border border-accent-orange/20 rounded-2xl p-6 shadow-2xl shadow-accent-orange/5">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-2 h-2 bg-accent-orange rounded-full animate-pulse" />
-                  <h3 className="text-[10px] font-bold text-accent-orange uppercase tracking-[0.2em]">KI-Vorlagen-Generator</h3>
+                  <h3 className="text-[10px] font-bold text-accent-orange uppercase tracking-[0.2em]">Vorlagen-Generator</h3>
                 </div>
                 <div className="flex gap-3 items-start">
                   <textarea 
@@ -576,7 +670,7 @@ export default function Settings() {
                   </button>
                 </div>
                 <p className="mt-3 text-[10px] text-text-secondary opacity-60">
-                  Die KI erstellt basierend auf Ihrem Wunsch eine professionelle System-Anweisung inklusive JSON-Struktur.
+                  Aus Ihrer Beschreibung wird eine System-Anweisung mit JSON-Struktur erstellt.
                 </p>
               </div>
 

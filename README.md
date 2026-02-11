@@ -1,76 +1,140 @@
 # GhostTyper
 
-**Your thought, decoded and distilled.**
+GhostTyper ist eine selbstgehostete Webanwendung für:
+- Audio-Transkription
+- OCR (Dokumente/Fotos)
+- KI-Zusammenfassungen und Textverarbeitung
+- Übersetzungen
+- editor-zentrierte Dokumentbearbeitung (PDF/DOCX)
 
-GhostTyper ist eine leistungsstarke Webanwendung für Audio-Transkription, KI-gestützte Analyse, Dokumenten-OCR und Übersetzung. Sie nutzt modernste KI-Modelle von Mistral AI (Voxtral, Mistral Large, Mistral OCR) in einer datenschutzfreundlichen, selbstgehosteten Umgebung.
+Stack: Next.js 13, React 18, PostgreSQL 16, NextAuth, Mistral API, Docker Compose.
 
 ![GhostTyper Screenshot](public/logo-text.png)
 
-## Features
+## Funktionsumfang
 
 ### Audio & Transkription
-- **Transkription**: Hochpräzise Audio-zu-Text Umwandlung mit `voxtral-mini`.
-- **Sprechererkennung (Diarization)**: Erkennt verschiedene Sprecher und ermöglicht einfache Namenszuweisung.
-- **In-App Aufnahme**: Direkt im Browser aufnehmen (Desktop & Mobile).
-- **Kontext-Bias**: Fachbegriffe und Namen durch benutzerdefinierte Wörterlisten besser erkennen.
+- Upload von Audio-Dateien (inkl. robuster MIME-/Extension-Prüfung)
+- Browser-Aufnahme (Desktop & Mobile)
+- Diarisierung mit Sprecherzuweisung
+- Optional sofortige Folgeanalyse nach Transkription
+- Standard-Analysemodus beim Upload: `Zusammenfassung` (`generic`)
+- Kontext-Bias (Begriffe/Domainvokabular)
 
-### KI-Analyse & Verarbeitung
-- **Strukturierte Analyse**: Automatische Zusammenfassungen, To-Do-Listen oder Aufmaß-Daten mittels `mistral-large`.
-- **Individuelle Vorlagen**: Erstellen Sie eigene Prompts für spezifische Anwendungsfälle (z.B. Arztbriefe, Baustellenberichte).
-- **Modellauswahl**: Wählen Sie zwischen Mistral Large (Qualität), Medium oder Small (Geschwindigkeit/Kosten).
+### OCR & Dokumente
+- OCR für PDF und Bilder
+- Kamera-Upload für mobile Nutzung
+- Optional direkte KI-Analyse nach OCR
+- Speicherung der OCR-Ergebnisse in der Historie
 
-### Dokumente & Übersetzung
-- **OCR / Document AI**: Textextraktion aus PDFs und Bildern via `mistral-ocr`. Integrierte Kamera-Funktion für mobile Dokumentenerfassung.
-- **Übersetzung**: Hochwertige Übersetzungen mit Kontexterhalt.
+### KI-Analyse & Textverarbeitung
+- Analysemodi: Zusammenfassung, Meeting, Aufmaß, Custom Templates
+- Modellauswahl mit serverseitiger Modell-Policy (Whitelist)
+- Text-Assistent mit verwaltbaren Aufgaben (text_tasks)
+- Übersetzung als eigener Workflow
 
-### Benutzer & Admin
-- **Authentifizierung**: Sicheres Login-System (NextAuth.js).
-- **Kostenkontrolle**: Detailliertes Tracking der API-Kosten pro User mit monatlichen Limits.
-- **Admin-Dashboard**: Benutzerverwaltung und globale Kostenübersicht.
-- **Dark Mode UI**: Modernes, augenschonendes Design mit vertikaler Navigation.
+### Editor-zentrierter Workflow
+- Einheitlicher Document Editor für Ergebnisbearbeitung
+- PDF/DOCX-Export (PDF primär serverseitig via Chromium, mit lokalem Fallback)
+- PDF-Export nutzt standardmäßig einen festen Stil:
+  - Stil: `Soft Business`
+  - Schrift: `Google Sans Soft` (mit robusten Fallbacks)
+- Premium-Layout ist pro Export im Editor zuschaltbar
+- Premium-Daten (Firma/Name/Rolle/Kontakt/Fußzeile) werden zentral in den Einstellungen gepflegt
+- Optionaler PDF-Kopfbereich als dezente Signatur (Titel, Datum, optional Projekt)
+- PDF wird nach Export standardmäßig direkt im Browser-Tab geöffnet
+- Kein erzwungener Download-Fallback beim PDF-Export (bei blockierten Pop-ups erscheint ein Hinweis)
+- Historie mit Favoriten/Ordnern
+- Übersetzungsfunktion auf den Editor fokussiert (kein Parallel-Workflow mehr in der Detailseite)
 
-## Technologiestack
+### UX-Verbesserungen (neu)
+- Einheitliche Prozesskarte (`ProcessStatusCard`) mit:
+  - Schrittanzeige
+  - Restzeitindikator (ETA)
+  - rotierenden Lade-Texten
+- Auto-Weiterleitung nach Upload, sobald Ergebnis bereit ist (optional)
+- Event-Timeline pro Auftrag in der Detailansicht (Verlauf)
+- Live-Status über SSE bei laufenden Transkriptionsjobs (Polling nur als Fallback)
 
-- **Frontend**: Next.js 13 (Pages Router), React 18, Tailwind CSS
-- **Backend**: Next.js API Routes
-- **Datenbank**: PostgreSQL 16
-- **KI-Backend**: Mistral AI API (Voxtral, Large, OCR)
-- **Deployment**: Docker (Multi-Stage), Docker Compose, Traefik
+### Sicherheit & Betriebsstabilität (neu)
+- API-Key-Verschlüsselung (`settings.mistral_api_key_encrypted`)
+- Migrationsskript für Legacy-Klartext-Keys (`npm run migrate-api-keys`)
+- Rate-Limits auf kritischen API-Routen
+- Atomische Statusübergänge bei Transkriptions-/Analysejobs
+- Stale-Job-Recovery (hängende Jobs werden auf `error` gesetzt)
+- Sicheres Dateilöschen nur innerhalb des Upload-Verzeichnisses
+- Separates `DB_INIT_SECRET`; `db-init` in Produktion standardmäßig deaktivierbar
 
-## Installation & Setup
+## Schnellstart (Docker Dev)
 
-### Voraussetzungen
-- Docker & Docker Compose
-- Mistral API Key (console.mistral.ai)
+### 1. Starten
+```bash
+docker compose -f config/docker-compose.dev.yml up --build -d
+```
 
-### Lokale Entwicklung
+### 2. Datenbank initialisieren
+```bash
+curl -X POST http://localhost:3000/api/db-init -H "x-init-secret: dev-db-init-secret"
+```
 
-1. Repository klonen:
-   ```bash
-   git clone https://github.com/IhrUsername/transkription_webapp.git
-   cd transkription_webapp
-   ```
+### 3. Optional: Admin anlegen/aktualisieren
+```bash
+npm run seed-admin
+```
 
-2. Umgebungsvariablen setzen:
-   Erstellen Sie eine `.env` Datei basierend auf `.env.example`.
+## API-Key-Migration (Legacy Klartext -> verschlüsselt)
 
-3. Starten mit Docker Compose:
-   ```bash
-   docker compose -f config/docker-compose.dev.yml up --build
-   ```
+Wenn ältere Einträge noch `settings.mistral_api_key` (Klartext) enthalten:
 
-4. Datenbank initialisieren:
-   ```bash
-   # Schema erstellen
-   curl -X POST http://localhost:3000/api/db-init -H "x-init-secret: IHR_NEXTAUTH_SECRET"
-   
-   # Admin-User erstellen
-   curl -X POST http://localhost:3000/api/admin/seed -H "x-init-secret: IHR_NEXTAUTH_SECRET"
-   ```
+### 1. Umgebung setzen
+```bash
+export SETTINGS_ENCRYPTION_KEY='dev-settings-encryption-key'
+export DATABASE_URL='postgresql://transkription:transkription@localhost:5432/transkription'
+```
 
-### Produktion (VPS)
+### 2. Dry-Run
+```bash
+npm run migrate-api-keys -- --dry-run
+```
 
-Verwenden Sie `config/docker-compose.prod.yml`. Stellen Sie sicher, dass Traefik als Reverse Proxy konfiguriert ist.
+### 3. Write-Run
+```bash
+npm run migrate-api-keys
+```
+
+### 4. Verifikation
+```bash
+docker compose -f config/docker-compose.dev.yml exec transkription-db \
+  psql -U transkription -d transkription -c "SELECT COUNT(*) AS plaintext_remaining FROM settings WHERE NULLIF(TRIM(mistral_api_key), '') IS NOT NULL;"
+
+docker compose -f config/docker-compose.dev.yml exec transkription-db \
+  psql -U transkription -d transkription -c "SELECT COUNT(*) AS encrypted_present FROM settings WHERE NULLIF(TRIM(mistral_api_key_encrypted), '') IS NOT NULL;"
+```
+
+## Wichtige Umgebungsvariablen
+
+Siehe `.env.example`.
+
+- `DATABASE_URL`
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`
+- `MISTRAL_API_KEY`
+- `DB_INIT_SECRET`
+- `ENABLE_DB_INIT_API`
+- `SETTINGS_ENCRYPTION_KEY`
+- `PDF_CHROMIUM_PATH`
+
+## Qualitäts-/Build-Hinweis
+
+- `npm run build` kompiliert die Anwendung.
+- In restriktiven Sandbox-Umgebungen kann der Build bei `Collecting page data` mit `EPERM listen 0.0.0.0` abbrechen. Das ist umgebungsbedingt und kein Compile-Fehler der Anwendung.
+
+## Dokumentation
+
+- Übersicht: `docs/README.md`
+- Feature- und Verbesserungsstand: `docs/features-and-improvements.md`
+- Security Review & Hardening: `docs/code-review-hardening-2026-02-11.md`
+- Projektplan: `PROJECT_PLAN.md`
 
 ## Lizenz
 

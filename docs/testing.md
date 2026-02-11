@@ -1,206 +1,107 @@
-# Testen und Verifizierung Dokumentation
+# Testen und Verifizieren
 
-## Übersicht
+Stand: 2026-02-11
 
-Dieses Dokument beschreibt das Testen und die Verifizierung für die Transkription WebApp. Die Anwendung wird lokal und auf dem VPS getestet.
+Dieses Dokument beschreibt die aktuelle Teststrategie für GhostTyper.
 
-## Architektur
+## 1. Testziele
 
-### Test-Fluss
+- Funktionssicherheit der Hauptworkflows
+- keine Regression durch Security-/Migrationsänderungen
+- konsistentes Verhalten auf Desktop und Mobile
+- Grundsicherheit der API-Routen (Auth, Rate-Limits, Validierung)
 
-1. **Lokale Tests**: Die Anwendung wird lokal getestet.
-2. **VPS-Tests**: Die Anwendung wird auf dem VPS getestet.
-3. **Fehlerbehebung**: Fehler werden behoben.
-4. **Verifizierung**: Die Anwendung wird verifiziert.
+## 2. Teststufen
 
-## Konfiguration
+### 2.1 Smoke Tests (nach jedem größeren Change)
+1. Login funktioniert.
+2. Audio-Upload startet Verarbeitung.
+3. Transkriptionsdetail lädt und zeigt Status.
+4. OCR Upload funktioniert.
+5. Übersetzung funktioniert.
+6. Editor öffnet, speichert, exportiert.
+7. Bei Startfehlern im Upload wird eine klare Fehlermeldung angezeigt.
+8. `Erneut starten` (Upload) und `Verarbeitung starten` (Detailseite) funktionieren.
 
-### Test-Dateien
+### 2.2 Funktions-Regression
 
-Die Test-Dateien sind in der Datei `tests/` definiert:
+#### A) Audio-Flow
+- Upload gängiger Formate (`mp3`, `wav`, `webm`, `m4a`)
+- Statuswechsel: `pending -> processing -> transcribed/analyzing -> completed`
+- Diarisierung: Sprecherzuweisung + manuelle Analyse
+- Event-Timeline vorhanden und plausibel
+- Live-Status über SSE aktiv (kein sichtbares 3s-„Stottern“); Polling nur Fallback
 
-```javascript
-import { test, expect } from '@playwright/test'
+#### B) OCR-Flow
+- PDF und Bilddatei
+- optional Analyse aktiv/inaktiv
+- Ergebnis in Historie gespeichert
 
-test('Homepage', async ({ page }) => {
-  await page.goto('http://localhost:3000')
-  await expect(page).toHaveTitle('Transkription WebApp')
-})
+#### C) Übersetzung/Text-AI
+- Eingabetext -> Ergebnis
+- Editor-Übergabe und Speichern
 
-test('Audio-Upload', async ({ page }) => {
-  await page.goto('http://localhost:3000/upload')
-  await expect(page).toHaveTitle('Audio-Upload')
-})
+#### D) Historie
+- Filtern/Suchen
+- Favorit/Ordner
+- Löschen inklusive Datei-Cleanup
 
-test('API-Health', async ({ page }) => {
-  await page.goto('http://localhost:3000/api/health')
-  await expect(page).toHaveTitle('Health')
-})
-```
+### 2.3 Sicherheits- und Betriebschecks
+- Rate-Limits liefern bei Last erwartbar `429`
+- Ungültige Modelle werden serverseitig abgewiesen (`400`)
+- DB-Init nur mit korrektem Secret
+- API-Key-Migration: keine Klartext-Keys verbleiben
 
-### Umgebung
+## 3. Testumgebung
 
-Die Umgebung wird über die `.env`-Datei konfiguriert. Eine Beispiel-Datei ist im Repository enthalten.
-
-- **NEXT_PUBLIC_API_URL**: URL der API
-- **DATABASE_URL**: URL der Datenbank
-- **NEXTAUTH_SECRET**: Geheimnis für NextAuth.js
-- **NEXTAUTH_URL**: URL der Anwendung
-
-## Setup
-
-### Voraussetzungen
-
-- Next.js
-- Node.js
-- Datenbank (PostgreSQL)
-- Playwright
-
-### Installation
-
-1. **Abhängigkeiten installieren**:
-
+### 3.1 Lokal (Docker)
 ```bash
-npm install @playwright/test
+docker compose -f config/docker-compose.dev.yml up --build -d
+curl -X POST http://localhost:3000/api/db-init -H "x-init-secret: dev-db-init-secret"
 ```
 
-2. **Test-Dateien erstellen**:
-
+### 3.2 Optional: Legacy-Key Migration testen
 ```bash
-mkdir -p tests
+export SETTINGS_ENCRYPTION_KEY='dev-settings-encryption-key'
+export DATABASE_URL='postgresql://transkription:transkription@localhost:5432/transkription'
+npm run migrate-api-keys -- --dry-run
+npm run migrate-api-keys
 ```
 
-3. **Test-Dateien erstellen**:
+## 4. Build-/Lint-Validierung
 
+### 4.1 Build
 ```bash
-touch tests/homepage.spec.js
-touch tests/upload.spec.js
-touch tests/api.spec.js
+npm run build
 ```
+Hinweis: In restriktiven Sandbox-Umgebungen kann `EPERM listen 0.0.0.0` bei `Collecting page data` auftreten.
 
-4. **Test-Dateien bearbeiten**:
-
+### 4.2 Lint
 ```bash
-nano tests/homepage.spec.js
-nano tests/upload.spec.js
-nano tests/api.spec.js
+npm run lint
 ```
+Aktueller Stand: es erscheint ein interaktiver ESLint-Setup-Dialog, solange keine finalisierte ESLint-Konfiguration vorliegt.
 
-## Entwicklung
+## 5. Mobile/Responsive Testkriterien
 
-### 1. Lokale Tests
+- Upload/OCR/Translate auf kleinen Viewports bedienbar
+- keine horizontalen Overflow-Probleme in Kernansichten
+- Statuskarten und Timeline bleiben lesbar
+- Kamera-Upload im OCR-Flow auf Mobilgeräten nutzbar
 
-1. **Anwendung starten**:
+## 6. Abnahme-Checkliste (Kurz)
 
-```bash
-npm run dev
-```
+1. Audio-Upload + Transkription + Analyse erfolgreich
+2. OCR + Analyse erfolgreich
+3. Editor speichern/exportieren erfolgreich
+4. Event-Verlauf sichtbar
+5. API-Key-Migration validiert (falls relevant)
+6. Keine Klartext-API-Keys mehr in `settings.mistral_api_key`
+7. Startfehler bei `pending` sind sichtbar und manuell behebbar (UI-Buttons vorhanden)
 
-2. **Tests ausführen**:
+## 7. Referenzen
 
-```bash
-npx playwright test
-```
-
-3. **Tests überprüfen**:
-
-Die Tests sind unter `http://localhost:3000` verfügbar.
-
-### 2. VPS-Tests
-
-1. **Anwendung starten**:
-
-```bash
-docker compose -f config/docker-compose.dev.yml up -d
-```
-
-2. **Tests ausführen**:
-
-```bash
-npx playwright test
-```
-
-3. **Tests überprüfen**:
-
-Die Tests sind unter `https://transkription.helgeroos.de` verfügbar.
-
-## Probleme
-
-### 1. Tests fehlschlagen
-
-Falls die Tests fehlschlagen, müssen die Test-Dateien überprüft werden:
-
-```bash
-nano tests/homepage.spec.js
-nano tests/upload.spec.js
-nano tests/api.spec.js
-```
-
-### 2. Anwendung nicht verfügbar
-
-Falls die Anwendung nicht verfügbar ist, müssen die Docker-Container überprüft werden:
-
-```bash
-docker compose -f config/docker-compose.dev.yml logs
-```
-
-### 3. Datenbank-Verbindung
-
-Falls die Datenbank-Verbindung fehlschlägt, muss die Datenbank-Konfiguration überprüft werden:
-
-```bash
-nano config/docker-compose.dev.yml
-```
-
-## Tests
-
-### Lokale Tests
-
-1. **Anwendung starten**:
-
-```bash
-npm run dev
-```
-
-2. **Tests ausführen**:
-
-```bash
-npx playwright test
-```
-
-3. **Tests überprüfen**:
-
-Die Tests sind unter `http://localhost:3000` verfügbar.
-
-### VPS-Tests
-
-1. **Anwendung starten**:
-
-```bash
-docker compose -f config/docker-compose.dev.yml up -d
-```
-
-2. **Tests ausführen**:
-
-```bash
-npx playwright test
-```
-
-3. **Tests überprüfen**:
-
-Die Tests sind unter `https://transkription.helgeroos.de` verfügbar.
-
-## Dokumentation
-
-- [Umgebungsanalyse](umgebungsanalyse.md)
-- [API-Spezifikation](api-specification.md)
-- [Projektplan](PROJECT_PLAN.md)
-- [Docker-Setup](docker-setup.md)
-- [Authentifizierung](authentication.md)
-- [CI/CD-Pipeline](ci-cd-pipeline.md)
-- [Audio-Upload](audio-upload.md)
-- [AI-Integration](ai-integration.md)
-
-## Nächste Schritte
-
-1. **Dokumentation aktualisieren**: Aktualisierung der Dokumentation mit den neuen Implementierungen.
+- `../README.md`
+- `../PROJECT_PLAN.md`
+- `code-review-hardening-2026-02-11.md`
+- `features-and-improvements.md`

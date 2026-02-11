@@ -1,222 +1,124 @@
-# Projektabschluss Dokumentation
+# Projektabschluss und Übergabestatus
 
-## Übersicht
+Stand: 2026-02-11
 
-Dieses Dokument beschreibt den Projektabschluss für die Transkription WebApp. Das Projekt umfasst die Entwicklung einer Transkriptions-WebApp mit dynamischer Audio-Analyse unter Nutzung von Mistral Voxtral und Mistral Large, integriert in eine bestehende Docker-Umgebung auf einem VPS.
+Dieses Dokument fasst den aktuellen Projektabschlussstatus zusammen und dient als Übergabegrundlage für Betrieb und Weiterentwicklung.
 
-## Architektur
+## 1. Abschlussstatus
 
-### Projektabschluss-Fluss
+Status: abgeschlossen, deployment-ready (mit finaler Go-Live-Checkliste).
 
-1. **Umgebungsanalyse**: Analyse der bestehenden Docker-Umgebung auf dem VPS.
-2. **API-Spezifikation**: Spezifikation der API-Endpunkte.
-3. **Projektplan**: Planung der Implementierung.
-4. **Docker-Setup**: Konfiguration der Docker-Umgebung.
-5. **Authentifizierung**: Implementierung der Authentifizierung.
-6. **CI/CD-Pipeline**: Einrichtung der CI/CD-Pipeline.
-7. **Audio-Upload**: Implementierung des Audio-Uploads.
-8. **AI-Integration**: Integration der Mistral-APIs.
-9. **Testen und Verifizierung**: Testen und Verifizierung der gesamten Implementierung.
-10. **Dokumentation**: Aktualisierung der Dokumentation.
-11. **Projektabschluss**: Abschluss des Projekts und Bereitstellung für die Nutzung.
+Abgeschlossen:
+- Kernfunktionen (Audio, OCR, Analyse, Übersetzung, Editor)
+- Benutzer-/Admin-Funktionen
+- Kostenkontrolle
+- Security-Härtung und Migrationspfad
+- wesentliche UX-Verbesserungen für lange Verarbeitungszeiten
+- Live-Status für Transkriptionsjobs via SSE (Polling nur Fallback)
+- Warteschlangen-Startfehler transparent im UI + manuelles Neustarten möglich
 
-## Konfiguration
+Noch offen (nicht blockierend für Betrieb):
+- CI-feste ESLint-Konfiguration (non-interaktiv)
+- formalisierte E2E-Regressionsmatrix
+- optionale Worker/Queue-Entkopplung als nächste Skalierungsstufe
 
-### Projektabschluss-Dateien
+## 2. Umgesetzte Ergebnisse
 
-Die Projektabschluss-Dateien sind in der Datei `docs/` definiert:
+### 2.1 Produktfunktionen
+- Audio-Transkription inkl. Diarisierung
+- OCR für PDF/Bilder inkl. Kamera-Workflow
+- KI-Analyse per Templates + Custom Prompt
+- Übersetzungsmodul
+- Editor-zentrierte Nachbearbeitung mit PDF/DOCX Export
 
-```markdown
-# Projektabschluss
+### 2.2 Security und Stabilität
+- API-Key-Verschlüsselung (`mistral_api_key_encrypted`)
+- Migrationsskript für Legacy-Klartext
+- Rate-Limits auf kritischen Routen
+- atomische Job-Transitions und Schutz gegen Doppelstart
+- Stale-Job-Recovery
+- sichere Upload-Dateipfadbehandlung
+- gehärteter DB-Init mit separatem Secret
 
-## Übersicht
+### 2.3 UX
+- einheitliche Statuskarte mit Steps und ETA
+- rotierende Lade-Texte
+- Auto-Weiterleitung bei fertigem Ergebnis
+- Event-Timeline (`transcription_events`) in der Detailansicht
 
-Dieses Dokument beschreibt den Projektabschluss für die Transkription WebApp.
+## 3. Betriebsübergabe
 
-## Architektur
-
-### Projektabschluss-Fluss
-
-1. **Umgebungsanalyse**: Analyse der bestehenden Docker-Umgebung auf dem VPS.
-2. **API-Spezifikation**: Spezifikation der API-Endpunkte.
-3. **Projektplan**: Planung der Implementierung.
-4. **Docker-Setup**: Konfiguration der Docker-Umgebung.
-5. **Authentifizierung**: Implementierung der Authentifizierung.
-6. **CI/CD-Pipeline**: Einrichtung der CI/CD-Pipeline.
-7. **Audio-Upload**: Implementierung des Audio-Uploads.
-8. **AI-Integration**: Integration der Mistral-APIs.
-9. **Testen und Verifizierung**: Testen und Verifizierung der gesamten Implementierung.
-10. **Dokumentation**: Aktualisierung der Dokumentation.
-11. **Projektabschluss**: Abschluss des Projekts und Bereitstellung für die Nutzung.
-
-### Umgebung
-
-Die Umgebung wird über die `.env`-Datei konfiguriert. Eine Beispiel-Datei ist im Repository enthalten.
-
-- **NEXT_PUBLIC_API_URL**: URL der API
-- **DATABASE_URL**: URL der Datenbank
-- **NEXTAUTH_SECRET**: Geheimnis für NextAuth.js
-- **NEXTAUTH_URL**: URL der Anwendung
-
-### Probleme
-
-1. **Docker-Netzwerk**: Falls das Docker-Netzwerk `web` nicht existiert, muss es manuell erstellt werden.
-2. **Docker Compose**: Falls Docker Compose nicht installiert ist, muss es installiert werden.
-3. **Speicherplatz**: Falls der Speicherplatz auf dem VPS knapp ist, kann der Docker-Speicher bereinigt werden.
-
-### Tests
-
-1. **Lokale Tests**: Die Anwendung wird lokal getestet.
-2. **VPS-Tests**: Die Anwendung wird auf dem VPS getestet.
-
-### Dokumentation
-
-- [Umgebungsanalyse](umgebungsanalyse.md)
-- [API-Spezifikation](api-specification.md)
-- [Projektplan](PROJECT_PLAN.md)
-- [Docker-Setup](docker-setup.md)
-- [Authentifizierung](authentication.md)
-- [CI/CD-Pipeline](ci-cd-pipeline.md)
-- [Audio-Upload](audio-upload.md)
-- [AI-Integration](ai-integration.md)
-- [Testen und Verifizierung](testing.md)
-- [Dokumentation](documentation.md)
-
-### Nächste Schritte
-
-1. **Projekt abschließen**: Abschluss des Projekts und Bereitstellung für die Nutzung.
-```
-
-### Umgebung
-
-Die Umgebung wird über die `.env`-Datei konfiguriert. Eine Beispiel-Datei ist im Repository enthalten.
-
-- **NEXT_PUBLIC_API_URL**: URL der API
-- **DATABASE_URL**: URL der Datenbank
-- **NEXTAUTH_SECRET**: Geheimnis für NextAuth.js
-- **NEXTAUTH_URL**: URL der Anwendung
-
-## Setup
-
-### Voraussetzungen
-
-- Next.js
-- Node.js
-- Datenbank (PostgreSQL)
-- Docker
-- Docker Compose
-
-### Installation
-
-1. **Projektabschluss-Dateien erstellen**:
-
+### 3.1 Pflichtschritte nach Code-Update
+1. Container neu bauen/starten:
 ```bash
-mkdir -p docs
+docker compose -f config/docker-compose.dev.yml up --build -d
 ```
-
-2. **Projektabschluss-Dateien erstellen**:
-
+2. DB-Init/Migrationen ausführen:
 ```bash
-touch docs/project-completion.md
+curl -X POST http://localhost:3000/api/db-init -H "x-init-secret: dev-db-init-secret"
 ```
 
-3. **Projektabschluss-Dateien bearbeiten**:
-
+### 3.2 Pflichtschritte für API-Key-Härtung
 ```bash
-nano docs/project-completion.md
+export SETTINGS_ENCRYPTION_KEY='dev-settings-encryption-key'
+export DATABASE_URL='postgresql://transkription:transkription@localhost:5432/transkription'
+npm run migrate-api-keys -- --dry-run
+npm run migrate-api-keys
 ```
 
-## Entwicklung
-
-### 1. Projektabschluss aktualisieren
-
-1. **Projektabschluss bearbeiten**:
-
+Verifikation:
 ```bash
-nano docs/project-completion.md
+docker compose -f config/docker-compose.dev.yml exec transkription-db \
+  psql -U transkription -d transkription -c "SELECT COUNT(*) AS plaintext_remaining FROM settings WHERE NULLIF(TRIM(mistral_api_key), '') IS NOT NULL;"
 ```
 
-2. **Projektabschluss überprüfen**:
+## 4. Qualitäts- und Abnahmebild
 
-Der Projektabschluss ist unter `docs/` verfügbar.
+Funktionalität:
+- Workflow ist konsistent und ohne bekannte Funktionsverluste im Vergleich zum vorherigen Stand.
 
-### 2. Projektabschluss testen
+Sicherheit:
+- zentrale Schwachstellen aus der Code-Review sind adressiert.
 
-1. **Projektabschluss testen**:
+Betrieb:
+- reproduzierbare Start-/Migrationsabläufe dokumentiert.
 
+UX:
+- Status-Transparenz bei langen Prozessen deutlich verbessert.
+- Keine "stille" Warteschlangen-Hänger mehr: Startfehler werden direkt angezeigt.
+
+## 5. Go-Live Checkliste (final)
+
+1. Container mit aktuellem Stand bauen/starten:
 ```bash
-npm run dev
+docker compose -f config/docker-compose.dev.yml up --build -d
 ```
-
-2. **Projektabschluss überprüfen**:
-
-Der Projektabschluss ist unter `http://localhost:3000` verfügbar.
-
-## Probleme
-
-### 1. Projektabschluss fehlschlägt
-
-Falls der Projektabschluss fehlschlägt, müssen die Projektabschluss-Dateien überprüft werden:
-
+2. DB-Init/Migrationen ausführen:
 ```bash
-nano docs/project-completion.md
+curl --retry 20 --retry-delay 2 --retry-connrefused \
+  -X POST http://localhost:3000/api/db-init \
+  -H "x-init-secret: dev-db-init-secret"
 ```
+3. Smoke-Test Kernflow:
+- Upload starten und prüfen: Status springt aus `pending` in `processing`.
+- Bei absichtlichem Fehler (z. B. fehlender API-Key) erscheint klare UI-Fehlermeldung.
+- Button `Erneut starten`/`Verarbeitung starten` funktioniert.
+4. Editor-Export prüfen:
+- PDF mit und ohne Kopfbereich exportieren.
+- PDF öffnet inline im Browser.
+5. Optional (falls noch Legacy-Keys vorhanden): API-Key-Migration + Verifikation ausführen.
 
-### 2. Anwendung nicht verfügbar
+## 6. Übergabedokumente
 
-Falls die Anwendung nicht verfügbar ist, müssen die Docker-Container überprüft werden:
+- `../README.md`
+- `../PROJECT_PLAN.md`
+- `features-and-improvements.md`
+- `implementation.md`
+- `code-review-hardening-2026-02-11.md`
+- `testing.md`
 
-```bash
-docker compose -f config/docker-compose.dev.yml logs
-```
+## 7. Nächste technische Ausbaupunkte
 
-### 3. Datenbank-Verbindung
-
-Falls die Datenbank-Verbindung fehlschlägt, muss die Datenbank-Konfiguration überprüft werden:
-
-```bash
-nano config/docker-compose.dev.yml
-```
-
-## Tests
-
-### Lokale Tests
-
-1. **Anwendung starten**:
-
-```bash
-npm run dev
-```
-
-2. **Projektabschluss testen**:
-
-Der Projektabschluss ist unter `http://localhost:3000` verfügbar.
-
-### VPS-Tests
-
-1. **Anwendung starten**:
-
-```bash
-docker compose -f config/docker-compose.dev.yml up -d
-```
-
-2. **Projektabschluss testen**:
-
-Der Projektabschluss ist unter `https://transkription.helgeroos.de` verfügbar.
-
-## Dokumentation
-
-- [Umgebungsanalyse](umgebungsanalyse.md)
-- [API-Spezifikation](api-specification.md)
-- [Projektplan](PROJECT_PLAN.md)
-- [Docker-Setup](docker-setup.md)
-- [Authentifizierung](authentication.md)
-- [CI/CD-Pipeline](ci-cd-pipeline.md)
-- [Audio-Upload](audio-upload.md)
-- [AI-Integration](ai-integration.md)
-- [Testen und Verifizierung](testing.md)
-- [Dokumentation](documentation.md)
-
-## Nächste Schritte
-
-1. **Projekt abschließen**: Abschluss des Projekts und Bereitstellung für die Nutzung.
+1. CI- und Lint-Pipeline finalisieren.
+2. E2E-Regressionssuite für Hauptworkflows.
+3. Optional: Queue/Worker für asynchrone Jobs bei höherer Last.

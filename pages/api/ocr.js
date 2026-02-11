@@ -8,6 +8,11 @@ import { query, resolveTemplate } from '../../lib/db';
 import { performOCR, analyzeTranscription } from '../../lib/ai-service';
 import { logUsage, checkCostLimit } from '../../lib/usage';
 import { ACCEPTED_OCR_TYPES, MAX_FILE_SIZE } from '../../lib/constants';
+import { resolveChatModel } from '../../lib/model-policy';
+import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service';
+import { checkRateLimit, applyRateLimitHeaders } from '../../lib/rate-limit';
+import { logApiError, serverError } from '../../lib/api-utils';
+import { addTranscriptionEvent } from '../../lib/transcription-events';
 
 export const config = {
   api: {
@@ -45,7 +50,19 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
 
+  const rate = checkRateLimit(req, {
+    keyPrefix: 'upload-ocr',
+    identifier: `user:${session.user.id}`,
+    limit: 20,
+    windowMs: 60_000,
+  });
+  applyRateLimitHeaders(res, rate);
+  if (!rate.allowed) {
+    return res.status(429).json({ message: 'Zu viele OCR-Anfragen. Bitte später erneut versuchen.' });
+  }
+
   let filePath = '';
+  let tempUploadPath = '';
   try {
     await ensureUploadDir();
     const { fields, files } = await parseForm(req);
@@ -55,7 +72,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Keine Datei hochgeladen' });
     }
 
+    tempUploadPath = file.filepath || '';
     if (!ACCEPTED_OCR_TYPES.includes(file.mimetype)) {
+      if (tempUploadPath) await unlink(tempUploadPath).catch(() => {});
       return res.status(400).json({ message: 'Ungültiges Dateiformat. Erlaubt sind PDF, PNG, JPG, WEBP.' });
     }
 
@@ -66,17 +85,16 @@ export default async function handler(req, res) {
     await copyFile(file.filepath, filePath);
     await unlink(file.filepath).catch(() => {});
 
-    // Get user settings
-    const settingsResult = await query(
-      'SELECT mistral_api_key, preferred_model, language FROM settings WHERE user_id = $1',
-      [session.user.id]
-    );
-    const apiKey = settingsResult.rows[0]?.mistral_api_key || process.env.MISTRAL_API_KEY;
-    const preferredModel = settingsResult.rows[0]?.preferred_model || 'mistral-large-latest';
-    const language = settingsResult.rows[0]?.language || 'de';
+    const settingsRow = await getSettingsRow(session.user.id);
+    const apiKey = resolveStoredApiKey(settingsRow) || process.env.MISTRAL_API_KEY;
+    const preferredModel = resolveChatModel(settingsRow?.preferred_model || 'mistral-large-latest');
+    const language = settingsRow?.language || 'de';
 
     if (!apiKey) {
       return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert' });
+    }
+    if (!preferredModel) {
+      return res.status(400).json({ message: 'Ungültiges Standardmodell in den Einstellungen' });
     }
 
     // Check cost limit
@@ -92,6 +110,7 @@ export default async function handler(req, res) {
     await logUsage(session.user.id, ocrModel, 'ocr', ocrUsage);
 
     let analysis = null;
+    let selectedModelForAnalysis = preferredModel;
 
     // Optional: Further analysis with LLM
     const shouldAnalyze = (fields.analyze?.[0] || fields.analyze) === 'true';
@@ -99,6 +118,11 @@ export default async function handler(req, res) {
       const template = fields.template?.[0] || fields.template || 'generic';
       const customPrompt = fields.customPrompt?.[0] || fields.customPrompt || '';
       const requestModel = fields.model?.[0] || fields.model;
+      selectedModelForAnalysis = resolveChatModel(requestModel || preferredModel);
+      if (!selectedModelForAnalysis) {
+        await unlink(filePath).catch(() => {});
+        return res.status(400).json({ message: 'Ungültiges KI-Modell' });
+      }
       
       const resolvedTemplate = await resolveTemplate(template, session.user.id);
 
@@ -107,7 +131,7 @@ export default async function handler(req, res) {
         resolvedTemplate, 
         apiKey, 
         customPrompt, 
-        requestModel || preferredModel, 
+        selectedModelForAnalysis,
         language
       );
       await logUsage(session.user.id, analysisResult.model, 'analysis', analysisResult.usage);
@@ -127,7 +151,7 @@ export default async function handler(req, res) {
         file.size,
         file.mimetype,
         fields.template?.[0] || fields.template || 'generic',
-        fields.model?.[0] || fields.model || 'mistral-ocr-latest',
+        shouldAnalyze ? selectedModelForAnalysis : 'mistral-ocr-latest',
         fields.customPrompt?.[0] || fields.customPrompt || '',
         markdown,
         analysis ? JSON.stringify(analysis) : null
@@ -135,14 +159,22 @@ export default async function handler(req, res) {
     );
 
     const transcriptionId = transcriptionResult.rows[0].id;
+    await addTranscriptionEvent({
+      transcriptionId,
+      userId: session.user.id,
+      stage: 'completed',
+      message: shouldAnalyze
+        ? 'OCR und KI-Analyse abgeschlossen.'
+        : 'OCR abgeschlossen.',
+    });
 
     // Local file cleanup is handled by transcription detail deletion eventually,
     // but for now we keep it as it's the source.
 
     return res.status(200).json({ transcriptionId, markdown, analysis });
   } catch (error) {
-    console.error('OCR error:', error);
+    logApiError('OCR error', error);
     if (filePath) await unlink(filePath).catch(() => {});
-    return res.status(500).json({ message: error.message || 'OCR fehlgeschlagen' });
+    return serverError(res, 'OCR fehlgeschlagen');
   }
 }

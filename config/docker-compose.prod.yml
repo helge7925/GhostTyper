@@ -23,7 +23,11 @@ services:
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@transkription-db:5432/${DB_NAME}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=https://${DOMAIN}
+      - DB_INIT_SECRET=${DB_INIT_SECRET}
+      - SETTINGS_ENCRYPTION_KEY=${SETTINGS_ENCRYPTION_KEY}
+      - ENABLE_DB_INIT_API=${ENABLE_DB_INIT_API:-false}
       - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - PDF_CHROMIUM_PATH=${PDF_CHROMIUM_PATH:-/usr/bin/chromium-browser}
     depends_on:
       transkription-db:
         condition: service_healthy

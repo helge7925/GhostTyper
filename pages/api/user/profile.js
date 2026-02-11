@@ -29,6 +29,15 @@ export default async function handler(req, res) {
       const { name, email, avatarUrl, password, currentPassword } = req.body;
 
       try {
+        if (avatarUrl !== undefined && avatarUrl !== null) {
+          const isAllowedAvatar =
+            /^data:image\//.test(avatarUrl) ||
+            /^https?:\/\//i.test(avatarUrl);
+          if (!isAllowedAvatar || avatarUrl.length > 2_500_000) {
+            return res.status(400).json({ message: 'Ungültiges Profilbild-Format' });
+          }
+        }
+
         // Fetch current user data for password verification
         const userResult = await query('SELECT password_hash FROM users WHERE id = $1', [userId]);
         const user = userResult.rows[0];

@@ -2,6 +2,15 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const readline = require('readline');
 
+function validatePassword(password) {
+  if (password.length < 8) return 'Passwort muss mindestens 8 Zeichen lang sein.';
+  if (!/[A-Z]/.test(password)) return 'Passwort muss mindestens einen Grossbuchstaben enthalten.';
+  if (!/[a-z]/.test(password)) return 'Passwort muss mindestens einen Kleinbuchstaben enthalten.';
+  if (!/\d/.test(password)) return 'Passwort muss mindestens eine Zahl enthalten.';
+  if (!/[@$!%*?&]/.test(password)) return 'Passwort muss mindestens ein Sonderzeichen enthalten (@$!%*?&).';
+  return null;
+}
+
 // Minimalistische DB-Config für das Skript
 // Nutzt DATABASE_URL aus der Umgebung (oder Standardwert für Docker)
 const pool = new Pool({
@@ -24,6 +33,12 @@ async function seed() {
 
   if (!email || !password) {
     console.error('Fehler: E-Mail und Passwort sind erforderlich!');
+    process.exit(1);
+  }
+
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    console.error(`Fehler: ${passwordError}`);
     process.exit(1);
   }
 

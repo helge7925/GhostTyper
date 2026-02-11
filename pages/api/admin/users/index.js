@@ -12,7 +12,7 @@ export default async function handler(req, res) {
       try {
         const result = await query(
           `SELECT u.id, u.email, u.name, u.role, u.created_at,
-                  s.mistral_api_key IS NOT NULL AS api_key_configured,
+                  (s.mistral_api_key IS NOT NULL OR s.mistral_api_key_encrypted IS NOT NULL) AS api_key_configured,
                   s.preferred_model, s.cost_limit
            FROM users u
            LEFT JOIN settings s ON s.user_id = u.id

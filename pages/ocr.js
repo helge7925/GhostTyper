@@ -3,17 +3,39 @@ import { useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
-import { getTemplates, getSettings } from '../lib/api';
+import { getTemplates } from '../lib/api';
 import DocumentEditor from '../components/DocumentEditor';
+import ProcessStatusCard from '../components/ProcessStatusCard';
 import { analysisToHtml } from '../lib/export-utils';
 
-const LANGUAGES = [
-  { code: 'German', label: 'Deutsch' },
-  { code: 'English', label: 'Englisch' },
-  { code: 'French', label: 'Französisch' },
-  { code: 'Spanish', label: 'Spanisch' },
-  { code: 'Italian', label: 'Italienisch' },
-  { code: 'Chinese', label: 'Chinesisch' },
+const OCR_LOADING_MESSAGES = [
+  'Wir lesen Pixel für Pixel, damit kein Wort verloren geht.',
+  'Die OCR kneift die Augen zusammen und entschlüsselt jede Zeile.',
+  'Scanner-Geister flüstern uns gerade den Dokumenttext zu.',
+  'Das Dokument wird gerade in maschinenlesbarem Klartext serviert.',
+  'Wir sammeln Buchstaben ein, auch die besonders schüchternen.',
+  'Seiten werden gerade elegant in Text verwandelt.',
+  'Jede Zeile wird gerade einmal freundlich abgeklopft.',
+  'Das Dokument erzählt, wir schreiben digital mit.',
+  'Wir zerlegen gerade Seiten in sauber lesbare Textbausteine.',
+  'Die OCR nimmt gerade Maß und setzt Buchstaben präzise ein.',
+  'Papierlogik wird gerade in Bildschirmlogik übersetzt.',
+  'Wir polieren gerade Silben aus Pixeln heraus.',
+];
+
+const OCR_ANALYSIS_MESSAGES = [
+  'Die KI setzt gerade Ordnung ins Dokument-Chaos.',
+  'Absätze werden gezähmt und in klare Aussagen verwandelt.',
+  'Unser Text-Bauleiter verteilt gerade Überschriften und Struktur.',
+  'Kernaussagen werden gerade gebündelt und sauber verpackt.',
+  'To-dos werden markiert, sortiert und auf Hochglanz poliert.',
+  'Wir machen aus Rohtext gerade eine lesbare Abkürzung.',
+  'Die wichtigsten Punkte stehen schon an der Startlinie.',
+  'Wir filtern gerade Rauschen weg und behalten Substanz.',
+  'Das Ergebnis bekommt gerade eine klare Dramaturgie.',
+  'Gedankensplitter werden gerade zu einer stringenten Story.',
+  'Wir sortieren Details nach Relevanz und Schärfe.',
+  'Klarheit in Arbeit: der Text bekommt Strukturkanten.',
 ];
 
 export default function OCR() {
@@ -26,6 +48,7 @@ export default function OCR() {
   const [transcriptionId, setTranscriptionId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(''); 
+  const [stepStartedAt, setStepStartedAt] = useState(null);
   const [analyze, setAnalyze] = useState(true);
   const [error, setError] = useState('');
   const [dragActive, setDragActive] = useState(false);
@@ -34,6 +57,7 @@ export default function OCR() {
   const [template, setTemplate] = useState('generic');
   const [model, setModel] = useState('mistral-large-latest');
   const [customPrompt, setCustomPrompt] = useState('');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [templates, setTemplates] = useState([]);
 
   // Editor state
@@ -41,6 +65,7 @@ export default function OCR() {
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
+  const analysisStepTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -48,13 +73,21 @@ export default function OCR() {
       return;
     }
     if (status === 'authenticated') {
-      Promise.all([getTemplates(), getSettings()])
-        .then(([templatesData, settingsData]) => {
+      getTemplates()
+        .then((templatesData) => {
           setTemplates(templatesData);
         })
         .catch(err => console.error('Error loading options:', err));
     }
   }, [status, router]);
+
+  useEffect(() => {
+    return () => {
+      if (analysisStepTimeoutRef.current) {
+        clearTimeout(analysisStepTimeoutRef.current);
+      }
+    };
+  }, []);
 
   function handleFile(f) {
     setError('');
@@ -72,6 +105,7 @@ export default function OCR() {
 
     setLoading(true);
     setLoadingStep('ocr');
+    setStepStartedAt(new Date().toISOString());
     setError('');
     setMarkdown('');
     setAnalysis(null);
@@ -85,7 +119,14 @@ export default function OCR() {
       formData.append('template', template);
       formData.append('model', model);
       if (customPrompt) formData.append('customPrompt', customPrompt);
-      setTimeout(() => { if (loading) setLoadingStep('analysis'); }, 8000);
+
+      if (analysisStepTimeoutRef.current) {
+        clearTimeout(analysisStepTimeoutRef.current);
+      }
+      analysisStepTimeoutRef.current = setTimeout(() => {
+        setLoadingStep('analysis');
+        setStepStartedAt(new Date().toISOString());
+      }, 8000);
     }
 
     try {
@@ -107,8 +148,13 @@ export default function OCR() {
     } catch (err) {
       setError(err.message);
     } finally {
+      if (analysisStepTimeoutRef.current) {
+        clearTimeout(analysisStepTimeoutRef.current);
+        analysisStepTimeoutRef.current = null;
+      }
       setLoading(false);
       setLoadingStep('');
+      setStepStartedAt(null);
     }
   }
 
@@ -131,14 +177,14 @@ export default function OCR() {
 
   return (
     <>
-      <Head><title>OCR & Document AI - GhostTyper</title></Head>
+      <Head><title>OCR - GhostTyper</title></Head>
 
       {!showEditor ? (
         <div className="max-w-5xl mx-auto animate-fade-in pb-20">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-text-primary">OCR & Document AI</h1>
-              <p className="text-sm text-text-secondary mt-1">Dokumente extrahieren & analysieren</p>
+              <h1 className="text-2xl font-bold text-text-primary">OCR</h1>
+              <p className="text-sm text-text-secondary mt-1">Dokumente lesen und optional zusammenfassen</p>
             </div>
           </div>
 
@@ -194,23 +240,44 @@ export default function OCR() {
               </label>
 
               {analyze && (
-                <div className="w-full max-w-sm space-y-4 bg-white/[0.02] p-4 rounded-xl border border-white/[0.06]">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1.5 ml-1">Modus</label>
-                      <select value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
-                        <option value="generic">Zusammenfassung</option><option value="meeting">Meeting</option><option value="aufmass">Aufmaß</option>
-                        {templates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}
-                      </select>
+                <div className="w-full max-w-sm space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedOptions((prev) => !prev)}
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.02] text-sm text-text-primary hover:bg-white/[0.04] transition-colors"
+                    aria-expanded={showAdvancedOptions}
+                  >
+                    <span>Erweiterte Analyseoptionen</span>
+                    <svg
+                      className={`w-4 h-4 text-text-secondary transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {showAdvancedOptions && (
+                    <div className="space-y-4 bg-white/[0.02] p-4 rounded-xl border border-white/[0.06]">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1.5 ml-1">Modus</label>
+                          <select value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
+                            <option value="generic">Zusammenfassung</option><option value="meeting">Meeting</option><option value="aufmass">Aufmaß</option>
+                            {templates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1.5 ml-1">Modell</label>
+                          <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
+                            <option value="mistral-large-latest">Mistral Large</option><option value="mistral-medium-latest">Mistral Medium</option><option value="mistral-small-latest">Mistral Small</option>
+                          </select>
+                        </div>
+                      </div>
+                      <textarea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Zusätzliche Anweisungen..." rows={2} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-orange outline-none" />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1.5 ml-1">KI-Modell</label>
-                      <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
-                        <option value="mistral-large-latest">Mistral Large</option><option value="mistral-medium-latest">Mistral Medium</option><option value="mistral-small-latest">Mistral Small</option>
-                      </select>
-                    </div>
-                  </div>
-                  <textarea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Zusätzliche Anweisungen..." rows={2} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-orange outline-none" />
+                  )}
                 </div>
               )}
             </div>
@@ -219,10 +286,32 @@ export default function OCR() {
               {loading ? (
                 <div className="flex items-center gap-3">
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>{loadingStep === 'ocr' ? 'Schritt 1/2: Text-Extraktion...' : 'Schritt 2/2: KI-Analyse läuft...'}</span>
+                  <span>{loadingStep === 'analysis' ? 'Schritt 2/2: Zusammenfassung wird erstellt...' : 'Schritt 1/2: Text wird gelesen...'}</span>
                 </div>
               ) : 'Vorgang starten'}
             </button>
+
+            {loading && (
+              <ProcessStatusCard
+                title={loadingStep === 'analysis' ? 'Zusammenfassung wird erstellt' : 'Text wird gelesen'}
+                description={loadingStep === 'analysis'
+                  ? 'Der extrahierte Text wird zusammengefasst.'
+                  : 'Der Dokumenttext wird aus Datei oder Foto gelesen.'}
+                steps={analyze
+                  ? [
+                    { key: 'ocr', label: 'Text aus Dokument extrahieren' },
+                    { key: 'analysis', label: 'Text strukturieren' },
+                  ]
+                  : [
+                    { key: 'ocr', label: 'Text aus Dokument extrahieren' },
+                  ]}
+                activeStep={analyze && loadingStep === 'analysis' ? 1 : 0}
+                done={false}
+                startedAt={stepStartedAt}
+                etaSeconds={loadingStep === 'analysis' ? 22 : 16}
+                messages={loadingStep === 'analysis' ? OCR_ANALYSIS_MESSAGES : OCR_LOADING_MESSAGES}
+              />
+            )}
           </div>
         </div>
       ) : (
@@ -230,6 +319,7 @@ export default function OCR() {
           initialHtml={analysisToHtml({ original_name: file?.name || 'OCR Dokument', created_at: new Date(), text: markdown, analysis: analysis })}
           filename={file?.name || 'ocr-export'}
           sidebarContent={markdown}
+          sourceLabel="Originaltext"
           onSave={handleSaveDocument}
           onCancel={() => setShowEditor(false)}
         />

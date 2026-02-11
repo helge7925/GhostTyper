@@ -1,116 +1,183 @@
 # GhostTyper Projektplan
 
-## Übersicht
-Web-Anwendung für Audio-Transkription, OCR/Document AI und KI-gestützte Analyse. Nutzt Mistral Voxtral Mini für die Transkription, Mistral OCR für Dokumentenerkennung und Mistral Large/Medium/Small für kontextsensitive Analyse und Übersetzung. Deployment auf einem Hetzner VPS mit Docker und Traefik.
+Stand: 2026-02-11
 
-## Technologiestack
+## 1. Zielbild
 
-| Komponente | Technologie |
+GhostTyper ist eine sichere, selbstgehostete KI-Webanwendung für Audio, OCR, Übersetzung und Textverarbeitung mit einem editor-zentrierten Nutzerfluss:
+- Aufnahme/Upload -> Transkription/OCR -> Analyse -> Bearbeitung im Editor -> Export.
+
+Qualitätsziele:
+- Keine Funktionsverschlechterung bei Sicherheitsmaßnahmen.
+- Hohe Transparenz im Verarbeitungsstatus.
+- Konsistentes UX-Verhalten auf Desktop und Mobile.
+
+## 2. Architektur (Ist)
+
+| Bereich | Technologie |
 |---|---|
-| Frontend | Next.js 13 (Pages Router), React 18, Tailwind CSS 3 |
+| Frontend | Next.js 13 (Pages Router), React 18, Tailwind |
 | Backend | Next.js API Routes |
-| Datenbank | PostgreSQL 16 (eigene DB in bestehender Paperless-Instanz) |
-| Auth | NextAuth.js (Credentials Provider, JWT Sessions) |
-| KI-Transkription | Mistral Voxtral Mini (`voxtral-mini-latest`) |
-| KI-Analyse | Mistral Large/Medium/Small (pro Job wählbar) |
-| KI-OCR | Mistral OCR (`mistral-ocr-latest`) |
-| KI-Übersetzung | Mistral Modelle (pro Job wählbar) |
-| Reverse Proxy | Traefik (Let's Encrypt, Domain: `transkription.helgeroos.de`) |
-| Containerisierung | Docker (Multi-Stage Build, `output: 'standalone'`) |
-| Design | Dark Theme (#0a0a0f, Mistral Orange #ff5917) |
+| Auth | NextAuth Credentials + JWT |
+| Datenbank | PostgreSQL 16 |
+| KI-Transkription | Mistral Voxtral (`voxtral-mini-latest`) |
+| KI-Analyse/Translate | Mistral Large/Medium/Small |
+| OCR | Mistral OCR |
+| Deployment | Docker Compose, Traefik |
 
-## Architektur
+## 3. Umgesetzte Arbeitspakete
 
+### AP-01 Kernfunktionen
+Status: abgeschlossen
+- Audio-Upload, Browser-Aufnahme, Transkription
+- OCR Upload/Kamera
+- Analyse-Templates inkl. Custom Prompt
+- Übersetzungsmodul
+- Document Editor mit PDF/DOCX Export
+
+### AP-02 Benutzer/Administration
+Status: abgeschlossen
+- Login/Auth
+- Admin-Userverwaltung
+- Kosten-Tracking und Monatslimit
+- Profilverwaltung
+
+### AP-03 Security Hardening
+Status: abgeschlossen
+- API-Key-Verschlüsselung in `settings.mistral_api_key_encrypted`
+- Migrationsskript für Legacy-Klartext-Keys (`scripts/migrate-api-keys.js`)
+- Rate-Limits für kritische Routen
+- Modell-Whitelist (serverseitige Validierung)
+- getrennte Secrets für DB-Init (`DB_INIT_SECRET`)
+- Produktionsschutz für `/api/db-init` über `ENABLE_DB_INIT_API`
+- robustes Error-Handling und reduzierte sensible Logs
+
+### AP-04 Stabilität & Betriebsrisiken
+Status: abgeschlossen
+- atomische Statusübergänge (`pending -> processing`, `transcribed -> analyzing`)
+- Schutz vor Doppelstarts (409)
+- Stale-Job-Recovery bei hängenden Jobs
+- sichere Dateilöschung nur unterhalb `uploads/`
+- Upload/OCR-Tempfile-Cleanup verbessert
+
+### AP-05 UX-/Produktverbesserungen
+Status: abgeschlossen
+- einheitliche Prozessanzeige (`ProcessStatusCard`)
+- ETA/Restzeit + rotierende Lade-Texte
+- Auto-Weiterleitung nach Upload (optional)
+- Event-Timeline je Auftrag (`transcription_events`)
+- Detailseite auf Editor-Workflow fokussiert (Translation dort entfernt)
+- Live-Status für laufende Transkriptionsjobs via SSE mit Polling-Fallback
+- Microcopy-Überarbeitung auf Kernseiten (reduzierter, konsistenter Ton)
+
+### AP-06 Datenbank-/Migrationspflege
+Status: abgeschlossen
+- neue DB-Spalten/Tables über `lib/db-init.js`
+- `transcription_events` Tabelle + Indizes
+- `mistral_api_key_encrypted` Spalte + Migrationspfad
+
+### AP-07 PDF-Export-Härtung (Startphase)
+Status: in Umsetzung (MVP+ erweitert)
+- neuer API-Exportpfad `POST /api/export/pdf`
+- serverseitiges Rendering über Chromium (Docker vorbereitet)
+- Editor nutzt API-Export mit Fallback auf Browser-Print
+- fester PDF-Markenstil für Konsistenz (`Soft Business` + `Google Sans Soft`)
+- PDF öffnet standardmäßig direkt im Browser (inline)
+- Premium-Layout pro Export im Editor einzeln zuschaltbar
+- Premium-Metadaten in Einstellungen hinterlegbar und serverseitig in PDF-Kopf integriert
+- Optionaler schlanker PDF-Kopfbereich (Titel, Datum, Projekt) integriert
+
+## 4. Betriebsschritte nach Migration
+
+1. Container neu bauen/starten:
+```bash
+docker compose -f config/docker-compose.dev.yml up --build -d
 ```
-transkription_webapp/
-├── components/          # React-Komponenten
-│   ├── AudioUploadForm  # Upload mit Modell- und Template-Wahl
-│   ├── AudioRecorder    # In-App Audio-Aufnahme (.webm/Opus)
-│   ├── Layout           # Seitenlayout mit Sidebar & mobilem Header
-│   ├── Sidebar          # Vertikale Navigation (reorganisiert)
-│   ├── DocumentEditor   # Canvas-Editor mit Rich-Text Toolbar & .docx Export
-│   ├── StatusBadge      # Farbkodierte Status-Badges
-│   └── LoadingSpinner
-├── config/
-│   ├── docker-compose.dev.yml   # Lokale Entwicklung (eigene PostgreSQL)
-│   └── docker-compose.prod.yml  # Produktion (Traefik + Paperless-DB)
-├── lib/
-│   ├── ai-service.js    # Mistral API Integration
-│   ├── api.js           # Frontend API-Helper
-│   ├── export-utils.js  # Markdown-zu-HTML & PDF/DOCX Export
-│   ├── prompts.js       # Zentralisierte KI-Anweisungen (Zusammenfassung, Meeting, Aufmaß)
-│   ├── constants.js     # Status-Konstanten, Dateitypen
-│   ├── db.js            # PostgreSQL Pool & Template-Resolver
-│   ├── db-init.js       # Datenbankschema & Migrationen
-│   ├── admin.js         # Admin-Middleware
-│   └── usage.js         # Token/Kosten-Tracking in €
-├── pages/
-│   ├── api/             # API Endpunkte (Auth, Profile, Transcriptions, OCR, Translate, Settings, Admin)
-│   ├── login.js         # Branding-optimierte Login-Seite
-│   ├── upload.js        # Hauptseite für Transkription
-│   ├── translate.js     # Modulares Übersetzungs-Tool (inkl. OCR-Import)
-│   ├── ocr.js           # Dokumentenerkennung mit Canvas-Integration
-│   ├── profile.js       # Benutzerprofil (Avatar-Upload, E-Mail, Passwort)
-│   ├── transcriptions.js # Historie (Audio & OCR kombiniert)
-│   ├── settings.js      # Einstellungen & Canvas Template-Editor
-│   └── admin/           # Admin-User-Verwaltung
-└── styles/globals.css   # Dark-Theme & Branding-Styles
+
+2. DB-Init/Migrationen anwenden:
+```bash
+curl -X POST http://localhost:3000/api/db-init -H "x-init-secret: dev-db-init-secret"
 ```
 
-## Datenbankschema (Updates)
-- `transcriptions`: Spalten `document_html` (korrigierte Fassung) und `model` (gewähltes LLM).
-- `settings`: Spalte `cost_limit` (monatliches Limit in €).
-- `templates`: Tabelle für benutzerdefinierte & überschriebene Analyse-Prompts.
-- `users`: Spalte `avatar_url` für Profilbilder (Base64).
+3. Legacy API Keys migrieren:
+```bash
+export SETTINGS_ENCRYPTION_KEY='dev-settings-encryption-key'
+export DATABASE_URL='postgresql://transkription:transkription@localhost:5432/transkription'
+npm run migrate-api-keys -- --dry-run
+npm run migrate-api-keys
+```
 
-## Features
+4. Verifizieren:
+```bash
+docker compose -f config/docker-compose.dev.yml exec transkription-db \
+  psql -U transkription -d transkription -c "SELECT COUNT(*) AS plaintext_remaining FROM settings WHERE NULLIF(TRIM(mistral_api_key), '') IS NOT NULL;"
+```
 
-### Implementiert
+## 5. Qualitätsstatus
 
-#### 1. Branding & Design (F1, F12)
-- Systemweites Redesign auf **Mistral Orange** (#ff5917).
-- Neues Logo mit schwarzem Hintergrund, Favicon und PWA-Icons integriert.
-- Konsistente Benennung der KI-Modelle ("Mistral Large" etc.).
+- Funktionsumfang: intakt, um sicherheitsrelevante Schutzmechanismen erweitert.
+- UX: deutlich transparenter bei längeren Jobs (Status, ETA, Verlauf).
+- Build: Kompilierung erfolgreich; Sandbox-Fehler `EPERM listen 0.0.0.0` kann in restriktiven Umgebungen auftreten.
 
-#### 2. Transkription & Audio (F5, F6)
-- Hochpräzise Audio-Umwandlung mit Voxtral Mini.
-- In-App Aufnahme (.webm) mit direktem API-Mapping.
-- Modellauswahl (Large/Medium/Small) direkt beim Start des Jobs.
+## 6. Offene Roadmap (nächste Schritte)
 
-#### 3. OCR & Document AI (F4) — ERWEITERT
-- Textextraktion aus PDF/Bildern mit automatischer Speicherung in der Historie.
-- 2-Schritt-Feedback: "Text-Extraktion" -> "KI-Analyse".
-- Flexible Analyse mit wählbaren Templates und Custom Prompts.
+### P1 (hoch)
+- End-to-End Regressionstest-Matrix formalisieren (Audio, OCR, Translate, Editor-Export).
+- ESLint-Konfiguration fixieren, damit `npm run lint` non-interaktiv in CI läuft.
 
-#### 4. Dokumenten-Workflow (F14) — CANVAS
-- **Canvas Editor:** WYSIWYG-Umgebung im Gemini-Stil mit Rich-Text Toolbar (Fett, Kursiv, Unterstreichen, Listen, Ausrichtung, H2/H3).
-- **Referenz-Sidebar:** Originaltext bleibt beim Bearbeiten links sichtbar.
-- **Clean Export:** PDF- und professioneller **DOCX-Export** (via `docx` Library) ohne Website-Metadaten.
-- **Markdown-Fix:** Automatische Umwandlung von KI-Strukturen/Markdown in formatierten Text.
+### P2 (mittel)
+- Queue/Worker-Entkopplung für Hintergrundjobs (z. B. Redis/BullMQ).
+- Zentralisiertes Observability-Setup (strukturierte Logs, Job-Metriken).
 
-#### 5. Übersetzungs-Modul (F3)
-- Zwischen-Übersetzung von OCR- oder Audio-Texten direkt im Canvas-Editor.
-- Dediziertes Tool mit **OCR-Import-Funktion** (Text aus Foto/PDF extrahieren und übersetzen).
+### P3 (mittel)
+- Feinjustierung PDF-Paginierung (Witwen/Waisen, Heading-Umbruchschutz) auf Basis des neuen Renderer-Pfads.
+- Weitere Mikro-UX-Verbesserungen im Apple-Stil (reduzierte Komplexität, klare Primäraktionen).
 
-#### 6. Profil-Management (NEU)
-- Direktes Hochladen von Profilbildern (Galerie/Explorer) mit Base64-Speicherung.
-- Änderung von Name, E-Mail und Passwort (mit Sicherheits-Verifizierung des alten Passworts).
+## 7. Umsetzungsplan PDF-Renderer (stabiler Export)
 
-#### 7. Admin & Kostenkontrolle (F7, F8, F9)
-- Benutzerverwaltung und individuelle monatliche Kostenlimits in €.
-- Statische Preisliste in den Einstellungen integriert.
+Ziel:
+- Umstellung vom Browser-Print (`window.print`) auf serverseitigen PDF-Render, um konstante, reproduzierbare PDF-Ausgaben für Standard- und Spezial-Templates (z. B. Aufmaß) zu erreichen.
 
-## Implementierungsfortschritt
+Arbeitspakete:
+1. Technische Basis
+- Status: erledigt
+- API-Route `POST /api/export/pdf` implementiert.
+- Renderer auf Chromium-CLI ausgelegt (`PDF_CHROMIUM_PATH`).
+2. Print-Template
+- Status: erledigt (Basis)
+- Dedizierte A4-Print-CSS im Server-Renderer.
+- Umbruchschutz für Überschriften, Tabellen und typische Blocks integriert.
+3. Backend-Exportpipeline
+- Status: erledigt (Basis)
+- Request-Validierung, Sanitizing, Timeout-Handling und Tempfile-Cleanup vorhanden.
+4. Frontend-Integration
+- Status: erledigt (Basis)
+- PDF-Button nutzt API-Export und fällt bei Fehlern auf Browser-Print zurück.
+5. Betriebsstabilität
+- Status: teilweise offen
+- Docker-Abhängigkeiten ergänzt (Chromium + Fonts).
+- Feintuning für parallele Exportjobs/Lastgrenzen noch offen.
+6. Qualitätssicherung
+- Status: offen
+- Gezielte Vergleichstests für lange Spezial-Templates (Aufmaß, Mehrseiten-Tabellen) ausstehend.
 
-### Phasen 1 bis 11 — Abgeschlossen
-- Alle Kernfeatures, Sicherheitsaspekte und Design-Anpassungen umgesetzt.
-- Stabilität der KI-Anzeige durch typsicheres Rendering gewährleistet.
-- Rebranding auf Mistral Orange abgeschlossen.
-- Professionelle Export-Engine für DOCX und PDF integriert.
-- **Fix (Aktuell):** Radikaler PDF-Export-Fix (keine Browser-Header mehr, korrekte Listen-Formatierung).
+Zeitabschätzung (eigener Aufwand):
+- MVP (API + UI + Basislayout): 1,5 bis 2 Arbeitstage.
+- Produktionsreife Umsetzung inkl. Stabilität für Spezial-Templates, Limits, QA und Doku: gesamt 3 bis 5 Arbeitstage.
+- Puffer für Feinschliff bei komplexen Umbruchfällen: +0,5 bis 1 Arbeitstag.
+- Realistische Gesamtschätzung: 4 bis 6 Arbeitstage.
 
-### Phase 12: Deployment & Finalisierung — In Arbeit
-- [x] Lokale Docker-Umgebung stabilisiert.
-- [x] Datenbank-Migrationspfad via `/api/db-init` etabliert.
-- [x] Finaler E2E-Test aller Module abgeschlossen.
-- [ ] Vorbereitung VPS-Deployment.
+Risiken:
+- Zusätzlicher Ressourcenbedarf (Chromium in Container, RAM-Spitzen bei Exportjobs).
+- Unterschiedliche Inhaltsqualität alter Dokumente (unsaubere HTML-Strukturen) kann Einzelfall-Nacharbeit erzeugen.
+
+Erfolgskriterien:
+- Keine Browser-Header/Footer-Artefakte mehr im Export.
+- Konsistente Seitenumbrüche ohne abgeschnittene Zeilen.
+- Reproduzierbare PDF-Ausgabe über Desktop/Mobile-Clients hinweg.
+
+## 8. Referenzen
+
+- Hauptdoku: `docs/README.md`
+- Features: `docs/features-and-improvements.md`
+- Security/Hardening: `docs/code-review-hardening-2026-02-11.md`

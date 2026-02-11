@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import TranscriptionCard from '../components/TranscriptionCard';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { getTranscriptions, getFolders, createFolder, updateFolder, deleteFolder, updateTranscription } from '../lib/api';
+import { getTranscriptions, getFolders, createFolder, updateFolder, deleteFolder, updateTranscription, deleteTranscription } from '../lib/api';
 
 export default function Transcriptions() {
   const { data: session, status } = useSession();
@@ -103,9 +103,12 @@ export default function Transcriptions() {
   }, []);
 
   const filteredTranscriptions = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
     return transcriptions.filter(t => {
       const matchesFolder = activeFolderId === null || t.folder_id === activeFolderId;
-      const matchesSearch = t.original_name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = normalizedQuery === ''
+        ? true
+        : (t.original_name || t.filename || '').toLowerCase().includes(normalizedQuery);
       return matchesFolder && matchesSearch;
     });
   }, [transcriptions, activeFolderId, searchQuery]);
@@ -179,7 +182,7 @@ export default function Transcriptions() {
                       <span className="truncate">{folder.name}</span>
                     </button>
                     
-                    <div className="absolute right-2 opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity">
+                    <div className="absolute right-2 flex gap-1 transition-opacity opacity-100 md:opacity-0 md:group-hover:opacity-100">
                       <button 
                         onClick={() => { setEditingFolderId(folder.id); setEditFolderName(folder.name); }}
                         className="p-1 text-text-secondary hover:text-white"

@@ -2,6 +2,10 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { query } from '../../lib/db';
 import { logUsage, checkCostLimit } from '../../lib/usage';
+import { resolveTextAiModel } from '../../lib/model-policy';
+import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service';
+import { checkRateLimit, applyRateLimitHeaders } from '../../lib/rate-limit';
+import { logApiError, serverError } from '../../lib/api-utils';
 
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1';
 
@@ -15,10 +19,25 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
 
-  const { text, action, model = 'mistral-small-latest' } = req.body;
+  const rate = checkRateLimit(req, {
+    keyPrefix: 'text-ai',
+    identifier: `user:${session.user.id}`,
+    limit: 60,
+    windowMs: 60_000,
+  });
+  applyRateLimitHeaders(res, rate);
+  if (!rate.allowed) {
+    return res.status(429).json({ message: 'Zu viele Anfragen. Bitte später erneut versuchen.' });
+  }
+
+  const { text, action, model } = req.body;
+  const selectedModel = resolveTextAiModel(model);
 
   if (!text || !action) {
     return res.status(400).json({ message: 'Text und Aktion sind erforderlich' });
+  }
+  if (!selectedModel) {
+    return res.status(400).json({ message: 'Ungültiges KI-Modell' });
   }
 
   try {
@@ -34,11 +53,8 @@ export default async function handler(req, res) {
 
     const actionPrompt = taskResult.rows[0].prompt;
 
-    const settingsResult = await query(
-      'SELECT mistral_api_key FROM settings WHERE user_id = $1',
-      [session.user.id]
-    );
-    const apiKey = settingsResult.rows[0]?.mistral_api_key || process.env.MISTRAL_API_KEY;
+    const settingsRow = await getSettingsRow(session.user.id);
+    const apiKey = resolveStoredApiKey(settingsRow) || process.env.MISTRAL_API_KEY;
 
     if (!apiKey) {
       return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert' });
@@ -56,9 +72,9 @@ export default async function handler(req, res) {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model,
+        model: selectedModel,
         messages: [
-          { role: 'system', content: 'Du bist ein hilfreicher KI-Assistent für Textverarbeitung. Antworte präzise und gib nur das Ergebnis zurück, ohne Einleitung oder Kommentare.' },
+          { role: 'system', content: 'Du bist ein hilfreicher KI-Assistent für Textverarbeitung. Antworte präzise und gib nur das Ergebnis zurück, ohne Einleitung oder Kommentare. Kein Text um des Textes willen: keine Floskeln, keine Wiederholungen, kein unnötiger Zusatz.' },
           { role: 'user', content: `${actionPrompt}
 
 Text:
@@ -75,11 +91,11 @@ ${text}` }
     const data = await response.json();
     const resultText = data.choices[0]?.message?.content || '';
 
-    await logUsage(session.user.id, model, 'text_ai', data.usage);
+    await logUsage(session.user.id, selectedModel, 'text_ai', data.usage);
 
     return res.status(200).json({ resultText });
   } catch (error) {
-    console.error('Text AI error:', error);
-    return res.status(500).json({ message: 'Fehler bei der Textverarbeitung' });
+    logApiError('Text AI error', error);
+    return serverError(res, 'Fehler bei der Textverarbeitung');
   }
 }

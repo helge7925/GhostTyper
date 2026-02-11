@@ -6,6 +6,10 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { query } from '../../lib/db';
 import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE } from '../../lib/constants';
+import { resolveChatModel } from '../../lib/model-policy';
+import { checkRateLimit, applyRateLimitHeaders } from '../../lib/rate-limit';
+import { logApiError, serverError } from '../../lib/api-utils';
+import { addTranscriptionEvent } from '../../lib/transcription-events';
 
 export const config = {
   api: {
@@ -43,6 +47,17 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
 
+  const rate = checkRateLimit(req, {
+    keyPrefix: 'upload-audio',
+    identifier: `user:${session.user.id}`,
+    limit: 30,
+    windowMs: 60_000,
+  });
+  applyRateLimitHeaders(res, rate);
+  if (!rate.allowed) {
+    return res.status(429).json({ message: 'Zu viele Uploads. Bitte später erneut versuchen.' });
+  }
+
   try {
     await ensureUploadDir();
 
@@ -53,11 +68,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Keine Datei hochgeladen' });
     }
 
-    const mimetype = file.mimetype.split(';')[0];
+    const rawMimeType = (file.mimetype || '').toString();
+    const mimetype = rawMimeType.split(';')[0];
     const extension = path.extname(file.originalFilename || '').toLowerCase();
     const isAllowedExt = ['.mp3', '.wav', '.ogg', '.webm', '.m4a', '.mp4', '.flac', '.aac'].includes(extension);
 
     if (!ACCEPTED_AUDIO_TYPES.includes(mimetype) && !mimetype.startsWith('audio/') && !isAllowedExt) {
+      if (file.filepath) await unlink(file.filepath).catch(() => {});
       return res.status(400).json({ message: 'Ungültiges Dateiformat' });
     }
 
@@ -68,8 +85,13 @@ export default async function handler(req, res) {
     await copyFile(file.filepath, filePath);
     await unlink(file.filepath).catch(() => {});
 
-    const template = fields.template?.[0] || fields.template || 'meeting';
-    const model = fields.model?.[0] || fields.model || 'mistral-large-latest';
+    const template = fields.template?.[0] || fields.template || 'generic';
+    const requestedModel = fields.model?.[0] || fields.model || 'mistral-large-latest';
+    const model = resolveChatModel(requestedModel);
+    if (!model) {
+      await unlink(filePath).catch(() => {});
+      return res.status(400).json({ message: 'Ungültiges KI-Modell' });
+    }
     const diarize = (fields.diarize?.[0] || fields.diarize) === 'true';
     const customPrompt = fields.customPrompt?.[0] || fields.customPrompt || null;
     const autoAnalyze = (fields.autoAnalyze?.[0] || fields.autoAnalyze) !== 'false';
@@ -81,12 +103,19 @@ export default async function handler(req, res) {
       [session.user.id, filename, file.originalFilename, filePath, file.size, file.mimetype, template, model, diarize, customPrompt, autoAnalyze]
     );
 
+    await addTranscriptionEvent({
+      transcriptionId: result.rows[0].id,
+      userId: session.user.id,
+      stage: 'queued',
+      message: 'Upload abgeschlossen. Wartet auf Start der Verarbeitung.',
+    });
+
     return res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error('Upload error:', error);
+    logApiError('Upload error', error);
     if (error.code === 'LIMIT_FILE_SIZE' || error.message?.includes('maxFileSize')) {
       return res.status(413).json({ message: 'Datei ist zu groß (max. 50 MB)' });
     }
-    return res.status(500).json({ message: 'Upload fehlgeschlagen' });
+    return serverError(res, 'Upload fehlgeschlagen');
   }
 }

@@ -1,224 +1,109 @@
-# Implementierung Dokumentation
-
-## Übersicht
-
-Dieses Dokument beschreibt die Implementierung der Transkription WebApp. Die Anwendung umfasst die Entwicklung einer Transkriptions-WebApp mit dynamischer Audio-Analyse unter Nutzung von Mistral Voxtral und Mistral Large, integriert in eine bestehende Docker-Umgebung auf einem VPS.
-
-## Architektur
-
-### Implementierungs-Fluss
-
-1. **Umgebungsanalyse**: Analyse der bestehenden Docker-Umgebung auf dem VPS.
-2. **API-Spezifikation**: Spezifikation der API-Endpunkte.
-3. **Projektplan**: Planung der Implementierung.
-4. **Docker-Setup**: Konfiguration der Docker-Umgebung.
-5. **Authentifizierung**: Implementierung der Authentifizierung.
-6. **CI/CD-Pipeline**: Einrichtung der CI/CD-Pipeline.
-7. **Audio-Upload**: Implementierung des Audio-Uploads.
-8. **AI-Integration**: Integration der Mistral-APIs.
-9. **Testen und Verifizierung**: Testen und Verifizierung der gesamten Implementierung.
-10. **Dokumentation**: Aktualisierung der Dokumentation.
-11. **Projektabschluss**: Abschluss des Projekts und Bereitstellung für die Nutzung.
-
-## Konfiguration
-
-### Implementierungs-Dateien
-
-Die Implementierungs-Dateien sind in der Datei `docs/` definiert:
-
-```markdown
 # Implementierung
 
-## Übersicht
+Stand: 2026-02-11
+
+Dieses Dokument beschreibt die technische Implementierung des aktuellen GhostTyper-Systems.
+
+## 1. Systemüberblick
+
+GhostTyper ist eine Next.js-Anwendung mit API-Routen als Backend. Die Datenhaltung erfolgt in PostgreSQL, KI-Funktionen werden über die Mistral API aufgerufen.
+
+Kernfluss:
+1. Upload/Erfassung (Audio oder Dokument)
+2. Verarbeitung (Transkription/OCR)
+3. optionale KI-Analyse
+4. Bearbeitung im Editor
+5. Export oder Speicherung in Historie
+
+## 2. Wichtige Module
+
+### 2.1 Frontend (`pages/`, `components/`)
+- `pages/upload.js`: Audio-Upload und Jobstart
+- `pages/ocr.js`: OCR-Upload/Kamera und Analysefluss
+- `pages/transcriptions/[id].js`: Detailansicht mit Verlauf und Editor-Übergang
+- `components/ProcessStatusCard.js`: einheitliche Prozessanzeige (Schritte, ETA, Lade-Texte)
+- `components/DocumentEditor.js`: Bearbeitung und Export
+
+### 2.2 Backend (`pages/api/`)
+- `upload.js`: Upload, Validierung, Transkriptionsjob anlegen
+- `ocr.js`: OCR-Verarbeitung und optional Analyse
+- `transcriptions/[id]/process.js`: Transkriptions-Backgroundflow
+- `transcriptions/[id]/analyze.js`: manuelle Folgeanalyse
+- `transcriptions/[id].js`: Detail-GET/PATCH/DELETE inkl. Event-Auslieferung
+- `settings.js`: API-Key-Verwaltung, Modell-/Kosten-Einstellungen
+- `db-init.js`: Schema-/Migrationsausführung
+
+### 2.3 Shared Libs (`lib/`)
+- `ai-service.js`: Aufrufe zu Mistral (Transkription/OCR/Analyse/Translate)
+- `db.js`: DB-Zugriff
+- `db-init.js`: Schema + Migrationen
+- `settings-service.js`: Auflösung gespeicherter API-Keys
+- `secrets.js`: Verschlüsselungsfunktionen
+- `rate-limit.js`: Ratenbegrenzung
+- `model-policy.js`: Modell-Whitelist
+- `transcription-events.js`: Event-Logging/Abfrage für Timeline
+
+## 3. Datenmodell (relevante Teile)
+
+### 3.1 `transcriptions`
+- Prozessstatus: `pending`, `processing`, `transcribed`, `analyzing`, `completed`, `error`
+- Inhalt: `text`, `analysis`, `segments`, `speakers`, `document_html`
+- Orga: `folder_id`, `is_favorite`
+
+### 3.2 `settings`
+- `mistral_api_key` (Legacy)
+- `mistral_api_key_encrypted` (aktueller Standard)
+- Modell-/Sprachpräferenzen und Kostenlimit
+
+### 3.3 `transcription_events`
+- Timeline pro Job (Stage, Message, Timestamp, optional Meta)
+- Indizes für schnelle Abfrage pro `transcription_id` und `user_id`
+
+## 4. Verarbeitungslogik
+
+### 4.1 Transkriptionsjob
+1. Upload legt Datensatz in `pending` an.
+2. `process` setzt atomar auf `processing`.
+3. Nach erfolgreicher Transkription:
+   - bei Diarisierung: `transcribed` (Warten auf Sprecherzuweisung)
+   - ohne Auto-Analyse: `transcribed`
+   - mit Auto-Analyse: `analyzing` -> `completed`
+4. Fehlerpfad: `error`.
+
+### 4.2 Manuelle Analyse
+1. erlaubt nur aus `transcribed`.
+2. atomarer Wechsel `transcribed -> analyzing`.
+3. Analyseergebnis schreibt `completed` + `analysis`.
+4. Fehlerpfad: `error`.
+
+### 4.3 Event-Log
+Bei jedem wichtigen Übergang wird ein Event geschrieben (`queued`, `processing`, `analyzing`, `completed`, `error`).
+Die Detailansicht rendert diese Events als Verlauf.
+
+## 5. Security-Implementierung
+
+- API-Key-Schutz über verschlüsselte Speicherung.
+- Legacy-Migration via `scripts/migrate-api-keys.js`.
+- Rate-Limits für sicherheits-/kostenrelevante Endpunkte.
+- Modell-Whitelist serverseitig.
+- Sicheres Dateilöschen nur im Upload-Verzeichnis.
+- DB-Init abgesichert über eigenes Secret und Prod-Toggle.
+
+## 6. UX-Implementierung
+
+- Einheitliche Statuskomponente mit Schritten und ETA.
+- Rotierende Lade-Sprüche pro Prozessphase.
+- Optionale Auto-Weiterleitung nach Upload bei fertigem Job.
+- Konsistente Zustandskommunikation in Upload/OCR/Translate/Text-AI.
+
+## 7. Bekannte technische Grenzen
+
+- `npm run lint` benötigt eine finalisierte ESLint-Konfiguration (sonst interaktiver Prompt).
+- In restriktiven Sandboxen kann `next build` bei `Collecting page data` mit `EPERM listen 0.0.0.0` abbrechen.
+
+## 8. Referenzen
 
-Dieses Dokument beschreibt die Implementierung der Transkription WebApp.
-
-## Architektur
-
-### Implementierungs-Fluss
-
-1. **Umgebungsanalyse**: Analyse der bestehenden Docker-Umgebung auf dem VPS.
-2. **API-Spezifikation**: Spezifikation der API-Endpunkte.
-3. **Projektplan**: Planung der Implementierung.
-4. **Docker-Setup**: Konfiguration der Docker-Umgebung.
-5. **Authentifizierung**: Implementierung der Authentifizierung.
-6. **CI/CD-Pipeline**: Einrichtung der CI/CD-Pipeline.
-7. **Audio-Upload**: Implementierung des Audio-Uploads.
-8. **AI-Integration**: Integration der Mistral-APIs.
-9. **Testen und Verifizierung**: Testen und Verifizierung der gesamten Implementierung.
-10. **Dokumentation**: Aktualisierung der Dokumentation.
-11. **Projektabschluss**: Abschluss des Projekts und Bereitstellung für die Nutzung.
-
-### Umgebung
-
-Die Umgebung wird über die `.env`-Datei konfiguriert. Eine Beispiel-Datei ist im Repository enthalten.
-
-- **NEXT_PUBLIC_API_URL**: URL der API
-- **DATABASE_URL**: URL der Datenbank
-- **NEXTAUTH_SECRET**: Geheimnis für NextAuth.js
-- **NEXTAUTH_URL**: URL der Anwendung
-
-### Probleme
-
-1. **Docker-Netzwerk**: Falls das Docker-Netzwerk `web` nicht existiert, muss es manuell erstellt werden.
-2. **Docker Compose**: Falls Docker Compose nicht installiert ist, muss es installiert werden.
-3. **Speicherplatz**: Falls der Speicherplatz auf dem VPS knapp ist, kann der Docker-Speicher bereinigt werden.
-
-### Tests
-
-1. **Lokale Tests**: Die Anwendung wird lokal getestet.
-2. **VPS-Tests**: Die Anwendung wird auf dem VPS getestet.
-
-### Dokumentation
-
-- [Umgebungsanalyse](umgebungsanalyse.md)
-- [API-Spezifikation](api-specification.md)
-- [Projektplan](PROJECT_PLAN.md)
-- [Docker-Setup](docker-setup.md)
-- [Authentifizierung](authentication.md)
-- [CI/CD-Pipeline](ci-cd-pipeline.md)
-- [Audio-Upload](audio-upload.md)
-- [AI-Integration](ai-integration.md)
-- [Testen und Verifizierung](testing.md)
-- [Dokumentation](documentation.md)
-- [Projektabschluss](project-completion.md)
-
-### Nächste Schritte
-
-1. **Projekt abschließen**: Abschluss des Projekts und Bereitstellung für die Nutzung.
-```
-
-### Umgebung
-
-Die Umgebung wird über die `.env`-Datei konfiguriert. Eine Beispiel-Datei ist im Repository enthalten.
-
-- **NEXT_PUBLIC_API_URL**: URL der API
-- **DATABASE_URL**: URL der Datenbank
-- **NEXTAUTH_SECRET**: Geheimnis für NextAuth.js
-- **NEXTAUTH_URL**: URL der Anwendung
-
-## Setup
-
-### Voraussetzungen
-
-- Next.js
-- Node.js
-- Datenbank (PostgreSQL)
-- Docker
-- Docker Compose
-
-### Installation
-
-1. **Implementierungs-Dateien erstellen**:
-
-```bash
-mkdir -p docs
-```
-
-2. **Implementierungs-Dateien erstellen**:
-
-```bash
-touch docs/implementation.md
-```
-
-3. **Implementierungs-Dateien bearbeiten**:
-
-```bash
-nano docs/implementation.md
-```
-
-## Entwicklung
-
-### 1. Implementierung aktualisieren
-
-1. **Implementierung bearbeiten**:
-
-```bash
-nano docs/implementation.md
-```
-
-2. **Implementierung überprüfen**:
-
-Die Implementierung ist unter `docs/` verfügbar.
-
-### 2. Implementierung testen
-
-1. **Implementierung testen**:
-
-```bash
-npm run dev
-```
-
-2. **Implementierung überprüfen**:
-
-Die Implementierung ist unter `http://localhost:3000` verfügbar.
-
-## Probleme
-
-### 1. Implementierung fehlschlägt
-
-Falls die Implementierung fehlschlägt, müssen die Implementierungs-Dateien überprüft werden:
-
-```bash
-nano docs/implementation.md
-```
-
-### 2. Anwendung nicht verfügbar
-
-Falls die Anwendung nicht verfügbar ist, müssen die Docker-Container überprüft werden:
-
-```bash
-docker compose -f config/docker-compose.dev.yml logs
-```
-
-### 3. Datenbank-Verbindung
-
-Falls die Datenbank-Verbindung fehlschlägt, muss die Datenbank-Konfiguration überprüft werden:
-
-```bash
-nano config/docker-compose.dev.yml
-```
-
-## Tests
-
-### Lokale Tests
-
-1. **Anwendung starten**:
-
-```bash
-npm run dev
-```
-
-2. **Implementierung testen**:
-
-Die Implementierung ist unter `http://localhost:3000` verfügbar.
-
-### VPS-Tests
-
-1. **Anwendung starten**:
-
-```bash
-docker compose -f config/docker-compose.dev.yml up -d
-```
-
-2. **Implementierung testen**:
-
-Die Implementierung ist unter `https://transkription.helgeroos.de` verfügbar.
-
-## Dokumentation
-
-- [Umgebungsanalyse](umgebungsanalyse.md)
-- [API-Spezifikation](api-specification.md)
-- [Projektplan](PROJECT_PLAN.md)
-- [Docker-Setup](docker-setup.md)
-- [Authentifizierung](authentication.md)
-- [CI/CD-Pipeline](ci-cd-pipeline.md)
-- [Audio-Upload](audio-upload.md)
-- [AI-Integration](ai-integration.md)
-- [Testen und Verifizierung](testing.md)
-- [Dokumentation](documentation.md)
-- [Projektabschluss](project-completion.md)
-
-## Nächste Schritte
-
-1. **Projekt abschließen**: Abschluss des Projekts und Bereitstellung für die Nutzung.
+- Betriebsanleitung: `../README.md`
+- Projektstatus/Roadmap: `../PROJECT_PLAN.md`
+- Featureübersicht: `features-and-improvements.md`
+- Security-Review: `code-review-hardening-2026-02-11.md`

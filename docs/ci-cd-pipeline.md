@@ -1,249 +1,77 @@
-# CI/CD-Pipeline Dokumentation
+# CI/CD Pipeline
 
-## Übersicht
+Stand: 2026-02-11
 
-Dieses Dokument beschreibt die CI/CD-Pipeline für die Transkription WebApp. Die Pipeline wird mit GitHub Actions implementiert und umfasst Build, Test und Deployment.
+Dieses Dokument beschreibt den aktuellen CI/CD-Status und eine empfohlene Zielpipeline.
 
-## Architektur
+## 1. Aktueller Stand
 
-### GitHub Actions
+- Es gibt noch keine vollständig standardisierte, verpflichtende CI-Pipeline im Repository.
+- Build und Tests werden aktuell primär lokal bzw. in der Laufzeitumgebung ausgeführt.
+- `npm run lint` ist derzeit nicht CI-stabil, da ohne feste ESLint-Konfiguration ein interaktiver Setup-Dialog erscheinen kann.
 
-GitHub Actions ist eine CI/CD-Plattform, die direkt in GitHub integriert ist. Sie ermöglicht die Automatisierung von Build-, Test- und Deployment-Prozessen.
+## 2. Zielbild der Pipeline
 
-### Pipeline-Fluss
+Mindestpipeline pro Pull Request:
+1. Install (`npm ci`)
+2. Lint (`npm run lint`) ohne Interaktion
+3. Build (`npm run build`)
+4. Optionale API-/Integrationstests
 
-1. **Build**: Die Anwendung wird gebaut.
-2. **Test**: Die Anwendung wird getestet.
-3. **Deployment**: Die Anwendung wird bereitgestellt.
+Deploymentpipeline (main/release):
+1. Image bauen
+2. Container starten/aktualisieren
+3. DB-Init/Migration ausführen
+4. Smoke-Checks
 
-## Konfiguration
+## 3. Empfohlene CI-Jobs
 
-### GitHub Actions-Konfiguration
+### 3.1 `validate`
+- `npm ci`
+- `npm run build`
+- optional: `npm run lint` sobald ESLint finalisiert
 
-Die GitHub Actions-Konfiguration ist in der Datei `.github/workflows/ci-cd.yml` definiert:
+### 3.2 `security-check`
+- Dependency-Audit (abhängig von Registry-Zugriff)
+- Prüfung auf erforderliche ENV-Variablen in Deployment-Umgebung
 
-```yaml
-name: CI/CD Pipeline
+### 3.3 `smoke-dev`
+- Docker Compose Dev hochfahren
+- `/api/db-init` ausführen
+- kurze API-Smokechecks (`/api/transcriptions`, Login-Flow, Upload-Route)
 
-on:
-  push:
-    branches: [ main, develop, feature/** ]
-  pull_request:
-    branches: [ main, develop ]
+## 4. Deployment-Hinweise
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      - name: Install dependencies
-        run: npm install
-      - name: Build application
-        run: npm run build
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: build-artifacts
-          path: ./
+Für jede produktionsnahe Auslieferung:
+1. Container neu bauen/starten
+2. DB-Init/Migrationen ausführen
+3. ggf. API-Key-Migration ausführen
+4. Verifikation per SQL-Checks
 
-  test:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v3
-        with:
-          name: build-artifacts
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      - name: Install dependencies
-        run: npm install
-      - name: Run tests
-        run: npm test
-
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v3
-        with:
-          name: build-artifacts
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      - name: Install dependencies
-        run: npm install
-      - name: Build Docker image
-        run: docker build -t transkription-webapp .
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
-      - name: Push Docker image
-        run: docker push transkription-webapp:latest
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            cd /path/to/transkription_webapp
-            git pull origin main
-            docker compose -f config/docker-compose.dev.yml down
-            docker compose -f config/docker-compose.dev.yml up -d
-```
-
-### Umgebung
-
-Die Umgebung wird über die GitHub Actions-Secrets konfiguriert. Die Secrets müssen in den GitHub Repository-Einstellungen definiert werden.
-
-- **DOCKER_HUB_USERNAME**: Docker Hub Benutzername
-- **DOCKER_HUB_TOKEN**: Docker Hub Token
-- **VPS_HOST**: VPS Host
-- **VPS_USERNAME**: VPS Benutzername
-- **VPS_SSH_KEY**: VPS SSH-Schlüssel
-
-## Setup
-
-### Voraussetzungen
-
-- GitHub Repository
-- Docker Hub Account
-- VPS mit Docker und Docker Compose
-
-### Installation
-
-1. **GitHub Actions-Konfiguration erstellen**:
-
+Beispiel:
 ```bash
-mkdir -p .github/workflows
+docker compose -f config/docker-compose.dev.yml up --build -d
+curl -X POST http://localhost:3000/api/db-init -H "x-init-secret: dev-db-init-secret"
 ```
 
-2. **GitHub Actions-Konfiguration erstellen**:
+## 5. Pipeline-Risiken und Maßnahmen
 
-```bash
-touch .github/workflows/ci-cd.yml
-```
+- Risiko: unvollständige Lint-Integration
+  - Maßnahme: feste ESLint-Konfiguration committen, interaktive Abfrage eliminieren
+- Risiko: migrationsabhängige Runtime-Fehler
+  - Maßnahme: DB-Init und Verifikationsqueries als festen Deployment-Schritt aufnehmen
+- Risiko: Secrets/ENV fehlen
+  - Maßnahme: Preflight-Checks auf `NEXTAUTH_SECRET`, `DB_INIT_SECRET`, `SETTINGS_ENCRYPTION_KEY`, `DATABASE_URL`
 
-3. **GitHub Actions-Konfiguration bearbeiten**:
+## 6. Nächste Schritte
 
-```bash
-nano .github/workflows/ci-cd.yml
-```
+1. GitHub Actions Workflow mit `validate` Job einführen.
+2. ESLint non-interaktiv machen und in CI verpflichtend schalten.
+3. Optional Docker-basierte Integrationstests in CI ergänzen.
 
-4. **GitHub Secrets konfigurieren**:
+## 7. Referenzen
 
-Die Secrets müssen in den GitHub Repository-Einstellungen definiert werden.
-
-## Entwicklung
-
-### 1. Pipeline testen
-
-1. **Änderungen committen**:
-
-```bash
-git add .
-git commit -m "Test CI/CD Pipeline"
-git push origin main
-```
-
-2. **Pipeline überprüfen**:
-
-Die Pipeline ist unter `https://github.com/username/transkription_webapp/actions` verfügbar.
-
-### 2. Pipeline anpassen
-
-1. **Pipeline bearbeiten**:
-
-```bash
-nano .github/workflows/ci-cd.yml
-```
-
-2. **Änderungen committen**:
-
-```bash
-git add .
-git commit -m "Update CI/CD Pipeline"
-git push origin main
-```
-
-## Probleme
-
-### 1. Pipeline fehlschlägt
-
-Falls die Pipeline fehlschlägt, müssen die Logs überprüft werden:
-
-```bash
-https://github.com/username/transkription_webapp/actions
-```
-
-### 2. Docker-Build fehlschlägt
-
-Falls der Docker-Build fehlschlägt, muss die Dockerfile überprüft werden:
-
-```bash
-nano Dockerfile
-```
-
-### 3. Deployment fehlschlägt
-
-Falls das Deployment fehlschlägt, müssen die VPS-Einstellungen überprüft werden:
-
-```bash
-ssh username@host
-cd /path/to/transkription_webapp
-docker compose -f config/docker-compose.dev.yml logs
-```
-
-## Tests
-
-### Lokale Tests
-
-1. **Pipeline testen**:
-
-```bash
-npm install
-npm run build
-npm test
-```
-
-2. **Docker-Build testen**:
-
-```bash
-docker build -t transkription-webapp .
-```
-
-### VPS-Tests
-
-1. **Pipeline testen**:
-
-```bash
-git add .
-git commit -m "Test CI/CD Pipeline"
-git push origin main
-```
-
-2. **Deployment testen**:
-
-Die Anwendung ist unter `https://transkription.helgeroos.de` verfügbar.
-
-## Dokumentation
-
-- [Umgebungsanalyse](umgebungsanalyse.md)
-- [API-Spezifikation](api-specification.md)
-- [Projektplan](PROJECT_PLAN.md)
-- [Docker-Setup](docker-setup.md)
-- [Authentifizierung](authentication.md)
-
-## Nächste Schritte
-
-1. **Audio-Upload-Endpoint implementieren**: Backend-Endpoint für den Audio-Upload erstellen.
-2. **AI-Integration**: Mistral-APIs für Transkription und Analyse integrieren.
+- Projektplan: `../PROJECT_PLAN.md`
+- Testing: `testing.md`
+- Security/Hardening: `code-review-hardening-2026-02-11.md`
+- Deployment: `vps-deployment-guide.md`
