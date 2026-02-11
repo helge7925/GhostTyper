@@ -3,14 +3,25 @@ import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE } from '../lib/constants';
 import { uploadAudio, getTemplates, getSettings } from '../lib/api';
 import AudioRecorder from './AudioRecorder';
 
+function normalizeDefaultTemplate(value) {
+  if (typeof value !== 'string') return 'generic';
+  const template = value.trim();
+  if (!template) return 'generic';
+
+  if (template === 'generic') return 'generic';
+  if (template.startsWith('custom-')) return template;
+  return 'generic';
+}
+
 export default function AudioUploadForm({ onSuccess }) {
   const [file, setFile] = useState(null);
-  const [template, setTemplate] = useState('meeting');
+  const [template, setTemplate] = useState('generic');
   const [model, setModel] = useState('mistral-large-latest');
   const [templates, setTemplates] = useState([]);
   const [diarize, setDiarize] = useState(false);
   const [autoAnalyze, setAutoAnalyze] = useState(true);
   const [customPrompt, setCustomPrompt] = useState('');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [uploadMode, setUploadMode] = useState('file');
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -23,9 +34,7 @@ export default function AudioUploadForm({ onSuccess }) {
     Promise.all([getTemplates(), getSettings()])
       .then(([templatesData, settingsData]) => {
         setTemplates(templatesData);
-        if (settingsData.defaultTemplate) {
-          setTemplate(settingsData.defaultTemplate);
-        }
+        setTemplate(normalizeDefaultTemplate(settingsData.defaultTemplate));
       })
       .catch(err => console.error('Error loading upload options:', err));
   }, []);
@@ -173,24 +182,6 @@ export default function AudioUploadForm({ onSuccess }) {
         <AudioRecorder onRecordingComplete={handleRecordingComplete} />
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="upload-template" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Analyse-Modus</label>
-          <select id="upload-template" value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
-            <optgroup label="Standard"><option value="meeting">Meeting-Protokoll</option><option value="aufmass">Aufmaß</option><option value="generic">Zusammenfassung</option></optgroup>
-            {templates.length > 0 && <optgroup label="Eigene Vorlagen">{templates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}</optgroup>}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="upload-model" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">KI-Modell</label>
-          <select id="upload-model" value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
-            <option value="mistral-large-latest">Mistral Large</option>
-            <option value="mistral-medium-latest">Mistral Medium</option>
-            <option value="mistral-small-latest">Mistral Small</option>
-          </select>
-        </div>
-      </div>
-
       <div className="space-y-3 pt-2">
         <label className="flex items-center gap-3 cursor-pointer group">
           <input type="checkbox" checked={diarize} onChange={(e) => setDiarize(e.target.checked)} className="w-4 h-4 text-accent-orange bg-dark-input border-white/[0.2] rounded focus:ring-accent-orange" />
@@ -202,10 +193,50 @@ export default function AudioUploadForm({ onSuccess }) {
         </label>
       </div>
 
-      <div>
-        <label htmlFor="upload-prompt" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Zusätzlicher Kontext</label>
-        <textarea id="upload-prompt" value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Teilnehmer, Projekte, Hinweise..." rows={2} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none resize-none" />
+      <div className="pt-1">
+        <button
+          type="button"
+          onClick={() => setShowAdvancedOptions((prev) => !prev)}
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.02] text-sm text-text-primary hover:bg-white/[0.04] transition-colors"
+          aria-expanded={showAdvancedOptions}
+        >
+          <span>Erweiterte Optionen</span>
+          <svg
+            className={`w-4 h-4 text-text-secondary transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
       </div>
+
+      {showAdvancedOptions && (
+        <div className="space-y-4 bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="upload-template" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Analyse-Modus</label>
+              <select id="upload-template" value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
+                <optgroup label="Standard"><option value="generic">Zusammenfassung</option><option value="meeting">Meeting-Protokoll</option><option value="aufmass">Aufmaß</option></optgroup>
+                {templates.length > 0 && <optgroup label="Eigene Vorlagen">{templates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}</optgroup>}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="upload-model" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">KI-Modell</label>
+              <select id="upload-model" value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
+                <option value="mistral-large-latest">Mistral Large</option>
+                <option value="mistral-medium-latest">Mistral Medium</option>
+                <option value="mistral-small-latest">Mistral Small</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="upload-prompt" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Zusätzlicher Kontext</label>
+            <textarea id="upload-prompt" value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Teilnehmer, Projekte, Hinweise..." rows={2} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none resize-none" />
+          </div>
+        </div>
+      )}
 
       {error && <div className="bg-accent-red/10 border border-accent-red/20 text-accent-red px-4 py-3 rounded-lg text-sm">{error}</div>}
 

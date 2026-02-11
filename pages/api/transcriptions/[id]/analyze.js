@@ -3,6 +3,11 @@ import { authOptions } from '../../auth/[...nextauth]';
 import { query, resolveTemplate } from '../../../../lib/db';
 import { analyzeTranscription, buildTextWithSpeakers } from '../../../../lib/ai-service';
 import { logUsage, checkCostLimit } from '../../../../lib/usage';
+import { resolveChatModel } from '../../../../lib/model-policy';
+import { getSettingsRow, resolveStoredApiKey } from '../../../../lib/settings-service';
+import { checkRateLimit, applyRateLimitHeaders } from '../../../../lib/rate-limit';
+import { logApiError } from '../../../../lib/api-utils';
+import { addTranscriptionEvent } from '../../../../lib/transcription-events';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,6 +17,17 @@ export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions);
   if (!session) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
+  }
+
+  const rate = checkRateLimit(req, {
+    keyPrefix: 'transcription-analyze',
+    identifier: `user:${session.user.id}`,
+    limit: 30,
+    windowMs: 60_000,
+  });
+  applyRateLimitHeaders(res, rate);
+  if (!rate.allowed) {
+    return res.status(429).json({ message: 'Zu viele Anfragen. Bitte später erneut versuchen.' });
   }
 
   const { id } = req.query;
@@ -31,17 +47,16 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: `Analyse kann nur im Status "transcribed" gestartet werden (aktuell: "${job.status}")` });
   }
 
-  // Get user's API key + settings
-  const settingsResult = await query(
-    'SELECT mistral_api_key, preferred_model, language FROM settings WHERE user_id = $1',
-    [session.user.id]
-  );
-  const apiKey = settingsResult.rows[0]?.mistral_api_key || process.env.MISTRAL_API_KEY;
-  const preferredModelFallback = settingsResult.rows[0]?.preferred_model || 'mistral-large-latest';
-  const language = settingsResult.rows[0]?.language || 'de';
+  const settingsRow = await getSettingsRow(session.user.id);
+  const apiKey = resolveStoredApiKey(settingsRow) || process.env.MISTRAL_API_KEY;
+  const preferredModelFallback = resolveChatModel(settingsRow?.preferred_model || 'mistral-large-latest');
+  const language = settingsRow?.language || 'de';
 
   if (!apiKey) {
     return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert' });
+  }
+  if (!preferredModelFallback) {
+    return res.status(400).json({ message: 'Ungültiges Standardmodell in den Einstellungen' });
   }
 
   // Check cost limit
@@ -52,13 +67,22 @@ export default async function handler(req, res) {
     });
   }
 
-  // Set status to analyzing
-  await query(
-    "UPDATE transcriptions SET status = 'analyzing', updated_at = NOW() WHERE id = $1",
-    [id]
+  // Atomically lock this job transition and prevent duplicate starts.
+  const lockResult = await query(
+    "UPDATE transcriptions SET status = 'analyzing', updated_at = NOW() WHERE id = $1 AND user_id = $2 AND status = 'transcribed' RETURNING id",
+    [id, session.user.id]
   );
+  if (lockResult.rowCount === 0) {
+    return res.status(409).json({ message: 'Analyse wurde bereits gestartet oder hat den Status geändert.' });
+  }
 
   res.status(202).json({ message: 'Analyse gestartet', status: 'analyzing' });
+  await addTranscriptionEvent({
+    transcriptionId: Number(id),
+    userId: session.user.id,
+    stage: 'analyzing',
+    message: 'Manuelle KI-Analyse gestartet.',
+  });
 
   // Build text with speaker names if available
   try {
@@ -76,6 +100,12 @@ export default async function handler(req, res) {
         'UPDATE transcriptions SET text = $1, updated_at = NOW() WHERE id = $2',
         [analysisText, id]
       );
+      await addTranscriptionEvent({
+        transcriptionId: Number(id),
+        userId: session.user.id,
+        stage: 'analyzing',
+        message: 'Sprechernamen in den Text übernommen.',
+      });
     }
 
     const resolvedTemplate = await resolveTemplate(job.template, session.user.id);
@@ -84,7 +114,7 @@ export default async function handler(req, res) {
       resolvedTemplate, 
       apiKey, 
       job.custom_prompt || '', 
-      job.model || preferredModelFallback, 
+      resolveChatModel(job.model || preferredModelFallback) || preferredModelFallback,
       language
     );
 
@@ -95,11 +125,23 @@ export default async function handler(req, res) {
       "UPDATE transcriptions SET status = 'completed', analysis = $1, updated_at = NOW() WHERE id = $2",
       [JSON.stringify(analysis), id]
     );
+    await addTranscriptionEvent({
+      transcriptionId: Number(id),
+      userId: session.user.id,
+      stage: 'completed',
+      message: 'Manuelle KI-Analyse abgeschlossen.',
+    });
   } catch (error) {
-    console.error(`Analysis ${id} failed:`, error);
+    logApiError(`Analysis ${id} failed`, error);
     await query(
       "UPDATE transcriptions SET status = 'error', error = $1, updated_at = NOW() WHERE id = $2",
-      [error.message, id]
+      ['Analyse fehlgeschlagen. Bitte erneut versuchen.', id]
     );
+    await addTranscriptionEvent({
+      transcriptionId: Number(id),
+      userId: session.user.id,
+      stage: 'error',
+      message: 'Fehler während der manuellen KI-Analyse.',
+    });
   }
 }

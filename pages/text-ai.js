@@ -5,8 +5,18 @@ import Head from 'next/head';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import DocumentEditor from '../components/DocumentEditor';
+import ProcessStatusCard from '../components/ProcessStatusCard';
 import { getTextTasks, saveDocument } from '../lib/api';
 import { mdToHtml } from '../lib/export-utils';
+
+const TEXT_AI_LOADING_MESSAGES = [
+  'Die KI streicht gerade Umwege und bringt den Punkt auf den Punkt.',
+  'Wir schütteln den Text kurz durch, bis die beste Version herausfällt.',
+  'Virtueller Lektor im Einsatz: präzise, schnell, leicht pedantisch.',
+  'Gedanken werden sortiert, bevor sie wieder durcheinanderlaufen.',
+  'Wir bügeln gerade Kanten aus dem Text und legen Klarheit drauf.',
+  'Fast da: der Feinschliff macht gerade letzte Kniebeugen.',
+];
 
 export default function TextAI() {
   const { data: session, status } = useSession();
@@ -14,7 +24,9 @@ export default function TextAI() {
   const [inputText, setInputText] = useState('');
   const [resultText, setResultText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStartedAt, setLoadingStartedAt] = useState(null);
   const [selectedModel, setSelectedModel] = useState('mistral-small-latest');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [toast, setToast] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
   const [tasks, setTasks] = useState([]);
@@ -39,6 +51,7 @@ export default function TextAI() {
     }
 
     setIsLoading(true);
+    setLoadingStartedAt(new Date().toISOString());
     setActiveTaskId(taskId);
     
     try {
@@ -61,6 +74,7 @@ export default function TextAI() {
       setToast({ message: err.message, type: 'error' });
     } finally {
       setIsLoading(false);
+      setLoadingStartedAt(null);
     }
   }
 
@@ -90,22 +104,10 @@ export default function TextAI() {
 
       {!showEditor ? (
         <div className="max-w-6xl mx-auto animate-fade-in pb-20">
-          <div className="flex items-center justify-between mb-8">
+          <div className="mb-8">
             <div>
               <h1 className="text-2xl font-bold text-text-primary">Text-Assistent</h1>
-              <p className="text-sm text-text-secondary mt-1">Intelligente Textkorrektur, Umformulierung und Analyse.</p>
-            </div>
-            
-            <div className="flex items-center gap-3 bg-dark-card border border-white/[0.06] rounded-xl px-4 py-2">
-              <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Modell</span>
-              <select 
-                value={selectedModel} 
-                onChange={e => setSelectedModel(e.target.value)}
-                className="bg-transparent text-sm text-accent-orange font-medium outline-none cursor-pointer"
-              >
-                <option value="mistral-small-latest">Mistral Small</option>
-                <option value="mistral-medium-latest">Mistral Medium (Besser)</option>
-              </select>
+              <p className="text-sm text-text-secondary mt-1">Text korrigieren, umformulieren oder zusammenfassen.</p>
             </div>
           </div>
 
@@ -124,15 +126,46 @@ export default function TextAI() {
               <textarea
                 value={inputText}
                 onChange={e => setInputText(e.target.value)}
-                placeholder="Fügen Sie hier Ihren Text ein, den Sie korrigieren oder bearbeiten möchten..."
-                className="w-full h-[500px] bg-dark-card border border-white/[0.06] rounded-2xl p-6 text-sm text-text-primary outline-none focus:border-accent-orange/30 shadow-xl resize-none transition-all"
+                placeholder="Text hier eingeben oder einfügen..."
+                className="w-full h-[500px] bg-dark-card border border-white/[0.06] rounded-2xl p-6 text-sm text-text-primary outline-none focus:border-accent-orange/30 resize-none transition-all"
               />
             </div>
 
             {/* Actions Area */}
             <div className="space-y-6">
-              <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
+              <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6">
                 <h2 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-6">Aktionen</h2>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedOptions((prev) => !prev)}
+                  className="w-full mb-4 flex items-center justify-between px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.02] text-sm text-text-primary hover:bg-white/[0.04] transition-colors"
+                  aria-expanded={showAdvancedOptions}
+                >
+                  <span>Erweiterte Optionen</span>
+                  <svg
+                    className={`w-4 h-4 text-text-secondary transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {showAdvancedOptions && (
+                  <div className="mb-6 bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
+                    <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-2">KI-Modell</label>
+                    <select
+                      value={selectedModel}
+                      onChange={e => setSelectedModel(e.target.value)}
+                      className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none"
+                    >
+                      <option value="mistral-small-latest">Mistral Small</option>
+                      <option value="mistral-medium-latest">Mistral Medium</option>
+                    </select>
+                  </div>
+                )}
                 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {tasks.map((task) => (
@@ -149,16 +182,24 @@ export default function TextAI() {
                 </div>
 
                 {isLoading && (
-                  <div className="mt-8 flex flex-col items-center gap-3 animate-fade-in">
-                    <div className="w-8 h-8 border-2 border-accent-orange/20 border-t-accent-orange rounded-full animate-spin" />
-                    <span className="text-[10px] text-text-secondary animate-pulse uppercase tracking-widest">KI denkt nach...</span>
+                  <div className="mt-8">
+                    <ProcessStatusCard
+                      title="Text wird verarbeitet"
+                      description="Die ausgewählte Aktion wird ausgeführt."
+                      steps={[{ key: 'text-ai', label: 'Antwort wird generiert' }]}
+                      activeStep={0}
+                      done={false}
+                      startedAt={loadingStartedAt}
+                      etaSeconds={18}
+                      messages={TEXT_AI_LOADING_MESSAGES}
+                    />
                   </div>
                 )}
               </div>
               
-              <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 opacity-50">
-                <p className="text-xs text-text-secondary leading-relaxed">
-                  Wählen Sie eine Aktion aus, um den Text zu verarbeiten. Das Ergebnis wird direkt im professionellen Editor geöffnet.
+              <div className="px-1">
+                <p className="text-xs text-text-secondary/80 leading-relaxed">
+                  Wählen Sie eine Aktion. Das Ergebnis wird im Editor geöffnet.
                 </p>
               </div>
             </div>
@@ -169,6 +210,7 @@ export default function TextAI() {
           initialHtml={mdToHtml(resultText)}
           filename="text-assistent-ergebnis"
           sidebarContent={inputText}
+          sourceLabel="Ausgangstext"
           onSave={handleSaveDocument}
           onCancel={() => setShowEditor(false)}
         />

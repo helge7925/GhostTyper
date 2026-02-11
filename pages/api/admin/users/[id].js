@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import { requireAdmin } from '../../../../lib/admin';
 import { query } from '../../../../lib/db';
+import { validatePassword } from '../../../../lib/constants';
+import { serializeApiKeyForStorage } from '../../../../lib/settings-service';
 
 export default async function handler(req, res) {
   const session = await requireAdmin(req, res);
@@ -8,6 +10,7 @@ export default async function handler(req, res) {
 
   const { id } = req.query;
   const userId = parseInt(id, 10);
+  const sessionUserId = Number(session.user.id);
 
   if (isNaN(userId)) {
     return res.status(400).json({ message: 'Ungültige User-ID' });
@@ -24,7 +27,7 @@ export default async function handler(req, res) {
         }
 
         // Prevent admin from removing their own admin role
-        if (userId === session.user.id && role && role !== 'admin') {
+        if (userId === sessionUserId && role && role !== 'admin') {
           return res.status(400).json({ message: 'Sie können Ihre eigene Admin-Rolle nicht entfernen' });
         }
 
@@ -49,9 +52,8 @@ export default async function handler(req, res) {
         }
 
         if (password) {
-          if (password.length < 8) {
-            return res.status(400).json({ message: 'Passwort muss mindestens 8 Zeichen lang sein' });
-          }
+          const passwordError = validatePassword(password);
+          if (passwordError) return res.status(400).json({ message: passwordError });
           const passwordHash = await bcrypt.hash(password, 12);
           updates.push(`password_hash = $${paramIndex++}`);
           values.push(passwordHash);
@@ -71,14 +73,25 @@ export default async function handler(req, res) {
           );
         }
 
+        if (costLimit !== undefined && costLimit !== null && costLimit !== '') {
+          const parsedLimit = Number(costLimit);
+          if (!Number.isFinite(parsedLimit) || parsedLimit < 0) {
+            return res.status(400).json({ message: 'Ungültiges Kostenlimit' });
+          }
+        }
+
         // Update settings (API key + cost limit) — F8
         if (mistralApiKey !== undefined || costLimit !== undefined) {
           const settingsExists = await query('SELECT id FROM settings WHERE user_id = $1', [userId]);
+          const shouldClearApiKey = mistralApiKey === null || mistralApiKey === '';
+          const apiKeyPayload = mistralApiKey !== undefined && !shouldClearApiKey
+            ? serializeApiKeyForStorage(String(mistralApiKey).trim())
+            : { plainApiKey: null, encryptedApiKey: null };
 
           if (settingsExists.rows.length === 0) {
             await query(
-              'INSERT INTO settings (user_id, mistral_api_key, cost_limit) VALUES ($1, $2, $3)',
-              [userId, mistralApiKey || null, costLimit ?? null]
+              'INSERT INTO settings (user_id, mistral_api_key, mistral_api_key_encrypted, cost_limit) VALUES ($1, $2, $3, $4)',
+              [userId, apiKeyPayload.plainApiKey, apiKeyPayload.encryptedApiKey, costLimit ?? null]
             );
           } else {
             const sUpdates = [];
@@ -87,7 +100,9 @@ export default async function handler(req, res) {
 
             if (mistralApiKey !== undefined) {
               sUpdates.push(`mistral_api_key = $${sIdx++}`);
-              sValues.push(mistralApiKey || null);
+              sValues.push(shouldClearApiKey ? null : apiKeyPayload.plainApiKey);
+              sUpdates.push(`mistral_api_key_encrypted = $${sIdx++}`);
+              sValues.push(shouldClearApiKey ? null : apiKeyPayload.encryptedApiKey);
             }
 
             if (costLimit !== undefined) {
@@ -109,7 +124,7 @@ export default async function handler(req, res) {
         // Return updated user
         const result = await query(
           `SELECT u.id, u.email, u.name, u.role, u.created_at,
-                  s.mistral_api_key IS NOT NULL AS api_key_configured,
+                  (s.mistral_api_key IS NOT NULL OR s.mistral_api_key_encrypted IS NOT NULL) AS api_key_configured,
                   s.preferred_model, s.cost_limit
            FROM users u
            LEFT JOIN settings s ON s.user_id = u.id
@@ -126,7 +141,7 @@ export default async function handler(req, res) {
 
     case 'DELETE': {
       // Prevent admin from deleting themselves
-      if (userId === session.user.id) {
+      if (userId === sessionUserId) {
         return res.status(400).json({ message: 'Sie können Ihr eigenes Konto nicht löschen' });
       }
 

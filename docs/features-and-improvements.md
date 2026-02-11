@@ -1,123 +1,176 @@
-# GhostTyper: Detaillierte Feature- & Verbesserungs-Dokumentation
+# GhostTyper: Features und Verbesserungen
 
-Dieses Dokument fasst alle seit dem letzten umfassenden Überblick (VPS Deployment Guide) vorgenommenen Änderungen, Fehlerbehebungen und Implementierungen zusammen. Es dient als umfassende Referenz für den aktuellen Funktionsumfang und die technische Basis.
+Stand: 2026-02-11
 
----
+Dieses Dokument beschreibt den aktuellen Funktionsstand inklusive Security-Härtungen, UX-Verbesserungen und Betriebsmaßnahmen.
 
-## 1. Modul: Text-Assistent Task-Manager
+## 1. Kernfunktionen
 
-### 1.1 Funktionalität & Workflow
-- **Dynamische Aufgabenverwaltung**: Die KI-Aktionen des Text-Assistenten sind nun nicht mehr statisch codiert, sondern werden dynamisch aus der Datenbank (`text_tasks` Tabelle) geladen.
-- **Benutzerdefinierte Aufgaben**: Nutzer können in den `Einstellungen` eigene Text-Assistent-Aufgaben anlegen, deren Prompt-Text bearbeiten und nicht benötigte Aufgaben löschen.
-- **Favoriten-System**: Aufgaben können als Favoriten markiert werden. Diese werden im Text-Assistenten UI farblich hervorgehoben und priorisiert angezeigt, um einen schnellen Zugriff auf häufig genutzte Funktionen zu ermöglichen.
-- **Automatische Initialisierung**: Beim ersten Besuch der Einstellungsseite werden Standard-Tasks (Korrektur, Umformulieren, To-Dos etc.) automatisch in die `text_tasks`-Tabelle des Benutzers migriert, um einen schnellen Start zu ermöglichen.
-- **Speicher-Funktion**: Ergebnisse aus dem Text-Assistenten können nun direkt im `DocumentEditor` über den "Speichern"-Button als neue Einträge in der Historie abgelegt werden. Der Titel des Historien-Eintrags reflektiert die verwendete Aufgabe und das Datum.
+### 1.1 Audio-Transkription
+- Upload von Audio-Dateien
+- Browser-Aufnahme (Desktop und Mobile)
+- Voxtral-basierte Transkription
+- Diarisierung (Sprecherzuweisung)
+- optional automatische Folgeanalyse
+- Default-Template im Upload auf `Zusammenfassung` (`generic`) vereinheitlicht
 
-### 1.2 Technische Umsetzung
-- **Datenbank-Schema**: Neue Tabelle `text_tasks` mit Spalten für `name`, `prompt`, `is_favorite`, `position` und `user_id`.
-- **API-Endpunkte**:
-    - `/api/text-tasks` (GET, POST): Zum Abrufen aller Aufgaben und zum Erstellen neuer Aufgaben.
-    - `/api/text-tasks/[id]` (PUT, DELETE): Zum Aktualisieren (inkl. Favoriten-Status) und Löschen spezifischer Aufgaben.
-- **Frontend-Integration**:
-    - `pages/settings.js`: Neue UI-Sektion zur Verwaltung der `text_tasks` (Erstellen, Bearbeiten, Löschen, Favoriten).
-    - `pages/text-ai.js`: Lädt die Aufgaben dynamisch aus der DB und rendert die Buttons entsprechend. Der `action`-Parameter im POST-Request zum `/api/text-ai` ist nun die ID der Aufgabe.
-    - `lib/api.js`: Neue Helferfunktionen für `text-tasks` CRUD-Operationen.
+### 1.2 OCR / Document AI
+- OCR für PDF und Bilddateien
+- Kamera-Workflow für mobile Erfassung
+- optional direkte Analyse des OCR-Textes
+- Speicherung in der Historie als eigener Datensatz
 
----
+### 1.3 KI-Analyse
+- Analysemodi: `meeting`, `generic`, `aufmass`, Custom-Templates
+- Modellauswahl (Large/Medium/Small)
+- benutzerdefinierte Zusatzanweisungen (`custom_prompt`)
 
-## 2. UI/UX & Design-Konsistenz
+### 1.4 Übersetzung
+- dediziertes Übersetzungsmodul mit Modellauswahl
+- OCR-Import in den Übersetzungsfluss
+- Weiterbearbeitung im Editor
 
-### 2.1 Editor-Design & Funktionalität
-- **Design-Vereinheitlichung**:
-    - Das **Übersetzungs-Tool** (`pages/translate.js`) nutzt nun ebenfalls den vollwertigen `DocumentEditor` zur Anzeige der Übersetzungs-Ergebnisse. Dies stellt ein konsistentes Look & Feel und die Nutzung aller Editor-Features (Kopieren, DOCX/PDF-Export, Bearbeiten) sicher.
-    - **Adaptive Höhe des Editors**: Der `DocumentEditor` passt seine Mindesthöhe dynamisch an den Inhalt an (`min-h-[300px]` bzw. `md:min-h-[500px]`), um bei kürzeren Texten keine unnötig lange "Papier"-Fläche zu generieren.
-- **Interaktive Elemente**:
-    - **Kopier-Funktion im Editor**: Ein neuer "Kopieren"-Button in der Navbar des `DocumentEditor` ermöglicht das einfache Kopieren des gesamten Editor-Inhalts in die Zwischenablage, inkl. visuellem Feedback ("Kopiert!").
-    - **Speicher-Feedback im Editor**: Der "Speichern"-Button im `DocumentEditor` (speziell im Text-Assistent) zeigt nun visuelles Feedback ("Gespeichert!") an, nachdem das Dokument erfolgreich in der Historie abgelegt wurde.
+### 1.5 Editor-zentrierter Workflow
+- einheitlicher Document Editor für Ergebnisbearbeitung
+- PDF- und DOCX-Export
+- PDF-Export über serverseitigen Chromium-Renderer (`/api/export/pdf`) mit Browser-Fallback
+- Premium-Layout pro Export per Schalter im Editor aktivierbar/deaktivierbar
+- Optionaler PDF-Kopfbereich als reduzierte Signatur mit Titel, Datum und Projekt
+- PDF-Ausgabe mit festem UX-Standard:
+  - Stil: `Soft Business`
+  - Schrift: `Google Sans Soft` (mit Fallbacks)
+- PDF öffnet nach Export standardmäßig im Browser-Tab (inline)
+- PDF-Export nutzt keinen erzwungenen Download-Fallback mehr
+- Speicherung von Editor-Inhalten in Historie
+- Fokus auf zentrale Bearbeitung im Editor
 
-### 2.2 Sprachunterstützung & Lokalisierung
-- **Chinesisch (中文)**: Als neue Übersetzungsoption in allen relevanten Modulen (DocumentEditor, Transkriptionen, OCR, Übersetzungs-Tool) hinzugefügt.
+## 2. Bedienung und UX
 
-### 2.3 Historien-Ansicht
-- **Optimiertes Layout**: Die Historien-Seite (`pages/transcriptions.js`) nutzt nun eine `max-w-7xl` Breite mit horizontalem Padding (`px-4 sm:px-6 lg:px-8`), um den verfügbaren Bildschirmplatz besser auszunutzen und horizontales Scrollen zu eliminieren.
-- **Präzises Type-Labeling**: Einträge in der Historie werden jetzt korrekt als "Text-Assistent" oder "Übersetzung" gelabelt, anstatt als generische "Transkription", was die Übersichtlichkeit erheblich verbessert.
+### 2.1 Transparenter Verarbeitungsstatus
+- `ProcessStatusCard` als einheitliches Status-UI
+- Schrittanzeige pro Prozess
+- Restzeitindikator (ETA)
+- rotierende Lade-Texte zur Wartezeitüberbrückung
+- Live-Updates über SSE (`/api/transcriptions/[id]/stream`) bei laufenden Transkriptionsjobs
+- Polling bleibt nur als technischer Fallback
+- Startfehler im `pending`-Zustand werden direkt in der Upload-UI angezeigt
+- Sofortmaßnahmen im UI: `Erneut starten` (Upload) und `Verarbeitung starten` (Detailseite)
 
----
+### 2.2 Verlauf pro Auftrag
+- Event-Timeline (`Verlauf`) in der Detailansicht
+- Ereignisse entlang des gesamten Flows:
+  - `queued`
+  - `processing`
+  - `speaker_assignment`
+  - `analyzing`
+  - `completed`
+  - `error`
 
-## 3. Technische Verbesserungen & Robustheit
+### 2.3 Upload-Flow verbessert
+- Polling des Auftragsstatus direkt nach Upload
+- optionale Auto-Weiterleitung zur Detailseite, sobald Ergebnis bereit ist
 
-### 3.1 Markdown-Rendering & Export
-- **Professionelles Markdown-Rendering**: Die Integration der `marked`-Library in `lib/export-utils.js` (mittels `mdToHtml`) ermöglicht die robuste und korrekte Konvertierung von Markdown-Inhalten (inkl. **Tabellen**, Überschriften, Listen, Fett-/Kursivdruck) in HTML für die Darstellung im `DocumentEditor`. Dies gilt für alle Module (OCR, Transkriptionen, Text-Assistent).
-- **PDF-Export (Finaler Fix)**: Die Druck-Logik im `DocumentEditor` wurde vollständig überarbeitet:
-    - Browser-generierte Header und Footer (URL, Datum, Titel) werden durch `margin: 0` auf `@page` unterdrückt.
-    - Simulations von Seitenrändern erfolgt durch `padding` direkt auf dem Inhalt (`#editor-content-to-print`).
-    - Alle Nicht-Inhaltselemente werden gezielt mittels `no-print` Klasse und CSS `display: none !important;` ausgeblendet, um eine absolut saubere PDF-Ausgabe zu gewährleisten.
+### 2.4 Konsistenz
+- vergleichbarer Lade-/Status-Ansatz in Upload, OCR, Translate und Text-AI
+- Detailseite stärker auf Editor-Nutzung ausgerichtet
+- Fokus-Modus im Editor mit reduzierter, ruhiger Oberfläche (`Hell`/`Dunkel`)
+- Microcopy auf Kernseiten vereinheitlicht (reduzierter Ton, weniger Superlative)
 
-### 3.2 KI-Service Stabilität
-- **OCR-Zuverlässigkeit**: Verbesserungen in `lib/ai-service.js` bei der `performOCR`-Funktion:
-    - Der `mime_type` wird nun explizit beim Upload des Dokuments an Mistral übermittelt.
-    - Eine kurze Verzögerung (`1500ms`) wurde nach dem Dateiupload bei Mistral eingebaut, um sicherzustellen, dass die Datei für die OCR-Verarbeitung bereit ist und somit `500 - Service Unavailable` Fehler reduziert werden.
+### 2.5 Browser-Aufnahme verbessert
+- Visualizer startet robust nach Aufnahme-Start (kein Timing-Problem mit Canvas-Mount mehr)
+- Mikrofon-Signalindikator reagiert sensibler
+- Audio-Vorschau startet konsistent am Anfang
 
-### 3.3 Datenbank-Anpassungen
-- **Flexibilität für Textdokumente**: Die Spalten `filename`, `original_name` und `file_path` in der `transcriptions`-Tabelle wurden auf `NULL` zulässig (`DROP NOT NULL`) geändert. Dies erlaubt das Speichern von rein textbasierten Dokumenten (wie z.B. aus dem Text-Assistenten) ohne eine zugehörige Datei.
+## 3. Security-Härtung
 
----
+### 3.1 API-Key Schutz
+- neue verschlüsselte Spalte: `settings.mistral_api_key_encrypted`
+- sichere Auflösung von API-Keys über zentrale Service-Layer
+- Migrationsskript für Legacy-Klartextwerte
 
-## 4. Sicherheit & Deployment-Vorbereitung
+### 3.2 Rate Limiting
+- Limits auf sicherheits- und kostenkritischen Routen, u. a.:
+  - Auth
+  - Upload
+  - OCR
+  - Text-AI
+  - Translate
+  - Templates
+  - Transcription Detail/Process/Analyze
+  - DB-Init
 
-### 4.1 Authentifizierung & Admin-Verwaltung
-- **CLI Admin-Seed Tool**: Die potenziell unsichere API-Route `/api/admin/seed` wurde entfernt und durch ein sicheres, lokal ausführbares CLI-Skript (`scripts/seed-admin.js`, erreichbar via `npm run seed-admin`) ersetzt. Dieses Skript ermöglicht das sichere Anlegen und Aktualisieren von Admin-Konten inklusive korrektem `bcryptjs`-Hashing und Passwortvalidierung.
-- **Passwort-Validierung**: Verbesserte Passwort-Komplexitätsprüfungen (Mindestlänge, Groß-/Kleinbuchstaben, Zahl, Sonderzeichen) wurden sowohl für Admin-erstellte Benutzer als auch für Profil-Updates implementiert.
-- **Temporäre Debugging-Routen entfernt**: Alle zu Debugging-Zwecken erstellten Routen (`temp-hash.js`, `temp-reset-password.js`) wurden nach erfolgreicher Fehlerbehebung entfernt.
+### 3.3 Eingabehärtung
+- serverseitige Modell-Whitelist
+- stärkere Validierung von Parametern (z. B. Ordnerzuordnung)
+- robustere Fehlerausgaben (reduziert sensible Details)
 
-### 4.2 Deployment-Dokumentation
-- **`docs/troubleshooting-auth.md`**: Eine detaillierte Fehleranalyse und Lösungsvorschläge für Authentifizierungsprobleme.
-- **`docs/vps-deployment-guide.md`**: Ein umfassender Leitfaden für ein vollständig isoliertes Deployment auf einem VPS unter Verwendung von Docker und Traefik, inklusive `.env`-Konfiguration, Initialisierungs- und Seed-Anweisungen.
+### 3.4 Secrets & Init
+- separates `DB_INIT_SECRET` (entkoppelt von `NEXTAUTH_SECRET`)
+- DB-Init in Produktion standardmäßig deaktivierbar via `ENABLE_DB_INIT_API`
 
----
+## 4. Betriebsstabilität
 
----
+### 4.1 Job-Steuerung
+- atomische Statuswechsel für `process` und `analyze`
+- Schutz vor Doppelstarts
+- hängende Jobs werden als `error` markiert (Stale-Job-Recovery)
 
-## 5. Modulares Einstellungs-System
+### 4.2 Dateiverarbeitung
+- Tempfile-Cleanup bei Upload-/OCR-Fehlern
+- sichere Dateilöschung nur in erlaubten Upload-Pfaden
 
-### 5.1 Tab-basierte Struktur
-- **Organisierte Gliederung**: Die Einstellungen sind nun in logische Module unterteilt:
-    - **Transkription**: Sprache und Fachbegriffe (Context Bias).
-    - **Analyse**: Standard-Modellwahl und Vorlagen-Manager.
-    - **Text-Assistent**: Zentrale Task-Verwaltung.
-    - **OCR & Übersetzung**: Modulspezifische Präferenzen (OCR-Modell, Zielsprache).
-    - **Konto & API**: API-Key, Kostenlimit und Monatsstatistik.
+### 4.3 Datenbankpflege
+- Migrationen über `lib/db-init.js`
+- neue Tabelle `transcription_events` + Indizes
+- zusätzliche Indizes für häufige Zugriffe
 
-### 5.2 Kosten-Monitoring
-- **Echtzeit-Verbrauch**: Anzeige der aktuellen monatlichen API-Kosten in Euro.
-- **Limit-Check**: Automatischer Abgleich mit dem nutzerdefinierten Limit inkl. visueller Warnung bei hoher Auslastung.
-- **Preisliste**: Transparente Übersicht der Mistral-Modellpreise direkt in der App.
+## 5. Daten-/Kontoverwaltung
 
----
+### 5.1 Historie und Organisation
+- Favoriten und Ordner
+- Typ-spezifische Darstellung (Transkription, OCR, Übersetzung, Text-AI)
 
-## 6. Daten-Management & Historie
+### 5.2 Text-Assistent Aufgaben
+- Aufgaben werden dynamisch aus `text_tasks` geladen
+- eigene Aufgaben pro Nutzer verwaltbar
+- Favoritenpriorisierung
 
-### 6.1 Endgültiges Löschen
-- **Bereinigungs-Funktion**: Nutzer können Einträge nun dauerhaft aus der Historie entfernen. Dies löscht sowohl den Datenbankeintrag als auch die zugehörige physische Datei vom Server.
-- **Fehlertoleranz**: Die Löschlogik erkennt automatisch, ob eine physische Datei existiert (Audio/OCR) oder ob es sich um ein rein internes Dokument (Übersetzung/KI-Task) handelt.
+### 5.3 Kostenkontrolle
+- Nutzungsprotokoll und Kostenberechnung
+- monatliche Kostenlimits
 
-### 6.2 Responsive Historie
-- **Mobile First**: Das Layout der Dateikarten wurde vollständig responsiv gestaltet. Auf kleinen Bildschirmen werden Informationen gestapelt, um horizontales Scrollen zu verhindern.
-- **Visuelle Identifikation**: Einführung farbcodierter Icons zur schnellen Unterscheidung der Modul-Ergebnisse (Transkription, OCR, Übersetzung, Text-KI).
+### 5.4 Premium-PDF Profil
+- Premium-Headerdaten pro Nutzer in den Einstellungen pflegbar:
+  - Unternehmen
+  - Name
+  - Rolle
+  - Kontakt
+  - Fußzeile
+- Serverseitige Nutzung dieser Daten beim PDF-Render (nicht aus Client-Metadaten)
 
----
+## 6. Migration und Verifikation
 
-## 7. Audio-Optimierung
+### 6.1 Legacy API-Key Migration
+- Dry-Run:
+```bash
+npm run migrate-api-keys -- --dry-run
+```
+- Write-Run:
+```bash
+npm run migrate-api-keys
+```
 
-### 7.1 Serverseitige Konvertierung
-- **FFmpeg-Layer**: Automatische Umwandlung von Browser-Aufnahmen (insb. WebM) in MP3 zur Gewährleistung der Mistral-Kompatibilität.
-- **Path-Management**: Explizite Konfiguration des FFmpeg-Pfads für konsistente Ausführung in der Docker-Umgebung.
+### 6.2 Verifikation (Beispiel mit Docker-DB)
+```bash
+docker compose -f config/docker-compose.dev.yml exec transkription-db \
+  psql -U transkription -d transkription -c "SELECT COUNT(*) AS plaintext_remaining FROM settings WHERE NULLIF(TRIM(mistral_api_key), '') IS NOT NULL;"
 
-### 7.2 Echtzeit-Feedback
-- **Equalizer**: Visuelle Darstellung der Tonfrequenzen während der In-App Aufnahme als Bestätigung für ein aktives Mikrofon.
-- **Mime-Type Robustheit**: Verbesserte Erkennung und Validierung von Audio-Containern über verschiedene Browser hinweg.
+docker compose -f config/docker-compose.dev.yml exec transkription-db \
+  psql -U transkription -d transkription -c "SELECT COUNT(*) AS encrypted_present FROM settings WHERE NULLIF(TRIM(mistral_api_key_encrypted), '') IS NOT NULL;"
+```
 
----
+## 7. Verweise
 
-*Dokumentation aktualisiert am 11. Februar 2026*
-
+- Security-Details: `code-review-hardening-2026-02-11.md`
+- Projektplan: `../PROJECT_PLAN.md`
+- Einstieg: `../README.md`

@@ -3,8 +3,9 @@ import { useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
-import { exportToDoc, mdToHtml } from '../lib/export-utils';
+import { mdToHtml } from '../lib/export-utils';
 import DocumentEditor from '../components/DocumentEditor';
+import ProcessStatusCard from '../components/ProcessStatusCard';
 import { saveDocument } from '../lib/api';
 
 const LANGUAGES = [
@@ -21,6 +22,24 @@ const LANGUAGES = [
   { code: 'Chinese', label: 'Chinesisch' },
 ];
 
+const TRANSLATE_OCR_MESSAGES = [
+  'Wir entziffern das Dokument gerade wie ein Rätselheft.',
+  'Die OCR sucht jedes Zeichen, auch die besonders schüchternen.',
+  'Scanner-Modus aktiv: Buchstaben werden eingesammelt.',
+  'Das Dokument wird in Text umgegossen - ganz ohne Krümel.',
+  'Wir lesen gerade jede Zeile mit Adleraugen.',
+  'Die Seiten flüstern, wir schreiben mit.',
+];
+
+const TRANSLATION_MESSAGES = [
+  'Wörter packen gerade ihre Koffer für die Zielsprache.',
+  'Der Satzbau macht einen kleinen Urlaub und kommt übersetzt zurück.',
+  'Unsere Übersetzungs-Elfen feilen am Feinschliff.',
+  'Wir retten Bedeutung, Tonfall und Nuancen vor dem Zoll.',
+  'Der Text zieht gerade in eine neue Sprachwohnung um.',
+  'Feinschliff läuft: gleiche Aussage, neue Sprache.',
+];
+
 export default function Translate() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -31,7 +50,9 @@ export default function Translate() {
   const [translatedText, setTranslatedText] = useState('');
   const [loading, setLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [loadingStartedAt, setLoadingStartedAt] = useState(null);
   const [error, setError] = useState('');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -45,6 +66,7 @@ export default function Translate() {
   const handleOcr = async (file) => {
     if (!file) return;
     setOcrLoading(true);
+    setLoadingStartedAt(new Date().toISOString());
     setError('');
     
     const formData = new FormData();
@@ -63,6 +85,7 @@ export default function Translate() {
       setError('OCR fehlgeschlagen: ' + err.message);
     } finally {
       setOcrLoading(false);
+      setLoadingStartedAt(null);
     }
   };
 
@@ -71,6 +94,7 @@ export default function Translate() {
     if (!text.trim()) return;
 
     setLoading(true);
+    setLoadingStartedAt(new Date().toISOString());
     setError('');
     
     try {
@@ -88,6 +112,7 @@ export default function Translate() {
       setError(err.message);
     } finally {
       setLoading(false);
+      setLoadingStartedAt(null);
     }
   }
 
@@ -115,20 +140,9 @@ export default function Translate() {
 
       {!translatedText ? (
         <div className="max-w-5xl mx-auto pb-20 px-2 sm:px-0 animate-fade-in">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-text-primary">Übersetzung</h1>
-              <p className="text-sm text-text-secondary mt-1">Präzise Texte übersetzen & Dokumente scannen</p>
-            </div>
-            
-            <div className="flex items-center gap-3 bg-dark-card border border-white/[0.06] rounded-2xl px-4 py-2 text-white shadow-xl w-fit">
-              <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest opacity-50">KI-Modell:</span>
-              <select value={model} onChange={e => setModel(e.target.value)} className="bg-transparent text-xs text-text-primary outline-none cursor-pointer border-none p-0">
-                <option value="mistral-large-latest">Mistral Large</option>
-                <option value="mistral-medium-latest">Mistral Medium</option>
-                <option value="mistral-small-latest">Mistral Small</option>
-              </select>
-            </div>
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-text-primary">Übersetzung</h1>
+            <p className="text-sm text-text-secondary mt-1">Text übersetzen oder aus Dokument übernehmen</p>
           </div>
 
           <div className="space-y-6">
@@ -161,6 +175,21 @@ export default function Translate() {
                 )}
                 <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Text hier einfügen oder Dokument oben scannen..." className="w-full h-[400px] bg-transparent p-8 text-text-primary placeholder-text-secondary/20 outline-none resize-none text-base leading-relaxed custom-scrollbar" />
               </div>
+
+              {(ocrLoading || loading) && (
+                <ProcessStatusCard
+                  title={ocrLoading ? 'OCR läuft' : 'Übersetzung läuft'}
+                  description={ocrLoading
+                    ? 'Text wird aus dem Dokument extrahiert.'
+                    : 'Der erkannte Text wird in die Zielsprache übersetzt.'}
+                  steps={[{ key: ocrLoading ? 'ocr' : 'translation', label: ocrLoading ? 'Dokument lesen' : 'Text übersetzen' }]}
+                  activeStep={0}
+                  done={false}
+                  startedAt={loadingStartedAt}
+                  etaSeconds={ocrLoading ? 16 : 14}
+                  messages={ocrLoading ? TRANSLATE_OCR_MESSAGES : TRANSLATION_MESSAGES}
+                />
+              )}
             </div>
 
             {/* Language Selection & Action */}
@@ -170,6 +199,36 @@ export default function Translate() {
                 <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="bg-white/5 border border-white/10 text-accent-orange font-bold text-sm rounded-xl px-4 py-2 outline-none hover:bg-white/10 transition-all cursor-pointer">
                   {LANGUAGES.map(lang => <option key={lang.code} value={lang.code}>{lang.label}</option>)}
                 </select>
+              </div>
+
+              <div className="w-full max-w-md">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedOptions((prev) => !prev)}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.02] text-sm text-text-primary hover:bg-white/[0.04] transition-colors"
+                  aria-expanded={showAdvancedOptions}
+                >
+                  <span>Erweiterte Optionen</span>
+                  <svg
+                    className={`w-4 h-4 text-text-secondary transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {showAdvancedOptions && (
+                  <div className="mt-3 bg-dark-card border border-white/[0.06] rounded-2xl px-4 py-3 shadow-xl">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest opacity-60">Modell</label>
+                    <select value={model} onChange={e => setModel(e.target.value)} className="mt-2 w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
+                      <option value="mistral-large-latest">Mistral Large</option>
+                      <option value="mistral-medium-latest">Mistral Medium</option>
+                      <option value="mistral-small-latest">Mistral Small</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <button onClick={handleTranslate} disabled={loading || ocrLoading || !text.trim()} className="w-full max-w-md gradient-accent text-white py-4 rounded-2xl text-lg font-bold shadow-lg shadow-accent-orange/20 hover:shadow-accent-orange/40 disabled:opacity-30 transition-all hover:scale-[1.02] active:scale-95">
@@ -183,6 +242,7 @@ export default function Translate() {
           initialHtml={mdToHtml(translatedText)}
           filename={`Uebersetzung_${targetLanguage}`}
           sidebarContent={text}
+          sourceLabel="Originaltext"
           onSave={handleSaveDocument}
           onCancel={() => setTranslatedText('')}
         />

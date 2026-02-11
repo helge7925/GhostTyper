@@ -1,8 +1,11 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
-import { query } from '../../lib/db';
 import { translateText } from '../../lib/ai-service';
 import { logUsage, checkCostLimit } from '../../lib/usage';
+import { resolveChatModel } from '../../lib/model-policy';
+import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service';
+import { checkRateLimit, applyRateLimitHeaders } from '../../lib/rate-limit';
+import { logApiError, serverError } from '../../lib/api-utils';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -14,6 +17,17 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
 
+  const rate = checkRateLimit(req, {
+    keyPrefix: 'translate',
+    identifier: `user:${session.user.id}`,
+    limit: 60,
+    windowMs: 60_000,
+  });
+  applyRateLimitHeaders(res, rate);
+  if (!rate.allowed) {
+    return res.status(429).json({ message: 'Zu viele Anfragen. Bitte später erneut versuchen.' });
+  }
+
   const { text, targetLanguage, sourceLanguage = 'auto', model: requestModel } = req.body;
 
   if (!text || !targetLanguage) {
@@ -21,16 +35,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Get user settings
-    const settingsResult = await query(
-      'SELECT mistral_api_key, preferred_model FROM settings WHERE user_id = $1',
-      [session.user.id]
-    );
-    const apiKey = settingsResult.rows[0]?.mistral_api_key || process.env.MISTRAL_API_KEY;
-    const preferredModel = requestModel || settingsResult.rows[0]?.preferred_model || 'mistral-large-latest';
+    const settingsRow = await getSettingsRow(session.user.id);
+    const apiKey = resolveStoredApiKey(settingsRow) || process.env.MISTRAL_API_KEY;
+    const preferredModel = resolveChatModel(requestModel || settingsRow?.preferred_model || 'mistral-large-latest');
 
     if (!apiKey) {
       return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert' });
+    }
+    if (!preferredModel) {
+      return res.status(400).json({ message: 'Ungültiges KI-Modell' });
     }
 
     // Check cost limit
@@ -54,7 +67,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ translatedText });
   } catch (error) {
-    console.error('Translation error:', error);
-    return res.status(500).json({ message: error.message || 'Fehler bei der Übersetzung' });
+    logApiError('Translation error', error);
+    return serverError(res, 'Fehler bei der Übersetzung');
   }
 }

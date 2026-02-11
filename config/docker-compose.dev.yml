@@ -14,6 +14,10 @@ services:
       - DATABASE_URL=postgresql://transkription:transkription@transkription-db:5432/transkription
       - NEXTAUTH_SECRET=dev-secret-change-in-production
       - NEXTAUTH_URL=http://localhost:3000
+      - DB_INIT_SECRET=dev-db-init-secret
+      - SETTINGS_ENCRYPTION_KEY=dev-settings-encryption-key
+      - ENABLE_DB_INIT_API=true
+      - PDF_CHROMIUM_PATH=/usr/bin/chromium-browser
     volumes:
       - transkription-uploads:/app/uploads
     depends_on:

@@ -307,9 +307,9 @@ export default function AdminUsers() {
       {/* User list */}
       <div className="space-y-3">
         {users.map((user) => (
-          <div key={user.id} className="bg-dark-card border border-white/[0.06] rounded-xl p-4 flex items-center justify-between">
+          <div key={user.id} className="bg-dark-card border border-white/[0.06] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium text-text-primary truncate">
                   {user.name || user.email}
                 </span>
@@ -323,7 +323,7 @@ export default function AdminUsers() {
                     API-Key
                   </span>
                 )}
-                {user.cost_limit && (
+                {user.cost_limit !== null && user.cost_limit !== undefined && (
                   <span className="text-xs bg-accent-yellow/20 text-accent-yellow px-2 py-0.5 rounded-full">
                     Limit: {user.cost_limit} €
                   </span>
@@ -332,7 +332,7 @@ export default function AdminUsers() {
               <p className="text-xs text-text-secondary mt-0.5">{user.email}</p>
             </div>
 
-            <div className="flex items-center gap-2 ml-4">
+            <div className="w-full sm:w-auto flex items-center gap-2 sm:justify-end">
               <button
                 onClick={() => startEdit(user)}
                 className="text-xs text-text-secondary hover:text-text-primary hover:bg-white/[0.06] px-3 py-1.5 rounded-full transition-colors"

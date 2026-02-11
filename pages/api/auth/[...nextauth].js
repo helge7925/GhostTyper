@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { query } from '../../../lib/db';
+import { checkRateLimit } from '../../../lib/rate-limit';
 
 export const authOptions = {
   providers: [
@@ -11,23 +12,32 @@ export const authOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Passwort', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
+        const rate = checkRateLimit(req, {
+          keyPrefix: 'auth-login',
+          limit: 10,
+          windowMs: 5 * 60 * 1000,
+        });
+        if (!rate.allowed) {
+          return null;
+        }
+
+        if (!credentials?.email || !credentials?.password) {
+          return null;
+        }
+
         const result = await query(
           'SELECT id, email, name, password_hash, role FROM users WHERE email = $1',
           [credentials.email]
         );
 
         const user = result.rows[0];
-        console.log('Authorize: User found in DB:', user ? { id: user.id, email: user.email, role: user.role } : 'None');
         if (!user) {
-          console.log('Authorize: User not found for email:', credentials.email);
           return null;
         }
 
         const valid = await bcrypt.compare(credentials.password, user.password_hash);
-        console.log('Authorize: Password comparison result:', valid);
         if (!valid) {
-          console.log('Authorize: Invalid password for user:', credentials.email);
           return null;
         }
 
