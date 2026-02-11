@@ -8,11 +8,26 @@ Dieses Dokument beschreibt den Audio-Upload für die Transkription WebApp. Die A
 
 ### Audio-Upload-Fluss
 
-1. **Hochladen**: Der Benutzer lädt eine Audio-Datei hoch.
-2. **Speichern**: Die Audio-Datei wird auf dem Server gespeichert.
-3. **Transkription**: Die Audio-Datei wird transkribiert.
-4. **Analyse**: Die Transkription wird analysiert.
-5. **Speichern**: Die Transkription und Analyse werden in der Datenbank gespeichert.
+1. **Aufnahme oder Upload**: Der Benutzer nimmt Audio direkt im Browser auf oder lädt eine Datei hoch.
+2. **Format-Erkennung**: Der Browser wählt das optimal unterstützte Format (Safari: MP4/AAC, Chrome: WebM).
+3. **Validierung**: Das System validiert Mime-Types flexibel (inkl. WebM-Containern und Codec-Parametern).
+4. **Speichern**: Die Audio-Datei wird im `uploads/` Verzeichnis gespeichert.
+5. **Konvertierung**: Falls erforderlich (z.B. bei `.webm`), wird die Datei serverseitig via FFmpeg in `.mp3` konvertiert, um volle Kompatibilität mit der Mistral API zu gewährleisten.
+6. **Transkription**: Die (ggf. konvertierte) Datei wird an Mistral Voxtral Mini gesendet.
+7. **Analyse**: Das Transkript wird mit Mistral Large/Medium/Small verarbeitet.
+8. **Speichern**: Alle Ergebnisse werden in der PostgreSQL-Datenbank abgelegt.
+
+## Features
+
+### In-App Audio-Recorder
+- **Multi-Browser Support**: Automatische Wahl zwischen WebM (Opus) und MP4 (AAC) je nach Browser-Fähigkeit.
+- **Echtzeit-Visualisierung**: Ein Equalizer gibt während der Aufnahme visuelles Feedback über den Audiopegel.
+- **Robustheit**: Nutzung von zeitgesteuerten Daten-Chunks (Timeslices) zur Vermeidung von Datenverlust.
+
+### Serverseitige Konvertierung
+- **FFmpeg Integration**: Automatisierte Umwandlung von inkompatiblen Formaten (insb. WebM) in MP3.
+- **Automatischer Cleanup**: Temporäre Konvertierungsdateien werden nach dem API-Aufruf sofort gelöscht.
+
 
 ## Konfiguration
 

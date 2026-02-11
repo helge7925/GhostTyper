@@ -31,7 +31,8 @@ export default function AudioUploadForm({ onSuccess }) {
   }, []);
 
   function validateFile(f) {
-    if (!ACCEPTED_AUDIO_TYPES.includes(f.type)) {
+    const type = f.type.split(';')[0];
+    if (!ACCEPTED_AUDIO_TYPES.includes(type) && !type.startsWith('audio/')) {
       return 'Ungültiger Dateityp. Bitte laden Sie eine Audio-Datei hoch.';
     }
     if (f.size > MAX_FILE_SIZE) {
@@ -59,7 +60,11 @@ export default function AudioUploadForm({ onSuccess }) {
   }
 
   function handleRecordingComplete(blob) {
-    const recordedFile = new File([blob], `aufnahme-${Date.now()}.webm`, { type: 'audio/webm' });
+    const extension = blob.type.includes('mp4') ? 'mp4' : 
+                      blob.type.includes('webm') ? 'webm' : 
+                      blob.type.includes('ogg') ? 'ogg' : 'webm';
+    
+    const recordedFile = new File([blob], `aufnahme-${Date.now()}.${extension}`, { type: blob.type });
     setFile(recordedFile);
     setUploadMode('file');
   }

@@ -163,11 +163,23 @@ export default function OCR() {
               ) : (
                 <div className="space-y-6">
                   <div className="flex justify-center gap-4">
-                    <button onClick={() => fileInputRef.current.click()} className="w-16 h-16 bg-white/[0.05] rounded-2xl flex items-center justify-center text-text-secondary hover:text-accent-orange transition-all group">
-                      <svg className="w-8 h-8 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    <button 
+                      type="button"
+                      onClick={() => fileInputRef.current.click()} 
+                      className="flex flex-col items-center gap-2 bg-white/[0.05] hover:bg-white/[0.1] text-text-primary px-6 py-4 rounded-2xl border border-white/5 transition-all group w-32"
+                      title="Dokument hochladen"
+                    >
+                      <svg className="w-8 h-8 text-accent-orange group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      <span className="text-[10px] font-bold uppercase tracking-widest">Dokument</span>
                     </button>
-                    <button onClick={() => cameraInputRef.current.click()} className="md:hidden w-16 h-16 bg-white/[0.05] rounded-2xl flex items-center justify-center text-text-secondary hover:text-accent-cyan transition-all group">
-                      <svg className="w-8 h-8 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <button 
+                      type="button"
+                      onClick={() => cameraInputRef.current.click()} 
+                      className="flex flex-col items-center gap-2 bg-white/[0.05] hover:bg-white/[0.1] text-text-primary px-6 py-4 rounded-2xl border border-white/5 transition-all group w-32"
+                      title="Foto machen"
+                    >
+                      <svg className="w-8 h-8 text-accent-orange group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      <span className="text-[10px] font-bold uppercase tracking-widest">Kamera</span>
                     </button>
                   </div>
                   <p className="text-text-primary font-medium">Dokument hochladen oder fotografieren</p>

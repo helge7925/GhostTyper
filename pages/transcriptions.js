@@ -92,6 +92,16 @@ export default function Transcriptions() {
     }
   }, []);
 
+  const handleDeleteTranscription = useCallback(async (id) => {
+    if (!confirm('Datei unwiderruflich löschen?')) return;
+    try {
+      await deleteTranscription(id);
+      setTranscriptions(prev => prev.filter(t => t.id !== id));
+    } catch (err) {
+      alert('Fehler beim Löschen: ' + (err.message || 'Unbekannter Fehler'));
+    }
+  }, []);
+
   const filteredTranscriptions = useMemo(() => {
     return transcriptions.filter(t => {
       const matchesFolder = activeFolderId === null || t.folder_id === activeFolderId;
@@ -108,7 +118,7 @@ export default function Transcriptions() {
         <title>Historie - GhostTyper</title>
       </Head>
 
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-8 min-h-[60vh] px-4 sm:px-6 lg:px-8">
+      <div className="w-full flex flex-col md:flex-row gap-8 min-h-[60vh]">
         {/* Sidebar: Folders */}
         <aside className="w-full md:w-64 shrink-0">
           <div className="flex items-center justify-between mb-4">
@@ -163,9 +173,9 @@ export default function Transcriptions() {
                   <div className="flex items-center">
                     <button
                       onClick={() => setActiveFolderId(folder.id)}
-                      className={`flex-1 text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-3 ${activeFolderId === folder.id ? 'bg-accent-orange/20 text-accent-orange border border-accent-orange/20' : 'text-text-secondary hover:bg-white/5'}`}
+                      className={`flex-1 text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-3 min-w-0 ${activeFolderId === folder.id ? 'bg-accent-orange/20 text-accent-orange border border-accent-orange/20' : 'text-text-secondary hover:bg-white/5'}`}
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
                       <span className="truncate">{folder.name}</span>
                     </button>
                     
@@ -191,14 +201,14 @@ export default function Transcriptions() {
         </aside>
 
         {/* Main: Transcription List */}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <h1 className="text-2xl font-semibold text-text-primary">
+            <h1 className="text-2xl font-semibold text-text-primary truncate">
               {activeFolderId === null ? 'Alle Dateien' : folders.find(f => f.id === activeFolderId)?.name}
             </h1>
             
             <div className="flex items-center gap-3">
-              <div className="relative">
+              <div className="relative flex-1 md:flex-initial">
                 <svg className="w-4 h-4 text-text-secondary absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 <input 
                   type="text" 
@@ -208,7 +218,7 @@ export default function Transcriptions() {
                   className="bg-dark-input border border-white/[0.1] rounded-xl pl-9 pr-4 py-2 text-xs text-text-primary outline-none focus:ring-1 focus:ring-accent-orange w-full md:w-64"
                 />
               </div>
-              <div className="text-[10px] text-text-secondary uppercase tracking-widest font-bold whitespace-nowrap">
+              <div className="text-[10px] text-text-secondary uppercase tracking-widest font-bold whitespace-nowrap hidden sm:block">
                 {filteredTranscriptions.length} {filteredTranscriptions.length === 1 ? 'Eintrag' : 'Einträge'}
               </div>
             </div>
@@ -239,6 +249,7 @@ export default function Transcriptions() {
                   folders={folders} 
                   onMove={(folderId) => handleMoveToFolder(t.id, folderId)}
                   onToggleFavorite={() => handleToggleFavorite(t.id, t.is_favorite)}
+                  onDelete={() => handleDeleteTranscription(t.id)}
                 />
               ))}
             </div>

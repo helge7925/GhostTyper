@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     switch (req.method) {
       case 'GET': {
         const result = await query(
-          'SELECT mistral_api_key, default_template, language, context_bias, preferred_model, cost_limit FROM settings WHERE user_id = $1',
+          'SELECT mistral_api_key, default_template, language, context_bias, preferred_model, cost_limit, default_translate_language, ocr_model FROM settings WHERE user_id = $1',
           [session.user.id]
         );
 
@@ -23,6 +23,8 @@ export default async function handler(req, res) {
             language: 'de',
             contextBias: '',
             preferredModel: 'mistral-large-latest',
+            defaultTranslateLanguage: 'en',
+            ocrModel: 'mistral-ocr-latest',
             costLimit: null,
           });
         }
@@ -34,16 +36,18 @@ export default async function handler(req, res) {
           language: settings.language,
           contextBias: settings.context_bias || '',
           preferredModel: settings.preferred_model || 'mistral-large-latest',
+          defaultTranslateLanguage: settings.default_translate_language || 'en',
+          ocrModel: settings.ocr_model || 'mistral-ocr-latest',
           costLimit: settings.cost_limit,
         });
       }
 
       case 'PUT': {
-        const { mistralApiKey, defaultTemplate, language, contextBias, preferredModel, costLimit } = req.body;
+        const { mistralApiKey, defaultTemplate, language, contextBias, preferredModel, costLimit, defaultTranslateLanguage, ocrModel } = req.body;
 
         await query(
-          `INSERT INTO settings (user_id, mistral_api_key, default_template, language, context_bias, preferred_model, cost_limit, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+          `INSERT INTO settings (user_id, mistral_api_key, default_template, language, context_bias, preferred_model, cost_limit, default_translate_language, ocr_model, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
            ON CONFLICT (user_id) DO UPDATE SET
              mistral_api_key = COALESCE($2, settings.mistral_api_key),
              default_template = COALESCE($3, settings.default_template),
@@ -51,8 +55,20 @@ export default async function handler(req, res) {
              context_bias = $5,
              preferred_model = COALESCE($6, settings.preferred_model),
              cost_limit = $7,
+             default_translate_language = COALESCE($8, settings.default_translate_language),
+             ocr_model = COALESCE($9, settings.ocr_model),
              updated_at = NOW()`,
-          [session.user.id, mistralApiKey || null, defaultTemplate || null, language || null, contextBias ?? null, preferredModel || null, costLimit !== undefined ? costLimit : null]
+          [
+            session.user.id, 
+            mistralApiKey || null, 
+            defaultTemplate || null, 
+            language || null, 
+            contextBias ?? null, 
+            preferredModel || null, 
+            costLimit !== undefined ? costLimit : null,
+            defaultTranslateLanguage || null,
+            ocrModel || null
+          ]
         );
 
         return res.status(200).json({ message: 'Einstellungen gespeichert' });

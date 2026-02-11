@@ -16,6 +16,7 @@
     "docx": "^8.2.2",
     "dompurify": "^3.3.1",
     "file-saver": "^2.0.5",
+    "fluent-ffmpeg": "^2.1.2",
     "formidable": "^3.5.1",
     "marked": "^17.0.1",
     "next": "^13.4.0",

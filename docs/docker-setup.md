@@ -81,33 +81,24 @@ volumes:
 
 ### Dockerfile
 
-Das Dockerfile definiert den Build-Prozess für die WebApp:
+Das Dockerfile nutzt einen Multi-Stage Build zur Minimierung der Image-Größe und enthält die notwendigen Tools für die Audio-Verarbeitung:
 
 ```dockerfile
-# Use the official Node.js image
-FROM node:18-alpine
-
-# Create app directory
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm install
-
-# Copy source files
-COPY . .
-
-# Build the application
-RUN npm run build
-
-# Expose port
-EXPOSE 3000
-
-# Start the application
-CMD ["npm", "start"]
+# Stage 1: Install dependencies
+FROM node:20-alpine AS deps
+...
+# Stage 3: Production runner
+FROM node:20-alpine AS runner
+...
+RUN apk add --no-cache ffmpeg
+...
 ```
+
+**Besonderheiten:**
+- **Node.js 20**: Ermöglicht die Nutzung moderner Bibliotheken (z.B. marked v17).
+- **FFmpeg**: Vorinstalliert im Runner-Image zur Konvertierung von Audio-Aufnahmen (WebM -> MP3).
+- **Standalone-Build**: Nutzt das Next.js Standalone-Feature für maximale Effizienz.
+
 
 ## Setup
 

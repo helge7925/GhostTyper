@@ -82,24 +82,40 @@ export default async function handler(req, res) {
     }
 
     case 'DELETE': {
-      const existing = await query(
-        'SELECT file_path FROM transcriptions WHERE id = $1 AND user_id = $2',
-        [id, session.user.id]
-      );
-
-      if (existing.rows.length === 0) {
-        return res.status(404).json({ message: 'Transkription nicht gefunden' });
-      }
-
       try {
-        await unlink(existing.rows[0].file_path);
-      } catch {
-        // File may already be deleted
+        const transId = parseInt(id);
+        const userId = session.user.id;
+
+        if (isNaN(transId)) {
+          return res.status(400).json({ message: 'Ungültige ID' });
+        }
+
+        const existing = await query(
+          'SELECT file_path FROM transcriptions WHERE id = $1 AND user_id = $2',
+          [transId, userId]
+        );
+
+        if (existing.rows.length === 0) {
+          return res.status(404).json({ message: 'Eintrag nicht gefunden oder keine Berechtigung' });
+        }
+
+        const filePath = existing.rows[0].file_path;
+
+        if (filePath && filePath !== 'INTERNAL_DOC') {
+          try {
+            await unlink(filePath);
+          } catch (err) {
+            console.warn(`File unlink failed for ${filePath}:`, err.message);
+          }
+        }
+
+        await query('DELETE FROM transcriptions WHERE id = $1 AND user_id = $2', [transId, userId]);
+
+        return res.status(200).json({ message: 'Erfolgreich gelöscht' });
+      } catch (error) {
+        console.error('DELETE error:', error);
+        return res.status(500).json({ message: 'Fehler beim Löschen: ' + error.message });
       }
-
-      await query('DELETE FROM transcriptions WHERE id = $1 AND user_id = $2', [id, session.user.id]);
-
-      return res.status(200).json({ message: 'Transkription gelöscht' });
     }
 
     default:
