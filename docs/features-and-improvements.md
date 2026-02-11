@@ -76,4 +76,48 @@ Dieses Dokument fasst alle seit dem letzten umfassenden Überblick (VPS Deployme
 
 ---
 
-*Dokumentation erstellt am 11. Februar 2026*
+---
+
+## 5. Modulares Einstellungs-System
+
+### 5.1 Tab-basierte Struktur
+- **Organisierte Gliederung**: Die Einstellungen sind nun in logische Module unterteilt:
+    - **Transkription**: Sprache und Fachbegriffe (Context Bias).
+    - **Analyse**: Standard-Modellwahl und Vorlagen-Manager.
+    - **Text-Assistent**: Zentrale Task-Verwaltung.
+    - **OCR & Übersetzung**: Modulspezifische Präferenzen (OCR-Modell, Zielsprache).
+    - **Konto & API**: API-Key, Kostenlimit und Monatsstatistik.
+
+### 5.2 Kosten-Monitoring
+- **Echtzeit-Verbrauch**: Anzeige der aktuellen monatlichen API-Kosten in Euro.
+- **Limit-Check**: Automatischer Abgleich mit dem nutzerdefinierten Limit inkl. visueller Warnung bei hoher Auslastung.
+- **Preisliste**: Transparente Übersicht der Mistral-Modellpreise direkt in der App.
+
+---
+
+## 6. Daten-Management & Historie
+
+### 6.1 Endgültiges Löschen
+- **Bereinigungs-Funktion**: Nutzer können Einträge nun dauerhaft aus der Historie entfernen. Dies löscht sowohl den Datenbankeintrag als auch die zugehörige physische Datei vom Server.
+- **Fehlertoleranz**: Die Löschlogik erkennt automatisch, ob eine physische Datei existiert (Audio/OCR) oder ob es sich um ein rein internes Dokument (Übersetzung/KI-Task) handelt.
+
+### 6.2 Responsive Historie
+- **Mobile First**: Das Layout der Dateikarten wurde vollständig responsiv gestaltet. Auf kleinen Bildschirmen werden Informationen gestapelt, um horizontales Scrollen zu verhindern.
+- **Visuelle Identifikation**: Einführung farbcodierter Icons zur schnellen Unterscheidung der Modul-Ergebnisse (Transkription, OCR, Übersetzung, Text-KI).
+
+---
+
+## 7. Audio-Optimierung
+
+### 7.1 Serverseitige Konvertierung
+- **FFmpeg-Layer**: Automatische Umwandlung von Browser-Aufnahmen (insb. WebM) in MP3 zur Gewährleistung der Mistral-Kompatibilität.
+- **Path-Management**: Explizite Konfiguration des FFmpeg-Pfads für konsistente Ausführung in der Docker-Umgebung.
+
+### 7.2 Echtzeit-Feedback
+- **Equalizer**: Visuelle Darstellung der Tonfrequenzen während der In-App Aufnahme als Bestätigung für ein aktives Mikrofon.
+- **Mime-Type Robustheit**: Verbesserte Erkennung und Validierung von Audio-Containern über verschiedene Browser hinweg.
+
+---
+
+*Dokumentation aktualisiert am 11. Februar 2026*
+

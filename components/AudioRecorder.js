@@ -12,18 +12,107 @@ export default function AudioRecorder({ onRecordingComplete }) {
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const streamRef = useRef(null);
+  const canvasRef = useRef(null);
+  const animationFrameRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const sourceRef = useRef(null);
 
   useEffect(() => {
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (timerRef.current) clearInterval(timerRef.current);
+      cleanup();
       if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
   }, [audioUrl]);
 
+  const cleanup = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+  };
+
+  const startVisualizer = async (stream) => {
+    try {
+      if (!canvasRef.current) return;
+
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const audioContext = new AudioContext();
+      
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
+      const analyser = audioContext.createAnalyser();
+      const source = audioContext.createMediaStreamSource(stream);
+      
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+      sourceRef.current = source;
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const draw = () => {
+        if (!canvasRef.current || !analyserRef.current) return;
+        
+        animationFrameRef.current = requestAnimationFrame(draw);
+        analyserRef.current.getByteFrequencyData(dataArray);
+
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const width = canvas.width;
+        const height = canvas.height;
+
+        ctx.clearRect(0, 0, width, height);
+
+        const barWidth = (width / bufferLength) * 2.5;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          const v = dataArray[i] / 255.0;
+          const barHeight = v * height * 1.2;
+
+          // Mistral Orange: #ff5917
+          ctx.fillStyle = `rgba(255, 89, 23, ${Math.max(0.3, v + 0.2)})`;
+          
+          const h = Math.max(barHeight, 3); 
+          ctx.fillRect(x, height - h, barWidth - 1, h);
+
+          x += barWidth;
+        }
+      };
+
+      draw();
+    } catch (err) {
+      console.error('Visualizer error:', err);
+    }
+  };
+
   async function startRecording() {
+    setError(null);
+    setAudioBlob(null);
+    setAudioUrl(null);
+    setDuration(0);
+    cleanup();
+
     if (!navigator.mediaDevices?.getUserMedia) {
       setError('Ihr Browser unterstützt keine Audio-Aufnahme.');
       return;
@@ -33,47 +122,65 @@ export default function AudioRecorder({ onRecordingComplete }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      let options = {};
-      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-        options.mimeType = 'audio/webm;codecs=opus';
-      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
-        options.mimeType = 'audio/webm';
+      // Start visualizer
+      await startVisualizer(stream);
+
+      const mimeTypes = [
+        'audio/mp4',
+        'audio/aac',
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/ogg'
+      ];
+      
+      let selectedType = '';
+      for (const type of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          selectedType = type;
+          break;
+        }
       }
 
+      const options = selectedType ? { mimeType: selectedType } : {};
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
+        if (e.data && e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const type = mediaRecorder.mimeType || selectedType || 'audio/webm';
+        
+        if (chunksRef.current.length === 0) {
+          setError('Aufnahme fehlgeschlagen: Keine Daten empfangen.');
+          return;
+        }
+
+        const blob = new Blob(chunksRef.current, { type });
         setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob));
+        
         stream.getTracks().forEach(track => track.stop());
-        clearInterval(timerRef.current);
+        cleanup();
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(1000);
       setIsRecording(true);
       setIsPaused(false);
-      setError(null);
-      setAudioBlob(null);
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
-      setAudioUrl(null);
-      setDuration(0);
 
       timerRef.current = setInterval(() => {
-        setDuration(d => d + 1);
+        setDuration(prev => prev + 1);
       }, 1000);
+
     } catch (err) {
-      if (err.name === 'NotAllowedError') {
-        setError('Mikrofon-Berechtigung wurde verweigert. Bitte erlauben Sie den Zugriff in Ihren Browser-Einstellungen.');
-      } else {
-        setError('Fehler beim Starten der Aufnahme. Bitte prüfen Sie Ihr Mikrofon.');
-      }
+      console.error('Start recording error:', err);
+      setError('Fehler beim Zugriff auf das Mikrofon: ' + err.message);
+      cleanup();
     }
   }
 
@@ -81,6 +188,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
     if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.pause();
       setIsPaused(true);
+      if (audioContextRef.current) audioContextRef.current.suspend();
       clearInterval(timerRef.current);
     }
   }
@@ -89,13 +197,16 @@ export default function AudioRecorder({ onRecordingComplete }) {
     if (mediaRecorderRef.current?.state === 'paused') {
       mediaRecorderRef.current.resume();
       setIsPaused(false);
-      timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
+      if (audioContextRef.current) audioContextRef.current.resume();
+      timerRef.current = setInterval(() => setDuration(prev => prev + 1), 1000);
     }
   }
 
   function stopRecording() {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+      if (mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
       setIsRecording(false);
       setIsPaused(false);
     }
@@ -120,7 +231,6 @@ export default function AudioRecorder({ onRecordingComplete }) {
     return `${mins}:${secs}`;
   }
 
-  // Preview after recording
   if (audioBlob) {
     return (
       <div className="space-y-4">
@@ -150,19 +260,26 @@ export default function AudioRecorder({ onRecordingComplete }) {
     );
   }
 
-  // Recording UI
   return (
     <div className="space-y-4">
       {error && (
-        <div className="bg-accent-red/10 border border-accent-red/20 text-accent-red px-4 py-3 rounded-lg text-sm">
+        <div className="bg-accent-red/10 border border-accent-red/20 text-accent-red px-4 py-3 rounded-lg text-sm text-center">
           {error}
         </div>
       )}
 
       <div className="flex flex-col items-center justify-center py-8">
         {isRecording ? (
-          <div className={`w-20 h-20 rounded-full mb-4 flex items-center justify-center ${isPaused ? 'bg-yellow-500/20' : 'bg-accent-red/20 animate-pulse'}`}>
-            <div className={`w-8 h-8 rounded-full ${isPaused ? 'bg-yellow-500' : 'bg-accent-red'}`} />
+          <div className="w-full flex flex-col items-center">
+            <canvas 
+              ref={canvasRef} 
+              width={300} 
+              height={80} 
+              className="mb-6 w-full max-w-[300px] h-[80px] bg-white/[0.02] border border-white/[0.05] rounded-xl"
+            />
+            <div className={`w-16 h-16 rounded-full mb-4 flex items-center justify-center ${isPaused ? 'bg-yellow-500/20' : 'bg-accent-red/20 animate-pulse'}`}>
+              <div className={`w-6 h-6 rounded-full ${isPaused ? 'bg-yellow-500' : 'bg-accent-red'}`} />
+            </div>
           </div>
         ) : (
           <div className="w-20 h-20 rounded-full bg-accent-orange/20 mb-4 flex items-center justify-center">
@@ -181,7 +298,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
             <button
               type="button"
               onClick={startRecording}
-              className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors"
+              className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors shadow-lg shadow-accent-orange/20 hover:scale-105 transform active:scale-95"
             >
               Aufnahme starten
             </button>
@@ -191,7 +308,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
                 <button
                   type="button"
                   onClick={resumeRecording}
-                  className="border border-white/[0.12] text-text-secondary px-5 py-2 rounded-full text-sm font-medium hover:bg-white/[0.06] transition-colors"
+                  className="border border-white/[0.12] text-text-secondary px-6 py-2.5 rounded-full text-sm font-medium hover:bg-white/[0.06] transition-colors"
                 >
                   Fortsetzen
                 </button>
@@ -199,7 +316,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
                 <button
                   type="button"
                   onClick={pauseRecording}
-                  className="border border-white/[0.12] text-text-secondary px-5 py-2 rounded-full text-sm font-medium hover:bg-white/[0.06] transition-colors"
+                  className="border border-white/[0.12] text-text-secondary px-6 py-2.5 rounded-full text-sm font-medium hover:bg-white/[0.06] transition-colors"
                 >
                   Pause
                 </button>
@@ -207,7 +324,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
               <button
                 type="button"
                 onClick={stopRecording}
-                className="gradient-accent text-white px-5 py-2 rounded-full text-sm font-medium transition-colors"
+                className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors shadow-lg hover:shadow-accent-orange/20 hover:scale-105 transform active:scale-95"
               >
                 Stopp
               </button>

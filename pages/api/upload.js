@@ -53,7 +53,11 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Keine Datei hochgeladen' });
     }
 
-    if (!ACCEPTED_AUDIO_TYPES.includes(file.mimetype)) {
+    const mimetype = file.mimetype.split(';')[0];
+    const extension = path.extname(file.originalFilename || '').toLowerCase();
+    const isAllowedExt = ['.mp3', '.wav', '.ogg', '.webm', '.m4a', '.mp4', '.flac', '.aac'].includes(extension);
+
+    if (!ACCEPTED_AUDIO_TYPES.includes(mimetype) && !mimetype.startsWith('audio/') && !isAllowedExt) {
       return res.status(400).json({ message: 'Ungültiges Dateiformat' });
     }
 

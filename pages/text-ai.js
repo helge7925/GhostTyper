@@ -103,7 +103,7 @@ export default function TextAI() {
                 onChange={e => setSelectedModel(e.target.value)}
                 className="bg-transparent text-sm text-accent-orange font-medium outline-none cursor-pointer"
               >
-                <option value="mistral-small-latest">Mistral Small (Günstig)</option>
+                <option value="mistral-small-latest">Mistral Small</option>
                 <option value="mistral-medium-latest">Mistral Medium (Besser)</option>
               </select>
             </div>
