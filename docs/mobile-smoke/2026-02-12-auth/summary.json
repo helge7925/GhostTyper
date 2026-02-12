@@ -1,0 +1,158 @@
+{
+  "generatedAt": "2026-02-12T08:53:27.910Z",
+  "baseUrl": "http://127.0.0.1:3001",
+  "outputDir": "/Users/helgeroos/Documents/GitHub/transkription_webapp/docs/mobile-smoke/2026-02-12-auth",
+  "focusViaMockTextAi": true,
+  "routeChecks": [
+    {
+      "device": "iphone_13",
+      "route": "/upload",
+      "finalUrl": "http://127.0.0.1:3001/upload",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "iphone_13-upload.png"
+    },
+    {
+      "device": "iphone_13",
+      "route": "/ocr",
+      "finalUrl": "http://127.0.0.1:3001/ocr",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "iphone_13-ocr.png"
+    },
+    {
+      "device": "iphone_13",
+      "route": "/translate",
+      "finalUrl": "http://127.0.0.1:3001/translate",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "iphone_13-translate.png"
+    },
+    {
+      "device": "iphone_13",
+      "route": "/transcriptions",
+      "finalUrl": "http://127.0.0.1:3001/transcriptions",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "iphone_13-transcriptions.png"
+    },
+    {
+      "device": "iphone_13",
+      "route": "/text-ai",
+      "finalUrl": "http://127.0.0.1:3001/text-ai",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "iphone_13-text-ai.png"
+    },
+    {
+      "device": "ipad_gen_7",
+      "route": "/upload",
+      "finalUrl": "http://127.0.0.1:3001/upload",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "ipad_gen_7-upload.png"
+    },
+    {
+      "device": "ipad_gen_7",
+      "route": "/ocr",
+      "finalUrl": "http://127.0.0.1:3001/ocr",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "ipad_gen_7-ocr.png"
+    },
+    {
+      "device": "ipad_gen_7",
+      "route": "/translate",
+      "finalUrl": "http://127.0.0.1:3001/translate",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "ipad_gen_7-translate.png"
+    },
+    {
+      "device": "ipad_gen_7",
+      "route": "/transcriptions",
+      "finalUrl": "http://127.0.0.1:3001/transcriptions",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "ipad_gen_7-transcriptions.png"
+    },
+    {
+      "device": "ipad_gen_7",
+      "route": "/text-ai",
+      "finalUrl": "http://127.0.0.1:3001/text-ai",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "ipad_gen_7-text-ai.png"
+    },
+    {
+      "device": "ipad_pro_11",
+      "route": "/upload",
+      "finalUrl": "http://127.0.0.1:3001/upload",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "ipad_pro_11-upload.png"
+    },
+    {
+      "device": "ipad_pro_11",
+      "route": "/ocr",
+      "finalUrl": "http://127.0.0.1:3001/ocr",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "ipad_pro_11-ocr.png"
+    },
+    {
+      "device": "ipad_pro_11",
+      "route": "/translate",
+      "finalUrl": "http://127.0.0.1:3001/translate",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "ipad_pro_11-translate.png"
+    },
+    {
+      "device": "ipad_pro_11",
+      "route": "/transcriptions",
+      "finalUrl": "http://127.0.0.1:3001/transcriptions",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "ipad_pro_11-transcriptions.png"
+    },
+    {
+      "device": "ipad_pro_11",
+      "route": "/text-ai",
+      "finalUrl": "http://127.0.0.1:3001/text-ai",
+      "redirectedToLogin": false,
+      "overflowX": false,
+      "screenshot": "ipad_pro_11-text-ai.png"
+    }
+  ],
+  "focusChecks": [
+    {
+      "device": "iphone_13",
+      "reachable": true,
+      "openedEditor": true,
+      "focusModeActivated": true,
+      "onlyFocusControlsVisible": true,
+      "darkControlVisibleInLight": true,
+      "darkContrastRatio": 21
+    },
+    {
+      "device": "ipad_gen_7",
+      "reachable": true,
+      "openedEditor": true,
+      "focusModeActivated": true,
+      "onlyFocusControlsVisible": true,
+      "darkControlVisibleInLight": true,
+      "darkContrastRatio": 21
+    },
+    {
+      "device": "ipad_pro_11",
+      "reachable": true,
+      "openedEditor": true,
+      "focusModeActivated": true,
+      "onlyFocusControlsVisible": true,
+      "darkControlVisibleInLight": true,
+      "darkContrastRatio": 21
+    }
+  ],
+  "issues": []
+}

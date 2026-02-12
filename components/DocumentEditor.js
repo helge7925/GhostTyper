@@ -33,9 +33,7 @@ export default function DocumentEditor({
   const [focusMode, setFocusMode] = useState(false);
   const [focusPreset, setFocusPreset] = useState('paper');
   const [showSourceContent, setShowSourceContent] = useState(false);
-  const [showActionMenu, setShowActionMenu] = useState(false);
   const editorRef = useRef(null);
-  const actionMenuRef = useRef(null);
 
   const sanitizeEditorHtml = useCallback((value) => {
     if (typeof window === 'undefined') return String(value || '');
@@ -53,32 +51,13 @@ export default function DocumentEditor({
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
-        if (showActionMenu) setShowActionMenu(false);
         if (focusMode) setFocusMode(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusMode, showActionMenu]);
-
-  useEffect(() => {
-    if (!showActionMenu) return undefined;
-
-    const handlePointerDown = (event) => {
-      if (!actionMenuRef.current) return;
-      if (!actionMenuRef.current.contains(event.target)) {
-        setShowActionMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('touchstart', handlePointerDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('touchstart', handlePointerDown);
-    };
-  }, [showActionMenu]);
+  }, [focusMode]);
 
   useEffect(() => {
     let active = true;
@@ -149,30 +128,36 @@ export default function DocumentEditor({
     exportToDoc(currentHtml, filename);
   };
 
-  const openPdfBlob = (blob) => {
+  const openPdfBlob = (blob, targetWindow = null) => {
     const url = window.URL.createObjectURL(blob);
-    const opened = window.open(url, '_blank', 'noopener,noreferrer');
+    const canUseTarget = targetWindow && !targetWindow.closed;
 
-    if (!opened) {
-      window.URL.revokeObjectURL(url);
-      alert('PDF konnte nicht in einem neuen Tab geöffnet werden. Bitte Pop-ups für diese Seite erlauben.');
-      return;
+    if (canUseTarget) {
+      targetWindow.location.href = url;
+    } else {
+      const opened = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        // Last fallback when popups are blocked: open in the current tab.
+        window.location.href = url;
+      }
     }
 
-    // Give the new tab enough time to load the blob before revoking.
+    // Give the target enough time to load the blob before revoking.
     window.setTimeout(() => {
       window.URL.revokeObjectURL(url);
     }, 60_000);
   };
 
-  const handleExportPdfLegacy = () => {
+  const handleExportPdfLegacy = (existingWindow = null) => {
     const currentHtml = editorRef.current?.innerHTML || html;
     const printableHtml = DOMPurify.sanitize(currentHtml || '', { USE_PROFILES: { html: true } });
     const printStyles = buildPdfPrintStyles({ theme: FIXED_PDF_THEME, fontPreset: FIXED_PDF_FONT });
-    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=900');
+    const printWindow = existingWindow && !existingWindow.closed
+      ? existingWindow
+      : window.open('', '_blank', 'noopener,noreferrer,width=1024,height=900');
 
     if (!printWindow) {
-      alert('PDF-Export wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben.');
+      window.print();
       return;
     }
 
@@ -208,6 +193,28 @@ export default function DocumentEditor({
 
   const handleExportPdf = async () => {
     if (isExportingPdf) return;
+    const previewWindow = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=900');
+
+    if (previewWindow) {
+      previewWindow.document.open();
+      previewWindow.document.write(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>PDF Export</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 2rem; background: #0b0b10; color: #e8e8ed; }
+      .muted { color: #9aa0b2; font-size: 0.9rem; }
+    </style>
+  </head>
+  <body>
+    <h1>PDF wird erstellt…</h1>
+    <p class="muted">Dieser Tab aktualisiert sich automatisch, sobald das PDF fertig ist.</p>
+  </body>
+</html>`);
+      previewWindow.document.close();
+    }
+
     setIsExportingPdf(true);
 
     try {
@@ -231,13 +238,15 @@ export default function DocumentEditor({
       }
 
       const blob = await response.blob();
-      openPdfBlob(blob);
+      openPdfBlob(blob, previewWindow);
     } catch (error) {
       const shouldUseBrowserFallback = window.confirm(
         'Der serverseitige PDF-Export ist gerade nicht verfügbar. Browser-Export als Fallback starten?'
       );
       if (shouldUseBrowserFallback) {
-        handleExportPdfLegacy();
+        handleExportPdfLegacy(previewWindow);
+      } else if (previewWindow && !previewWindow.closed) {
+        previewWindow.close();
       }
     } finally {
       setIsExportingPdf(false);
@@ -300,43 +309,23 @@ export default function DocumentEditor({
       <nav className={`min-h-16 border-b flex flex-wrap md:flex-nowrap items-center justify-between gap-2 px-3 md:px-6 py-2 md:py-0 shrink-0 no-print ${
         focusMode
           ? focusPreset === 'paper'
-            ? 'bg-[#f3f2ee]/88 border-black/[0.08] backdrop-blur-md md:min-h-14 md:px-8'
-            : 'bg-[#0b0b10]/85 border-white/[0.04] backdrop-blur-md md:min-h-14 md:px-8'
+            ? 'bg-[#f3f2ee] border-black/10 backdrop-blur-md md:min-h-14 md:px-8'
+            : 'bg-[#0b0b10] border-white/10 backdrop-blur-md md:min-h-14 md:px-8'
           : 'bg-dark-card border-white/[0.06]'
       }`}>
-        <div className="flex items-center gap-3 md:gap-4 min-w-0">
-          <button onClick={onCancel} className={`p-2 rounded-full transition-all ${
-            focusMode
-              ? focusPreset === 'paper'
-                ? 'text-black/60 hover:text-black bg-black/[0.04]'
-                : 'text-text-secondary hover:text-text-primary bg-white/[0.04]'
-              : 'text-text-secondary hover:text-accent-orange bg-white/5'
-          }`}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-          </button>
-          {!focusMode && (
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-accent-orange uppercase tracking-widest leading-none">Editor</span>
-              <span className="text-sm font-medium text-text-primary truncate max-w-[200px]">{filename}</span>
-            </div>
-          )}
-        </div>
-
-        <div className="relative flex items-center gap-2 md:gap-3 w-full md:w-auto justify-end overflow-x-auto no-scrollbar">
-          {focusMode && (
+        {focusMode ? (
+          <div className="w-full flex items-center justify-end gap-2 md:gap-3">
             <div className={`flex items-center rounded-lg p-0.5 border ${
               focusPreset === 'paper'
-                ? 'bg-black/[0.04] border-black/[0.08]'
-                : 'bg-white/[0.05] border-white/[0.08]'
+                ? 'bg-black/5 border-black/10'
+                : 'bg-white/5 border-white/10'
             }`}>
               <button
                 onClick={() => setFocusPreset('paper')}
                 className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-colors ${
                   focusPreset === 'paper'
                     ? 'bg-white text-black'
-                    : focusPreset === 'ink'
-                      ? 'text-text-secondary hover:text-text-primary'
-                      : 'text-black/60 hover:text-black'
+                    : 'text-white/80 hover:text-white bg-white/5'
                 }`}
               >
                 Hell
@@ -346,160 +335,100 @@ export default function DocumentEditor({
                 className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-colors ${
                   focusPreset === 'ink'
                     ? 'bg-[#1a1b22] text-white'
-                    : focusPreset === 'paper'
-                      ? 'text-black/60 hover:text-black'
-                      : 'text-text-secondary hover:text-text-primary'
+                    : 'text-black bg-white/90 border border-black/20 hover:bg-white'
                 }`}
               >
                 Dunkel
               </button>
             </div>
-          )}
-
-          <button onClick={handleSave} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
-            saveFeedback
-              ? 'bg-accent-green/20 text-accent-green'
-              : focusMode
-                ? focusPreset === 'paper'
-                  ? 'text-black hover:bg-black/[0.05] border border-black/[0.08]'
-                  : 'text-text-primary hover:bg-white/[0.04] border border-white/[0.06]'
-                : 'text-text-primary hover:bg-white/5'
-          }`}>
-            {saveFeedback ? 'Gespeichert!' : 'Speichern ⌘S'}
-          </button>
-
-          <button
-            onClick={handleExportPdf}
-            disabled={isExportingPdf}
-            className="gradient-accent text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg active:scale-95 disabled:opacity-50"
-          >
-            {isExportingPdf ? 'PDF wird erstellt…' : 'PDF exportieren'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowActionMenu((prev) => !prev)}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl border transition-all ${
-              focusMode
-                ? focusPreset === 'paper'
-                  ? 'text-black border-black/[0.12] bg-black/[0.03] hover:bg-black/[0.06]'
-                  : 'text-text-secondary border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06]'
-                : 'text-text-secondary border-white/10 bg-white/5 hover:bg-white/10'
-            }`}
-            aria-expanded={showActionMenu}
-            aria-label="Weitere Aktionen"
-          >
-            Mehr
-          </button>
-
-          {!showActionMenu && (
             <button
-              onClick={() => setFocusMode((prev) => !prev)}
-              className={`hidden md:inline-flex px-4 py-2 text-xs font-bold rounded-xl transition-all ${
-                focusMode
-                  ? focusPreset === 'paper'
-                    ? 'bg-black/10 text-black border border-black/20'
-                    : 'bg-accent-orange/20 text-accent-orange border border-accent-orange/30'
-                  : 'text-text-primary hover:bg-white/5'
+              onClick={() => setFocusMode(false)}
+              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+                focusPreset === 'paper'
+                  ? 'bg-black/10 text-black border border-black/20'
+                  : 'bg-accent-orange/20 text-accent-orange border border-accent-orange/30'
               }`}
             >
-              {focusMode ? 'Fokus aus' : 'Fokus'}
+              Fokus aus
             </button>
-          )}
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-3 md:gap-4 min-w-0">
+              <button onClick={onCancel} className="p-2 rounded-full transition-all text-text-secondary hover:text-accent-orange bg-white/5">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-accent-orange uppercase tracking-widest leading-none">Editor</span>
+                <span className="text-sm font-medium text-text-primary truncate max-w-[200px]">{filename}</span>
+              </div>
+            </div>
 
-          {showActionMenu && (
-            <div
-              ref={actionMenuRef}
-              className={`absolute right-0 top-[calc(100%+8px)] z-30 min-w-[240px] rounded-2xl border p-3 shadow-2xl ${
-                focusMode
-                  ? focusPreset === 'paper'
-                    ? 'bg-[#f5f4ef] border-black/[0.10]'
-                    : 'bg-[#14141b] border-white/[0.10]'
-                  : 'bg-dark-card border-white/[0.08]'
-              }`}
-            >
-              {!focusMode && (
-                <>
-                  <p className="text-[10px] uppercase tracking-widest text-text-secondary mb-2">Textwerkzeuge</p>
-                  <div className="flex items-center gap-2 bg-white/5 rounded-xl px-2 py-1 border border-white/5 mb-2">
-                    <select value={targetLang} onChange={e => setTargetLang(e.target.value)} className="flex-1 bg-transparent text-[10px] text-text-primary outline-none cursor-pointer">
-                      {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
-                    </select>
-                    <button
-                      onClick={() => {
-                        handleTranslateAction();
-                        setShowActionMenu(false);
-                      }}
-                      disabled={isTranslating}
-                      className="text-[10px] font-bold text-accent-orange hover:text-white transition-colors uppercase tracking-wider px-2"
-                    >
-                      {isTranslating ? '...' : 'Übersetzen'}
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => {
-                      handleCopy();
-                      setShowActionMenu(false);
-                    }}
-                    className={`w-full px-3 py-2 text-xs font-bold rounded-xl transition-all mb-2 text-left ${copyFeedback ? 'bg-accent-green/20 text-accent-green' : 'text-text-primary hover:bg-white/5'}`}
-                  >
-                    {copyFeedback ? 'Kopiert!' : 'Text kopieren'}
-                  </button>
-                </>
-              )}
+            <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
+              <button onClick={handleSave} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+                saveFeedback
+                  ? 'bg-accent-green/20 text-accent-green'
+                  : 'text-text-primary hover:bg-white/5'
+              }`}>
+                {saveFeedback ? 'Gespeichert!' : 'Speichern ⌘S'}
+              </button>
 
-              <p className="text-[10px] uppercase tracking-widest text-text-secondary mb-2">Export & Ansicht</p>
               <button
-                onClick={() => {
-                  handleExportDoc();
-                  setShowActionMenu(false);
-                }}
-                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold border transition-colors mb-2 ${
-                  focusMode
-                    ? focusPreset === 'paper'
-                      ? 'bg-black/[0.03] hover:bg-black/[0.06] border-black/[0.08] text-black'
-                      : 'bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08]'
-                    : 'bg-white/5 hover:bg-white/10 border-white/10 text-text-primary'
-                }`}
+                onClick={handleExportPdf}
+                disabled={isExportingPdf}
+                className="gradient-accent text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg active:scale-95 disabled:opacity-50"
+              >
+                {isExportingPdf ? 'PDF wird erstellt…' : 'PDF exportieren'}
+              </button>
+
+              <button
+                onClick={handleExportDoc}
+                className="px-4 py-2 text-xs font-bold rounded-xl border transition-colors bg-white/5 hover:bg-white/10 border-white/10 text-text-primary"
               >
                 DOCX exportieren
               </button>
 
-              <label className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wide mb-2 ${
-                focusMode
-                  ? focusPreset === 'paper'
-                    ? 'border-black/[0.12] bg-black/[0.03] text-black/80'
-                    : 'border-white/[0.10] bg-white/[0.03] text-text-secondary'
-                  : 'border-white/10 bg-white/5 text-text-secondary'
-              }`}>
-                <span>Kopfbereich</span>
-                <input
-                  type="checkbox"
-                  checked={pdfPremiumEnabled}
-                  onChange={(e) => setPdfPremiumEnabled(e.target.checked)}
-                  disabled={pdfSettingsLoading}
-                  className="h-3.5 w-3.5 accent-accent-orange"
-                />
-              </label>
-
+              <div className="flex items-center gap-2 bg-white/5 rounded-xl px-2 py-1 border border-white/5">
+                <select value={targetLang} onChange={e => setTargetLang(e.target.value)} className="bg-transparent text-[10px] text-text-primary outline-none cursor-pointer">
+                  {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+                </select>
+                <button
+                  onClick={handleTranslateAction}
+                  disabled={isTranslating}
+                  className="text-[10px] font-bold text-accent-orange hover:text-white transition-colors uppercase tracking-wider px-2"
+                >
+                  {isTranslating ? '...' : 'Übersetzen'}
+                </button>
+              </div>
               <button
-                onClick={() => {
-                  setFocusMode((prev) => !prev);
-                  setShowActionMenu(false);
-                }}
-                className={`w-full px-3 py-2 text-left text-xs font-bold rounded-xl transition-all ${
-                  focusMode
-                    ? focusPreset === 'paper'
-                      ? 'bg-black/10 text-black border border-black/20'
-                      : 'bg-accent-orange/20 text-accent-orange border border-accent-orange/30'
-                    : 'text-text-primary hover:bg-white/5 border border-transparent'
+                onClick={handleCopy}
+                className={`px-3 py-2 text-xs font-bold rounded-xl transition-all ${
+                  copyFeedback ? 'bg-accent-green/20 text-accent-green' : 'text-text-primary hover:bg-white/5 border border-transparent'
                 }`}
               >
-                {focusMode ? 'Fokusmodus beenden' : 'Fokusmodus aktivieren'}
+                {copyFeedback ? 'Kopiert!' : 'Text kopieren'}
+              </button>
+
+              <label className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wide border-white/10 bg-white/5 text-text-secondary">
+            <span>Kopfbereich</span>
+            <input
+              type="checkbox"
+              checked={pdfPremiumEnabled}
+              onChange={(e) => setPdfPremiumEnabled(e.target.checked)}
+              disabled={pdfSettingsLoading}
+              className="h-3.5 w-3.5 accent-accent-orange"
+            />
+          </label>
+
+              <button
+                onClick={() => setFocusMode(true)}
+                className="inline-flex px-4 py-2 text-xs font-bold rounded-xl transition-all text-text-primary hover:bg-white/5"
+              >
+                Fokus
               </button>
             </div>
-          )}
-        </div>
+          </>
+        )}
       </nav>
 
       <div className="flex-1 flex overflow-hidden relative">

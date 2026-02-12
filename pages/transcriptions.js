@@ -205,23 +205,23 @@ export default function Transcriptions() {
 
         {/* Main: Transcription List */}
         <div className="flex-1 min-w-0">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <h1 className="text-2xl font-semibold text-text-primary truncate">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+            <h1 className="text-2xl font-semibold text-text-primary truncate min-w-0">
               {activeFolderId === null ? 'Alle Dateien' : folders.find(f => f.id === activeFolderId)?.name}
             </h1>
             
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1 md:flex-initial">
+            <div className="flex items-center gap-3 w-full lg:w-auto min-w-0">
+              <div className="relative flex-1 lg:flex-initial min-w-0">
                 <svg className="w-4 h-4 text-text-secondary absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 <input 
                   type="text" 
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="Suchen..." 
-                  className="bg-dark-input border border-white/[0.1] rounded-xl pl-9 pr-4 py-2 text-xs text-text-primary outline-none focus:ring-1 focus:ring-accent-orange w-full md:w-64"
+                  className="bg-dark-input border border-white/[0.1] rounded-xl pl-9 pr-4 py-2 text-xs text-text-primary outline-none focus:ring-1 focus:ring-accent-orange w-full lg:w-64"
                 />
               </div>
-              <div className="text-[10px] text-text-secondary uppercase tracking-widest font-bold whitespace-nowrap hidden sm:block">
+              <div className="text-[10px] text-text-secondary uppercase tracking-widest font-bold whitespace-nowrap hidden xl:block">
                 {filteredTranscriptions.length} {filteredTranscriptions.length === 1 ? 'Eintrag' : 'Einträge'}
               </div>
             </div>

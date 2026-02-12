@@ -93,6 +93,21 @@ Aktueller Stand: non-interaktiv lauffähig über `.eslintrc.json`.
 - Statuskarten und Timeline bleiben lesbar
 - Kamera-Upload im OCR-Flow auf Mobilgeräten nutzbar
 
+## 5.1 Mobile Smoke (eingeloggt, 2026-02-12)
+
+- Ergebnisartefakte liegen unter `docs/mobile-smoke/2026-02-12-auth`.
+- Zusammenfassung: `docs/mobile-smoke/2026-02-12-auth/summary.json`
+- Issues: `docs/mobile-smoke/2026-02-12-auth/issues.json`
+- Testmatrix:
+  - Geräte: `iPhone 13`, `iPad (gen 7) landscape`, `iPad Pro 11`
+  - Routen: `/upload`, `/ocr`, `/translate`, `/transcriptions`, `/text-ai`
+- Ergebnis:
+  - `15/15` Routenchecks erfolgreich (keine Login-Redirects, kein horizontaler Overflow)
+  - Fokusmodus-Checks erfolgreich:
+    - Editor öffnet auf allen drei Geräten.
+    - In Fokusmodus sind nur `Hell`, `Dunkel`, `Fokus aus` sichtbar.
+    - Kontrast von `Dunkel` im hellen Fokusmodus ist wieder ausreichend (gemessenes Kontrastverhältnis: `21`).
+
 ## 6. Abnahme-Checkliste (Kurz)
 
 1. Audio-Upload + Transkription + Analyse erfolgreich
