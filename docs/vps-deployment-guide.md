@@ -1,33 +1,63 @@
-# GhostTyper VPS Deployment Plan
+# GhostTyper VPS Deployment Guide
 
 Stand: 2026-02-12  
-Basis: `umgebungsanalyse.md` + `config/docker-compose.prod.yml`
+Basis: `umgebungsanalyse.md`, `../config/docker-compose.prod.yml`, `../Dockerfile`
 
-## Zielbild (für den bestehenden VPS)
+## 1) Zielbild
 
-- Reverse-Proxy/HTTPS über bestehendes Traefik-Netzwerk `web`.
-- GhostTyper läuft als eigener Stack mit:
-  - `transkription-webapp`
-  - `transkription-db` (isoliert im internen Docker-Netzwerk).
-- Keine DB-Portfreigabe nach außen.
+GhostTyper läuft auf dem bestehenden VPS als eigener Docker-Compose-Stack:
 
-## 0) Preflight (einmalig vor Deployment)
+1. `transkription-webapp` (Next.js, API, Worker, PDF-Renderer)
+2. `transkription-db` (PostgreSQL 16)
+3. HTTPS-Routing über bestehendes Traefik-Netzwerk `web`
+4. Keine externe DB-Portfreigabe
 
-1. Speicherplatz bereinigen (laut Umgebungsanalyse kritisch):
+## 2) Architektur und Annahmen
+
+1. VPS hat bereits Docker + Docker Compose Plugin.
+2. Externes Docker-Netzwerk `web` existiert.
+3. DNS zeigt auf den VPS (`transkription.<domain>`).
+4. Deployment erfolgt aus dem Repository mit `config/docker-compose.prod.yml`.
+
+## 3) Preflight-Checkliste (Pflicht vor Erstdeployment)
+
+1. Speicherplatz prüfen (laut Umgebungsanalyse kritisch):
 ```bash
+df -h /
 docker system df
+```
+2. Falls knapp: bereinigen:
+```bash
 docker image prune -a
 docker volume prune
 ```
-2. Externes Netzwerk prüfen:
+3. Docker/Compose prüfen:
+```bash
+docker --version
+docker compose version
+```
+4. Traefik-Netzwerk prüfen:
 ```bash
 docker network ls | grep -w web
 ```
-3. DNS prüfen: `transkription.<domain>` zeigt auf VPS.
+5. DNS prüfen:
+```bash
+dig +short transkription.example.de
+```
 
-## 1) Secrets und `.env` vorbereiten
+## 4) Verzeichnis- und Git-Setup auf dem VPS
 
-Im Projektroot auf dem VPS eine `.env` anlegen (nicht committen):
+```bash
+sudo mkdir -p /opt/ghosttyper
+sudo chown -R "$USER":"$USER" /opt/ghosttyper
+cd /opt/ghosttyper
+git clone <REPO_URL> .
+git checkout main
+```
+
+## 5) `.env` für Produktion erstellen
+
+Im Repo-Root `/opt/ghosttyper/.env`:
 
 ```env
 DOMAIN=transkription.example.de
@@ -38,75 +68,172 @@ DB_NAME=transkription
 
 NEXTAUTH_SECRET=<openssl rand -base64 32>
 NEXTAUTH_URL=https://transkription.example.de
-DB_INIT_SECRET=<separater-secret-fuer-db-init>
-SETTINGS_ENCRYPTION_KEY=<separater-secret-fuer-settings>
+DB_INIT_SECRET=<separater-secret>
+SETTINGS_ENCRYPTION_KEY=<separater-secret>
 ENABLE_DB_INIT_API=true
 
-MISTRAL_API_KEY=<mistral-key>
+MISTRAL_API_KEY=<mistral-api-key>
 
+NEXT_PUBLIC_API_URL=/api
 RATE_LIMIT_STORE=db
 RATE_LIMIT_TRUST_PROXY=false
+LOG_FORMAT=json
+LOG_LEVEL=info
+
+PDF_CHROMIUM_PATH=/usr/bin/chromium-browser
 PDF_CHROMIUM_NO_SANDBOX=false
+PDF_EXPORT_MAX_CONCURRENCY=2
+PDF_EXPORT_QUEUE_TIMEOUT_MS=5000
 ```
 
-## 2) Erstdeployment
+Secret-Erzeugung:
+```bash
+openssl rand -base64 32
+```
+
+## 6) Hinweis zu Chromium/PDF-Renderer
+
+Der serverseitige PDF-Export braucht ein ausführbares Chromium/Chrome im App-Container.
+
+1. Im Docker-Deployment ist Chromium bereits im Image enthalten (`Dockerfile`).
+2. Trotzdem muss `PDF_CHROMIUM_PATH` korrekt sein.
+3. Verifizieren nach dem Deploy:
+```bash
+docker compose -f config/docker-compose.prod.yml exec transkription-webapp sh -lc 'echo "$PDF_CHROMIUM_PATH"; ls -l "$PDF_CHROMIUM_PATH"; "$PDF_CHROMIUM_PATH" --version'
+```
+4. Falls Pfad nicht stimmt, Kandidaten prüfen:
+```bash
+docker compose -f config/docker-compose.prod.yml exec transkription-webapp sh -lc 'which chromium-browser || which chromium || which google-chrome-stable || which google-chrome'
+```
+5. Anschließend `.env` korrigieren und Stack neu laden.
+
+## 7) Erstdeployment
 
 ```bash
+cd /opt/ghosttyper
 docker compose -f config/docker-compose.prod.yml up --build -d
 ```
 
-## 3) Datenbank initialisieren (nur initial/bei Schema-Updates)
+Status prüfen:
+```bash
+docker compose -f config/docker-compose.prod.yml ps
+docker compose -f config/docker-compose.prod.yml logs --tail=150 transkription-webapp
+```
 
+## 8) Datenbank initialisieren und absichern
+
+Initiale Schema-Erstellung:
 ```bash
 curl -X POST "https://transkription.example.de/api/db-init" \
   -H "x-init-secret: <DB_INIT_SECRET>"
 ```
 
-Danach Sicherheits-Härtung:
+Danach sofort härten:
+
 1. `ENABLE_DB_INIT_API=false` in `.env`
-2. Stack neu laden:
+2. Container neu starten:
 ```bash
 docker compose -f config/docker-compose.prod.yml up -d
 ```
 
-## 4) Admin-Account und Smoke-Checks
+## 9) Post-Deploy Verifikation (Abnahme)
 
-Admin anlegen:
+1. Health:
 ```bash
-docker exec -it transkription-webapp npm run seed-admin
+curl -fsS "https://transkription.example.de/api/health"
+```
+2. Login manuell prüfen.
+3. Upload und Transkription manuell prüfen.
+4. OCR manuell prüfen.
+5. Editor öffnen, speichern, DOCX exportieren.
+6. PDF-Export prüfen:
+   - Erwartet: PDF öffnet inline im Browserviewer.
+   - Nicht erwartet: Browser-Header mit `about:blank`, Datum, Uhrzeit.
+7. Optional Admin anlegen:
+```bash
+docker compose -f config/docker-compose.prod.yml exec transkription-webapp npm run seed-admin
 ```
 
-Checks:
+## 10) Update-Runbook (jede Auslieferung)
+
+1. Backup von DB + Uploads.
+2. Code aktualisieren:
 ```bash
-curl -I "https://transkription.example.de"
-curl "https://transkription.example.de/api/health"
-docker compose -f config/docker-compose.prod.yml ps
+cd /opt/ghosttyper
+git fetch --all
+git checkout main
+git pull --ff-only
+```
+3. Rolling Update:
+```bash
+docker compose -f config/docker-compose.prod.yml up --build -d
+```
+4. Health + Smoke-Checks aus Abschnitt 9.
+5. Fehlerfall: Rollback auf letzten stabilen Commit (Abschnitt 12).
+
+## 11) Backup/Restore (Mindeststandard)
+
+Empfohlen täglich (inkrementell) + wöchentlich Vollbackup.
+
+DB-Dump:
+```bash
+docker compose -f config/docker-compose.prod.yml exec -T transkription-db \
+  pg_dump -U "$DB_USER" -d "$DB_NAME" > backup-$(date +%F)-db.sql
 ```
 
-## 5) Update-Plan (laufender Betrieb)
+Uploads sichern:
+```bash
+docker run --rm \
+  -v transkription-uploads:/data \
+  -v "$PWD":/backup \
+  alpine tar czf /backup/backup-$(date +%F)-uploads.tar.gz -C /data .
+```
 
-1. Backup (DB + Uploads).
-2. `git pull`
-3. `docker compose -f config/docker-compose.prod.yml up --build -d`
-4. Healthcheck + Login + Upload-Test.
-5. Bei Fehlern: auf vorherigen Git-Commit zurück und erneut deployen.
+Restore regelmäßig in separater Umgebung testen.
 
-## 6) Backup/Recovery (Mindeststandard)
+## 12) Rollback-Plan
 
-- Zu sichern:
-  - Volume `transkription-db-data`
-  - Volume `transkription-uploads`
-- Frequenz: täglich inkrementell, wöchentlich Vollbackup.
-- Restore regelmäßig testweise in separater Umgebung prüfen.
+1. Letzten stabilen Commit identifizieren:
+```bash
+git log --oneline -n 20
+```
+2. Auf stabilen Commit wechseln:
+```bash
+git checkout <stable-commit-sha>
+```
+3. Stack neu deployen:
+```bash
+docker compose -f config/docker-compose.prod.yml up --build -d
+```
+4. Health + Kernflows prüfen.
+5. Rückwechsel auf `main` erst nach Root-Cause-Analyse.
 
-## 7) Betriebshinweise für diese VPS-Umgebung
+## 13) Betriebsregeln
 
-- Watchtower nicht blind auf diesen Stack anwenden; kontrollierte Updates bevorzugen.
-- Speicher-Monitoring aktiv halten (Root-Partition war bereits >90% belegt).
-- Traefik-Logs und App-Logs (`LOG_FORMAT=json`) zentral sammeln.
+1. Watchtower nicht unkontrolliert auf diesen Stack anwenden.
+2. Disk-Usage monitoren (Warnung ab 80%, Alarm ab 90%).
+3. Logs zentralisieren (`LOG_FORMAT=json`).
+4. Secrets nie im Git speichern.
+5. Änderungen am Deployment nur über dokumentierte Runbooks.
 
-## Referenzen
+## 14) Troubleshooting Kurzmatrix
 
-- Umgebungsdetails: `umgebungsanalyse.md`
-- Compose Prod: `../config/docker-compose.prod.yml`
-- Betriebs- und Testchecks: `testing.md`
+1. `503 PDF-Renderer ist nicht verfügbar`:
+   - `PDF_CHROMIUM_PATH` im Container prüfen.
+   - Chromium-Binary im Container prüfen (`which` + `--version`).
+2. PDF zeigt `about:blank`/Datum/Uhrzeit:
+   - Serverrenderer fällt aus, Browser-Fallback aktiv.
+   - Ursache des Renderer-Fehlers beheben, dann erneut testen.
+3. `401 Nicht authentifiziert` bei API:
+   - NextAuth-URL/Secret prüfen.
+4. `429` bei Last:
+   - Rate-Limits prüfen (`RATE_LIMIT_STORE`, DB erreichbar).
+5. DB-Fehler beim Start:
+   - `DATABASE_URL`, DB-Healthcheck, Volume-Status prüfen.
+
+## 15) Referenzen
+
+1. Umgebungsanalyse: `umgebungsanalyse.md`
+2. Compose Produktion: `../config/docker-compose.prod.yml`
+3. Projektplan: `../PROJECT_PLAN.md`
+4. Test- und Abnahmeplan: `testing.md`
