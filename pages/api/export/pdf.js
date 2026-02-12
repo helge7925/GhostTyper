@@ -1,7 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
-import { checkRateLimit, applyRateLimitHeaders } from '../../../lib/rate-limit';
-import { logApiError, serverError } from '../../../lib/api-utils';
+import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { renderPdfBufferFromHtml } from '../../../lib/pdf-export';
 import { getSettingsRow } from '../../../lib/settings-service';
 import { withPdfRenderSlot } from '../../../lib/pdf-render-limiter';
@@ -52,16 +51,13 @@ export default async function handler(req, res) {
   }
 
   const userIdentifier = session?.user?.id || session?.user?.email || 'unknown';
-  const rate = checkRateLimit(req, {
+  const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'export-pdf',
     identifier: `user:${userIdentifier}`,
     limit: 20,
     windowMs: 60_000,
-  });
-  applyRateLimitHeaders(res, rate);
-  if (!rate.allowed) {
-    return res.status(429).json({ message: 'Zu viele Exporte. Bitte später erneut versuchen.' });
-  }
+  }, 'Zu viele Exporte. Bitte später erneut versuchen.');
+  if (!allowed) return;
 
   try {
     const { html, filename, theme, fontPreset, premiumLayout } = req.body || {};

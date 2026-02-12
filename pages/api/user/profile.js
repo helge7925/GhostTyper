@@ -3,6 +3,7 @@ import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
 import bcrypt from 'bcryptjs';
 import { validatePassword } from '../../../lib/constants';
+import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
 
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions);
@@ -11,6 +12,13 @@ export default async function handler(req, res) {
   }
 
   const userId = session.user.id;
+  const allowed = await enforceRateLimit(req, res, {
+    keyPrefix: 'user-profile',
+    identifier: `user:${userId}`,
+    limit: 60,
+    windowMs: 60_000,
+  });
+  if (!allowed) return;
 
   switch (req.method) {
     case 'GET': {
@@ -21,6 +29,7 @@ export default async function handler(req, res) {
         );
         return res.status(200).json(result.rows[0]);
       } catch (error) {
+        logApiError('User profile fetch error', error);
         return res.status(500).json({ message: 'Fehler beim Laden des Profils' });
       }
     }
@@ -46,7 +55,12 @@ export default async function handler(req, res) {
         if (name || email || avatarUrl !== undefined) {
           await query(
             'UPDATE users SET name = COALESCE($1, name), email = COALESCE($2, email), avatar_url = $3, updated_at = NOW() WHERE id = $4',
-            [name, email, avatarUrl, userId]
+            [
+              typeof name === 'string' ? name.trim().slice(0, 255) : name,
+              typeof email === 'string' ? email.trim().toLowerCase() : email,
+              avatarUrl,
+              userId,
+            ]
           );
         }
 
@@ -78,7 +92,7 @@ export default async function handler(req, res) {
         if (error.code === '23505') {
           return res.status(400).json({ message: 'Diese E-Mail-Adresse wird bereits verwendet' });
         }
-        console.error('Profile update error:', error);
+        logApiError('Profile update error', error);
         return res.status(500).json({ message: 'Fehler beim Aktualisieren des Profils' });
       }
     }

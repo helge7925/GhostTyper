@@ -1,8 +1,20 @@
 import { query } from '../../lib/db';
 import { getObservabilitySnapshot } from '../../lib/observability';
 import { ensureTranscriptionWorkerRunning } from '../../lib/transcription-worker';
+import { enforceRateLimit } from '../../lib/api-utils';
 
 export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
+
+  const allowed = await enforceRateLimit(req, res, {
+    keyPrefix: 'health',
+    limit: 180,
+    windowMs: 60_000,
+  }, 'Zu viele Healthchecks. Bitte später erneut versuchen.');
+  if (!allowed) return;
+
   ensureTranscriptionWorkerRunning();
 
   let dbStatus = 'unknown';

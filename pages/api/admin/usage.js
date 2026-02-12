@@ -1,5 +1,6 @@
 import { requireAdmin } from '../../../lib/admin';
 import { query } from '../../../lib/db';
+import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
 
 /**
  * GET /api/admin/usage — Returns usage overview for all users (admin only).
@@ -11,6 +12,13 @@ export default async function handler(req, res) {
 
   const session = await requireAdmin(req, res);
   if (!session) return;
+  const allowed = await enforceRateLimit(req, res, {
+    keyPrefix: 'admin-usage',
+    identifier: `admin:${session.user.id}`,
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!allowed) return;
 
   try {
     const result = await query(
@@ -45,7 +53,7 @@ export default async function handler(req, res) {
       })),
     });
   } catch (error) {
-    console.error('Admin usage API error:', error);
+    logApiError('Admin usage API error', error);
     return res.status(500).json({ message: 'Fehler beim Laden der Nutzungsdaten' });
   }
 }

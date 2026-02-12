@@ -25,6 +25,7 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Admin-Observability-Endpunkt: `GET /api/admin/observability`.
 - Vollständiges P0-P3-Protokoll: `docs/code-review-priorities-p0-p3-2026-02-12.md`.
 - Externes Review als eigene Quelle dokumentiert: `docs/external-review-2026-02-12.md`.
+- Entkoppelter Manual-Analysis-Runner `lib/manual-analysis.js` für asynchrone KI-Analysen.
 
 ### Changed
 - UI auf reduzierte, Apple-orientierte Interaktion ausgerichtet:
@@ -45,6 +46,7 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Workflow-Status erweitert: `pending -> queued -> processing -> ...` für transparente Warteschlangenkommunikation.
 - PDF-Print-CSS weiter verfeinert (Witwen/Waisen, Heading-Folgeblockschutz, stabilere Tabellen-/Listenumbrüche).
 - `settings`-Updatepfad auf wartbaren dynamischen Query-Builder umgestellt.
+- `POST /api/transcriptions/[id]/analyze` startet die Analyse jetzt entkoppelt und liefert sofort `202`.
 
 ### Fixed
 - Robustere Job-Verarbeitung durch atomische Statusübergänge und Schutz vor Doppelstarts.
@@ -59,6 +61,7 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - `save-doc` validiert jetzt harte Längenlimits für `title`, `text`, `documentHtml`.
 - Admin-User-Update schreibt User/Settings konsistent in einer DB-Transaktion.
 - ESLint-Warnungen vollständig bereinigt (`npm run lint` ohne Warnungen/Fehler).
+- AudioRecorder räumt Blob-URLs stabil auf und reduziert Race-Conditions im Cleanup.
 
 ### Security
 - Verschlüsselte API-Key-Speicherung (`settings.mistral_api_key_encrypted`).

@@ -1,11 +1,11 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { query } from '../../lib/db';
-import { logUsage, checkCostLimit } from '../../lib/usage';
+import { CostLimitExceededError, logUsage, checkCostLimit, withUserCostLock } from '../../lib/usage';
 import { resolveTextAiModel } from '../../lib/model-policy';
 import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service';
-import { checkRateLimit, applyRateLimitHeaders } from '../../lib/rate-limit';
-import { logApiError, serverError } from '../../lib/api-utils';
+import { MAX_TEXT_AI_INPUT_LENGTH } from '../../lib/constants';
+import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1';
 
@@ -19,23 +19,23 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
 
-  const rate = checkRateLimit(req, {
+  const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'text-ai',
     identifier: `user:${session.user.id}`,
     limit: 60,
     windowMs: 60_000,
   });
-  applyRateLimitHeaders(res, rate);
-  if (!rate.allowed) {
-    return res.status(429).json({ message: 'Zu viele Anfragen. Bitte später erneut versuchen.' });
-  }
+  if (!allowed) return;
 
   const { text, action, model } = req.body;
   const selectedModel = resolveTextAiModel(model);
   const taskId = Number.parseInt(action, 10);
 
-  if (!text || !action) {
+  if (!text || !action || typeof text !== 'string') {
     return res.status(400).json({ message: 'Text und Aktion sind erforderlich' });
+  }
+  if (text.length > MAX_TEXT_AI_INPUT_LENGTH) {
+    return res.status(400).json({ message: `Text ist zu lang (max. ${MAX_TEXT_AI_INPUT_LENGTH} Zeichen)` });
   }
   if (!Number.isFinite(taskId)) {
     return res.status(400).json({ message: 'Ungültige Aktion' });
@@ -64,41 +64,45 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert' });
     }
 
-    const costCheck = await checkCostLimit(session.user.id);
-    if (!costCheck.allowed) {
-      return res.status(429).json({ message: 'Kostenlimit erreicht' });
-    }
+    const resultText = await withUserCostLock(session.user.id, async () => {
+      const costCheck = await checkCostLimit(session.user.id);
+      if (!costCheck.allowed) {
+        throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
+      }
 
-    const response = await fetch(`${MISTRAL_API_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: selectedModel,
-        messages: [
-          { role: 'system', content: 'Du bist ein hilfreicher KI-Assistent für Textverarbeitung. Antworte präzise und gib nur das Ergebnis zurück, ohne Einleitung oder Kommentare. Kein Text um des Textes willen: keine Floskeln, keine Wiederholungen, kein unnötiger Zusatz.' },
-          { role: 'user', content: `${actionPrompt}
+      const response = await fetch(`${MISTRAL_API_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [
+            { role: 'system', content: 'Du bist ein hilfreicher KI-Assistent für Textverarbeitung. Antworte präzise und gib nur das Ergebnis zurück, ohne Einleitung oder Kommentare. Kein Text um des Textes willen: keine Floskeln, keine Wiederholungen, kein unnötiger Zusatz.' },
+            { role: 'user', content: `${actionPrompt}
 
 Text:
 ${text}` }
-        ],
-        temperature: 0.3,
-      }),
+          ],
+          temperature: 0.3,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Mistral API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      await logUsage(session.user.id, selectedModel, 'text_ai', data.usage);
+      return data.choices[0]?.message?.content || '';
     });
-
-    if (!response.ok) {
-      throw new Error(`Mistral API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const resultText = data.choices[0]?.message?.content || '';
-
-    await logUsage(session.user.id, selectedModel, 'text_ai', data.usage);
 
     return res.status(200).json({ resultText });
   } catch (error) {
+    if (error?.code === 'COST_LIMIT_EXCEEDED') {
+      return res.status(429).json({ message: error.message });
+    }
     logApiError('Text AI error', error);
     return serverError(res, 'Fehler bei der Textverarbeitung');
   }

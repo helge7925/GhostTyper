@@ -2,10 +2,18 @@ import bcrypt from 'bcryptjs';
 import { requireAdmin } from '../../../../lib/admin';
 import { query } from '../../../../lib/db';
 import { validatePassword } from '../../../../lib/constants';
+import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 
 export default async function handler(req, res) {
   const session = await requireAdmin(req, res);
   if (!session) return;
+  const allowed = await enforceRateLimit(req, res, {
+    keyPrefix: 'admin-users',
+    identifier: `admin:${session.user.id}`,
+    limit: 60,
+    windowMs: 60_000,
+  });
+  if (!allowed) return;
 
   switch (req.method) {
     case 'GET': {
@@ -20,7 +28,7 @@ export default async function handler(req, res) {
         );
         return res.status(200).json(result.rows);
       } catch (error) {
-        console.error('Admin users list error:', error);
+        logApiError('Admin users list error', error);
         return res.status(500).json({ message: 'Fehler beim Laden der User-Liste' });
       }
     }
@@ -53,7 +61,7 @@ export default async function handler(req, res) {
 
         return res.status(201).json(result.rows[0]);
       } catch (error) {
-        console.error('Admin create user error:', error);
+        logApiError('Admin create user error', error);
         return res.status(500).json({ message: 'User-Erstellung fehlgeschlagen' });
       }
     }

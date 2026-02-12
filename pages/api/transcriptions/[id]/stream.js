@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { query } from '../../../../lib/db';
 import { addTranscriptionEvent, listTranscriptionEvents } from '../../../../lib/transcription-events';
-import { logApiError } from '../../../../lib/api-utils';
+import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { ensureTranscriptionWorkerRunning } from '../../../../lib/transcription-worker';
 import {
   isStaleTranscription,
@@ -79,6 +79,13 @@ export default async function handler(req, res) {
   if (!session) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
+  const allowed = await enforceRateLimit(req, res, {
+    keyPrefix: 'transcription-stream',
+    identifier: `user:${session.user.id}`,
+    limit: 30,
+    windowMs: 60_000,
+  }, 'Zu viele Live-Verbindungen. Bitte später erneut versuchen.');
+  if (!allowed) return;
 
   const transId = Number.parseInt(req.query.id, 10);
   if (!Number.isFinite(transId)) {

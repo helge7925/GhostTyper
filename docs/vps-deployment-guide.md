@@ -1,68 +1,112 @@
-# GhostTyper: VPS Deployment Guide (Isoliert & Autark)
+# GhostTyper VPS Deployment Plan
 
-Dieses Dokument beschreibt die Vorbereitung und Durchführung des Deployments von GhostTyper auf einem VPS (z.B. Hetzner, DigitalOcean) unter Verwendung von Docker und Traefik.
+Stand: 2026-02-12  
+Basis: `umgebungsanalyse.md` + `config/docker-compose.prod.yml`
 
-## Architektur-Überblick
-Die Anwendung ist so konzipiert, dass sie vollständig **autark** läuft. Sie bringt ihre eigene Datenbank mit und ist über ein isoliertes Docker-Netzwerk geschützt. Der einzige Kontaktpunkt nach außen ist der Reverse-Proxy (Traefik).
+## Zielbild (für den bestehenden VPS)
 
-- **Web-Container**: Next.js App (Standalone Mode).
-- **Datenbank**: PostgreSQL 16 (Alpine-basiert für minimale Größe).
-- **Netzwerke**: 
-    - `internal`: Privates Netzwerk für App <-> DB Kommunikation.
-    - `web`: Externes Netzwerk für die Anbindung an Traefik.
+- Reverse-Proxy/HTTPS über bestehendes Traefik-Netzwerk `web`.
+- GhostTyper läuft als eigener Stack mit:
+  - `transkription-webapp`
+  - `transkription-db` (isoliert im internen Docker-Netzwerk).
+- Keine DB-Portfreigabe nach außen.
 
-## 1. Voraussetzungen
-- Docker und Docker Compose auf dem VPS installiert.
-- Ein laufender Traefik Reverse-Proxy im Docker-Netzwerk `web`.
-- Eine Domain/Subdomain, die auf die IP des VPS zeigt.
+## 0) Preflight (einmalig vor Deployment)
 
-## 2. Vorbereitung der Umgebung (.env)
-Erstellen Sie im Hauptverzeichnis des Projekts auf dem VPS eine `.env` Datei. Diese Datei steuert die gesamte Konfiguration:
+1. Speicherplatz bereinigen (laut Umgebungsanalyse kritisch):
+```bash
+docker system df
+docker image prune -a
+docker volume prune
+```
+2. Externes Netzwerk prüfen:
+```bash
+docker network ls | grep -w web
+```
+3. DNS prüfen: `transkription.<domain>` zeigt auf VPS.
+
+## 1) Secrets und `.env` vorbereiten
+
+Im Projektroot auf dem VPS eine `.env` anlegen (nicht committen):
 
 ```env
-# Domain & Netzwerk
-DOMAIN=transkription.ihre-domain.de
+DOMAIN=transkription.example.de
 
-# Datenbank-Konfiguration (isoliert)
-DB_USER=ghosttyper_user
-DB_PASSWORD=waehle-ein-sicheres-passwort
-DB_NAME=ghosttyper_db
+DB_USER=transkription
+DB_PASSWORD=<starkes-passwort>
+DB_NAME=transkription
 
-# Sicherheit (NextAuth)
-# Generieren mit: openssl rand -base64 32
-NEXTAUTH_SECRET=ihr-sehr-langer-geheimstring
-NEXTAUTH_URL=https://transkription.ihre-domain.de
+NEXTAUTH_SECRET=<openssl rand -base64 32>
+NEXTAUTH_URL=https://transkription.example.de
+DB_INIT_SECRET=<separater-secret-fuer-db-init>
+SETTINGS_ENCRYPTION_KEY=<separater-secret-fuer-settings>
+ENABLE_DB_INIT_API=true
 
-# KI-Backend
-MISTRAL_API_KEY=ihr-api-key-von-mistral-ai
+MISTRAL_API_KEY=<mistral-key>
+
+RATE_LIMIT_STORE=db
+RATE_LIMIT_TRUST_PROXY=false
+PDF_CHROMIUM_NO_SANDBOX=false
 ```
 
-## 3. Deployment-Schritte
+## 2) Erstdeployment
 
-### A. Container bauen und starten
-Navigieren Sie in das Projektverzeichnis und führen Sie aus:
 ```bash
 docker compose -f config/docker-compose.prod.yml up --build -d
 ```
 
-### B. Datenbank initialisieren
-Nach dem ersten Start müssen die Tabellen angelegt werden. Dies geschieht über den internen Initialisierungs-Endpunkt:
+## 3) Datenbank initialisieren (nur initial/bei Schema-Updates)
+
 ```bash
-curl -X POST https://transkription.ihre-domain.de/api/db-init 
-  -H "x-init-secret: IHR_NEXTAUTH_SECRET"
+curl -X POST "https://transkription.example.de/api/db-init" \
+  -H "x-init-secret: <DB_INIT_SECRET>"
 ```
 
-### C. Admin-Konto erstellen (CLI)
-Um sich sicher als Administrator anzulegen, nutzen Sie das mitgelieferte CLI-Tool innerhalb des laufenden Containers:
+Danach Sicherheits-Härtung:
+1. `ENABLE_DB_INIT_API=false` in `.env`
+2. Stack neu laden:
+```bash
+docker compose -f config/docker-compose.prod.yml up -d
+```
+
+## 4) Admin-Account und Smoke-Checks
+
+Admin anlegen:
 ```bash
 docker exec -it transkription-webapp npm run seed-admin
 ```
-Folgen Sie den Anweisungen im Terminal, um E-Mail, Name und ein sicheres Passwort festzulegen.
 
-## 4. Wartung & Sicherheit
-- **Backups**: Sichern Sie regelmäßig das Docker-Volume `transkription-db-data`.
-- **Updates**: Zum Aktualisieren der App führen Sie einfach `git pull` und den Build-Befehl aus Schritt 3A erneut aus.
-- **Isolation**: Die Datenbank ist von außen nicht erreichbar und nur mit dem Web-Container verknüpft.
+Checks:
+```bash
+curl -I "https://transkription.example.de"
+curl "https://transkription.example.de/api/health"
+docker compose -f config/docker-compose.prod.yml ps
+```
 
----
-*Dokumentation erstellt am 11. Februar 2026*
+## 5) Update-Plan (laufender Betrieb)
+
+1. Backup (DB + Uploads).
+2. `git pull`
+3. `docker compose -f config/docker-compose.prod.yml up --build -d`
+4. Healthcheck + Login + Upload-Test.
+5. Bei Fehlern: auf vorherigen Git-Commit zurück und erneut deployen.
+
+## 6) Backup/Recovery (Mindeststandard)
+
+- Zu sichern:
+  - Volume `transkription-db-data`
+  - Volume `transkription-uploads`
+- Frequenz: täglich inkrementell, wöchentlich Vollbackup.
+- Restore regelmäßig testweise in separater Umgebung prüfen.
+
+## 7) Betriebshinweise für diese VPS-Umgebung
+
+- Watchtower nicht blind auf diesen Stack anwenden; kontrollierte Updates bevorzugen.
+- Speicher-Monitoring aktiv halten (Root-Partition war bereits >90% belegt).
+- Traefik-Logs und App-Logs (`LOG_FORMAT=json`) zentral sammeln.
+
+## Referenzen
+
+- Umgebungsdetails: `umgebungsanalyse.md`
+- Compose Prod: `../config/docker-compose.prod.yml`
+- Betriebs- und Testchecks: `testing.md`

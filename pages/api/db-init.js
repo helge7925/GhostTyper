@@ -1,29 +1,23 @@
 import { initDatabase } from '../../lib/db-init';
-import { checkRateLimit, applyRateLimitHeaders } from '../../lib/rate-limit';
-import { logApiError, serverError } from '../../lib/api-utils';
+import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const rate = checkRateLimit(req, {
+  const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'db-init',
     limit: 5,
     windowMs: 60_000,
   });
-  applyRateLimitHeaders(res, rate);
-  if (!rate.allowed) {
-    return res.status(429).json({ message: 'Zu viele Anfragen. Bitte später erneut versuchen.' });
-  }
+  if (!allowed) return;
 
   if (process.env.NODE_ENV === 'production' && process.env.ENABLE_DB_INIT_API !== 'true') {
     return res.status(404).json({ message: 'Not found' });
   }
 
-  const configuredSecret =
-    process.env.DB_INIT_SECRET ||
-    (process.env.NODE_ENV !== 'production' ? process.env.NEXTAUTH_SECRET : null);
+  const configuredSecret = process.env.DB_INIT_SECRET || null;
   if (!configuredSecret) {
     return serverError(res, 'DB-Initialisierung ist nicht konfiguriert');
   }
