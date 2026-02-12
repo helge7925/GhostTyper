@@ -53,6 +53,10 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Einstellungsbezeichnung angepasst: `Analyse` / `Analyse-Vorlagen` heißt jetzt `Verarbeitungstemplates`.
 - Vorlagen-Generator in den Einstellungen kann für neue Vorlagen automatisch einen Namensvorschlag aus dem Zieltext setzen.
 - Historie-Header (`/transcriptions`) responsive nachgeschärft, um horizontalen Overflow auf Tablet-Landscape zu vermeiden.
+- DOCX-Export visuell an den `Soft Business`-Look angeglichen (Inter als Primärschrift, weichere Akzentfarbe, strukturierende Trennlinien).
+- PDF- und DOCX-Typografie für Überschriften und Trennlinien stärker harmonisiert.
+- PDF-Export-Flow im Editor auf robustes Hybridmodell umgestellt: serverseitiger Renderer zuerst, Browser-Vorschau als Fallback.
+- Deployment-Dokumentation auf ein vollständiges VPS-Runbook erweitert (`docs/vps-deployment-guide.md`), inkl. Chromium-/`PDF_CHROMIUM_PATH`-Vorgaben.
 
 ### Fixed
 - Robustere Job-Verarbeitung durch atomische Statusübergänge und Schutz vor Doppelstarts.
@@ -73,6 +77,13 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Fokus-Preset-Umschalter-Kontrast korrigiert (Button `Dunkel` im hellen Fokusmodus wieder gut lesbar).
 - Neuer Vorlagen-Flow korrigiert: neue Analyse-Vorlagen werden nicht mehr zwangsweise als `Neue Vorlage` gespeichert.
 - Label-Normalisierung korrigiert: keine fehlerhafte globale `ae/oe/ue`-Ersetzung mehr (z. B. kein `Aktülle`).
+- Editor-Caret-Sprung behoben: `contentEditable` wird nicht mehr bei jedem Input durch React-Re-Render zurückgesetzt.
+- Struktur-Rendering im Editor verbessert: verschachtelte Inhalte werden konsistent als `ul/li` ausgegeben (klare Einzüge und bessere Unterscheidbarkeit).
+- Fokusmodus-Preset-Umschalter zeigt den aktiven Zustand jetzt eindeutig; aktive Presets sind orange hervorgehoben.
+- Checkboxen app-weit auf einheitliche Akzentfarbe vereinheitlicht (`accent-accent-orange` statt Browser-Default blau/schwarz).
+- PDF-Export öffnet keine störenden leeren `about:blank`-Tabs mehr im Fehlerpfad; kein automatischer Druckdialog im Fallback-Viewer.
+- PDF-Renderer-Start robuster gemacht (erweiterte Chromium-Pfadsuche, klassifizierte Renderer-Fehler, Fallback von `--headless=new` auf `--headless`).
+- Doppelte Trennlinie am Dokumentanfang entfernt (keine Linie mehr unter Hauptüberschrift bei PDF/DOCX).
 
 ### Security
 - Verschlüsselte API-Key-Speicherung (`settings.mistral_api_key_encrypted`).
