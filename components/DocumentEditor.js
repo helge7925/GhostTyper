@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { exportToDoc } from '../lib/export-utils';
 import DOMPurify from 'dompurify';
 import { buildPdfPrintStyles } from '../lib/pdf-print-style';
@@ -40,13 +40,17 @@ export default function DocumentEditor({
     return DOMPurify.sanitize(String(value || ''), { USE_PROFILES: { html: true } });
   }, []);
 
-  const sanitizedHtml = useMemo(() => {
-    return sanitizeEditorHtml(html);
-  }, [html, sanitizeEditorHtml]);
-
   useEffect(() => {
     setHtml(initialHtml);
   }, [initialHtml]);
+
+  useEffect(() => {
+    if (!editorRef.current) return;
+    const cleanHtml = sanitizeEditorHtml(html);
+    if (editorRef.current.innerHTML !== cleanHtml) {
+      editorRef.current.innerHTML = cleanHtml;
+    }
+  }, [html, sanitizeEditorHtml]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -128,76 +132,142 @@ export default function DocumentEditor({
     exportToDoc(currentHtml, filename);
   };
 
+  const escapeForHtml = (value) => String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
   const openPdfBlob = (blob, targetWindow = null) => {
     const url = window.URL.createObjectURL(blob);
     const canUseTarget = targetWindow && !targetWindow.closed;
 
     if (canUseTarget) {
-      targetWindow.location.href = url;
+      try {
+        targetWindow.location.replace(url);
+      } catch (_) {
+        const opened = window.open(url, '_blank');
+        if (!opened) {
+          window.location.href = url;
+        }
+      }
     } else {
-      const opened = window.open(url, '_blank', 'noopener,noreferrer');
+      const opened = window.open(url, '_blank');
       if (!opened) {
-        // Last fallback when popups are blocked: open in the current tab.
         window.location.href = url;
       }
     }
 
-    // Give the target enough time to load the blob before revoking.
     window.setTimeout(() => {
       window.URL.revokeObjectURL(url);
     }, 60_000);
   };
 
-  const handleExportPdfLegacy = (existingWindow = null) => {
+  const openBrowserPdfFallbackPreview = (existingWindow = null, reason = '') => {
     const currentHtml = editorRef.current?.innerHTML || html;
     const printableHtml = DOMPurify.sanitize(currentHtml || '', { USE_PROFILES: { html: true } });
     const printStyles = buildPdfPrintStyles({ theme: FIXED_PDF_THEME, fontPreset: FIXED_PDF_FONT });
-    const printWindow = existingWindow && !existingWindow.closed
+    const safeReason = escapeForHtml(reason);
+    let fallbackWindow = existingWindow && !existingWindow.closed
       ? existingWindow
-      : window.open('', '_blank', 'noopener,noreferrer,width=1024,height=900');
+      : window.open('', '_blank', 'width=1024,height=900');
 
-    if (!printWindow) {
-      window.print();
-      return;
+    // If popup opening is blocked, render fallback preview in the current tab.
+    if (!fallbackWindow) {
+      fallbackWindow = window;
     }
 
-    printWindow.document.open();
-    printWindow.document.write(`<!doctype html>
+    fallbackWindow.document.open();
+    fallbackWindow.document.write(`<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title></title>
+    <title>PDF Vorschau</title>
+    <style>
+      body {
+        margin: 0;
+        background: #0b0b10;
+        color: #e8e8ed;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      .toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.9rem 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        background: #12131b;
+      }
+      .muted {
+        color: #9aa0b2;
+        font-size: 0.83rem;
+      }
+      .action {
+        border: 1px solid rgba(255, 89, 23, 0.45);
+        background: rgba(255, 89, 23, 0.2);
+        color: #ff8b63;
+        border-radius: 10px;
+        padding: 0.45rem 0.7rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .sheet {
+        max-width: 980px;
+        margin: 1rem auto;
+        background: #fff;
+        color: #1f2a37;
+        box-shadow: 0 24px 50px rgba(0, 0, 0, 0.35);
+        border-radius: 14px;
+      }
+      .sheet main {
+        padding: 20mm 16mm;
+      }
+      @media print {
+        .toolbar { display: none !important; }
+        .sheet {
+          box-shadow: none !important;
+          margin: 0 !important;
+          max-width: none !important;
+          border-radius: 0 !important;
+        }
+        .sheet main {
+          padding: 0 !important;
+        }
+      }
+    </style>
     <style>${printStyles}</style>
   </head>
   <body>
-    <main id="print-root">${printableHtml}</main>
+    <div class="toolbar">
+      <div>
+        <div>PDF-Vorschau im Browser geöffnet.</div>
+        <div class="muted">${safeReason || 'Hier kannst du selbst drucken oder als PDF speichern.'}</div>
+      </div>
+      <button class="action" onclick="window.print()">Drucken / Als PDF speichern</button>
+    </div>
+    <section class="sheet">
+      <main id="print-root">${printableHtml}</main>
+    </section>
   </body>
 </html>`);
-    printWindow.document.close();
-
-    const triggerPrint = () => {
-      printWindow.focus();
-      printWindow.print();
-      setTimeout(() => {
-        printWindow.close();
-      }, 300);
-    };
-
-    if (printWindow.document.readyState === 'complete') {
-      setTimeout(triggerPrint, 120);
-    } else {
-      printWindow.onload = () => setTimeout(triggerPrint, 120);
-    }
+    fallbackWindow.document.close();
+    fallbackWindow.focus();
+    return true;
   };
 
   const handleExportPdf = async () => {
     if (isExportingPdf) return;
-    const previewWindow = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=900');
-
+    const previewWindow = window.open('', '_blank', 'width=1024,height=900');
     if (previewWindow) {
-      previewWindow.document.open();
-      previewWindow.document.write(`<!doctype html>
+      try {
+        previewWindow.document.open();
+        previewWindow.document.write(`<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
@@ -209,10 +279,13 @@ export default function DocumentEditor({
   </head>
   <body>
     <h1>PDF wird erstellt…</h1>
-    <p class="muted">Dieser Tab aktualisiert sich automatisch, sobald das PDF fertig ist.</p>
+    <p class="muted">Die Datei wird gleich im Browser-Viewer geöffnet.</p>
   </body>
 </html>`);
-      previewWindow.document.close();
+        previewWindow.document.close();
+      } catch (_) {
+        // Continue; blob/open fallback can still work.
+      }
     }
 
     setIsExportingPdf(true);
@@ -240,14 +313,9 @@ export default function DocumentEditor({
       const blob = await response.blob();
       openPdfBlob(blob, previewWindow);
     } catch (error) {
-      const shouldUseBrowserFallback = window.confirm(
-        'Der serverseitige PDF-Export ist gerade nicht verfügbar. Browser-Export als Fallback starten?'
-      );
-      if (shouldUseBrowserFallback) {
-        handleExportPdfLegacy(previewWindow);
-      } else if (previewWindow && !previewWindow.closed) {
-        previewWindow.close();
-      }
+      const message = error instanceof Error ? error.message : 'PDF_EXPORT_API_FAILED';
+      console.error('Serverseitiger PDF-Export fehlgeschlagen:', message);
+      openBrowserPdfFallbackPreview(previewWindow, `Fallback aktiv: ${message}`);
     } finally {
       setIsExportingPdf(false);
     }
@@ -276,14 +344,8 @@ export default function DocumentEditor({
 
   const handleEditorInput = useCallback((event) => {
     const rawHtml = event.currentTarget.innerHTML || '';
-    const cleanHtml = sanitizeEditorHtml(rawHtml);
-
-    if (cleanHtml !== rawHtml) {
-      event.currentTarget.innerHTML = cleanHtml;
-    }
-
-    setHtml(cleanHtml);
-  }, [sanitizeEditorHtml]);
+    setHtml(rawHtml);
+  }, []);
 
   const handleEditorPaste = useCallback((event) => {
     event.preventDefault();
@@ -322,20 +384,20 @@ export default function DocumentEditor({
             }`}>
               <button
                 onClick={() => setFocusPreset('paper')}
-                className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-colors ${
+                className={`px-2.5 py-1 text-[10px] font-bold rounded-md border transition-colors ${
                   focusPreset === 'paper'
-                    ? 'bg-white text-black'
-                    : 'text-white/80 hover:text-white bg-white/5'
+                    ? 'bg-accent-orange text-white border-accent-orange shadow-sm'
+                    : 'bg-transparent text-white/75 border-transparent hover:text-white hover:bg-white/10'
                 }`}
               >
                 Hell
               </button>
               <button
                 onClick={() => setFocusPreset('ink')}
-                className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-colors ${
+                className={`px-2.5 py-1 text-[10px] font-bold rounded-md border transition-colors ${
                   focusPreset === 'ink'
-                    ? 'bg-[#1a1b22] text-white'
-                    : 'text-black bg-white/90 border border-black/20 hover:bg-white'
+                    ? 'bg-accent-orange text-white border-accent-orange shadow-sm'
+                    : 'bg-transparent text-black/75 border-transparent hover:text-black hover:bg-black/5'
                 }`}
               >
                 Dunkel
@@ -472,7 +534,7 @@ export default function DocumentEditor({
               } ${isTranslating ? 'opacity-50 pointer-events-none' : ''}`}
               contentEditable 
               ref={editorRef} 
-              dangerouslySetInnerHTML={{ __html: sanitizedHtml }} 
+              suppressContentEditableWarning
               onInput={handleEditorInput}
               onPaste={handleEditorPaste}
               spellCheck="false"

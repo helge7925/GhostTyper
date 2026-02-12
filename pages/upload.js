@@ -261,7 +261,7 @@ export default function Upload() {
                 type="checkbox"
                 checked={autoOpenWhenReady}
                 onChange={(e) => setAutoOpenWhenReady(e.target.checked)}
-                className="w-4 h-4 rounded border-white/20 bg-dark-input text-accent-orange focus:ring-accent-orange"
+                className="w-4 h-4 rounded border-white/20 bg-dark-input accent-accent-orange focus:ring-accent-orange"
               />
               Detailseite automatisch öffnen, sobald das Ergebnis bereit ist
             </label>
@@ -272,7 +272,7 @@ export default function Upload() {
                   type="checkbox"
                   checked={autoOpenEditorWhenReady}
                   onChange={(e) => setAutoOpenEditorWhenReady(e.target.checked)}
-                  className="w-4 h-4 rounded border-white/20 bg-dark-input text-accent-orange focus:ring-accent-orange"
+                  className="w-4 h-4 rounded border-white/20 bg-dark-input accent-accent-orange focus:ring-accent-orange"
                 />
                 Editor nach Zusammenfassung automatisch öffnen
               </label>

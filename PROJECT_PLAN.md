@@ -58,5 +58,10 @@ docker compose -f config/docker-compose.dev.yml up --build -d
 ```bash
 curl -X POST http://localhost:3000/api/db-init -H "x-init-secret: dev-db-init-secret"
 ```
+3. Für serverseitigen PDF-Export Chromium/Chrome auf dem Server installieren und Pfad fix setzen:
+```bash
+export PDF_CHROMIUM_PATH="/usr/bin/chromium"
+# alternativ je nach Distribution z. B. /usr/bin/chromium-browser oder /usr/bin/google-chrome
+```
 
 Weitere Betriebsdetails: `README.md`, `docs/testing.md`.
