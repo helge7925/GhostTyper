@@ -5,10 +5,9 @@ import { randomUUID } from 'crypto';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { query } from '../../lib/db';
-import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE } from '../../lib/constants';
+import { ACCEPTED_AUDIO_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE } from '../../lib/constants';
 import { resolveChatModel } from '../../lib/model-policy';
-import { checkRateLimit, applyRateLimitHeaders } from '../../lib/rate-limit';
-import { logApiError, serverError } from '../../lib/api-utils';
+import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { addTranscriptionEvent } from '../../lib/transcription-events';
 
 export const config = {
@@ -47,16 +46,13 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
 
-  const rate = checkRateLimit(req, {
+  const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'upload-audio',
     identifier: `user:${session.user.id}`,
     limit: 30,
     windowMs: 60_000,
-  });
-  applyRateLimitHeaders(res, rate);
-  if (!rate.allowed) {
-    return res.status(429).json({ message: 'Zu viele Uploads. Bitte später erneut versuchen.' });
-  }
+  }, 'Zu viele Uploads. Bitte später erneut versuchen.');
+  if (!allowed) return;
 
   try {
     await ensureUploadDir();
@@ -94,6 +90,10 @@ export default async function handler(req, res) {
     }
     const diarize = (fields.diarize?.[0] || fields.diarize) === 'true';
     const customPrompt = fields.customPrompt?.[0] || fields.customPrompt || null;
+    if (typeof customPrompt === 'string' && customPrompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
+      await unlink(filePath).catch(() => {});
+      return res.status(400).json({ message: `Zusätzlicher Kontext ist zu lang (max. ${MAX_CUSTOM_PROMPT_LENGTH} Zeichen)` });
+    }
     const autoAnalyze = (fields.autoAnalyze?.[0] || fields.autoAnalyze) !== 'false';
 
     const result = await query(

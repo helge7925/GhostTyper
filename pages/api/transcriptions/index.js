@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
-import { logApiError, serverError } from '../../../lib/api-utils';
+import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { recoverStaleTranscriptionsForUser } from '../../../lib/transcription-stale';
 import { ensureTranscriptionWorkerRunning } from '../../../lib/transcription-worker';
 
@@ -10,6 +10,13 @@ export default async function handler(req, res) {
   if (!session) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
+  const allowed = await enforceRateLimit(req, res, {
+    keyPrefix: 'transcriptions-list',
+    identifier: `user:${session.user.id}`,
+    limit: 120,
+    windowMs: 60_000,
+  });
+  if (!allowed) return;
 
   switch (req.method) {
     case 'GET': {

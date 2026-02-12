@@ -21,6 +21,7 @@ Stand: 2026-02-12
 - API: `api-specification.md`
 - Docker lokal: `docker-setup.md`
 - VPS/Traefik: `vps-deployment-guide.md`
+- Umgebungsanalyse Ziel-VPS: `umgebungsanalyse.md`
 - Troubleshooting Docker: `docker-troubleshooting.md`
 - Auth Troubleshooting: `troubleshooting-auth.md`
 

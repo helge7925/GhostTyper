@@ -18,6 +18,9 @@ services:
       - SETTINGS_ENCRYPTION_KEY=dev-settings-encryption-key
       - ENABLE_DB_INIT_API=true
       - PDF_CHROMIUM_PATH=/usr/bin/chromium-browser
+      - PDF_CHROMIUM_NO_SANDBOX=false
+      - RATE_LIMIT_STORE=db
+      - RATE_LIMIT_TRUST_PROXY=false
     volumes:
       - transkription-uploads:/app/uploads
     depends_on:

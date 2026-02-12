@@ -6,6 +6,7 @@ Version: Unreleased Snapshot (P0-P3 Abschluss)
 
 - P0 bis P3 aus der priorisierten Code-Review vollständig umgesetzt.
 - Hintergrundverarbeitung auf Queue/Worker-Fluss erweitert (`pending -> queued -> processing`).
+- Manuelle KI-Analyse vom API-Request entkoppelt (asynchroner Job-Runner).
 - Observability-Basis ergänzt (`GET /api/health`, `GET /api/admin/observability`).
 - PDF-Renderer für lange Dokumente stabilisiert (Witwen/Waisen, Heading-/Block-Umbruchschutz).
 - Editor-UX vereinfacht (klare Primäraktionen, Sekundäres im `Mehr`-Menü).
@@ -17,6 +18,7 @@ Version: Unreleased Snapshot (P0-P3 Abschluss)
 - Secret-Härtung: kein Fallback mehr von `SETTINGS_ENCRYPTION_KEY` auf `NEXTAUTH_SECRET`.
 - Admin-User-Update transaktional gemacht (konsistente Writes über User/Settings).
 - Duplizierte Kernlogik zentralisiert (Analysis-Cleaning, Template-Auflösung, Stale-Recovery).
+- AudioRecorder-Cleanup stabilisiert (saubere Blob-URL-Freigabe, weniger Race-Potenzial).
 
 ## Produkt & UX
 

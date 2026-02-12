@@ -4,6 +4,10 @@ import bcrypt from 'bcryptjs';
 import { query } from '../../../lib/db';
 import { checkRateLimit } from '../../../lib/rate-limit';
 
+if (!process.env.NEXTAUTH_SECRET) {
+  throw new Error('NEXTAUTH_SECRET ist nicht gesetzt. Bitte Umgebungsvariablen prüfen.');
+}
+
 export const authOptions = {
   providers: [
     CredentialsProvider({
@@ -13,7 +17,7 @@ export const authOptions = {
         password: { label: 'Passwort', type: 'password' },
       },
       async authorize(credentials, req) {
-        const rate = checkRateLimit(req, {
+        const rate = await checkRateLimit(req, {
           keyPrefix: 'auth-login',
           limit: 10,
           windowMs: 5 * 60 * 1000,

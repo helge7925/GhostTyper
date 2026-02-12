@@ -1,11 +1,11 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { translateText } from '../../lib/ai-service';
-import { logUsage, checkCostLimit } from '../../lib/usage';
+import { CostLimitExceededError, logUsage, checkCostLimit, withUserCostLock } from '../../lib/usage';
 import { resolveChatModel } from '../../lib/model-policy';
 import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service';
-import { checkRateLimit, applyRateLimitHeaders } from '../../lib/rate-limit';
-import { logApiError, serverError } from '../../lib/api-utils';
+import { MAX_TRANSLATE_INPUT_LENGTH } from '../../lib/constants';
+import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -17,21 +17,21 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
 
-  const rate = checkRateLimit(req, {
+  const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'translate',
     identifier: `user:${session.user.id}`,
     limit: 60,
     windowMs: 60_000,
   });
-  applyRateLimitHeaders(res, rate);
-  if (!rate.allowed) {
-    return res.status(429).json({ message: 'Zu viele Anfragen. Bitte später erneut versuchen.' });
-  }
+  if (!allowed) return;
 
   const { text, targetLanguage, sourceLanguage = 'auto', model: requestModel } = req.body;
 
-  if (!text || !targetLanguage) {
+  if (!text || !targetLanguage || typeof text !== 'string') {
     return res.status(400).json({ message: 'Text und Zielsprache sind erforderlich' });
+  }
+  if (text.length > MAX_TRANSLATE_INPUT_LENGTH) {
+    return res.status(400).json({ message: `Text ist zu lang (max. ${MAX_TRANSLATE_INPUT_LENGTH} Zeichen)` });
   }
 
   try {
@@ -46,27 +46,29 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Ungültiges KI-Modell' });
     }
 
-    // Check cost limit
-    const costCheck = await checkCostLimit(session.user.id);
-    if (!costCheck.allowed) {
-      return res.status(429).json({
-        message: `Monatliches Kostenlimit erreicht (${costCheck.currentCost.toFixed(2)} / ${costCheck.limit.toFixed(2)} EUR)`,
-      });
-    }
+    const translatedText = await withUserCostLock(session.user.id, async () => {
+      const costCheck = await checkCostLimit(session.user.id);
+      if (!costCheck.allowed) {
+        throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
+      }
 
-    const { translatedText, usage, model } = await translateText(
-      text,
-      targetLanguage,
-      sourceLanguage,
-      apiKey,
-      preferredModel
-    );
+      const { translatedText: value, usage, model } = await translateText(
+        text,
+        targetLanguage,
+        sourceLanguage,
+        apiKey,
+        preferredModel
+      );
 
-    // Log usage
-    await logUsage(session.user.id, model, 'translation', usage);
+      await logUsage(session.user.id, model, 'translation', usage);
+      return value;
+    });
 
     return res.status(200).json({ translatedText });
   } catch (error) {
+    if (error?.code === 'COST_LIMIT_EXCEEDED') {
+      return res.status(429).json({ message: error.message });
+    }
     logApiError('Translation error', error);
     return serverError(res, 'Fehler bei der Übersetzung');
   }

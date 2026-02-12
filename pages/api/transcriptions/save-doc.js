@@ -6,6 +6,7 @@ import {
   MAX_DOCUMENT_TEXT_LENGTH,
   MAX_DOCUMENT_TITLE_LENGTH,
 } from '../../../lib/constants';
+import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -16,6 +17,13 @@ export default async function handler(req, res) {
   if (!session) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
+  const allowed = await enforceRateLimit(req, res, {
+    keyPrefix: 'transcription-save-doc',
+    identifier: `user:${session.user.id}`,
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!allowed) return;
 
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const { title, text, documentHtml, template } = body;
@@ -62,7 +70,7 @@ export default async function handler(req, res) {
 
     return res.status(201).json({ id: result.rows[0].id, message: 'Dokument gespeichert' });
   } catch (error) {
-    console.error('Save doc error:', error);
+    logApiError('Save doc error', error);
     return res.status(500).json({ message: 'Fehler beim Speichern des Dokuments' });
   }
 }

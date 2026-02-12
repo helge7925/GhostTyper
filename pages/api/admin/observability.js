@@ -1,7 +1,7 @@
 import { requireAdmin } from '../../../lib/admin';
 import { query } from '../../../lib/db';
 import { getObservabilitySnapshot } from '../../../lib/observability';
-import { logApiError } from '../../../lib/api-utils';
+import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
 
 function toCountMap(rows) {
   return rows.reduce((accumulator, row) => {
@@ -17,6 +17,13 @@ export default async function handler(req, res) {
 
   const session = await requireAdmin(req, res);
   if (!session) return;
+  const allowed = await enforceRateLimit(req, res, {
+    keyPrefix: 'admin-observability',
+    identifier: `admin:${session.user.id}`,
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!allowed) return;
 
   try {
     const [statusCountsResult, eventCountsResult] = await Promise.all([

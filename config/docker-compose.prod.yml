@@ -28,6 +28,9 @@ services:
       - ENABLE_DB_INIT_API=${ENABLE_DB_INIT_API:-false}
       - MISTRAL_API_KEY=${MISTRAL_API_KEY}
       - PDF_CHROMIUM_PATH=${PDF_CHROMIUM_PATH:-/usr/bin/chromium-browser}
+      - PDF_CHROMIUM_NO_SANDBOX=${PDF_CHROMIUM_NO_SANDBOX:-false}
+      - RATE_LIMIT_STORE=${RATE_LIMIT_STORE:-db}
+      - RATE_LIMIT_TRUST_PROXY=${RATE_LIMIT_TRUST_PROXY:-false}
     depends_on:
       transkription-db:
         condition: service_healthy

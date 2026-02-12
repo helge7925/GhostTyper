@@ -1,8 +1,7 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { query } from '../../../../lib/db';
-import { checkRateLimit, applyRateLimitHeaders } from '../../../../lib/rate-limit';
-import { logApiError } from '../../../../lib/api-utils';
+import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { addTranscriptionEvent } from '../../../../lib/transcription-events';
 import { ensureTranscriptionWorkerRunning, queueTranscriptionJob } from '../../../../lib/transcription-worker';
 
@@ -16,16 +15,13 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
 
-  const rate = checkRateLimit(req, {
+  const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'transcription-process',
     identifier: `user:${session.user.id}`,
     limit: 30,
     windowMs: 60_000,
   });
-  applyRateLimitHeaders(res, rate);
-  if (!rate.allowed) {
-    return res.status(429).json({ message: 'Zu viele Anfragen. Bitte später erneut versuchen.' });
-  }
+  if (!allowed) return;
 
   const transcriptionId = Number.parseInt(req.query.id, 10);
   if (!Number.isFinite(transcriptionId)) {

@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { query } from '../../lib/db';
+import { enforceRateLimit, logApiError } from '../../lib/api-utils';
 
 /**
  * GET /api/usage — Returns the current user's usage for this month.
@@ -14,6 +15,13 @@ export default async function handler(req, res) {
   if (!session) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
+  const allowed = await enforceRateLimit(req, res, {
+    keyPrefix: 'usage',
+    identifier: `user:${session.user.id}`,
+    limit: 60,
+    windowMs: 60_000,
+  });
+  if (!allowed) return;
 
   try {
     // Current month totals
@@ -69,7 +77,7 @@ export default async function handler(req, res) {
       })),
     });
   } catch (error) {
-    console.error('Usage API error:', error);
+    logApiError('Usage API error', error);
     return res.status(500).json({ message: 'Fehler beim Laden der Nutzungsdaten' });
   }
 }

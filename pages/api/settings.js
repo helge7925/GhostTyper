@@ -8,8 +8,7 @@ import {
 } from '../../lib/settings-service';
 import { normalizeDefaultTemplate } from '../../lib/constants';
 import { resolveChatModel, resolveOcrModel } from '../../lib/model-policy';
-import { checkRateLimit, applyRateLimitHeaders } from '../../lib/rate-limit';
-import { logApiError, serverError } from '../../lib/api-utils';
+import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 
 function normalizeCostLimit(costLimit) {
   if (costLimit === null || costLimit === '') return null;
@@ -61,16 +60,13 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
 
-  const rate = checkRateLimit(req, {
+  const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'api-settings',
     identifier: `user:${session.user.id}`,
     limit: 120,
     windowMs: 60_000,
   });
-  applyRateLimitHeaders(res, rate);
-  if (!rate.allowed) {
-    return res.status(429).json({ message: 'Zu viele Anfragen. Bitte später erneut versuchen.' });
-  }
+  if (!allowed) return;
 
   try {
     switch (req.method) {

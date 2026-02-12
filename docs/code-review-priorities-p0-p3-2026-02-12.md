@@ -27,6 +27,7 @@ Quelle der Prioritäten: `external-review-2026-02-12.md` (externes Kollegenrevie
   - konsolidierte Template-Normalisierung
 - **P2**
   - DB-Queue/Worker-Entkopplung mit `queued`-Status
+  - manuelle Analyse aus dem Request-Handler entkoppelt (`runManualAnalysisJob`)
   - strukturierte Logs + Runtime-Metriken
   - Observability-Endpunkte für Betrieb/Admin
 - **P3**

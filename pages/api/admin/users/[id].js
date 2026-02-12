@@ -3,10 +3,18 @@ import { requireAdmin } from '../../../../lib/admin';
 import pool, { query } from '../../../../lib/db';
 import { validatePassword } from '../../../../lib/constants';
 import { serializeApiKeyForStorage } from '../../../../lib/settings-service';
+import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 
 export default async function handler(req, res) {
   const session = await requireAdmin(req, res);
   if (!session) return;
+  const allowed = await enforceRateLimit(req, res, {
+    keyPrefix: 'admin-user-item',
+    identifier: `admin:${session.user.id}`,
+    limit: 60,
+    windowMs: 60_000,
+  });
+  if (!allowed) return;
 
   const { id } = req.query;
   const userId = parseInt(id, 10);
@@ -19,6 +27,10 @@ export default async function handler(req, res) {
   switch (req.method) {
     case 'PUT': {
       const { email, name, password, role, mistralApiKey, costLimit } = req.body;
+      if (password) {
+        const passwordError = validatePassword(password);
+        if (passwordError) return res.status(400).json({ message: passwordError });
+      }
       const shouldUpdateCostLimit = costLimit !== undefined;
       const shouldUpdateApiKey = mistralApiKey !== undefined;
       const shouldClearApiKey = shouldUpdateApiKey && (mistralApiKey === null || mistralApiKey === '');
@@ -74,8 +86,6 @@ export default async function handler(req, res) {
         }
 
         if (password) {
-          const passwordError = validatePassword(password);
-          if (passwordError) return res.status(400).json({ message: passwordError });
           const passwordHash = await bcrypt.hash(password, 12);
           updates.push(`password_hash = $${paramIndex++}`);
           values.push(passwordHash);
@@ -146,7 +156,7 @@ export default async function handler(req, res) {
         } catch {
           // ignore rollback errors
         }
-        console.error('Admin update user error:', error);
+        logApiError('Admin update user error', error);
         return res.status(500).json({ message: 'User-Aktualisierung fehlgeschlagen' });
       } finally {
         client.release();
@@ -166,7 +176,7 @@ export default async function handler(req, res) {
         }
         return res.status(200).json({ message: 'User gelöscht' });
       } catch (error) {
-        console.error('Admin delete user error:', error);
+        logApiError('Admin delete user error', error);
         return res.status(500).json({ message: 'User-Löschung fehlgeschlagen' });
       }
     }

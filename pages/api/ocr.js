@@ -6,12 +6,11 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { query } from '../../lib/db';
 import { performOCR, analyzeTranscription } from '../../lib/ai-service';
-import { logUsage, checkCostLimit } from '../../lib/usage';
-import { ACCEPTED_OCR_TYPES, MAX_FILE_SIZE } from '../../lib/constants';
+import { CostLimitExceededError, logUsage, checkCostLimit, withUserCostLock } from '../../lib/usage';
+import { ACCEPTED_OCR_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE } from '../../lib/constants';
 import { resolveChatModel } from '../../lib/model-policy';
 import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service';
-import { checkRateLimit, applyRateLimitHeaders } from '../../lib/rate-limit';
-import { logApiError, serverError } from '../../lib/api-utils';
+import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { addTranscriptionEvent } from '../../lib/transcription-events';
 import { resolveTemplate } from '../../lib/template-service';
 
@@ -51,16 +50,13 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
 
-  const rate = checkRateLimit(req, {
+  const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'upload-ocr',
     identifier: `user:${session.user.id}`,
     limit: 20,
     windowMs: 60_000,
-  });
-  applyRateLimitHeaders(res, rate);
-  if (!rate.allowed) {
-    return res.status(429).json({ message: 'Zu viele OCR-Anfragen. Bitte später erneut versuchen.' });
-  }
+  }, 'Zu viele OCR-Anfragen. Bitte später erneut versuchen.');
+  if (!allowed) return;
 
   let filePath = '';
   let tempUploadPath = '';
@@ -98,46 +94,56 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Ungültiges Standardmodell in den Einstellungen' });
     }
 
-    // Check cost limit
-    const costCheck = await checkCostLimit(session.user.id);
-    if (!costCheck.allowed) {
-      return res.status(429).json({
-        message: `Monatliches Kostenlimit erreicht (${costCheck.currentCost.toFixed(2)} / ${costCheck.limit.toFixed(2)} €)`,
-      });
+    const shouldAnalyze = (fields.analyze?.[0] || fields.analyze) === 'true';
+    const template = fields.template?.[0] || fields.template || 'generic';
+    const customPrompt = fields.customPrompt?.[0] || fields.customPrompt || '';
+    if (typeof customPrompt === 'string' && customPrompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
+      await unlink(filePath).catch(() => {});
+      return res.status(400).json({ message: `Zusätzlicher Kontext ist zu lang (max. ${MAX_CUSTOM_PROMPT_LENGTH} Zeichen)` });
+    }
+    const requestModel = fields.model?.[0] || fields.model;
+    const selectedModelForAnalysis = shouldAnalyze
+      ? resolveChatModel(requestModel || preferredModel)
+      : preferredModel;
+    if (shouldAnalyze && !selectedModelForAnalysis) {
+      await unlink(filePath).catch(() => {});
+      return res.status(400).json({ message: 'Ungültiges KI-Modell' });
     }
 
-    // Perform OCR
-    const { markdown, usage: ocrUsage, model: ocrModel } = await performOCR(filePath, apiKey, file.mimetype);
-    await logUsage(session.user.id, ocrModel, 'ocr', ocrUsage);
-
-    let analysis = null;
-    let selectedModelForAnalysis = preferredModel;
-
-    // Optional: Further analysis with LLM
-    const shouldAnalyze = (fields.analyze?.[0] || fields.analyze) === 'true';
-    if (shouldAnalyze && markdown.trim()) {
-      const template = fields.template?.[0] || fields.template || 'generic';
-      const customPrompt = fields.customPrompt?.[0] || fields.customPrompt || '';
-      const requestModel = fields.model?.[0] || fields.model;
-      selectedModelForAnalysis = resolveChatModel(requestModel || preferredModel);
-      if (!selectedModelForAnalysis) {
-        await unlink(filePath).catch(() => {});
-        return res.status(400).json({ message: 'Ungültiges KI-Modell' });
+    const { markdown, analysis, selectedModelForSave } = await withUserCostLock(session.user.id, async () => {
+      const costCheck = await checkCostLimit(session.user.id);
+      if (!costCheck.allowed) {
+        throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
       }
-      
-      const resolvedTemplate = await resolveTemplate(template, session.user.id);
 
+      const { markdown: markdownValue, usage: ocrUsage, model: ocrModel } = await performOCR(filePath, apiKey, file.mimetype);
+      await logUsage(session.user.id, ocrModel, 'ocr', ocrUsage);
+
+      if (!shouldAnalyze || !markdownValue.trim()) {
+        return {
+          markdown: markdownValue,
+          analysis: null,
+          selectedModelForSave: 'mistral-ocr-latest',
+        };
+      }
+
+      const resolvedTemplate = await resolveTemplate(template, session.user.id);
       const analysisResult = await analyzeTranscription(
-        markdown, 
-        resolvedTemplate, 
-        apiKey, 
-        customPrompt, 
+        markdownValue,
+        resolvedTemplate,
+        apiKey,
+        customPrompt,
         selectedModelForAnalysis,
         language
       );
       await logUsage(session.user.id, analysisResult.model, 'analysis', analysisResult.usage);
-      analysis = analysisResult.analysis;
-    }
+
+      return {
+        markdown: markdownValue,
+        analysis: analysisResult.analysis,
+        selectedModelForSave: selectedModelForAnalysis,
+      };
+    });
 
     // Save OCR result as a transcription record in the history
     const transcriptionResult = await query(
@@ -152,7 +158,7 @@ export default async function handler(req, res) {
         file.size,
         file.mimetype,
         fields.template?.[0] || fields.template || 'generic',
-        shouldAnalyze ? selectedModelForAnalysis : 'mistral-ocr-latest',
+        selectedModelForSave,
         fields.customPrompt?.[0] || fields.customPrompt || '',
         markdown,
         analysis ? JSON.stringify(analysis) : null
@@ -174,6 +180,9 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ transcriptionId, markdown, analysis });
   } catch (error) {
+    if (error?.code === 'COST_LIMIT_EXCEEDED') {
+      return res.status(429).json({ message: error.message });
+    }
     logApiError('OCR error', error);
     if (filePath) await unlink(filePath).catch(() => {});
     return serverError(res, 'OCR fehlgeschlagen');

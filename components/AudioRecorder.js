@@ -32,19 +32,17 @@ export default function AudioRecorder({ onRecordingComplete }) {
   const latestPeakRef = useRef(0);
   const hasVisualizerStartedRef = useRef(false);
   const previewResetDoneRef = useRef(false);
+  const activeAudioUrlRef = useRef(null);
 
   useEffect(() => {
-    return () => {
-      cleanup();
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
-    };
-  }, [audioUrl]);
-
-  useEffect(() => {
+    if (activeAudioUrlRef.current && activeAudioUrlRef.current !== audioUrl) {
+      URL.revokeObjectURL(activeAudioUrlRef.current);
+    }
+    activeAudioUrlRef.current = audioUrl || null;
     previewResetDoneRef.current = false;
   }, [audioUrl]);
 
-  const cleanup = () => {
+  const cleanup = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
@@ -71,7 +69,16 @@ export default function AudioRecorder({ onRecordingComplete }) {
     latestRawLevelRef.current = 0;
     latestPeakRef.current = 0;
     hasVisualizerStartedRef.current = false;
-  };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cleanup();
+      if (activeAudioUrlRef.current) {
+        URL.revokeObjectURL(activeAudioUrlRef.current);
+      }
+    };
+  }, [cleanup]);
 
   const startVisualizer = useCallback(async (stream) => {
     try {
