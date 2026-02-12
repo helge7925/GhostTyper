@@ -11,59 +11,29 @@ Stack: Next.js 13, React 18, PostgreSQL 16, NextAuth, Mistral API, Docker Compos
 
 ![GhostTyper Screenshot](public/logo-text.png)
 
-## Funktionsumfang
+## Kurzüberblick
 
-### Audio & Transkription
-- Upload von Audio-Dateien (inkl. robuster MIME-/Extension-Prüfung)
-- Browser-Aufnahme (Desktop & Mobile)
-- Diarisierung mit Sprecherzuweisung
-- Optional sofortige Folgeanalyse nach Transkription
-- Standard-Analysemodus beim Upload: `Zusammenfassung` (`generic`)
-- Kontext-Bias (Begriffe/Domainvokabular)
+GhostTyper ist für Teams gedacht, die Sprache und Dokumente schnell in verwertbare Ergebnisse überführen möchten – lokal betreibbar und mit klarem Fokus auf zuverlässige Abläufe.
 
-### OCR & Dokumente
-- OCR für PDF und Bilder
-- Kamera-Upload für mobile Nutzung
-- Optional direkte KI-Analyse nach OCR
-- Speicherung der OCR-Ergebnisse in der Historie
+- Audio hochladen oder direkt im Browser aufnehmen, inkl. Sprechertrennung.
+- PDFs/Bilder per OCR erfassen und direkt weiterverarbeiten.
+- Inhalte mit KI zusammenfassen, strukturieren oder übersetzen.
+- Ergebnisse im zentralen Editor finalisieren und als PDF/DOCX exportieren.
+- Historie, Favoriten und Ordner für wiederkehrende Arbeitsschritte.
+- Self-Hosted mit Next.js, PostgreSQL, NextAuth und Docker Compose.
+- Sicherheitsbasis mit Rate-Limits, verschlüsselten API-Keys und klaren Status-Übergängen.
 
-### KI-Analyse & Textverarbeitung
-- Analysemodi: Zusammenfassung, Meeting, Aufmaß, Custom Templates
-- Modellauswahl mit serverseitiger Modell-Policy (Whitelist)
-- Text-Assistent mit verwaltbaren Aufgaben (text_tasks)
-- Übersetzung als eigener Workflow
+## Code-Review Prioritäten (P0-P3)
 
-### Editor-zentrierter Workflow
-- Einheitlicher Document Editor für Ergebnisbearbeitung
-- PDF/DOCX-Export (PDF primär serverseitig via Chromium, mit lokalem Fallback)
-- PDF-Export nutzt standardmäßig einen festen Stil:
-  - Stil: `Soft Business`
-  - Schrift: `Google Sans Soft` (mit robusten Fallbacks)
-- Premium-Layout ist pro Export im Editor zuschaltbar
-- Premium-Daten (Firma/Name/Rolle/Kontakt/Fußzeile) werden zentral in den Einstellungen gepflegt
-- Optionaler PDF-Kopfbereich als dezente Signatur (Titel, Datum, optional Projekt)
-- PDF wird nach Export standardmäßig direkt im Browser-Tab geöffnet
-- Kein erzwungener Download-Fallback beim PDF-Export (bei blockierten Pop-ups erscheint ein Hinweis)
-- Historie mit Favoriten/Ordnern
-- Übersetzungsfunktion auf den Editor fokussiert (kein Parallel-Workflow mehr in der Detailseite)
+Status: vollständig umgesetzt (Stand 2026-02-12).
 
-### UX-Verbesserungen (neu)
-- Einheitliche Prozesskarte (`ProcessStatusCard`) mit:
-  - Schrittanzeige
-  - Restzeitindikator (ETA)
-  - rotierenden Lade-Texten
-- Auto-Weiterleitung nach Upload, sobald Ergebnis bereit ist (optional)
-- Event-Timeline pro Auftrag in der Detailansicht (Verlauf)
-- Live-Status über SSE bei laufenden Transkriptionsjobs (Polling nur als Fallback)
+Quelle der Prioritäten: externes Kollegenreview (`docs/external-review-2026-02-12.md`).
 
-### Sicherheit & Betriebsstabilität (neu)
-- API-Key-Verschlüsselung (`settings.mistral_api_key_encrypted`)
-- Migrationsskript für Legacy-Klartext-Keys (`npm run migrate-api-keys`)
-- Rate-Limits auf kritischen API-Routen
-- Atomische Statusübergänge bei Transkriptions-/Analysejobs
-- Stale-Job-Recovery (hängende Jobs werden auf `error` gesetzt)
-- Sicheres Dateilöschen nur innerhalb des Upload-Verzeichnisses
-- Separates `DB_INIT_SECRET`; `db-init` in Produktion standardmäßig deaktivierbar
+- P0 (kritisch): XSS-Härtung im Editor, Input-Limits bei `save-doc`, Secrets-Fallback entfernt.
+- P1 (hoch): Duplikate zentralisiert (Analysis-/Template-/Stale-Logik), transaktionales Admin-Update, wartbarer Settings-Updatepfad.
+- P2 (mittel): Queue/Worker-Entkopplung (`queued`) + Observability-Basis (`/api/health`, `/api/admin/observability`).
+- P3 (mittel): PDF-Paginierung verbessert + Mikro-UX-Vereinfachungen im Editor/Statusflow.
+- Vollständiges Änderungsprotokoll: `docs/code-review-priorities-p0-p3-2026-02-12.md`.
 
 ## Schnellstart (Docker Dev)
 
@@ -123,6 +93,19 @@ Siehe `.env.example`.
 - `ENABLE_DB_INIT_API`
 - `SETTINGS_ENCRYPTION_KEY`
 - `PDF_CHROMIUM_PATH`
+- `PDF_EXPORT_MAX_CONCURRENCY`
+- `PDF_EXPORT_QUEUE_TIMEOUT_MS`
+- `TRANSCRIPTION_WORKER_CONCURRENCY`
+- `TRANSCRIPTION_WORKER_SCAN_INTERVAL_MS`
+- `TRANSCRIPTION_WORKER_SCAN_BATCH`
+- `LOG_FORMAT` (`json` oder `plain`)
+- `LOG_LEVEL` (`debug`, `info`, `warn`, `error`)
+
+## Observability
+
+- Strukturierte Server-Logs über `LOG_FORMAT=json` (Default).
+- Laufzeitmetriken im Healthcheck unter `GET /api/health` (worker/db/counters).
+- Erweiterte Metriken für Admins unter `GET /api/admin/observability`.
 
 ## Qualitäts-/Build-Hinweis
 
@@ -132,8 +115,10 @@ Siehe `.env.example`.
 ## Dokumentation
 
 - Übersicht: `docs/README.md`
-- Feature- und Verbesserungsstand: `docs/features-and-improvements.md`
+- Feature-Index (kompakt): `docs/features-and-improvements.md`
 - Security Review & Hardening: `docs/code-review-hardening-2026-02-11.md`
+- Externes Review: `docs/external-review-2026-02-12.md`
+- Prioritäten-Umsetzung P0-P3: `docs/code-review-priorities-p0-p3-2026-02-12.md`
 - Projektplan: `PROJECT_PLAN.md`
 
 ## Lizenz

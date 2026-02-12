@@ -32,9 +32,13 @@ export default async function handler(req, res) {
 
   const { text, action, model } = req.body;
   const selectedModel = resolveTextAiModel(model);
+  const taskId = Number.parseInt(action, 10);
 
   if (!text || !action) {
     return res.status(400).json({ message: 'Text und Aktion sind erforderlich' });
+  }
+  if (!Number.isFinite(taskId)) {
+    return res.status(400).json({ message: 'Ungültige Aktion' });
   }
   if (!selectedModel) {
     return res.status(400).json({ message: 'Ungültiges KI-Modell' });
@@ -44,7 +48,7 @@ export default async function handler(req, res) {
     // 1. Fetch prompt from DB (action is the ID of the text_task)
     const taskResult = await query(
       'SELECT prompt FROM text_tasks WHERE id = $1 AND user_id = $2',
-      [action, session.user.id]
+      [taskId, session.user.id]
     );
 
     if (taskResult.rows.length === 0) {

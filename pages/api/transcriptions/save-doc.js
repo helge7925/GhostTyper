@@ -1,6 +1,11 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
+import {
+  MAX_DOCUMENT_HTML_LENGTH,
+  MAX_DOCUMENT_TEXT_LENGTH,
+  MAX_DOCUMENT_TITLE_LENGTH,
+} from '../../../lib/constants';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,10 +17,26 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Nicht authentifiziert' });
   }
 
-  const { title, text, documentHtml, template } = req.body;
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const { title, text, documentHtml, template } = body;
 
-  if (!title || !documentHtml) {
+  if (typeof title !== 'string' || typeof documentHtml !== 'string') {
     return res.status(400).json({ message: 'Titel und Inhalt sind erforderlich' });
+  }
+  if (!title.trim() || !documentHtml.trim()) {
+    return res.status(400).json({ message: 'Titel und Inhalt sind erforderlich' });
+  }
+  if (title.length > MAX_DOCUMENT_TITLE_LENGTH) {
+    return res.status(400).json({ message: `Titel ist zu lang (max. ${MAX_DOCUMENT_TITLE_LENGTH} Zeichen)` });
+  }
+  if (typeof text === 'string' && text.length > MAX_DOCUMENT_TEXT_LENGTH) {
+    return res.status(400).json({ message: `Text ist zu lang (max. ${MAX_DOCUMENT_TEXT_LENGTH} Zeichen)` });
+  }
+  if (documentHtml.length > MAX_DOCUMENT_HTML_LENGTH) {
+    return res.status(400).json({ message: `Dokument ist zu groß (max. ${MAX_DOCUMENT_HTML_LENGTH} Zeichen)` });
+  }
+  if (template !== undefined && typeof template !== 'string') {
+    return res.status(400).json({ message: 'Ungültiges Template-Format' });
   }
 
   try {
@@ -29,12 +50,12 @@ export default async function handler(req, res) {
       [
         session.user.id,
         'doc_' + Date.now(),
-        title,
+        title.trim(),
         'INTERNAL_DOC', // Placeholder for file_path
         0,
         'application/vnd.ghosttyper.doc',
         template || 'text-assistant',
-        text || '',
+        typeof text === 'string' ? text : '',
         documentHtml
       ]
     );

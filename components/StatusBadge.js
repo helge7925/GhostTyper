@@ -2,6 +2,7 @@ import { STATUS, STATUS_LABELS } from '../lib/constants';
 
 const BADGE_STYLES = {
   [STATUS.PENDING]: 'bg-accent-yellow/20 text-accent-yellow',
+  [STATUS.QUEUED]: 'bg-accent-yellow/20 text-accent-yellow',
   [STATUS.PROCESSING]: 'bg-accent-orange/20 text-accent-orange',
   [STATUS.TRANSCRIBED]: 'bg-accent-cyan/20 text-accent-cyan',
   [STATUS.ANALYZING]: 'bg-accent-orange/20 text-accent-orange',

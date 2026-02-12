@@ -4,6 +4,8 @@ import { checkRateLimit, applyRateLimitHeaders } from '../../../lib/rate-limit';
 import { logApiError, serverError } from '../../../lib/api-utils';
 import { renderPdfBufferFromHtml } from '../../../lib/pdf-export';
 import { getSettingsRow } from '../../../lib/settings-service';
+import { withPdfRenderSlot } from '../../../lib/pdf-render-limiter';
+import { normalizePdfFontPreset, normalizePdfTheme } from '../../../lib/pdf-print-style';
 
 export const config = {
   api: {
@@ -13,8 +15,7 @@ export const config = {
   },
 };
 
-const ALLOWED_THEMES = new Set(['atelier', 'ghosttyper', 'minimal']);
-const ALLOWED_FONT_PRESETS = new Set(['google-sans', 'google-serif', 'system', 'humanist', 'serif']);
+const MAX_PDF_HTML_LENGTH = 2_000_000;
 
 function normalizeFilename(filename) {
   const base = String(filename || 'dokument')
@@ -33,16 +34,6 @@ function normalizeDocumentTitle(filename) {
     .trim()
     .slice(0, 120);
   return value || 'Dokument';
-}
-
-function normalizeTheme(theme) {
-  if (typeof theme !== 'string') return 'atelier';
-  return ALLOWED_THEMES.has(theme) ? theme : 'atelier';
-}
-
-function normalizeFontPreset(fontPreset) {
-  if (typeof fontPreset !== 'string') return 'google-sans';
-  return ALLOWED_FONT_PRESETS.has(fontPreset) ? fontPreset : 'google-sans';
 }
 
 function normalizePremiumLayout(value) {
@@ -77,6 +68,9 @@ export default async function handler(req, res) {
     if (!html || typeof html !== 'string') {
       return res.status(400).json({ message: 'HTML-Inhalt fehlt.' });
     }
+    if (html.length > MAX_PDF_HTML_LENGTH) {
+      return res.status(413).json({ message: 'HTML-Inhalt ist zu groß für den PDF-Export.' });
+    }
 
     const settings = await getSettingsRow(session.user.id);
     const premiumProfile = settings
@@ -90,13 +84,13 @@ export default async function handler(req, res) {
         }
       : null;
 
-    const pdfBuffer = await renderPdfBufferFromHtml(html, {
-      theme: normalizeTheme(theme),
-      fontPreset: normalizeFontPreset(fontPreset),
+    const pdfBuffer = await withPdfRenderSlot(() => renderPdfBufferFromHtml(html, {
+      theme: normalizePdfTheme(theme),
+      fontPreset: normalizePdfFontPreset(fontPreset),
       premiumLayout: normalizePremiumLayout(premiumLayout),
       premiumProfile,
       documentTitle: normalizeDocumentTitle(filename),
-    });
+    }));
     const safeName = `${normalizeFilename(filename)}.pdf`;
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -109,6 +103,9 @@ export default async function handler(req, res) {
     }
     if (error.message === 'PDF_RENDER_TIMEOUT') {
       return res.status(504).json({ message: 'PDF-Erstellung dauerte zu lange.' });
+    }
+    if (error.message === 'PDF_RENDER_BUSY') {
+      return res.status(503).json({ message: 'PDF-Export ist derzeit ausgelastet. Bitte in wenigen Sekunden erneut versuchen.' });
     }
     logApiError('PDF export error', error);
     return serverError(res, 'PDF-Export fehlgeschlagen');

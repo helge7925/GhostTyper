@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useSession, signOut } from 'next-auth/react';
 import { useState, useEffect, useRef } from 'react';
@@ -123,7 +124,14 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         {/* Logo Section */}
         <div className="p-6">
           <Link href="/" className="flex items-center gap-3" onClick={() => setIsOpen(false)}>
-            <img src="/logo.png" alt="GhostTyper Logo" className="w-8 h-8" />
+            <Image
+              src="/logo.png"
+              alt="GhostTyper Logo"
+              width={32}
+              height={32}
+              className="w-8 h-8"
+              priority
+            />
             <span className="text-xl font-bold tracking-tight text-text-primary">GhostTyper</span>
           </Link>
         </div>
@@ -178,6 +186,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/[0.04] transition-all group"
           >
             {session.user.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img 
                 src={session.user.avatar_url} 
                 alt="Profil" 

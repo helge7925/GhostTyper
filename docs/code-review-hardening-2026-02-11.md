@@ -3,6 +3,10 @@
 Datum: 2026-02-11
 Scope: gesamtes Repository (API, Auth, Upload/OCR, DB, Admin, Frontend-Runtime)
 
+Update 2026-02-12:
+- Die priorisierte Nacharbeit aus der Folge-Review (P0-P3) ist abgeschlossen.
+- Detailprotokoll: `code-review-priorities-p0-p3-2026-02-12.md`
+
 ## 1) Ziel und Vorgehen
 
 Diese Review hatte drei Ziele:

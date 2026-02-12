@@ -41,6 +41,13 @@ const ANALYSIS_LOADING_MESSAGES = [
   'Wir verwandeln gerade Gesprächswolken in klare Checklisten.',
 ];
 
+const QUEUE_LOADING_MESSAGES = [
+  'Ihr Auftrag steht bereit und wird als Nächstes gestartet.',
+  'Wir verteilen gerade Rechenzeit und schieben Ihren Job nach vorne.',
+  'Kurz eingeplant: Die Verarbeitung startet in wenigen Augenblicken.',
+  'Die Pipeline wärmt bereits die Motoren für diesen Auftrag auf.',
+];
+
 const EVENT_STAGE_LABELS = {
   queued: 'Warteschlange',
   processing: 'Transkription',
@@ -133,9 +140,10 @@ export default function TranscriptionDetail() {
 
   // Live updates via SSE with polling fallback.
   useEffect(() => {
-    if (!transcription) return;
-    const trackedStatuses = [STATUS.PENDING, STATUS.PROCESSING, STATUS.ANALYZING];
-    if (!trackedStatuses.includes(transcription.status)) return undefined;
+    const currentStatus = transcription?.status;
+    if (!currentStatus) return undefined;
+    const trackedStatuses = [STATUS.PENDING, STATUS.QUEUED, STATUS.PROCESSING, STATUS.ANALYZING];
+    if (!trackedStatuses.includes(currentStatus)) return undefined;
 
     let eventSource = null;
     let fallbackInterval = null;
@@ -230,7 +238,7 @@ export default function TranscriptionDetail() {
       }
       const nextStatus = payload?.status || STATUS.PROCESSING;
       const toastMessage =
-        nextStatus === STATUS.PROCESSING || nextStatus === STATUS.ANALYZING
+        nextStatus === STATUS.QUEUED || nextStatus === STATUS.PROCESSING || nextStatus === STATUS.ANALYZING
           ? 'Verarbeitung läuft.'
           : 'Verarbeitung ist bereits abgeschlossen.';
       setToast({ message: toastMessage, type: 'success' });
@@ -284,7 +292,11 @@ export default function TranscriptionDetail() {
     let title = 'Transkription wird vorbereitet';
     let description = 'Upload abgeschlossen. Die Verarbeitung startet im Hintergrund.';
 
-    if (transcription.status === STATUS.PROCESSING) {
+    if (transcription.status === STATUS.QUEUED) {
+      activeStep = 0;
+      title = 'In Warteschlange';
+      description = 'Der Auftrag ist eingeplant und startet in Kürze automatisch.';
+    } else if (transcription.status === STATUS.PROCESSING) {
       activeStep = 0;
       title = 'Transkription läuft';
       description = 'Das Audio wird gerade in Text umgewandelt.';
@@ -324,6 +336,10 @@ export default function TranscriptionDetail() {
 
     if (transcription.status === STATUS.ANALYZING) {
       return ANALYSIS_LOADING_MESSAGES;
+    }
+
+    if (transcription.status === STATUS.QUEUED) {
+      return QUEUE_LOADING_MESSAGES;
     }
 
     if (transcription.status === STATUS.PROCESSING || transcription.status === STATUS.PENDING) {
@@ -371,7 +387,7 @@ export default function TranscriptionDetail() {
                   {transcription.custom_prompt && (
                     <div>
                       <label className="text-[10px] font-bold text-text-secondary uppercase opacity-50">Anweisung</label>
-                      <p className="text-xs text-text-secondary italic">"{transcription.custom_prompt}"</p>
+                      <p className="text-xs text-text-secondary italic">&quot;{transcription.custom_prompt}&quot;</p>
                     </div>
                   )}
                 </div>
@@ -429,7 +445,7 @@ export default function TranscriptionDetail() {
 
             {/* Right: Preview Area */}
             <div className="lg:col-span-2 space-y-6">
-              {workflowState && [STATUS.PENDING, STATUS.PROCESSING, STATUS.ANALYZING].includes(transcription.status) && (
+              {workflowState && [STATUS.PENDING, STATUS.QUEUED, STATUS.PROCESSING, STATUS.ANALYZING].includes(transcription.status) && (
                 <ProcessStatusCard
                   title={workflowState.title}
                   description={workflowState.description}

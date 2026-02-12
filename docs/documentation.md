@@ -52,12 +52,18 @@ Jede aktualisierte Doku soll:
 - den Unterschied zwischen Dev und Prod klar machen,
 - auf Folgeprüfungen verweisen (Verifikation nach Migration).
 
+Zusatz (Minimal-Ansatz):
+- zuerst verlinken, dann erklären (Link-first)
+- keine doppelten Volltexte in mehreren Dateien
+- pro Thema eine Primärquelle definieren
+
 ## 5. Redaktionsregeln
 
 - Keine generischen Datei-Anlege-/Editier-Platzhalter aus Initial-Tutorials.
 - Keine veralteten Workflows ohne Kennzeichnung.
 - Keine widersprüchlichen Secrets/Namen zwischen README und Setup-Dokumenten.
-- Statusbegriffe konsistent halten (`pending`, `processing`, `transcribed`, `analyzing`, `completed`, `error`).
+- Statusbegriffe konsistent halten (`pending`, `queued`, `processing`, `transcribed`, `analyzing`, `completed`, `error`).
+- Externe Reviews immer als eigene Quelle dokumentieren (klar getrennt von internen Reviews).
 
 ## 6. Pflicht-Check vor Merge/Release
 

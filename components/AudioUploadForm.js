@@ -1,17 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE } from '../lib/constants';
+import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE, normalizeDefaultTemplate } from '../lib/constants';
 import { uploadAudio, getTemplates, getSettings } from '../lib/api';
 import AudioRecorder from './AudioRecorder';
-
-function normalizeDefaultTemplate(value) {
-  if (typeof value !== 'string') return 'generic';
-  const template = value.trim();
-  if (!template) return 'generic';
-
-  if (template === 'generic') return 'generic';
-  if (template.startsWith('custom-')) return template;
-  return 'generic';
-}
 
 export default function AudioUploadForm({ onSuccess }) {
   const [file, setFile] = useState(null);

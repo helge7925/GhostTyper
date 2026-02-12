@@ -14,7 +14,7 @@ function hasFlag(flag) {
 }
 
 function getKeyMaterial() {
-  return process.env.SETTINGS_ENCRYPTION_KEY || process.env.NEXTAUTH_SECRET || null;
+  return process.env.SETTINGS_ENCRYPTION_KEY || null;
 }
 
 function deriveKey() {
@@ -75,7 +75,7 @@ async function migrateApiKeys() {
 
   if (!key) {
     throw new Error(
-      'SETTINGS_ENCRYPTION_KEY oder NEXTAUTH_SECRET ist erforderlich, um API-Keys verschluesselt zu migrieren.'
+      'SETTINGS_ENCRYPTION_KEY ist erforderlich, um API-Keys verschluesselt zu migrieren.'
     );
   }
 

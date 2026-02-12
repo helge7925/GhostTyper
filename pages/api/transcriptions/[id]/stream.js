@@ -3,6 +3,13 @@ import { authOptions } from '../../auth/[...nextauth]';
 import { query } from '../../../../lib/db';
 import { addTranscriptionEvent, listTranscriptionEvents } from '../../../../lib/transcription-events';
 import { logApiError } from '../../../../lib/api-utils';
+import { ensureTranscriptionWorkerRunning } from '../../../../lib/transcription-worker';
+import {
+  isStaleTranscription,
+  recoverStaleTranscriptionById,
+  STALE_TRANSCRIPTION_ERROR_MESSAGE,
+  STALE_TRANSCRIPTION_EVENT_MESSAGE,
+} from '../../../../lib/transcription-stale';
 
 const POLL_INTERVAL_MS = 1500;
 const HEARTBEAT_MS = 15000;
@@ -22,30 +29,20 @@ async function loadTranscriptionSnapshot(transcriptionId, userId) {
   }
 
   const transcription = result.rows[0];
-  const staleStatuses = new Set(['processing', 'analyzing']);
   const updatedAt = new Date(transcription.updated_at).getTime();
-  if (
-    staleStatuses.has(transcription.status) &&
-    Number.isFinite(updatedAt) &&
-    Date.now() - updatedAt > 45 * 60 * 1000
-  ) {
-    await query(
-      `UPDATE transcriptions
-       SET status = 'error',
-           error = 'Verarbeitung wurde unterbrochen. Bitte erneut starten.',
-           updated_at = NOW()
-       WHERE id = $1 AND user_id = $2`,
-      [transcriptionId, userId]
-    );
-    transcription.status = 'error';
-    transcription.error = 'Verarbeitung wurde unterbrochen. Bitte erneut starten.';
-    transcription.updated_at = new Date().toISOString();
-    await addTranscriptionEvent({
-      transcriptionId,
-      userId,
-      stage: 'error',
-      message: 'Verarbeitung wurde wegen Zeitüberschreitung als fehlerhaft markiert.',
-    });
+  if (isStaleTranscription(transcription.status, updatedAt)) {
+    const recovered = await recoverStaleTranscriptionById(transcriptionId, userId);
+    if (recovered) {
+      transcription.status = 'error';
+      transcription.error = STALE_TRANSCRIPTION_ERROR_MESSAGE;
+      transcription.updated_at = new Date().toISOString();
+      await addTranscriptionEvent({
+        transcriptionId,
+        userId,
+        stage: 'error',
+        message: STALE_TRANSCRIPTION_EVENT_MESSAGE,
+      });
+    }
   }
 
   const events = await listTranscriptionEvents(transcriptionId, userId);
@@ -87,6 +84,8 @@ export default async function handler(req, res) {
   if (!Number.isFinite(transId)) {
     return res.status(400).json({ message: 'Ungültige ID' });
   }
+
+  ensureTranscriptionWorkerRunning();
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
@@ -134,7 +133,7 @@ export default async function handler(req, res) {
         writeSseEvent(res, 'transcription', snapshot);
       }
 
-      if (!['pending', 'processing', 'analyzing'].includes(snapshot.status)) {
+      if (!['pending', 'queued', 'processing', 'analyzing'].includes(snapshot.status)) {
         cleanup();
       }
     } catch (error) {

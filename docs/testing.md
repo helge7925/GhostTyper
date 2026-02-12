@@ -1,6 +1,6 @@
 # Testen und Verifizieren
 
-Stand: 2026-02-11
+Stand: 2026-02-12
 
 Dieses Dokument beschreibt die aktuelle Teststrategie für GhostTyper.
 
@@ -27,7 +27,7 @@ Dieses Dokument beschreibt die aktuelle Teststrategie für GhostTyper.
 
 #### A) Audio-Flow
 - Upload gängiger Formate (`mp3`, `wav`, `webm`, `m4a`)
-- Statuswechsel: `pending -> processing -> transcribed/analyzing -> completed`
+- Statuswechsel: `pending -> queued -> processing -> transcribed/analyzing -> completed`
 - Diarisierung: Sprecherzuweisung + manuelle Analyse
 - Event-Timeline vorhanden und plausibel
 - Live-Status über SSE aktiv (kein sichtbares 3s-„Stottern“); Polling nur Fallback
@@ -51,6 +51,10 @@ Dieses Dokument beschreibt die aktuelle Teststrategie für GhostTyper.
 - Ungültige Modelle werden serverseitig abgewiesen (`400`)
 - DB-Init nur mit korrektem Secret
 - API-Key-Migration: keine Klartext-Keys verbleiben
+- Editor-Sanitizing greift auch bei laufenden Edits/Paste (kein unsanitized Re-Render)
+- `save-doc` lehnt übergroße `title`/`text`/`documentHtml` sauber ab
+- Worker-Queue verarbeitet `queued`-Jobs stabil nach Restart weiter
+- Observability-Endpunkte liefern valide Metrikstruktur (`/api/health`, `/api/admin/observability`)
 
 ## 3. Testumgebung
 
@@ -80,7 +84,7 @@ Hinweis: In restriktiven Sandbox-Umgebungen kann `EPERM listen 0.0.0.0` bei `Col
 ```bash
 npm run lint
 ```
-Aktueller Stand: es erscheint ein interaktiver ESLint-Setup-Dialog, solange keine finalisierte ESLint-Konfiguration vorliegt.
+Aktueller Stand: non-interaktiv lauffähig über `.eslintrc.json`.
 
 ## 5. Mobile/Responsive Testkriterien
 
@@ -97,11 +101,14 @@ Aktueller Stand: es erscheint ein interaktiver ESLint-Setup-Dialog, solange kein
 4. Event-Verlauf sichtbar
 5. API-Key-Migration validiert (falls relevant)
 6. Keine Klartext-API-Keys mehr in `settings.mistral_api_key`
-7. Startfehler bei `pending` sind sichtbar und manuell behebbar (UI-Buttons vorhanden)
+7. Start-/Queue-Fehler bei `pending`/`queued` sind sichtbar und manuell behebbar (UI-Buttons vorhanden)
 
 ## 7. Referenzen
 
 - `../README.md`
 - `../PROJECT_PLAN.md`
+- `e2e-regression-matrix.md`
 - `code-review-hardening-2026-02-11.md`
+- `external-review-2026-02-12.md`
+- `code-review-priorities-p0-p3-2026-02-12.md`
 - `features-and-improvements.md`

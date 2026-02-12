@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { requireAdmin } from '../../../../lib/admin';
-import { query } from '../../../../lib/db';
+import pool, { query } from '../../../../lib/db';
 import { validatePassword } from '../../../../lib/constants';
 import { serializeApiKeyForStorage } from '../../../../lib/settings-service';
 
@@ -19,15 +19,36 @@ export default async function handler(req, res) {
   switch (req.method) {
     case 'PUT': {
       const { email, name, password, role, mistralApiKey, costLimit } = req.body;
+      const shouldUpdateCostLimit = costLimit !== undefined;
+      const shouldUpdateApiKey = mistralApiKey !== undefined;
+      const shouldClearApiKey = shouldUpdateApiKey && (mistralApiKey === null || mistralApiKey === '');
+
+      let normalizedCostLimit = null;
+      if (shouldUpdateCostLimit && costLimit !== null && costLimit !== '') {
+        const parsedLimit = Number(costLimit);
+        if (!Number.isFinite(parsedLimit) || parsedLimit < 0) {
+          return res.status(400).json({ message: 'Ungültiges Kostenlimit' });
+        }
+        normalizedCostLimit = parsedLimit;
+      }
+
+      const client = await pool.connect();
 
       try {
-        const existing = await query('SELECT id FROM users WHERE id = $1', [userId]);
+        await client.query('BEGIN');
+        const apiKeyPayload = shouldUpdateApiKey && !shouldClearApiKey
+          ? serializeApiKeyForStorage(String(mistralApiKey).trim())
+          : { plainApiKey: null, encryptedApiKey: null };
+
+        const existing = await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
         if (existing.rows.length === 0) {
+          await client.query('ROLLBACK');
           return res.status(404).json({ message: 'User nicht gefunden' });
         }
 
         // Prevent admin from removing their own admin role
         if (userId === sessionUserId && role && role !== 'admin') {
+          await client.query('ROLLBACK');
           return res.status(400).json({ message: 'Sie können Ihre eigene Admin-Rolle nicht entfernen' });
         }
 
@@ -38,8 +59,9 @@ export default async function handler(req, res) {
 
         if (email !== undefined) {
           // Check email uniqueness
-          const emailCheck = await query('SELECT id FROM users WHERE email = $1 AND id != $2', [email, userId]);
+          const emailCheck = await client.query('SELECT id FROM users WHERE email = $1 AND id != $2', [email, userId]);
           if (emailCheck.rows.length > 0) {
+            await client.query('ROLLBACK');
             return res.status(409).json({ message: 'Diese Email wird bereits verwendet' });
           }
           updates.push(`email = $${paramIndex++}`);
@@ -67,62 +89,46 @@ export default async function handler(req, res) {
         if (updates.length > 0) {
           updates.push(`updated_at = NOW()`);
           values.push(userId);
-          await query(
+          await client.query(
             `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
             values
           );
         }
 
-        if (costLimit !== undefined && costLimit !== null && costLimit !== '') {
-          const parsedLimit = Number(costLimit);
-          if (!Number.isFinite(parsedLimit) || parsedLimit < 0) {
-            return res.status(400).json({ message: 'Ungültiges Kostenlimit' });
-          }
-        }
-
-        // Update settings (API key + cost limit) — F8
-        if (mistralApiKey !== undefined || costLimit !== undefined) {
-          const settingsExists = await query('SELECT id FROM settings WHERE user_id = $1', [userId]);
-          const shouldClearApiKey = mistralApiKey === null || mistralApiKey === '';
-          const apiKeyPayload = mistralApiKey !== undefined && !shouldClearApiKey
-            ? serializeApiKeyForStorage(String(mistralApiKey).trim())
-            : { plainApiKey: null, encryptedApiKey: null };
-
-          if (settingsExists.rows.length === 0) {
-            await query(
-              'INSERT INTO settings (user_id, mistral_api_key, mistral_api_key_encrypted, cost_limit) VALUES ($1, $2, $3, $4)',
-              [userId, apiKeyPayload.plainApiKey, apiKeyPayload.encryptedApiKey, costLimit ?? null]
-            );
-          } else {
-            const sUpdates = [];
-            const sValues = [];
-            let sIdx = 1;
-
-            if (mistralApiKey !== undefined) {
-              sUpdates.push(`mistral_api_key = $${sIdx++}`);
-              sValues.push(shouldClearApiKey ? null : apiKeyPayload.plainApiKey);
-              sUpdates.push(`mistral_api_key_encrypted = $${sIdx++}`);
-              sValues.push(shouldClearApiKey ? null : apiKeyPayload.encryptedApiKey);
-            }
-
-            if (costLimit !== undefined) {
-              sUpdates.push(`cost_limit = $${sIdx++}`);
-              sValues.push(costLimit === null || costLimit === '' ? null : costLimit);
-            }
-
-            if (sUpdates.length > 0) {
-              sUpdates.push('updated_at = NOW()');
-              sValues.push(userId);
-              await query(
-                `UPDATE settings SET ${sUpdates.join(', ')} WHERE user_id = $${sIdx}`,
-                sValues
-              );
-            }
-          }
+        if (shouldUpdateApiKey || shouldUpdateCostLimit) {
+          await client.query(
+            `INSERT INTO settings (user_id, mistral_api_key, mistral_api_key_encrypted, cost_limit, updated_at)
+             VALUES ($1, $2, $3, $4, NOW())
+             ON CONFLICT (user_id) DO UPDATE SET
+               mistral_api_key = CASE
+                 WHEN $5 THEN NULL
+                 WHEN $6 THEN $2
+                 ELSE settings.mistral_api_key
+               END,
+               mistral_api_key_encrypted = CASE
+                 WHEN $5 THEN NULL
+                 WHEN $6 THEN $3
+                 ELSE settings.mistral_api_key_encrypted
+               END,
+               cost_limit = CASE
+                 WHEN $7 THEN $4
+                 ELSE settings.cost_limit
+               END,
+               updated_at = NOW()`,
+            [
+              userId,
+              apiKeyPayload.plainApiKey,
+              apiKeyPayload.encryptedApiKey,
+              normalizedCostLimit,
+              shouldClearApiKey,
+              shouldUpdateApiKey,
+              shouldUpdateCostLimit,
+            ]
+          );
         }
 
         // Return updated user
-        const result = await query(
+        const result = await client.query(
           `SELECT u.id, u.email, u.name, u.role, u.created_at,
                   (s.mistral_api_key IS NOT NULL OR s.mistral_api_key_encrypted IS NOT NULL) AS api_key_configured,
                   s.preferred_model, s.cost_limit
@@ -132,10 +138,18 @@ export default async function handler(req, res) {
           [userId]
         );
 
+        await client.query('COMMIT');
         return res.status(200).json(result.rows[0]);
       } catch (error) {
+        try {
+          await client.query('ROLLBACK');
+        } catch {
+          // ignore rollback errors
+        }
         console.error('Admin update user error:', error);
         return res.status(500).json({ message: 'User-Aktualisierung fehlgeschlagen' });
+      } finally {
+        client.release();
       }
     }
 
