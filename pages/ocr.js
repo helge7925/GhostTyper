@@ -235,7 +235,7 @@ export default function OCR() {
 
             <div className="flex flex-col items-center gap-6">
               <label className="flex items-center gap-3 cursor-pointer group">
-                <input type="checkbox" checked={analyze} onChange={(e) => setAnalyze(e.target.checked)} className="w-5 h-5 rounded border-white/10 bg-white/5 text-accent-orange focus:ring-accent-orange" />
+                <input type="checkbox" checked={analyze} onChange={(e) => setAnalyze(e.target.checked)} className="w-5 h-5 rounded border-white/10 bg-white/5 accent-accent-orange focus:ring-accent-orange" />
                 <span className="text-sm text-text-secondary group-hover:text-text-primary">Direkt analysieren</span>
               </label>
 

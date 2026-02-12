@@ -94,14 +94,21 @@ export default async function handler(req, res) {
     res.setHeader('Content-Length', String(pdfBuffer.length));
     return res.status(200).send(pdfBuffer);
   } catch (error) {
-    if (error.message === 'PDF_RENDERER_UNAVAILABLE') {
-      return res.status(503).json({ message: 'PDF-Renderer ist nicht verfügbar.' });
+    const errorMessage = String(error?.message || '');
+    if (errorMessage.startsWith('PDF_RENDERER_UNAVAILABLE')) {
+      return res.status(503).json({ message: 'PDF-Renderer ist nicht verfügbar. Chromium/Chrome installieren oder PDF_CHROMIUM_PATH setzen.' });
     }
-    if (error.message === 'PDF_RENDER_TIMEOUT') {
+    if (errorMessage === 'PDF_RENDER_TIMEOUT') {
       return res.status(504).json({ message: 'PDF-Erstellung dauerte zu lange.' });
     }
-    if (error.message === 'PDF_RENDER_BUSY') {
+    if (errorMessage === 'PDF_RENDER_BUSY') {
       return res.status(503).json({ message: 'PDF-Export ist derzeit ausgelastet. Bitte in wenigen Sekunden erneut versuchen.' });
+    }
+    if (errorMessage.startsWith('PDF_RENDER_FAILED')) {
+      return res.status(503).json({ message: 'PDF-Renderer konnte kein PDF erzeugen.' });
+    }
+    if (errorMessage.startsWith('PDF_RENDER_SPAWN_FAILED')) {
+      return res.status(503).json({ message: 'PDF-Renderer konnte nicht gestartet werden.' });
     }
     logApiError('PDF export error', error);
     return serverError(res, 'PDF-Export fehlgeschlagen');

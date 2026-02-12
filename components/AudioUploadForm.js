@@ -174,11 +174,11 @@ export default function AudioUploadForm({ onSuccess }) {
 
       <div className="space-y-3 pt-2">
         <label className="flex items-center gap-3 cursor-pointer group">
-          <input type="checkbox" checked={diarize} onChange={(e) => setDiarize(e.target.checked)} className="w-4 h-4 text-accent-orange bg-dark-input border-white/[0.2] rounded focus:ring-accent-orange" />
+          <input type="checkbox" checked={diarize} onChange={(e) => setDiarize(e.target.checked)} className="w-4 h-4 accent-accent-orange bg-dark-input border-white/[0.2] rounded focus:ring-accent-orange" />
           <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">Sprechererkennung aktivieren</span>
         </label>
         <label className="flex items-center gap-3 cursor-pointer group">
-          <input type="checkbox" checked={autoAnalyze} onChange={(e) => setAutoAnalyze(e.target.checked)} className="w-4 h-4 text-accent-orange bg-dark-input border-white/[0.2] rounded focus:ring-accent-orange" />
+          <input type="checkbox" checked={autoAnalyze} onChange={(e) => setAutoAnalyze(e.target.checked)} className="w-4 h-4 accent-accent-orange bg-dark-input border-white/[0.2] rounded focus:ring-accent-orange" />
           <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">Direkt analysieren</span>
         </label>
       </div>
