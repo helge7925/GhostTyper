@@ -1,9 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 
-function shuffleMessages(messages) {
+function hashSeed(seed) {
+  let hash = 2166136261;
+  const normalized = String(seed || '');
+  for (let index = 0; index < normalized.length; index += 1) {
+    hash ^= normalized.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function shuffleMessages(messages, seed = '') {
   const arr = [...messages];
+  let randomState = hashSeed(seed) || 1;
+
   for (let i = arr.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
+    randomState = Math.imul(randomState, 1664525) + 1013904223;
+    const j = Math.abs(randomState) % (i + 1);
     const tmp = arr[i];
     arr[i] = arr[j];
     arr[j] = tmp;
@@ -35,8 +48,8 @@ export default function ProcessStatusCard({
     [messages]
   );
   const shuffledMessages = useMemo(
-    () => shuffleMessages(messagePool),
-    [messagePool.join('|'), title, activeStep]
+    () => shuffleMessages(messagePool, `${title}|${activeStep}`),
+    [messagePool, title, activeStep]
   );
   const [messageIndex, setMessageIndex] = useState(0);
   const [now, setNow] = useState(Date.now());

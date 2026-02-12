@@ -20,6 +20,11 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Premium-PDF-Profil in den Einstellungen (`Unternehmen`, `Name`, `Rolle`, `Kontakt`, `Fußzeile`).
 - Premium-Layout im PDF-Export pro Vorgang einzeln zuschaltbar (Editor-Schalter).
 - SSE-Stream für Live-Status bei Transkriptionsjobs: `GET /api/transcriptions/[id]/stream`.
+- DB-basierte Queue/Worker-Verarbeitung für Transkriptionsjobs (`queued`-Status + Worker-Pump).
+- Zentrales Observability-Modul (`lib/observability.js`) mit strukturierter Log-Ausgabe und Laufzeit-Countern.
+- Admin-Observability-Endpunkt: `GET /api/admin/observability`.
+- Vollständiges P0-P3-Protokoll: `docs/code-review-priorities-p0-p3-2026-02-12.md`.
+- Externes Review als eigene Quelle dokumentiert: `docs/external-review-2026-02-12.md`.
 
 ### Changed
 - UI auf reduzierte, Apple-orientierte Interaktion ausgerichtet:
@@ -36,6 +41,10 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Upload- und Detailseite nutzen für laufende Jobs primär SSE-Live-Updates statt Client-Polling (Polling bleibt Fallback).
 - PDF-Kopfbereich als schlanke Signatur angepasst (Titel, Datum, optional Projekt).
 - UI-Microcopy auf Kernseiten weiter beruhigt und vereinheitlicht.
+- Editor-Topbar vereinfacht: klare Primäraktionen (`Speichern`, `PDF exportieren`) + `Mehr`-Menü für Sekundäraktionen.
+- Workflow-Status erweitert: `pending -> queued -> processing -> ...` für transparente Warteschlangenkommunikation.
+- PDF-Print-CSS weiter verfeinert (Witwen/Waisen, Heading-Folgeblockschutz, stabilere Tabellen-/Listenumbrüche).
+- `settings`-Updatepfad auf wartbaren dynamischen Query-Builder umgestellt.
 
 ### Fixed
 - Robustere Job-Verarbeitung durch atomische Statusübergänge und Schutz vor Doppelstarts.
@@ -46,9 +55,15 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Chromium-PDF-Header/Footer-Artefakte (z. B. `file:///tmp/...`, Datum/Uhrzeit) entfernt.
 - Upload-/Queue-Startfehler sind nicht mehr „still“: klare UI-Meldung + manuelle Neustart-Aktion.
 - PDF-Export erzwingt keinen Datei-Download mehr; Öffnung erfolgt ausschließlich im Browser-Tab.
+- Doppelte Helper-Logik bereinigt (Analysis-Cleaning, Template-Auflösung, Stale-Recovery).
+- `save-doc` validiert jetzt harte Längenlimits für `title`, `text`, `documentHtml`.
+- Admin-User-Update schreibt User/Settings konsistent in einer DB-Transaktion.
+- ESLint-Warnungen vollständig bereinigt (`npm run lint` ohne Warnungen/Fehler).
 
 ### Security
 - Verschlüsselte API-Key-Speicherung (`settings.mistral_api_key_encrypted`).
 - Rate-Limits auf kritischen API-Endpunkten.
 - Modell-Whitelist serverseitig.
 - Getrennte Secrets für Auth und DB-Init (`NEXTAUTH_SECRET`, `DB_INIT_SECRET`).
+- Verschlüsselungshärtung: kein Fallback mehr von `SETTINGS_ENCRYPTION_KEY` auf `NEXTAUTH_SECRET`.
+- Editor-Sanitizing bei laufenden Edits/Paste abgesichert (zusätzliche XSS-Risikoreduktion).

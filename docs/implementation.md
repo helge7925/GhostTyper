@@ -1,6 +1,6 @@
 # Implementierung
 
-Stand: 2026-02-11
+Stand: 2026-02-12
 
 Dieses Dokument beschreibt die technische Implementierung des aktuellen GhostTyper-Systems.
 
@@ -27,7 +27,7 @@ Kernfluss:
 ### 2.2 Backend (`pages/api/`)
 - `upload.js`: Upload, Validierung, Transkriptionsjob anlegen
 - `ocr.js`: OCR-Verarbeitung und optional Analyse
-- `transcriptions/[id]/process.js`: Transkriptions-Backgroundflow
+- `transcriptions/[id]/process.js`: Queueing und Worker-Start für Transkriptionsjobs
 - `transcriptions/[id]/analyze.js`: manuelle Folgeanalyse
 - `transcriptions/[id].js`: Detail-GET/PATCH/DELETE inkl. Event-Auslieferung
 - `settings.js`: API-Key-Verwaltung, Modell-/Kosten-Einstellungen
@@ -42,11 +42,14 @@ Kernfluss:
 - `rate-limit.js`: Ratenbegrenzung
 - `model-policy.js`: Modell-Whitelist
 - `transcription-events.js`: Event-Logging/Abfrage für Timeline
+- `transcription-worker.js`: asynchrone Worker-Verarbeitung für `queued` Jobs
+- `observability.js`: strukturierte Logs + Laufzeitmetriken
+- `pdf-export.js` + `pdf-print-style.js`: serverseitiger PDF-Renderer inkl. Paginierungsregeln
 
 ## 3. Datenmodell (relevante Teile)
 
 ### 3.1 `transcriptions`
-- Prozessstatus: `pending`, `processing`, `transcribed`, `analyzing`, `completed`, `error`
+- Prozessstatus: `pending`, `queued`, `processing`, `transcribed`, `analyzing`, `completed`, `error`
 - Inhalt: `text`, `analysis`, `segments`, `speakers`, `document_html`
 - Orga: `folder_id`, `is_favorite`
 
@@ -63,12 +66,13 @@ Kernfluss:
 
 ### 4.1 Transkriptionsjob
 1. Upload legt Datensatz in `pending` an.
-2. `process` setzt atomar auf `processing`.
-3. Nach erfolgreicher Transkription:
+2. `process` setzt atomar auf `queued`.
+3. Worker claimed atomar `queued -> processing`.
+4. Nach erfolgreicher Transkription:
    - bei Diarisierung: `transcribed` (Warten auf Sprecherzuweisung)
    - ohne Auto-Analyse: `transcribed`
    - mit Auto-Analyse: `analyzing` -> `completed`
-4. Fehlerpfad: `error`.
+5. Fehlerpfad: `error`.
 
 ### 4.2 Manuelle Analyse
 1. erlaubt nur aus `transcribed`.
@@ -79,6 +83,11 @@ Kernfluss:
 ### 4.3 Event-Log
 Bei jedem wichtigen Übergang wird ein Event geschrieben (`queued`, `processing`, `analyzing`, `completed`, `error`).
 Die Detailansicht rendert diese Events als Verlauf.
+
+### 4.4 Observability
+- Strukturierte Logs werden zentral über `lib/observability.js` emittiert.
+- Laufzeitmetriken (Worker/DB/Counter) werden im Healthcheck ausgegeben.
+- Für Administratoren stehen erweiterte Metriken unter `GET /api/admin/observability` bereit.
 
 ## 5. Security-Implementierung
 
@@ -93,7 +102,9 @@ Die Detailansicht rendert diese Events als Verlauf.
 
 - Einheitliche Statuskomponente mit Schritten und ETA.
 - Rotierende Lade-Sprüche pro Prozessphase.
+- Eigene Warteschlangen-Kommunikation (`queued`) mit dedizierten Hinweisen.
 - Optionale Auto-Weiterleitung nach Upload bei fertigem Job.
+- Editor mit klaren Primäraktionen (`Speichern`, `PDF exportieren`) und gebündelten Sekundäraktionen (`Mehr`-Menü).
 - Konsistente Zustandskommunikation in Upload/OCR/Translate/Text-AI.
 
 ## 7. Bekannte technische Grenzen
@@ -107,3 +118,5 @@ Die Detailansicht rendert diese Events als Verlauf.
 - Projektstatus/Roadmap: `../PROJECT_PLAN.md`
 - Featureübersicht: `features-and-improvements.md`
 - Security-Review: `code-review-hardening-2026-02-11.md`
+- Externes Review: `external-review-2026-02-12.md`
+- Prioritäten-Protokoll P0-P3: `code-review-priorities-p0-p3-2026-02-12.md`

@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useState, useEffect } from 'react';
 import { getSettings, updateSettings, getTemplates, createTemplate, updateTemplate, deleteTemplate, generateTemplatePrompt, getTextTasks, createTextTask, updateTextTask, deleteTextTask } from '../lib/api';
+import { normalizeDefaultTemplate } from '../lib/constants';
 import { DEFAULT_PROMPTS, getPrompt } from '../lib/prompts';
 
 const PRICE_LIST = [
@@ -11,16 +12,6 @@ const PRICE_LIST = [
   { model: 'Mistral Small', input: '0,20 €', output: '0,60 €', note: 'Kompakt' },
   { model: 'Mistral Voxtral Mini', input: '0,01 €', output: '0,01 €', note: 'Transkription' },
 ];
-
-function normalizeDefaultTemplate(value) {
-  if (typeof value !== 'string') return 'generic';
-  const template = value.trim();
-  if (!template) return 'generic';
-
-  if (template === 'generic') return 'generic';
-  if (template.startsWith('custom-')) return template;
-  return 'generic';
-}
 
 export default function Settings() {
   const { data: session, status } = useSession();
@@ -409,7 +400,7 @@ export default function Settings() {
                           <svg className="w-4 h-4" fill={task.is_favorite ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
                         </button>
                       </div>
-                      <p className="text-[10px] text-text-secondary line-clamp-2 italic mb-4 opacity-60">"{task.prompt}"</p>
+                      <p className="text-[10px] text-text-secondary line-clamp-2 italic mb-4 opacity-60">&quot;{task.prompt}&quot;</p>
                     </div>
                     <div className="flex items-center gap-3 pt-4 border-t border-white/5">
                       <button onClick={() => setActiveTaskEditor(task)} className="text-[10px] font-bold text-accent-orange uppercase hover:underline">Edit</button>
@@ -611,7 +602,7 @@ export default function Settings() {
                 className="flex-1 bg-dark-card border border-white/5 rounded-2xl p-8 text-sm text-text-primary outline-none focus:border-accent-orange/30 shadow-2xl resize-none font-mono leading-relaxed"
               />
               <p className="mt-4 text-[10px] text-text-secondary italic">
-                Tipp: Seien Sie präzise. Beispiel: "Korrigiere alle Rechtschreibfehler, aber behalte den Dialekt bei."
+                Tipp: Seien Sie präzise. Beispiel: &quot;Korrigiere alle Rechtschreibfehler, aber behalte den Dialekt bei.&quot;
               </p>
             </div>
           </main>

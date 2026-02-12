@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
@@ -26,7 +27,14 @@ export default function Home() {
 
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="text-center max-w-lg">
-          <img src="/logo-text.png" alt="GhostTyper" className="h-16 mx-auto mb-6" />
+          <Image
+            src="/logo-text.png"
+            alt="GhostTyper"
+            width={240}
+            height={64}
+            className="h-16 w-auto mx-auto mb-6"
+            priority
+          />
           <p className="text-xl text-text-secondary mb-10 leading-relaxed">
             Your thoughts, decoded and distilled.
           </p>

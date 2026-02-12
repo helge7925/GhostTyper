@@ -220,7 +220,7 @@ Die Anwendung ist unter `https://transkription.helgeroos.de` verfügbar. Die API
 
 - [Umgebungsanalyse](umgebungsanalyse.md)
 - [API-Spezifikation](api-specification.md)
-- [Projektplan](PROJECT_PLAN.md)
+- [Projektplan](../PROJECT_PLAN.md)
 
 ## Nächste Schritte
 

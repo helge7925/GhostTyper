@@ -1,72 +1,38 @@
 # GhostTyper Dokumentation
 
-Stand: 2026-02-11
+Stand: 2026-02-12
 
-Diese Seite ist der Einstieg in die Projektdokumentation.
+## Start hier
 
-## Schnellnavigation
+- Produkt/Setup: `../README.md`
+- Aktueller Planstatus: `../PROJECT_PLAN.md`
+- Release Notes: `release-notes-2026-02-12.md`
 
-### Betrieb & Setup
-- `../README.md`: Quickstart, Migration, wichtigste Befehle
-- `docker-setup.md`: Docker-Setup und Laufzeitumgebung
-- `vps-deployment-guide.md`: Deployment auf VPS/Traefik
-- `docker-troubleshooting.md`: Docker-spezifische Fehlerbilder
+## Reviews & Prioritäten
 
-### Sicherheit & Stabilität
-- `code-review-hardening-2026-02-11.md`: umfassende Code-Review, Security-Härtung, Migrations-Checkliste
-- `authentication.md`: Authentifizierungskonzept
-- `troubleshooting-auth.md`: Auth-Fehlerbilder und Lösungen
+- Internes Hardening-Review (2026-02-11): `code-review-hardening-2026-02-11.md`
+- Externes Kollegenreview (2026-02-12): `external-review-2026-02-12.md`
+- Umsetzungsstatus P0-P3: `code-review-priorities-p0-p3-2026-02-12.md`
 
-### Funktionen & Produktstand
-- `features-and-improvements.md`: umgesetzte Features und UX-Verbesserungen
-- `ai-integration.md`: Mistral-Integration (Transkription/OCR/Analyse/Übersetzung)
-- `audio-upload.md`: Upload-/Audiofluss
-- `api-specification.md`: API-Schnittstellen
+## Technik & Betrieb
 
-### Projektführung
-- `../PROJECT_PLAN.md`: aktueller Projektplan und Roadmap
-- `project-completion.md`: historischer Abschluss-/Abnahmekontext
-- `implementation.md`: technische Implementierungsdetails
-- `testing.md`: Teststrategie und Prüfabläufe
-- `documentation.md`: Meta-Dokumentation
+- Implementierung: `implementation.md`
+- Tests/Abnahme: `testing.md`
+- API: `api-specification.md`
+- Docker lokal: `docker-setup.md`
+- VPS/Traefik: `vps-deployment-guide.md`
+- Troubleshooting Docker: `docker-troubleshooting.md`
+- Auth Troubleshooting: `troubleshooting-auth.md`
 
-## Neu seit dem Hardening-Block (2026-02-11)
+## Produktdokumente
 
-- API-Key-Härtung:
-  - verschlüsselte Speicherung in `settings.mistral_api_key_encrypted`
-  - Migrationsskript `npm run migrate-api-keys`
-- Sicherheitsmaßnahmen:
-  - Rate-Limits auf kritischen Endpunkten
-  - Modell-Whitelist und härtere Eingabevalidierung
-  - getrennte Secrets (`DB_INIT_SECRET`, `SETTINGS_ENCRYPTION_KEY`)
-- Betriebsstabilität:
-  - atomische Statusübergänge
-  - Stale-Job-Recovery
-  - robustere Datei-/Pfadbehandlung
-- UX-Verbesserungen:
-  - einheitliche Statuskarte mit ETA und rotierenden Lade-Texten
-  - Live-Status via SSE bei laufenden Transkriptionsjobs (Polling als Fallback)
-  - Auto-Weiterleitung nach Upload bei fertigem Ergebnis
-  - sichtbare Startfehler bei Warteschlangen-Jobs inkl. manueller Neustart-Aktion
-  - Event-Timeline (Verlauf) in der Transkriptionsdetailseite
-- Export:
-  - serverseitiger PDF-Exportpfad (`/api/export/pdf`) mit Chromium-Rendering
-  - fester PDF-Stil (`Soft Business` + `Google Sans Soft`) inkl. direkter Browser-Öffnung
-  - optionaler schlanker PDF-Kopfbereich (Titel, Datum, Projekt)
-  - Header/Footer-Artefakte im PDF entfernt
-- Defaults:
-  - Upload-Default-Template konsistent auf `Zusammenfassung` (`generic`) gesetzt
+- Features (Kurzfassung im README): `../README.md`
+- Feature-Index/Weiterführende Links: `features-and-improvements.md`
+- Audio-Flow: `audio-upload.md`
+- KI-Integration: `ai-integration.md`
 
-## Empfohlene Lesereihenfolge
+## Hinweis zur Doku-Philosophie
 
-1. `../README.md`
-2. `../PROJECT_PLAN.md`
-3. `code-review-hardening-2026-02-11.md`
-4. `features-and-improvements.md`
-5. je nach Bedarf: `api-specification.md`, `testing.md`, `vps-deployment-guide.md`
-
-## Betriebshinweis
-
-Wenn nach Codeänderungen neue DB-Strukturen erwartet werden (z. B. `transcription_events`, `mistral_api_key_encrypted`), müssen:
-1. Container neu gebaut/gestartet werden.
-2. `POST /api/db-init` mit korrekt gesetztem `x-init-secret` ausgeführt werden.
+- Link-first: Details nur in Fachdokumenten.
+- Keine redundanten Volltexte über mehrere Dateien hinweg.
+- `PROJECT_PLAN.md` und Release Notes sind die maßgeblichen Statusquellen.

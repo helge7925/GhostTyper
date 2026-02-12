@@ -133,6 +133,7 @@ export default function Profile() {
               className="relative cursor-pointer group"
             >
               {formData.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img 
                   src={formData.avatarUrl} 
                   alt="Avatar" 

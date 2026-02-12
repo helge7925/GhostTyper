@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
-import { query, resolveTemplate } from '../../../../lib/db';
+import { query } from '../../../../lib/db';
 import { analyzeTranscription, buildTextWithSpeakers } from '../../../../lib/ai-service';
 import { logUsage, checkCostLimit } from '../../../../lib/usage';
 import { resolveChatModel } from '../../../../lib/model-policy';
@@ -8,6 +8,7 @@ import { getSettingsRow, resolveStoredApiKey } from '../../../../lib/settings-se
 import { checkRateLimit, applyRateLimitHeaders } from '../../../../lib/rate-limit';
 import { logApiError } from '../../../../lib/api-utils';
 import { addTranscriptionEvent } from '../../../../lib/transcription-events';
+import { resolveTemplate } from '../../../../lib/template-service';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

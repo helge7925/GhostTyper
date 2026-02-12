@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import Image from 'next/image';
 import Sidebar from './Sidebar';
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
@@ -38,7 +39,14 @@ export default function Layout({ children }) {
               </button>
               
               <Link href="/" className="flex items-center gap-2">
-                <img src="/logo.png" alt="GhostTyper" className="w-7 h-7" />
+                <Image
+                  src="/logo.png"
+                  alt="GhostTyper"
+                  width={28}
+                  height={28}
+                  className="w-7 h-7"
+                  priority
+                />
                 <span className="font-bold text-text-primary tracking-tight">GhostTyper</span>
               </Link>
               

@@ -1,11 +1,12 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
-import { query } from '../../lib/db';
+import pool from '../../lib/db';
 import {
   getSettingsRow,
   hasStoredApiKey,
   serializeApiKeyForStorage,
 } from '../../lib/settings-service';
+import { normalizeDefaultTemplate } from '../../lib/constants';
 import { resolveChatModel, resolveOcrModel } from '../../lib/model-policy';
 import { checkRateLimit, applyRateLimitHeaders } from '../../lib/rate-limit';
 import { logApiError, serverError } from '../../lib/api-utils';
@@ -49,15 +50,9 @@ function normalizeOptionalText(value, maxLength) {
   };
 }
 
-function normalizeDefaultTemplate(value) {
-  if (typeof value !== 'string') return 'generic';
-  const template = value.trim();
-  if (!template) return 'generic';
-
-  // Product decision: summary is the default; meeting/aufmass stay selectable per job.
-  if (template === 'generic') return 'generic';
-  if (template.startsWith('custom-')) return template;
-  return 'generic';
+function addUpdate(updates, values, column, value) {
+  updates.push(`${column} = $${values.length + 1}`);
+  values.push(value);
 }
 
 export default async function handler(req, res) {
@@ -146,10 +141,16 @@ export default async function handler(req, res) {
           return res.status(400).json({ message: 'Ungültiges OCR-Modell' });
         }
 
-        const shouldUpdateApiKey = mistralApiKey !== undefined;
+        const shouldUpdateApiKey = hasOwnValue(body, 'mistralApiKey');
         const shouldClearApiKey = shouldUpdateApiKey && (mistralApiKey === null || mistralApiKey === '');
-        const shouldUpdateCostLimit = costLimit !== undefined;
-        const normalizedDefaultTemplate = normalizeDefaultTemplate(defaultTemplate);
+        const shouldUpdateDefaultTemplate = hasOwnValue(body, 'defaultTemplate');
+        const shouldUpdateLanguage = hasOwnValue(body, 'language');
+        const shouldUpdateContextBias = hasOwnValue(body, 'contextBias');
+        const shouldUpdatePreferredModel = hasOwnValue(body, 'preferredModel');
+        const shouldUpdateCostLimit = hasOwnValue(body, 'costLimit');
+        const shouldUpdateDefaultTranslateLanguage = hasOwnValue(body, 'defaultTranslateLanguage');
+        const shouldUpdateOcrModel = hasOwnValue(body, 'ocrModel');
+
         const normalizedCostLimit = normalizeCostLimit(costLimit);
         if (shouldUpdateCostLimit && costLimit !== null && costLimit !== '' && normalizedCostLimit === null) {
           return res.status(400).json({ message: 'Ungültiges Kostenlimit' });
@@ -202,105 +203,89 @@ export default async function handler(req, res) {
           return res.status(400).json({ message: 'Ungültiger Footer für Premium-PDF' });
         }
 
-        const apiKeyPayload = shouldUpdateApiKey && !shouldClearApiKey
-          ? serializeApiKeyForStorage(String(mistralApiKey).trim())
-          : { encryptedApiKey: null, plainApiKey: null };
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
 
-        await query(
-          `INSERT INTO settings (
-            user_id,
-            mistral_api_key,
-            mistral_api_key_encrypted,
-            default_template,
-            language,
-            context_bias,
-            preferred_model,
-            cost_limit,
-            default_translate_language,
-            ocr_model,
-            pdf_premium_enabled_default,
-            pdf_premium_company,
-            pdf_premium_name,
-            pdf_premium_role,
-            pdf_premium_contact,
-            pdf_premium_footer,
-            updated_at
-          )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $15, $17, $19, $21, $23, $25, NOW())
-           ON CONFLICT (user_id) DO UPDATE SET
-             mistral_api_key = CASE
-               WHEN $11 THEN NULL
-               WHEN $12 THEN $2
-               ELSE settings.mistral_api_key
-             END,
-             mistral_api_key_encrypted = CASE
-               WHEN $11 THEN NULL
-               WHEN $12 THEN $3
-               ELSE settings.mistral_api_key_encrypted
-             END,
-             default_template = COALESCE($4, settings.default_template),
-             language = COALESCE($5, settings.language),
-             context_bias = $6,
-             preferred_model = COALESCE($7, settings.preferred_model),
-             cost_limit = CASE
-               WHEN $13 THEN $8
-               ELSE settings.cost_limit
-             END,
-             default_translate_language = COALESCE($9, settings.default_translate_language),
-             ocr_model = COALESCE($10, settings.ocr_model),
-             pdf_premium_enabled_default = CASE
-               WHEN $14 THEN $15
-               ELSE settings.pdf_premium_enabled_default
-             END,
-             pdf_premium_company = CASE
-               WHEN $16 THEN $17
-               ELSE settings.pdf_premium_company
-             END,
-             pdf_premium_name = CASE
-               WHEN $18 THEN $19
-               ELSE settings.pdf_premium_name
-             END,
-             pdf_premium_role = CASE
-               WHEN $20 THEN $21
-               ELSE settings.pdf_premium_role
-             END,
-             pdf_premium_contact = CASE
-               WHEN $22 THEN $23
-               ELSE settings.pdf_premium_contact
-             END,
-             pdf_premium_footer = CASE
-               WHEN $24 THEN $25
-               ELSE settings.pdf_premium_footer
-             END,
-             updated_at = NOW()`,
-          [
-            session.user.id,
-            apiKeyPayload.plainApiKey,
-            apiKeyPayload.encryptedApiKey,
-            normalizedDefaultTemplate,
-            language || null,
-            contextBias ?? null,
-            preferredModel || null,
-            shouldUpdateCostLimit ? normalizedCostLimit : null,
-            defaultTranslateLanguage || null,
-            ocrModel || null,
-            shouldClearApiKey,
-            shouldUpdateApiKey,
-            shouldUpdateCostLimit,
-            shouldUpdatePdfPremiumEnabled,
-            parsedPdfPremiumEnabled,
-            shouldUpdatePdfPremiumCompany,
-            normalizedPdfPremiumCompany.value,
-            shouldUpdatePdfPremiumName,
-            normalizedPdfPremiumName.value,
-            shouldUpdatePdfPremiumRole,
-            normalizedPdfPremiumRole.value,
-            shouldUpdatePdfPremiumContact,
-            normalizedPdfPremiumContact.value,
-            shouldUpdatePdfPremiumFooter,
-            normalizedPdfPremiumFooter.value,
-          ]
-        );
+          await client.query(
+            `INSERT INTO settings (user_id, updated_at)
+             VALUES ($1, NOW())
+             ON CONFLICT (user_id) DO NOTHING`,
+            [session.user.id]
+          );
+
+          const updates = [];
+          const values = [];
+
+          if (shouldUpdateApiKey) {
+            const apiKeyPayload = shouldClearApiKey
+              ? { encryptedApiKey: null, plainApiKey: null }
+              : serializeApiKeyForStorage(String(mistralApiKey).trim());
+            addUpdate(updates, values, 'mistral_api_key', apiKeyPayload.plainApiKey);
+            addUpdate(updates, values, 'mistral_api_key_encrypted', apiKeyPayload.encryptedApiKey);
+          }
+
+          if (shouldUpdateDefaultTemplate) {
+            addUpdate(updates, values, 'default_template', normalizeDefaultTemplate(defaultTemplate));
+          }
+          if (shouldUpdateLanguage) {
+            addUpdate(updates, values, 'language', language || null);
+          }
+          if (shouldUpdateContextBias) {
+            addUpdate(updates, values, 'context_bias', contextBias ?? null);
+          }
+          if (shouldUpdatePreferredModel) {
+            addUpdate(updates, values, 'preferred_model', preferredModel || null);
+          }
+          if (shouldUpdateCostLimit) {
+            addUpdate(updates, values, 'cost_limit', normalizedCostLimit);
+          }
+          if (shouldUpdateDefaultTranslateLanguage) {
+            addUpdate(updates, values, 'default_translate_language', defaultTranslateLanguage || null);
+          }
+          if (shouldUpdateOcrModel) {
+            addUpdate(updates, values, 'ocr_model', ocrModel || null);
+          }
+          if (shouldUpdatePdfPremiumEnabled) {
+            addUpdate(updates, values, 'pdf_premium_enabled_default', parsedPdfPremiumEnabled);
+          }
+          if (shouldUpdatePdfPremiumCompany) {
+            addUpdate(updates, values, 'pdf_premium_company', normalizedPdfPremiumCompany.value);
+          }
+          if (shouldUpdatePdfPremiumName) {
+            addUpdate(updates, values, 'pdf_premium_name', normalizedPdfPremiumName.value);
+          }
+          if (shouldUpdatePdfPremiumRole) {
+            addUpdate(updates, values, 'pdf_premium_role', normalizedPdfPremiumRole.value);
+          }
+          if (shouldUpdatePdfPremiumContact) {
+            addUpdate(updates, values, 'pdf_premium_contact', normalizedPdfPremiumContact.value);
+          }
+          if (shouldUpdatePdfPremiumFooter) {
+            addUpdate(updates, values, 'pdf_premium_footer', normalizedPdfPremiumFooter.value);
+          }
+
+          if (updates.length > 0) {
+            values.push(session.user.id);
+            await client.query(
+              `UPDATE settings
+               SET ${updates.join(', ')}, updated_at = NOW()
+               WHERE user_id = $${values.length}`,
+              values
+            );
+          }
+
+          await client.query('COMMIT');
+        } catch (writeError) {
+          try {
+            await client.query('ROLLBACK');
+          } catch {
+            // ignore rollback errors
+          }
+          throw writeError;
+        } finally {
+          client.release();
+        }
 
         return res.status(200).json({ message: 'Einstellungen gespeichert' });
       }

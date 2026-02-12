@@ -4,7 +4,7 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
-import { query, resolveTemplate } from '../../lib/db';
+import { query } from '../../lib/db';
 import { performOCR, analyzeTranscription } from '../../lib/ai-service';
 import { logUsage, checkCostLimit } from '../../lib/usage';
 import { ACCEPTED_OCR_TYPES, MAX_FILE_SIZE } from '../../lib/constants';
@@ -13,6 +13,7 @@ import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service'
 import { checkRateLimit, applyRateLimitHeaders } from '../../lib/rate-limit';
 import { logApiError, serverError } from '../../lib/api-utils';
 import { addTranscriptionEvent } from '../../lib/transcription-events';
+import { resolveTemplate } from '../../lib/template-service';
 
 export const config = {
   api: {

@@ -6,6 +6,14 @@ import { query } from '../../../lib/db';
 import { checkRateLimit, applyRateLimitHeaders } from '../../../lib/rate-limit';
 import { logApiError, serverError } from '../../../lib/api-utils';
 import { addTranscriptionEvent, listTranscriptionEvents } from '../../../lib/transcription-events';
+import { MAX_DOCUMENT_HTML_LENGTH, MAX_DOCUMENT_TEXT_LENGTH } from '../../../lib/constants';
+import { ensureTranscriptionWorkerRunning } from '../../../lib/transcription-worker';
+import {
+  isStaleTranscription,
+  recoverStaleTranscriptionById,
+  STALE_TRANSCRIPTION_ERROR_MESSAGE,
+  STALE_TRANSCRIPTION_EVENT_MESSAGE,
+} from '../../../lib/transcription-stale';
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
@@ -42,6 +50,7 @@ export default async function handler(req, res) {
   switch (req.method) {
     case 'GET': {
       try {
+        ensureTranscriptionWorkerRunning();
         const result = await query(
           `SELECT id, original_name, filename, status, template, diarize, auto_analyze, custom_prompt,
                   mime_type, model,
@@ -56,29 +65,19 @@ export default async function handler(req, res) {
         }
 
         const transcription = result.rows[0];
-        const staleStatuses = new Set(['processing', 'analyzing']);
         const updatedAt = new Date(transcription.updated_at).getTime();
-        if (
-          staleStatuses.has(transcription.status) &&
-          Number.isFinite(updatedAt) &&
-          Date.now() - updatedAt > 45 * 60 * 1000
-        ) {
-          await query(
-            `UPDATE transcriptions
-             SET status = 'error',
-                 error = 'Verarbeitung wurde unterbrochen. Bitte erneut starten.',
-                 updated_at = NOW()
-             WHERE id = $1 AND user_id = $2`,
-            [transId, session.user.id]
-          );
-          transcription.status = 'error';
-          transcription.error = 'Verarbeitung wurde unterbrochen. Bitte erneut starten.';
-          await addTranscriptionEvent({
-            transcriptionId: transId,
-            userId: session.user.id,
-            stage: 'error',
-            message: 'Verarbeitung wurde wegen Zeitüberschreitung als fehlerhaft markiert.',
-          });
+        if (isStaleTranscription(transcription.status, updatedAt)) {
+          const recovered = await recoverStaleTranscriptionById(transId, session.user.id);
+          if (recovered) {
+            transcription.status = 'error';
+            transcription.error = STALE_TRANSCRIPTION_ERROR_MESSAGE;
+            await addTranscriptionEvent({
+              transcriptionId: transId,
+              userId: session.user.id,
+              stage: 'error',
+              message: STALE_TRANSCRIPTION_EVENT_MESSAGE,
+            });
+          }
         }
 
         transcription.events = await listTranscriptionEvents(transId, session.user.id);
@@ -115,11 +114,23 @@ export default async function handler(req, res) {
         }
 
         if (text !== undefined) {
+          if (typeof text !== 'string') {
+            return res.status(400).json({ message: 'text muss ein String sein' });
+          }
+          if (text.length > MAX_DOCUMENT_TEXT_LENGTH) {
+            return res.status(400).json({ message: `Text ist zu lang (max. ${MAX_DOCUMENT_TEXT_LENGTH} Zeichen)` });
+          }
           updates.push(`text = $${paramIndex++}`);
           values.push(text);
         }
 
         if (documentHtml !== undefined) {
+          if (typeof documentHtml !== 'string') {
+            return res.status(400).json({ message: 'documentHtml muss ein String sein' });
+          }
+          if (documentHtml.length > MAX_DOCUMENT_HTML_LENGTH) {
+            return res.status(400).json({ message: `Dokument ist zu groß (max. ${MAX_DOCUMENT_HTML_LENGTH} Zeichen)` });
+          }
           updates.push(`document_html = $${paramIndex++}`);
           values.push(documentHtml);
         }
