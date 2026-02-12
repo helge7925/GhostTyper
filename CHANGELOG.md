@@ -26,6 +26,7 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Vollständiges P0-P3-Protokoll: `docs/code-review-priorities-p0-p3-2026-02-12.md`.
 - Externes Review als eigene Quelle dokumentiert: `docs/external-review-2026-02-12.md`.
 - Entkoppelter Manual-Analysis-Runner `lib/manual-analysis.js` für asynchrone KI-Analysen.
+- Mobile-/Tablet-Smoke-Screenshots als Artefakte unter `docs/mobile-smoke/2026-02-12-auth`.
 
 ### Changed
 - UI auf reduzierte, Apple-orientierte Interaktion ausgerichtet:
@@ -42,11 +43,16 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Upload- und Detailseite nutzen für laufende Jobs primär SSE-Live-Updates statt Client-Polling (Polling bleibt Fallback).
 - PDF-Kopfbereich als schlanke Signatur angepasst (Titel, Datum, optional Projekt).
 - UI-Microcopy auf Kernseiten weiter beruhigt und vereinheitlicht.
-- Editor-Topbar vereinfacht: klare Primäraktionen (`Speichern`, `PDF exportieren`) + `Mehr`-Menü für Sekundäraktionen.
+- Editor-Topbar vereinfacht: alle Kernaktionen wieder direkt sichtbar (kein kompaktes `Mehr`-Menü).
 - Workflow-Status erweitert: `pending -> queued -> processing -> ...` für transparente Warteschlangenkommunikation.
 - PDF-Print-CSS weiter verfeinert (Witwen/Waisen, Heading-Folgeblockschutz, stabilere Tabellen-/Listenumbrüche).
 - `settings`-Updatepfad auf wartbaren dynamischen Query-Builder umgestellt.
 - `POST /api/transcriptions/[id]/analyze` startet die Analyse jetzt entkoppelt und liefert sofort `202`.
+- Editor-Topbar wieder auf direkte Aktionsbuttons umgestellt; Sekundäraktionen sind nicht mehr im `Mehr`-Menü versteckt.
+- Fokusmodus-Topbar auf Minimalumfang reduziert (`Hell`, `Dunkel`, `Fokus aus`).
+- Einstellungsbezeichnung angepasst: `Analyse` / `Analyse-Vorlagen` heißt jetzt `Verarbeitungstemplates`.
+- Vorlagen-Generator in den Einstellungen kann für neue Vorlagen automatisch einen Namensvorschlag aus dem Zieltext setzen.
+- Historie-Header (`/transcriptions`) responsive nachgeschärft, um horizontalen Overflow auf Tablet-Landscape zu vermeiden.
 
 ### Fixed
 - Robustere Job-Verarbeitung durch atomische Statusübergänge und Schutz vor Doppelstarts.
@@ -62,6 +68,11 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Admin-User-Update schreibt User/Settings konsistent in einer DB-Transaktion.
 - ESLint-Warnungen vollständig bereinigt (`npm run lint` ohne Warnungen/Fehler).
 - AudioRecorder räumt Blob-URLs stabil auf und reduziert Race-Conditions im Cleanup.
+- PDF-Export/Fallback robuster gegen Popup-Blocker: Ziel-Tab wird synchron geöffnet und im Fehlerfall sauber wiederverwendet.
+- Fallback-Verhalten für Browser-PDF verbessert: bei blockiertem neuen Fenster greift `window.print()` als letzte Option.
+- Fokus-Preset-Umschalter-Kontrast korrigiert (Button `Dunkel` im hellen Fokusmodus wieder gut lesbar).
+- Neuer Vorlagen-Flow korrigiert: neue Analyse-Vorlagen werden nicht mehr zwangsweise als `Neue Vorlage` gespeichert.
+- Label-Normalisierung korrigiert: keine fehlerhafte globale `ae/oe/ue`-Ersetzung mehr (z. B. kein `Aktülle`).
 
 ### Security
 - Verschlüsselte API-Key-Speicherung (`settings.mistral_api_key_encrypted`).

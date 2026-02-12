@@ -2,6 +2,21 @@
 
 Version: Unreleased Snapshot (P0-P3 Abschluss)
 
+## Nachtrag (seit letzter Doku)
+
+- PDF-Export im Editor robuster gemacht: Export-Tab wird direkt beim Klick geöffnet, Ergebnis wird in denselben Tab geschrieben; Browser-Fallback nutzt denselben Tab und fällt bei Popup-Block auf `window.print()` zurück.
+- Editor-Topbar wieder auf direkte Aktionen umgestellt: `DOCX exportieren`, `Übersetzen`, `Text kopieren` und `Kopfbereich` sind wieder sichtbar neben `PDF exportieren`; das kompakte `Mehr`-Menü wurde entfernt.
+- Fokusmodus konsequent reduziert: im Fokusmodus werden nur noch `Hell`, `Dunkel` und `Fokus aus` angezeigt.
+- Kontrast-Fix für Fokus-Preset-Umschalter: `Dunkel` ist im hellen Fokusmodus wieder klar lesbar.
+- Settings-UX für Vorlagen verbessert:
+  - Neue Analyse-Vorlagen starten mit leerem Namen statt festem Platzhalter.
+  - Speichern prüft jetzt Name und Prompt explizit.
+  - KI-Generator setzt bei neuen Vorlagen optional einen Namensvorschlag aus dem Zieltext.
+- Einstellungsbereich umbenannt: Tab `Analyse` sowie Überschrift `Analyse-Vorlagen` heißen jetzt `Verarbeitungstemplates`.
+- Label-Bug im Editor-Fallback behoben: keine fehlerhafte pauschale `ae/oe/ue`-Umwandlung mehr (z. B. `aktuelle_themen` bleibt korrekt als `Aktuelle Themen`).
+- Historie-Seite (`/transcriptions`) responsive korrigiert: kein horizontaler Overflow mehr auf iPad Pro 11 (Landscape).
+- Mobile-/Tablet-Smoke-Tests (authentifiziert) durchgeführt und Screenshots abgelegt unter `docs/mobile-smoke/2026-02-12-auth`.
+
 ## Highlights
 
 - P0 bis P3 aus der priorisierten Code-Review vollständig umgesetzt.
@@ -9,7 +24,7 @@ Version: Unreleased Snapshot (P0-P3 Abschluss)
 - Manuelle KI-Analyse vom API-Request entkoppelt (asynchroner Job-Runner).
 - Observability-Basis ergänzt (`GET /api/health`, `GET /api/admin/observability`).
 - PDF-Renderer für lange Dokumente stabilisiert (Witwen/Waisen, Heading-/Block-Umbruchschutz).
-- Editor-UX vereinfacht (klare Primäraktionen, Sekundäres im `Mehr`-Menü).
+- Editor-UX vereinfacht (klare Primäraktionen, Sekundäraktionen wieder direkt sichtbar).
 
 ## Security & Stabilität
 
@@ -24,7 +39,7 @@ Version: Unreleased Snapshot (P0-P3 Abschluss)
 
 - `queued`-Status transparent in Statusbadges, Live-Status und Workflow-Kommunikation integriert.
 - Queue-Startfehler werden sichtbar kommuniziert, manuelle Neustartpfade bleiben verfügbar.
-- Editor-Topbar priorisiert jetzt `Speichern` und `PDF exportieren`; weitere Aktionen in kompaktem Menü.
+- Editor-Topbar priorisiert `Speichern` und `PDF exportieren`; weitere Aktionen sind wieder direkt neben dem PDF-Button verfügbar.
 - PDF-Ausgabe zeigt stabilere Seitenumbrüche in Listen, Tabellen und bei Überschriften.
 
 ## Betrieb & Developer Experience

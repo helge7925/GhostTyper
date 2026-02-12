@@ -50,6 +50,16 @@ export default function Settings() {
 
   const [activeTab, setActiveTab] = useState('transcription');
 
+  function suggestTemplateNameFromGoal(goal) {
+    const normalized = String(goal || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!normalized) return '';
+
+    const firstPart = normalized.split(/[.!?]/)[0]?.trim() || normalized;
+    return firstPart.slice(0, 80);
+  }
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
@@ -134,7 +144,17 @@ export default function Settings() {
     setIsGenerating(true);
     try {
       const { promptText } = await generateTemplatePrompt(generatorGoal);
-      setActiveEditor(prev => ({ ...prev, prompt_text: promptText }));
+      const suggestedName = suggestTemplateNameFromGoal(generatorGoal);
+      setActiveEditor((prev) => {
+        if (!prev) return prev;
+        const currentName = String(prev.name || '').trim();
+        const shouldSetSuggestedName = prev.id === 'new' && !currentName;
+        return {
+          ...prev,
+          name: shouldSetSuggestedName ? suggestedName : prev.name,
+          prompt_text: promptText,
+        };
+      });
       setGeneratorGoal('');
     } catch (err) {
       alert('Fehler bei der KI-Generierung: ' + err.message);
@@ -146,6 +166,18 @@ export default function Settings() {
   // Template Handlers
   async function handleSaveTemplate() {
     if (!activeEditor) return;
+    const normalizedName = String(activeEditor.name || '').trim();
+    const normalizedPrompt = String(activeEditor.prompt_text || '').trim();
+
+    if (!normalizedName) {
+      alert('Bitte einen Namen für die Vorlage eingeben.');
+      return;
+    }
+    if (!normalizedPrompt) {
+      alert('Bitte zuerst einen Prompt für die Vorlage eingeben.');
+      return;
+    }
+
     setTemplateLoading(true);
 
     try {
@@ -153,17 +185,17 @@ export default function Settings() {
         // Standard-Vorlage überschreiben
         const existing = templates.find(t => t.name === activeEditor.id);
         if (existing) {
-          const updated = await updateTemplate(existing.id, { name: activeEditor.id, prompt_text: activeEditor.prompt_text });
+          const updated = await updateTemplate(existing.id, { name: activeEditor.id, prompt_text: normalizedPrompt });
           setTemplates(templates.map(t => t.id === updated.id ? updated : t));
         } else {
-          const created = await createTemplate({ name: activeEditor.id, prompt_text: activeEditor.prompt_text });
+          const created = await createTemplate({ name: activeEditor.id, prompt_text: normalizedPrompt });
           setTemplates([...templates, created]);
         }
       } else if (activeEditor.id === 'new') {
-        const created = await createTemplate({ name: activeEditor.name, prompt_text: activeEditor.prompt_text });
+        const created = await createTemplate({ name: normalizedName, prompt_text: normalizedPrompt });
         setTemplates([...templates, created]);
       } else {
-        const updated = await updateTemplate(activeEditor.id, { name: activeEditor.name, prompt_text: activeEditor.prompt_text });
+        const updated = await updateTemplate(activeEditor.id, { name: normalizedName, prompt_text: normalizedPrompt });
         setTemplates(templates.map(t => t.id === updated.id ? updated : t));
       }
       setActiveEditor(null);
@@ -241,7 +273,7 @@ export default function Settings() {
 
   const TABS = [
     { id: 'transcription', label: 'Transkription', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg> },
-    { id: 'analysis', label: 'Analyse', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
+    { id: 'analysis', label: 'Verarbeitungstemplates', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
     { id: 'tasks', label: 'Text-Assistent', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg> },
     { id: 'ocr-translate', label: 'OCR & Übersetzung', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg> },
     { id: 'account', label: 'Konto & API', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg> },
@@ -318,11 +350,11 @@ export default function Settings() {
                 <div className="lg:col-span-2 bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
                   <div className="flex items-center justify-between mb-8">
                     <div>
-                      <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest">Analyse-Vorlagen</h2>
+                      <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest">Verarbeitungstemplates</h2>
                       <p className="text-xs text-text-secondary mt-1">Wie soll die KI transkribierte Texte verarbeiten?</p>
                     </div>
-                    <button 
-                      onClick={() => setActiveEditor({ id: 'new', name: 'Neue Vorlage', prompt_text: '', isDefault: false })} 
+                    <button
+                      onClick={() => setActiveEditor({ id: 'new', name: '', prompt_text: '', isDefault: false })}
                       className="gradient-accent text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg"
                     >
                       + Neu
