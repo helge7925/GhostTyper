@@ -518,6 +518,13 @@ export default function DocumentEditor({
               <button onMouseDown={(e) => { e.preventDefault(); execCommand('insertOrderedList'); }} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h10M7 16h10M4 8h.01M4 12h.01M4 16h.01" /></svg>
               </button>
+              <div className="w-px h-4 bg-white/10 mx-1.5" />
+              <button onMouseDown={(e) => { e.preventDefault(); execCommand('indent'); }} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl" title="Einrücken">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16M13 9l3 3-3 3" /></svg>
+              </button>
+              <button onMouseDown={(e) => { e.preventDefault(); execCommand('outdent'); }} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl" title="Ausrücken">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16M11 9l-3 3 3 3" /></svg>
+              </button>
             </div>
           </div>
 
