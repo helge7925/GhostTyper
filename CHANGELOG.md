@@ -7,6 +7,16 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [1.0.1] - 2025-02-17
+
+### Fixed
+- Audio-Upload auf iOS: `capture="environment"` entfernt, damit Dateiverwaltung statt Kamera geöffnet wird.
+- Editor: Ein-/Ausrücken von Bulletpoints jetzt möglich (Buttons für `indent`/`outdent` hinzugefügt).
+- PDF-Export: Verbesserte Chromium-Erkennung auf macOS (inkl. Homebrew-Pfade) und detailliertere Logging-Informationen.
+- Word-Export (DOCX): HTML-Parser komplett überarbeitet - verschachtelte Listen, Formatierungen (fett, kursiv, unterstrichen) und verschachtelte Strukturen werden jetzt korrekt übernommen statt als Fließtext dargestellt.
+
+## [1.0.0] - 2025-02-12
+
 ### Added
 - `ProcessStatusCard` als einheitliche Prozesskomponente mit Schrittanzeige, ETA und rotierenden Lade-Texten.
 - Event-Timeline pro Transkriptionsjob über `transcription_events` in der Detailansicht.

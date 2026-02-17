@@ -145,7 +145,6 @@ export default function AudioUploadForm({ onSuccess }) {
             ref={inputRef}
             type="file"
             accept="audio/*"
-            capture="environment"
             onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
             className="hidden"
           />

@@ -1,6 +1,6 @@
 {
   "name": "ghosttyper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "GhostTyper - Audio-Transkription und KI-Analyse",
   "main": "index.js",
   "scripts": {
