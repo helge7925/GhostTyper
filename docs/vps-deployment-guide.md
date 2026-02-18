@@ -72,7 +72,11 @@ DB_INIT_SECRET=<separater-secret>
 SETTINGS_ENCRYPTION_KEY=<separater-secret>
 ENABLE_DB_INIT_API=true
 
-MISTRAL_API_KEY=<mistral-api-key>
+# Optional: Uploads auf Storage Box auslagern (statt Named Volume)
+# UPLOADS_PATH=/mnt/storage-box/ghosttyper/uploads
+
+# Hinweis: MISTRAL_API_KEY wird über die Admin-Oberfläche konfiguriert,
+# nicht mehr über Environment-Variablen.
 
 NEXT_PUBLIC_API_URL=/api
 RATE_LIMIT_STORE=db
@@ -111,8 +115,14 @@ docker compose -f config/docker-compose.prod.yml exec transkription-webapp sh -l
 
 ```bash
 cd /opt/ghosttyper
-docker compose -f config/docker-compose.prod.yml up --build -d
+# Wichtig: -p ghosttyper setzt den Projektnamen für korrekte Volume-Namen
+docker compose -f config/docker-compose.prod.yml --env-file .env -p ghosttyper up --build -d
 ```
+
+**Hinweise:**
+- `--env-file .env` ist erforderlich, da die `.env` im Repo-Root liegt, nicht im `config/`-Ordner.
+- `-p ghosttyper` setzt den Projektnamen, damit das richtige DB-Volume verwendet wird.
+- `HOSTNAME=0.0.0.0` sorgt dafür, dass die App von außen (Traefik, Healthcheck) erreichbar ist.
 
 Status prüfen:
 ```bash
@@ -166,7 +176,7 @@ git pull --ff-only
 ```
 3. Rolling Update:
 ```bash
-docker compose -f config/docker-compose.prod.yml up --build -d
+docker compose -f config/docker-compose.prod.yml --env-file .env -p ghosttyper up --build -d
 ```
 4. Health + Smoke-Checks aus Abschnitt 9.
 5. Fehlerfall: Rollback auf letzten stabilen Commit (Abschnitt 12).
@@ -221,6 +231,10 @@ docker compose -f config/docker-compose.prod.yml up --build -d
 1. `503 PDF-Renderer ist nicht verfügbar`:
    - `PDF_CHROMIUM_PATH` im Container prüfen.
    - Chromium-Binary im Container prüfen (`which` + `--version`).
+3. Container als `unhealthy` markiert:
+   - Healthcheck prüft `http://0.0.0.0:3000/api/health` (nicht `localhost`).
+   - `HOSTNAME=0.0.0.0` in `.env` gesetzt?
+   - Netzwerk-Labels korrekt (`traefik.docker.network=web`)?
 2. PDF zeigt `about:blank`/Datum/Uhrzeit:
    - Serverrenderer fällt aus, Browser-Fallback aktiv.
    - Ursache des Renderer-Fehlers beheben, dann erneut testen.
