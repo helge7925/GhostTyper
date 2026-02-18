@@ -11,14 +11,18 @@ services:
       - internal
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.transkription.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.transkription.entrypoints=websecure"
       - "traefik.http.routers.transkription.tls.certresolver=letsencrypt"
       - "traefik.http.services.transkription.loadbalancer.server.port=3000"
     volumes:
-      - transkription-uploads:/app/uploads
+      # Uploads: Named Volume (Standard) oder Host-Pfad (z.B. Storage Box)
+      # Setze UPLOADS_PATH=/mnt/storage-box/ghosttyper/uploads in .env für Storage Box
+      - ${UPLOADS_PATH:-transkription-uploads}:/app/uploads
     environment:
       - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
       - NEXT_PUBLIC_API_URL=/api
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@transkription-db:5432/${DB_NAME}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
@@ -26,7 +30,6 @@ services:
       - DB_INIT_SECRET=${DB_INIT_SECRET}
       - SETTINGS_ENCRYPTION_KEY=${SETTINGS_ENCRYPTION_KEY}
       - ENABLE_DB_INIT_API=${ENABLE_DB_INIT_API:-false}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
       - PDF_CHROMIUM_PATH=${PDF_CHROMIUM_PATH:-/usr/bin/chromium-browser}
       - PDF_CHROMIUM_NO_SANDBOX=${PDF_CHROMIUM_NO_SANDBOX:-false}
       - RATE_LIMIT_STORE=${RATE_LIMIT_STORE:-db}
@@ -34,6 +37,12 @@ services:
     depends_on:
       transkription-db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://0.0.0.0:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   transkription-db:
     image: postgres:16-alpine
