@@ -7,6 +7,17 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Fixed
+- **Deployment-Kritisch**: `context_bias` Format in Mistral API korrigiert (`JSON.stringify()` → `join(',')`) – verhindert HTTP 422 bei Transkriptionen mit Context-Bias.
+
+### Changed
+- **Docker Compose Produktion**:
+  - `traefik.docker.network=web` Label hinzugefügt (korrektes Routing bei Multi-Network-Setup).
+  - `HOSTNAME=0.0.0.0` Environment Variable hinzugefügt (externe Erreichbarkeit sichergestellt).
+  - Healthcheck für webapp-Service hinzugefügt (Traefik erkennt Container-Status korrekt).
+  - `MISTRAL_API_KEY` aus Environment entfernt (wird über Admin-UI konfiguriert).
+  - Uploads-Volume konfigurierbar via `UPLOADS_PATH` (Storage Box Support).
+
 ## [1.0.1] - 2025-02-17
 
 ### Fixed
