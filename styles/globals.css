@@ -8,6 +8,16 @@
   body {
     @apply text-text-primary bg-dark-bg antialiased;
   }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role='button']:focus-visible {
+    outline: 2px solid #ff8c00;
+    outline-offset: 2px;
+  }
 }
 
 @layer utilities {
@@ -22,5 +32,54 @@
   }
   .border-glow-hover {
     border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .upload-progress,
+  .mic-level-meter {
+    appearance: none;
+    background: rgba(255, 255, 255, 0.08);
+    border: 0;
+    border-radius: 9999px;
+    height: 0.375rem;
+    overflow: hidden;
+  }
+
+  .upload-progress::-webkit-progress-bar,
+  .mic-level-meter::-webkit-progress-bar {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 9999px;
+  }
+
+  .upload-progress::-webkit-progress-value {
+    background: linear-gradient(135deg, #ff5917, #ff8c00);
+    border-radius: 9999px;
+    transition: width 0.3s ease;
+  }
+
+  .mic-level-meter.mic-level-ok::-webkit-progress-value {
+    background: #34d399;
+    border-radius: 9999px;
+    transition: width 0.1s ease;
+  }
+
+  .mic-level-meter.mic-level-listening::-webkit-progress-value {
+    background: #facc15;
+    border-radius: 9999px;
+    transition: width 0.1s ease;
+  }
+
+  .upload-progress::-moz-progress-bar {
+    background: linear-gradient(135deg, #ff5917, #ff8c00);
+    border-radius: 9999px;
+  }
+
+  .mic-level-meter.mic-level-ok::-moz-progress-bar {
+    background: #34d399;
+    border-radius: 9999px;
+  }
+
+  .mic-level-meter.mic-level-listening::-moz-progress-bar {
+    background: #facc15;
+    border-radius: 9999px;
   }
 }

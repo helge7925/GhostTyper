@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { query } from '../../lib/db';
 import { enforceRateLimit, logApiError } from '../../lib/api-utils';
+import { calculateBudgetTrafficLight, resolveEffectiveBudgetLimit } from '../../lib/budget-guardrails';
 
 /**
  * GET /api/usage — Returns the current user's usage for this month.
@@ -54,20 +55,44 @@ export default async function handler(req, res) {
     );
 
     // Cost limit
-    const settings = await query(
-      'SELECT cost_limit FROM settings WHERE user_id = $1',
-      [session.user.id]
-    );
+    let settings;
+    try {
+      settings = await query(
+        'SELECT cost_limit, member_monthly_budget_limit FROM settings WHERE user_id = $1',
+        [session.user.id]
+      );
+    } catch (settingsError) {
+      if (settingsError?.code !== '42703') throw settingsError;
+      settings = await query(
+        'SELECT cost_limit, NULL::numeric AS member_monthly_budget_limit FROM settings WHERE user_id = $1',
+        [session.user.id]
+      );
+    }
 
     const summary = totals.rows[0];
+    const accountLimit = settings.rows[0]?.cost_limit ?? null;
+    const memberMonthlyBudgetLimit = settings.rows[0]?.member_monthly_budget_limit ?? null;
+    const effectiveLimit = resolveEffectiveBudgetLimit({
+      costLimit: accountLimit,
+      memberMonthlyBudgetLimit,
+    });
+    const totalCost = parseFloat(summary.total_cost);
+    const trafficLight = calculateBudgetTrafficLight({
+      currentCost: totalCost,
+      costLimit: effectiveLimit,
+      estimatedNextCost: 0,
+    });
 
     return res.status(200).json({
       month: new Date().toISOString().slice(0, 7),
       totalInputTokens: summary.total_input_tokens,
       totalOutputTokens: summary.total_output_tokens,
-      totalCost: parseFloat(summary.total_cost),
+      totalCost,
       totalRequests: summary.total_requests,
-      costLimit: settings.rows[0]?.cost_limit ? parseFloat(settings.rows[0].cost_limit) : null,
+      costLimit: accountLimit !== null ? parseFloat(accountLimit) : null,
+      memberMonthlyBudgetLimit: memberMonthlyBudgetLimit !== null ? parseFloat(memberMonthlyBudgetLimit) : null,
+      effectiveLimit: effectiveLimit !== null ? parseFloat(effectiveLimit) : null,
+      budgetTrafficLight: trafficLight,
       byOperation: byOperation.rows.map(r => ({
         operation: r.operation,
         inputTokens: r.input_tokens,

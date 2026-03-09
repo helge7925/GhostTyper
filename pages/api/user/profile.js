@@ -4,6 +4,7 @@ import { query } from '../../../lib/db';
 import bcrypt from 'bcryptjs';
 import { validatePassword } from '../../../lib/constants';
 import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
+import { isValidEmail, normalizeEmail } from '../../../lib/email';
 
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions);
@@ -36,6 +37,8 @@ export default async function handler(req, res) {
 
     case 'PUT': {
       const { name, email, avatarUrl, password, currentPassword } = req.body;
+      const shouldUpdateEmail = email !== undefined;
+      const normalizedEmail = shouldUpdateEmail ? normalizeEmail(email) : null;
 
       try {
         if (avatarUrl !== undefined && avatarUrl !== null) {
@@ -47,17 +50,21 @@ export default async function handler(req, res) {
           }
         }
 
+        if (shouldUpdateEmail && (!normalizedEmail || !isValidEmail(normalizedEmail))) {
+          return res.status(400).json({ message: 'Ungültige E-Mail-Adresse' });
+        }
+
         // Fetch current user data for password verification
         const userResult = await query('SELECT password_hash FROM users WHERE id = $1', [userId]);
         const user = userResult.rows[0];
 
         // Update basic info
-        if (name || email || avatarUrl !== undefined) {
+        if (name !== undefined || shouldUpdateEmail || avatarUrl !== undefined) {
           await query(
             'UPDATE users SET name = COALESCE($1, name), email = COALESCE($2, email), avatar_url = $3, updated_at = NOW() WHERE id = $4',
             [
               typeof name === 'string' ? name.trim().slice(0, 255) : name,
-              typeof email === 'string' ? email.trim().toLowerCase() : email,
+              shouldUpdateEmail ? normalizedEmail : null,
               avatarUrl,
               userId,
             ]

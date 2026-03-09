@@ -1,6 +1,6 @@
 # Testen und Verifizieren
 
-Stand: 2026-02-12
+Stand: 2026-03-08
 
 Dieses Dokument beschreibt die aktuelle Teststrategie für GhostTyper.
 
@@ -54,7 +54,7 @@ Dieses Dokument beschreibt die aktuelle Teststrategie für GhostTyper.
 - Editor-Sanitizing greift auch bei laufenden Edits/Paste (kein unsanitized Re-Render)
 - `save-doc` lehnt übergroße `title`/`text`/`documentHtml` sauber ab
 - Worker-Queue verarbeitet `queued`-Jobs stabil nach Restart weiter
-- Observability-Endpunkte liefern valide Metrikstruktur (`/api/health`, `/api/admin/observability`)
+- Observability-Endpunkte liefern valide Metrikstruktur (`/api/admin/observability`; `/api/health` nur mit `HEALTH_DETAILS_PUBLIC=true` oder `x-health-secret`)
 
 ## 3. Testumgebung
 
@@ -74,6 +74,12 @@ npm run migrate-api-keys
 
 ## 4. Build-/Lint-Validierung
 
+### 4.0 Schnellprüfung als Skript
+```bash
+npm run smoke
+npm run smoke:full
+```
+
 ### 4.1 Build
 ```bash
 npm run build
@@ -85,6 +91,18 @@ Hinweis: In restriktiven Sandbox-Umgebungen kann `EPERM listen 0.0.0.0` bei `Col
 npm run lint
 ```
 Aktueller Stand: non-interaktiv lauffähig über `.eslintrc.json`.
+
+### 4.3 Automatischer Unit-Test (Tabellenlogik)
+```bash
+npm test
+```
+
+Abgedeckt ist aktuell:
+- Formelauswertung (`evaluateFormula`)
+- Berechnete Spalten (`applyCalculations`)
+- Footer-Aggregationen (`calculateFooterStats`)
+- Schema-Validierung (`validateTableSchema`)
+- Prompt-Generierung für Tabellenvorlagen (`buildTableExtractionPrompt`)
 
 ## 5. Mobile/Responsive Testkriterien
 
@@ -118,7 +136,41 @@ Aktueller Stand: non-interaktiv lauffähig über `.eslintrc.json`.
 6. Keine Klartext-API-Keys mehr in `settings.mistral_api_key`
 7. Start-/Queue-Fehler bei `pending`/`queued` sind sichtbar und manuell behebbar (UI-Buttons vorhanden)
 
-## 7. Referenzen
+## 7. Aktueller Testlauf (2026-02-20)
+
+- Laufkette:
+  - `npm test` -> erfolgreich (`7/7`).
+  - `npm run lint` -> erfolgreich.
+  - `npm run build` -> erfolgreich.
+- Docker-Stack:
+  - `docker compose -f config/docker-compose.dev.yml up -d` -> `transkription-webapp` und `transkription-db` `healthy`.
+- API-Smoke:
+  - `GET /api/health` -> `200`.
+  - `GET /api/workflows` ohne Session -> `401` (erwartet).
+  - `POST /api/workflows/execute` ohne Session -> `401` (erwartet).
+  - `POST /api/db-init` ohne Secret -> `403` (erwartet).
+  - `POST /api/db-init` mit Secret -> `200`.
+- PDF-Renderer-Validierung:
+  - Chromium ohne `--no-sandbox` reproduzierbar instabil (Namespace-Fehler).
+  - Chromium mit `--no-sandbox` erzeugt PDF erfolgreich.
+
+## 8. Aktueller Testlauf (2026-03-08)
+
+- Laufkette:
+  - `npm test` -> erfolgreich.
+  - `npm run build` -> erfolgreich.
+- Docker-Stack:
+  - `docker compose -f config/docker-compose.dev.yml up -d --build transkription-webapp` -> erfolgreich.
+- API-Health:
+  - `GET /api/health` -> `200`.
+- UI-Smoke (neu für Sketch + Settings):
+  - `npx playwright test tests/ui-smoke-sketch-settings.spec.js --reporter=line --workers=1` -> erfolgreich.
+  - Ergebnis: `2 passed`.
+  - Abgedeckt:
+    - Desktop: Login, `/settings?tab=account`, `/sketch`.
+    - Mobile (`iPhone 13`): Sidebar-Navigation, `/sketch`, `/settings?tab=account`.
+
+## 9. Referenzen
 
 - `../README.md`
 - `../PROJECT_PLAN.md`
@@ -127,3 +179,4 @@ Aktueller Stand: non-interaktiv lauffähig über `.eslintrc.json`.
 - `external-review-2026-02-12.md`
 - `code-review-priorities-p0-p3-2026-02-12.md`
 - `features-and-improvements.md`
+- `sketch-summary-rollout-2026-03-08.md`

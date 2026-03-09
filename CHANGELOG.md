@@ -5,18 +5,177 @@ Alle relevanten Änderungen an diesem Projekt werden in dieser Datei dokumentier
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
-## [Unreleased]
+## [Unreleased] - Ziel: v1.3.0
 
-### Fixed
-- **Deployment-Kritisch**: `context_bias` Format in Mistral API korrigiert (`JSON.stringify()` → `join(',')`) – verhindert HTTP 422 bei Transkriptionen mit Context-Bias.
+### Added
+- **Produktivitätsfunktionen (Punkte 1-3)**:
+  - Auto-Glossar für Kontextbegriffe aus Historie (`GET /api/glossary/suggestions`).
+  - Intelligente Modellauswahl mit Kosten-/Token-Vorschau (`POST /api/model-assistant`).
+  - 1-Klick-Workflows im Text-Assistenten (`GET /api/workflows`, `POST /api/workflows/execute`).
+- **Wissensgraph-Generator**:
+  - Native Integration der Knowledge-Graph Generierung.
+  - Interaktives Rendering von Entitäten und Relationen mittels `vis-network`.
+  - PNG-Export-Funktionalität des generierten Graphen.
+- **Team Realtime**:
+  - Neue Realtime-Seite `/realtime` für Live-Transkript, Live-Dokument und Live-Wissensgraph.
+  - Neue Realtime-API-Endpunkte:
+    - `GET|POST /api/realtime/sessions`
+    - `GET|PATCH /api/realtime/sessions/[id]`
+    - `POST|DELETE /api/realtime/sessions/[id]/members`
+    - `POST /api/realtime/sessions/[id]/ingest`
+    - `GET /api/realtime/sessions/[id]/stream`
+  - Neue DB-Tabellen:
+    - `realtime_sessions`
+    - `realtime_session_members`
+    - `realtime_session_events`
+- **Workflow Editor + Versionierung**:
+  - Eigene Workflows als versionierte Definitionen in der DB.
+  - Rollback auf frühere Versionen.
+  - Neue API-Endpunkte:
+    - `POST /api/workflows` (Workflow speichern/neue Version)
+    - `DELETE /api/workflows/[workflowId]` (deaktivieren)
+    - `GET /api/workflows/[workflowId]/versions`
+    - `POST /api/workflows/[workflowId]/rollback`
+- **Audit-Log für kritische Aktionen**:
+  - Neue DB-Tabelle `audit_log`.
+  - Neuer Endpunkt `GET /api/audit-log`.
+  - Protokollierung von sicherheits- und betriebsrelevanten Aktionen (z. B. Settings, Workflow-Versionen, Realtime-Mitgliederverwaltung, Upload-Blockierungen).
+- **Upload Security Hook**:
+  - Optionaler Virus-Scan vor Persistenz des Uploads (`UPLOAD_VIRUS_SCAN_*`).
+- **Budget Guardrails (pro Mitglied/Account)**:
+  - Neues Setting `member_monthly_budget_limit`.
+  - Guardrail-Prüfung mit Prognose vor KI-Aufrufen in Text-AI, Übersetzung, Workflows und Realtime-Audio-Chunks.
+- **Sketch Summary / Lernskizze (Gemini)**:
+  - Neue Seite `/sketch` zur Bildgenerierung aus Lerntext.
+  - Neuer Endpunkt `POST /api/sketch-summary` (Gemini `gemini-3-pro-image-preview`).
+  - Neue Settings-Unterstützung für `google_api_key` / `google_api_key_encrypted` inkl. UI-Statusanzeige.
+  - Studio-Einstellungen vor Generierung: Layout-Modus, Detailgrad und Fokus.
+  - Mehrstufige Engine:
+    - Semantik-Extraktion (`TEXT` -> Struktur-JSON),
+    - Illustrationsplanung pro Block (`icon` + `motif`),
+    - deterministisches SVG-Rendering mit einheitlicher Typografie/Layoutregeln.
+  - Ausgabe jetzt vektorbasiert (`image/svg+xml`) im festen Querformat (16:9, 1920x1080).
+- **Datentabelle (NotebookLM-ähnlicher Modus)**:
+  - Neue Seite `/datentabelle` als separater Aufbereitungsmodus.
+  - Unterstützung für alle drei Quellen: Audio, Text und OCR.
+  - Neuer Built-in Template-Key `data_table` inkl. eigenem Analyseprompt.
+  - Dynamische Tabellen-Normalisierung in `rows + table_schema + analysis_meta` für einheitliche Darstellung in `TableRenderer`.
 
 ### Changed
-- **Docker Compose Produktion**:
-  - `traefik.docker.network=web` Label hinzugefügt (korrektes Routing bei Multi-Network-Setup).
-  - `HOSTNAME=0.0.0.0` Environment Variable hinzugefügt (externe Erreichbarkeit sichergestellt).
-  - Healthcheck für webapp-Service hinzugefügt (Traefik erkennt Container-Status korrekt).
-  - `MISTRAL_API_KEY` aus Environment entfernt (wird über Admin-UI konfiguriert).
-  - Uploads-Volume konfigurierbar via `UPLOADS_PATH` (Storage Box Support).
+- **Tabellen-Vorlagen Editor V2**:
+  - Fokus auf visuelle Bedienung statt technischer Felder.
+  - Schnellstart-Presets, vereinfachte Spaltenanlage und bessere Formelhilfe.
+  - Expertenansicht für interne Keys optional.
+- **Table-Extraction Prompt**:
+  - Klarere Regeln für wiederkehrende Tabellenstruktur im Text.
+  - Striktere JSON-Ausgabe ohne zusätzliche Felder.
+- **Model Assistant/Kostenvorschau**:
+  - Ampellogik (grün/gelb/rot) zur Startentscheidung vor Ausführung.
+- **Realtime Robustheit**:
+  - Duplikat-Erkennung für wiederholte Chunks.
+  - Finalisierungs-Pass bei Session-Abschluss mit `finalization_state`.
+- **Tabellenanalyse-Pipeline**:
+  - Serverseitige Normalisierung/Validierung gegen Schema.
+  - Persistenz von `analysis_meta` inklusive `missing_fields_by_row`.
+  - Frontend-Highlight für unvollständige Pflichtfelder pro Zeile.
+- **Sketch/Settings UX**:
+  - Einheitliche Bezeichnung „Lernskizze“ in Navigation und Seite.
+  - Verbesserte Ladezustände/Disable-Logik auf der Sketch-Seite.
+  - Account-Tab mit expliziten „Key entfernen“-Flows und Save-/Clear-Loadingstates.
+  - Toast-Positionierung für mobile Viewports verbessert.
+- **Realtime Session-Formular**:
+  - Start-Button in der Session-Erstellung ist nun responsive und bleibt auch auf kleinen Viewports innerhalb der Box.
+- **Dashboard API-Status**:
+  - Zweiter API-Status ergänzt: zusätzlich zur Google-API wird nun auch der Mistral-API-Status separat angezeigt.
+- **Navigation/Labeling**:
+  - Neuer Sidebar-Eintrag `Datentabelle`.
+  - Historie- und Detailansicht zeigen den Modus konsistent als `Datentabelle`.
+
+### Fixed
+- **PDF-Renderer**:
+  - Robuster Chromium-Fallback mit automatischem `--no-sandbox` in restriktiven Container-Umgebungen.
+- **Tabellen-Pipeline**:
+  - Korrekte Persistenz von `analysis_type='table'` und `table_schema`.
+  - API-Rückgaben in Transkriptionsdetails für Tabellenausgaben vervollständigt.
+- **Settings API Kompatibilität**:
+  - `POST /api/settings` und `PUT /api/settings` werden beide unterstützt.
+- **Sketch Fehlerbehandlung**:
+  - präzisere Fehlerklassifikation für API-Key/Berechtigung, Quota und Modellantworten.
+  - Robuster Fallback auf lokale Layout-/Illustrations-Engine bei fehlender oder unvollständiger Modellantwort.
+  - Kostenlimit wird im Sketch-Flow konsistent geprüft und als `429` zurückgegeben.
+
+## [1.2.0] - 2026-02-19
+
+### Added
+- **Template-Kategorien**: Vorlagen können jetzt in selbst erstellten Kategorien organisiert werden.
+  - Neue Datenbank-Tabelle `template_categories` (id, user_id, name, color, position).
+  - Neue Spalte `templates.category_id` für Kategorie-Zuordnung.
+  - Kategorien erstellen, bearbeiten, löschen direkt in den Einstellungen.
+  - Farbcodierte Kategorie-Badges für visuelle Unterscheidung.
+- **Volltext-Suche in Transkriptionen**: Durchsucht jetzt auch Transkript-Inhalte, nicht nur Dateinamen.
+  - Server-Side Search über `text` und `analysis` Felder via `?search=` Parameter.
+  - Debounced Search im Frontend mit Loading-Indicator.
+  - PostgreSQL ILIKE für case-insensitive Suche.
+
+### Changed
+- **Quick-Search UX**: Suchfeld zeigt jetzt Lade-Spinner während der Suche.
+- **API-Erweiterung**: `getTranscriptions(search)` unterstützt jetzt optionalen Suchparameter.
+
+### Technical
+- Neue API-Endpunkte:
+  - `GET /api/template-categories` - Alle Kategorien auflisten.
+  - `POST /api/template-categories` - Neue Kategorie erstellen.
+  - `PUT /api/template-categories/[id]` - Kategorie aktualisieren.
+  - `DELETE /api/template-categories/[id]` - Kategorie löschen.
+- Neue Frontend-Funktionen in `lib/api.js`:
+  - `getTemplateCategories()`, `createTemplateCategory()`, `updateTemplateCategory()`, `deleteTemplateCategory()`.
+- Datenbank-Migration in `lib/db-init.js`:
+  - Tabelle `template_categories` mit Index.
+  - Spalte `templates.category_id` mit Foreign Key.
+- Frontend-Erweiterungen in `pages/settings.js`:
+  - Kategorien-Section mit CRUD-UI.
+  - Kategorie-Badges mit Farb-Indikator.
+
+## [1.1.0] - 2025-02-18
+
+### Added
+- **Tabellen-Vorlagen**: Vollständig neue Funktion zur strukturierten Datenextraktion.
+  - Neuer Vorlagen-Typ `table` neben bestehenden `text` Vorlagen.
+  - Visueller Schema-Editor (`TableSchemaBuilder`) für Spalten-Definition.
+  - Unterstützte Datentypen: Text, Zahl, Währung, Datum.
+  - Berechnete Felder mit Formeln (z.B. `menge * preis`).
+  - Automatische Berechnung von Summen in der Fußzeile.
+  - KI-gestützte Generierung von Tabellen-Schemas aus Beschreibungen.
+- **Interaktive Tabellen-Ansicht** (`TableRenderer`):
+  - Inline-Editing von extrahierten Daten.
+  - Dynamische Berechnung von Formel-Spalten.
+  - Export als CSV, Excel (XLSX) und HTML.
+  - Zeilen hinzufügen/entfernen im Edit-Modus.
+- **Neue Datenbank-Spalten**:
+  - `templates.template_type` ('text' | 'table').
+  - `templates.table_schema` (JSONB für Schema-Definition).
+  - `transcriptions.analysis_type` ('text' | 'table').
+  - `transcriptions.table_schema` (JSONB für zugehöriges Schema).
+- **API-Erweiterungen**:
+  - Templates API unterstützt jetzt `template_type` und `table_schema`.
+  - Analyse-Flow erkennt Tabellen-Vorlagen und extrahiert strukturierte JSON-Daten.
+- ** Neue Bibliothek**: `xlsx` für Excel-Export-Funktionalität.
+- **Dokumentation**: Umfassende technische Dokumentation der Tabellen-Features.
+
+### Changed
+- **Settings-Seite**: Aufgeteilt in "Text-Verarbeitung" und "Tabellen-Verarbeitung".
+- **Vorlagen-Liste**: Zeigt jetzt Icons und Metadaten (Spalten-Anzahl, Berechnungen).
+- **Transkriptions-Detailansicht**: Rendert `TableRenderer` für Tabellen-Analysen.
+- **Template-Generierung**: Unterscheidet zwischen Text- und Tabellen-Prompts.
+
+### Technical
+- Neue Hilfsmodule:
+  - `lib/table-calculations.js`: Formel-Berechnung, Validierung, Prompt-Generierung.
+  - `lib/table-export.js`: Export-Funktionen (CSV, Excel, HTML).
+  - `lib/table-template-generator.js`: Schema-Generierung aus Beschreibungen.
+- Neue React-Komponenten:
+  - `components/TableSchemaBuilder.js`: Visueller Editor für Tabellenschemas.
+  - `components/TableRenderer.js`: Interaktive Tabellen-Komponente.
 
 ## [1.0.1] - 2025-02-17
 
@@ -44,72 +203,16 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - DB-basierte Queue/Worker-Verarbeitung für Transkriptionsjobs (`queued`-Status + Worker-Pump).
 - Zentrales Observability-Modul (`lib/observability.js`) mit strukturierter Log-Ausgabe und Laufzeit-Countern.
 - Admin-Observability-Endpunkt: `GET /api/admin/observability`.
-- Vollständiges P0-P3-Protokoll: `docs/code-review-priorities-p0-p3-2026-02-12.md`.
-- Externes Review als eigene Quelle dokumentiert: `docs/external-review-2026-02-12.md`.
-- Entkoppelter Manual-Analysis-Runner `lib/manual-analysis.js` für asynchrone KI-Analysen.
-- Mobile-/Tablet-Smoke-Screenshots als Artefakte unter `docs/mobile-smoke/2026-02-12-auth`.
 
 ### Changed
-- UI auf reduzierte, Apple-orientierte Interaktion ausgerichtet:
-  - erweiterte Optionen in Upload/OCR/Translate/Text-AI als einklappbare Bereiche,
-  - Fokus auf primäre Aktionen und geringere visuelle Komplexität.
-- Lade-Sprüche in Prozesskarten langsamer rotiert und größer dargestellt (bessere Lesbarkeit).
-- Übersetzungslogik stärker auf editor-zentrierten Workflow fokussiert.
-- PDF-Export im Editor priorisiert jetzt serverseitiges Rendering mit Browser-Fallback.
-- Browser-Fallback für PDF wird nicht mehr still genutzt, sondern als explizite Rückfalloption angeboten.
-- PDF-Export öffnet wieder direkt im Browser-Tab (`inline`) statt ausschließlich als Download.
-- PDF-Stil/Font-Auswahl aus der Editor-Toolbar entfernt; Export nutzt nun bewusst einen festen Markenstil.
-- Standard-Template für Transkriptions-Upload wird konsequent auf `Zusammenfassung` (`generic`) normalisiert.
-- PDF-Premium-Kopf wird serverseitig aus Nutzer-Einstellungen befüllt (keine Client-Metadaten als Quelle).
-- Upload- und Detailseite nutzen für laufende Jobs primär SSE-Live-Updates statt Client-Polling (Polling bleibt Fallback).
-- PDF-Kopfbereich als schlanke Signatur angepasst (Titel, Datum, optional Projekt).
-- UI-Microcopy auf Kernseiten weiter beruhigt und vereinheitlicht.
-- Editor-Topbar vereinfacht: alle Kernaktionen wieder direkt sichtbar (kein kompaktes `Mehr`-Menü).
-- Workflow-Status erweitert: `pending -> queued -> processing -> ...` für transparente Warteschlangenkommunikation.
-- PDF-Print-CSS weiter verfeinert (Witwen/Waisen, Heading-Folgeblockschutz, stabilere Tabellen-/Listenumbrüche).
+- UI auf reduzierte, Apple-orientierte Interaktion ausgerichtet.
 - `settings`-Updatepfad auf wartbaren dynamischen Query-Builder umgestellt.
-- `POST /api/transcriptions/[id]/analyze` startet die Analyse jetzt entkoppelt und liefert sofort `202`.
-- Editor-Topbar wieder auf direkte Aktionsbuttons umgestellt; Sekundäraktionen sind nicht mehr im `Mehr`-Menü versteckt.
-- Fokusmodus-Topbar auf Minimalumfang reduziert (`Hell`, `Dunkel`, `Fokus aus`).
-- Einstellungsbezeichnung angepasst: `Analyse` / `Analyse-Vorlagen` heißt jetzt `Verarbeitungstemplates`.
-- Vorlagen-Generator in den Einstellungen kann für neue Vorlagen automatisch einen Namensvorschlag aus dem Zieltext setzen.
-- Historie-Header (`/transcriptions`) responsive nachgeschärft, um horizontalen Overflow auf Tablet-Landscape zu vermeiden.
-- DOCX-Export visuell an den `Soft Business`-Look angeglichen (Inter als Primärschrift, weichere Akzentfarbe, strukturierende Trennlinien).
-- PDF- und DOCX-Typografie für Überschriften und Trennlinien stärker harmonisiert.
-- PDF-Export-Flow im Editor auf robustes Hybridmodell umgestellt: serverseitiger Renderer zuerst, Browser-Vorschau als Fallback.
-- Deployment-Dokumentation auf ein vollständiges VPS-Runbook erweitert (`docs/vps-deployment-guide.md`), inkl. Chromium-/`PDF_CHROMIUM_PATH`-Vorgaben.
+- PDF-Export-Flow im Editor auf robustes Hybridmodell umgestellt.
 
 ### Fixed
-- Robustere Job-Verarbeitung durch atomische Statusübergänge und Schutz vor Doppelstarts.
-- Stale-Job-Recovery für hängende `processing`/`analyzing`-Jobs.
-- Sichereres Datei-Handling beim Löschen und Upload-Cleanup.
-- Browser-Aufnahme: Visualizer-Start robust gegen Render-Timing (Wellenanzeige/Mikrofonsignal).
-- Browser-Aufnahme: Audio-Vorschau startet konsistent am Anfang statt mit falscher Fortschrittsposition.
-- Chromium-PDF-Header/Footer-Artefakte (z. B. `file:///tmp/...`, Datum/Uhrzeit) entfernt.
-- Upload-/Queue-Startfehler sind nicht mehr „still“: klare UI-Meldung + manuelle Neustart-Aktion.
-- PDF-Export erzwingt keinen Datei-Download mehr; Öffnung erfolgt ausschließlich im Browser-Tab.
-- Doppelte Helper-Logik bereinigt (Analysis-Cleaning, Template-Auflösung, Stale-Recovery).
-- `save-doc` validiert jetzt harte Längenlimits für `title`, `text`, `documentHtml`.
-- Admin-User-Update schreibt User/Settings konsistent in einer DB-Transaktion.
-- ESLint-Warnungen vollständig bereinigt (`npm run lint` ohne Warnungen/Fehler).
-- AudioRecorder räumt Blob-URLs stabil auf und reduziert Race-Conditions im Cleanup.
-- PDF-Export/Fallback robuster gegen Popup-Blocker: Ziel-Tab wird synchron geöffnet und im Fehlerfall sauber wiederverwendet.
-- Fallback-Verhalten für Browser-PDF verbessert: bei blockiertem neuen Fenster greift `window.print()` als letzte Option.
-- Fokus-Preset-Umschalter-Kontrast korrigiert (Button `Dunkel` im hellen Fokusmodus wieder gut lesbar).
-- Neuer Vorlagen-Flow korrigiert: neue Analyse-Vorlagen werden nicht mehr zwangsweise als `Neue Vorlage` gespeichert.
-- Label-Normalisierung korrigiert: keine fehlerhafte globale `ae/oe/ue`-Ersetzung mehr (z. B. kein `Aktülle`).
-- Editor-Caret-Sprung behoben: `contentEditable` wird nicht mehr bei jedem Input durch React-Re-Render zurückgesetzt.
-- Struktur-Rendering im Editor verbessert: verschachtelte Inhalte werden konsistent als `ul/li` ausgegeben (klare Einzüge und bessere Unterscheidbarkeit).
-- Fokusmodus-Preset-Umschalter zeigt den aktiven Zustand jetzt eindeutig; aktive Presets sind orange hervorgehoben.
-- Checkboxen app-weit auf einheitliche Akzentfarbe vereinheitlicht (`accent-accent-orange` statt Browser-Default blau/schwarz).
-- PDF-Export öffnet keine störenden leeren `about:blank`-Tabs mehr im Fehlerpfad; kein automatischer Druckdialog im Fallback-Viewer.
-- PDF-Renderer-Start robuster gemacht (erweiterte Chromium-Pfadsuche, klassifizierte Renderer-Fehler, Fallback von `--headless=new` auf `--headless`).
-- Doppelte Trennlinie am Dokumentanfang entfernt (keine Linie mehr unter Hauptüberschrift bei PDF/DOCX).
+- Robustere Job-Verarbeitung durch atomische Statusübergänge.
+- ESLint-Warnungen vollständig bereinigt.
 
 ### Security
-- Verschlüsselte API-Key-Speicherung (`settings.mistral_api_key_encrypted`).
+- Verschlüsselte API-Key-Speicherung.
 - Rate-Limits auf kritischen API-Endpunkten.
-- Modell-Whitelist serverseitig.
-- Getrennte Secrets für Auth und DB-Init (`NEXTAUTH_SECRET`, `DB_INIT_SECRET`).
-- Verschlüsselungshärtung: kein Fallback mehr von `SETTINGS_ENCRYPTION_KEY` auf `NEXTAUTH_SECRET`.
-- Editor-Sanitizing bei laufenden Edits/Paste abgesichert (zusätzliche XSS-Risikoreduktion).

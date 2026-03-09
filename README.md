@@ -7,7 +7,7 @@ GhostTyper ist eine selbstgehostete Webanwendung für:
 - Übersetzungen
 - editor-zentrierte Dokumentbearbeitung (PDF/DOCX)
 
-Stack: Next.js 13, React 18, PostgreSQL 16, NextAuth, Mistral API, Docker Compose.
+Stack: Next.js 13, React 18, PostgreSQL 16, NextAuth, Mistral API, Google Gemini API, Docker Compose.
 
 ![GhostTyper Screenshot](public/logo-text.png)
 
@@ -20,8 +20,27 @@ GhostTyper ist für Teams gedacht, die Sprache und Dokumente schnell in verwertb
 - Inhalte mit KI zusammenfassen, strukturieren oder übersetzen.
 - Ergebnisse im zentralen Editor finalisieren und als PDF/DOCX exportieren.
 - Historie, Favoriten und Ordner für wiederkehrende Arbeitsschritte.
+- **Volltext-Suche** über alle Transkripte und Analysen (v1.2.0).
+- **Vorlagen-Kategorien** für bessere Organisation (v1.2.0).
+- **Auto-Glossar**: Kontextwörter aus der Historie vorschlagen und mit einem Klick übernehmen.
+- **Intelligente Modellauswahl + Kostenvorschau** vor dem Start in Upload, Text-AI und Übersetzung.
+- **1-Klick-Workflows** im Text-Assistenten (z. B. Meeting -> Aktionsplan, Notizen -> Status-Update).
+- **Sketch Summary (`/sketch`)**: Lerntext wird mit Gemini als handgezeichnete Lernübersicht (PNG) generiert.
+- **Google API-Key (Gemini) in Settings**: eigener Key pro Nutzer inklusive Statusanzeige und Entfernen-Flow.
+- Versionshinweis: Aktuell released `v1.2.0`; nächste Feature-Welle als `v1.3.0` dokumentiert.
 - Self-Hosted mit Next.js, PostgreSQL, NextAuth und Docker Compose.
 - Sicherheitsbasis mit Rate-Limits, verschlüsselten API-Keys und klaren Status-Übergängen.
+
+## Produktivitätsfeatures (neu)
+
+- Auto-Glossar-API: `GET /api/glossary/suggestions`
+- Modell-Assistent: `POST /api/model-assistant`
+- Workflows:
+  - `GET /api/workflows`
+  - `POST /api/workflows/execute`
+
+Hinweis zur Kompatibilität:
+- `PUT /api/settings` und `POST /api/settings` werden beide unterstützt.
 
 ## Code-Review Prioritäten (P0-P3)
 
@@ -44,8 +63,13 @@ docker compose -f config/docker-compose.dev.yml up --build -d
 
 ### 2. Datenbank initialisieren
 ```bash
-curl -X POST http://localhost:3000/api/db-init -H "x-init-secret: dev-db-init-secret"
+docker compose -f config/docker-compose.dev.yml exec transkription-webapp \
+  sh -lc "wget -q -S -O - --post-data '' --header 'x-init-secret: dev-db-init-secret' http://127.0.0.1:3000/api/db-init"
 ```
+
+Hinweis:
+- Der direkte Host-Call auf `http://localhost:3000/api/db-init` kann wegen Maintenance-ACL mit `403 Forbidden` blockiert sein.
+- Der In-Container-Aufruf oben ist der verlässliche Weg für lokale Dev-Migrationen.
 
 ### 3. Optional: Admin anlegen/aktualisieren
 ```bash
@@ -89,6 +113,7 @@ Siehe `.env.example`.
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
 - `MISTRAL_API_KEY`
+- `GEMINI_API_KEY`
 - `DB_INIT_SECRET`
 - `ENABLE_DB_INIT_API`
 - `SETTINGS_ENCRYPTION_KEY`
@@ -98,27 +123,41 @@ Siehe `.env.example`.
 - `TRANSCRIPTION_WORKER_CONCURRENCY`
 - `TRANSCRIPTION_WORKER_SCAN_INTERVAL_MS`
 - `TRANSCRIPTION_WORKER_SCAN_BATCH`
+- `HTTP_CLIENT_TIMEOUT_MS`
+- `HEALTH_DETAILS_PUBLIC`
+- `HEALTH_DETAILS_SECRET`
+- `UPLOAD_VIRUS_SCAN_MODE`
+- `UPLOAD_VIRUS_SCAN_CMD`
+- `UPLOAD_VIRUS_SCAN_FAIL_OPEN`
+- `UPLOAD_VIRUS_SCAN_TIMEOUT_MS`
 - `LOG_FORMAT` (`json` oder `plain`)
 - `LOG_LEVEL` (`debug`, `info`, `warn`, `error`)
 
 ## Observability
 
 - Strukturierte Server-Logs über `LOG_FORMAT=json` (Default).
-- Laufzeitmetriken im Healthcheck unter `GET /api/health` (worker/db/counters).
+- `GET /api/health` liefert standardmäßig nur einen schlanken Health-Status.
+- Laufzeitmetriken im Healthcheck nur mit `HEALTH_DETAILS_PUBLIC=true` oder Header `x-health-secret` (bei gesetztem `HEALTH_DETAILS_SECRET`).
 - Erweiterte Metriken für Admins unter `GET /api/admin/observability`.
 
 ## Qualitäts-/Build-Hinweis
 
 - `npm run build` kompiliert die Anwendung.
+- `npm test` führt die automatischen Unit-Tests für die Tabellenlogik aus.
+- `npm run smoke` führt einen Docker/API-Smoke-Test durch.
+- `npm run smoke:full` führt zusätzlich `test + lint + build` sowie PDF-Renderer-Check aus.
+- UI-Smoke (Sketch + Settings, Desktop/Mobile): `npx playwright test tests/ui-smoke-sketch-settings.spec.js --reporter=line --workers=1`
 - In restriktiven Sandbox-Umgebungen kann der Build bei `Collecting page data` mit `EPERM listen 0.0.0.0` abbrechen. Das ist umgebungsbedingt und kein Compile-Fehler der Anwendung.
 
 ## Dokumentation
 
 - Übersicht: `docs/README.md`
 - Feature-Index (kompakt): `docs/features-and-improvements.md`
+- Geplante v1.3.0 Features: `docs/v1.3.0-features.md`
 - Security Review & Hardening: `docs/code-review-hardening-2026-02-11.md`
 - Externes Review: `docs/external-review-2026-02-12.md`
 - Prioritäten-Umsetzung P0-P3: `docs/code-review-priorities-p0-p3-2026-02-12.md`
+- Sketch-Rollout (Gemini + UX/UI + Verifikation): `docs/sketch-summary-rollout-2026-03-08.md`
 - Projektplan: `PROJECT_PLAN.md`
 
 ## Lizenz

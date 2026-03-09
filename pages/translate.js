@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { mdToHtml } from '../lib/export-utils';
 import DocumentEditor from '../components/DocumentEditor';
 import ProcessStatusCard from '../components/ProcessStatusCard';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { saveDocument } from '../lib/api';
 
 const LANGUAGES = [
@@ -131,8 +132,8 @@ export default function Translate() {
     }
   }
 
-  if (status === 'loading') return null;
-  if (!session) return null;
+  if (status === 'loading') return <LoadingSpinner />;
+  if (!session) return <LoadingSpinner />;
 
   return (
     <>
@@ -154,15 +155,15 @@ export default function Translate() {
                   <input type="file" ref={fileInputRef} onChange={e => handleOcr(e.target.files[0])} accept=".pdf,image/*" className="hidden" />
                   <input type="file" ref={cameraInputRef} onChange={e => handleOcr(e.target.files[0])} accept="image/*" capture="environment" className="hidden" />
                   
-                  <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-text-primary px-4 py-2 rounded-xl text-xs font-bold border border-white/5 transition-all" title="Dokument hochladen">
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-text-primary px-4 py-2 rounded-xl text-xs font-bold border border-white/5 transition-all" title="Dokument hochladen" aria-label="Dokument für OCR hochladen">
                     <svg className="w-5 h-5 text-accent-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                     <span className="hidden sm:inline">Dokument</span>
                   </button>
-                  <button onClick={() => cameraInputRef.current?.click()} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-text-primary px-4 py-2 rounded-xl text-xs font-bold border border-white/5 transition-all" title="Foto machen">
+                  <button type="button" onClick={() => cameraInputRef.current?.click()} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-text-primary px-4 py-2 rounded-xl text-xs font-bold border border-white/5 transition-all" title="Foto machen" aria-label="Foto aufnehmen und OCR starten">
                     <svg className="w-5 h-5 text-accent-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     <span className="hidden sm:inline">Kamera</span>
                   </button>
-                  <button onClick={() => setText('')} className="p-2 text-text-secondary hover:text-accent-red bg-white/5 rounded-xl transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></svg></button>
+                  <button type="button" onClick={() => setText('')} className="p-2 text-text-secondary hover:text-accent-red bg-white/5 rounded-xl transition-colors" aria-label="Eingabetext leeren"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></svg></button>
                 </div>
               </div>
               
@@ -223,10 +224,13 @@ export default function Translate() {
                   <div className="mt-3 bg-dark-card border border-white/[0.06] rounded-2xl px-4 py-3 shadow-xl">
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest opacity-60">Modell</label>
                     <select value={model} onChange={e => setModel(e.target.value)} className="mt-2 w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
-                      <option value="mistral-large-latest">Mistral Large</option>
-                      <option value="mistral-medium-latest">Mistral Medium</option>
-                      <option value="mistral-small-latest">Mistral Small</option>
+                      <option value="mistral-small-latest">Kostengünstig / Schnell</option>
+                      <option value="mistral-medium-latest">Ausgewogen</option>
+                      <option value="mistral-large-latest">Qualität</option>
                     </select>
+                    <p className="mt-2 text-[11px] text-text-secondary">
+                      Eine Auswahl reicht: Kostengünstig / Schnell, Ausgewogen oder Qualität.
+                    </p>
                   </div>
                 )}
               </div>

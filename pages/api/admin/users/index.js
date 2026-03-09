@@ -3,6 +3,7 @@ import { requireAdmin } from '../../../../lib/admin';
 import { query } from '../../../../lib/db';
 import { validatePassword } from '../../../../lib/constants';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
+import { isValidEmail, normalizeEmail } from '../../../../lib/email';
 
 export default async function handler(req, res) {
   const session = await requireAdmin(req, res);
@@ -21,6 +22,7 @@ export default async function handler(req, res) {
         const result = await query(
           `SELECT u.id, u.email, u.name, u.role, u.created_at,
                   (s.mistral_api_key IS NOT NULL OR s.mistral_api_key_encrypted IS NOT NULL) AS api_key_configured,
+                  (s.google_api_key IS NOT NULL OR s.google_api_key_encrypted IS NOT NULL) AS google_api_key_configured,
                   s.preferred_model, s.cost_limit
            FROM users u
            LEFT JOIN settings s ON s.user_id = u.id
@@ -35,9 +37,13 @@ export default async function handler(req, res) {
 
     case 'POST': {
       const { email, name, password, role } = req.body;
+      const normalizedEmail = normalizeEmail(email);
 
-      if (!email || !password) {
+      if (!normalizedEmail || !password) {
         return res.status(400).json({ message: 'Email und Passwort sind erforderlich' });
+      }
+      if (!isValidEmail(normalizedEmail)) {
+        return res.status(400).json({ message: 'Ungültige E-Mail-Adresse' });
       }
 
       const passwordError = validatePassword(password);
@@ -46,7 +52,7 @@ export default async function handler(req, res) {
       }
 
       try {
-        const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
+        const existing = await query('SELECT id FROM users WHERE lower(email) = $1', [normalizedEmail]);
         if (existing.rows.length > 0) {
           return res.status(409).json({ message: 'Ein Konto mit dieser Email existiert bereits' });
         }
@@ -56,7 +62,7 @@ export default async function handler(req, res) {
 
         const result = await query(
           'INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role',
-          [email, name || null, passwordHash, userRole]
+          [normalizedEmail, name || null, passwordHash, userRole]
         );
 
         return res.status(201).json(result.rows[0]);

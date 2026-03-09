@@ -2,6 +2,10 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useState, useEffect, useCallback } from 'react';
+import LoadingSpinner from '../../components/LoadingSpinner';
+import Toast from '../../components/Toast';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { useUiFeedback } from '../../lib/use-ui-feedback';
 
 export default function AdminUsers() {
   const { data: session, status } = useSession();
@@ -12,6 +16,15 @@ export default function AdminUsers() {
   const [editingUser, setEditingUser] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const {
+    toast,
+    showToast,
+    clearToast,
+    confirmDialog,
+    confirm,
+    closeConfirm,
+    acceptConfirm,
+  } = useUiFeedback();
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -19,6 +32,7 @@ export default function AdminUsers() {
   const [formPassword, setFormPassword] = useState('');
   const [formRole, setFormRole] = useState('user');
   const [formApiKey, setFormApiKey] = useState('');
+  const [formGoogleApiKey, setFormGoogleApiKey] = useState('');
   const [formCostLimit, setFormCostLimit] = useState('');
 
   const loadUsers = useCallback(async () => {
@@ -28,10 +42,11 @@ export default function AdminUsers() {
       setUsers(await res.json());
     } catch {
       setError('Fehler beim Laden der User-Liste');
+      showToast('Fehler beim Laden der User-Liste', 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -53,6 +68,7 @@ export default function AdminUsers() {
     setFormPassword('');
     setFormRole('user');
     setFormApiKey('');
+    setFormGoogleApiKey('');
     setFormCostLimit('');
     setEditingUser(null);
     setShowForm(false);
@@ -65,6 +81,7 @@ export default function AdminUsers() {
     setFormPassword('');
     setFormRole(user.role);
     setFormApiKey('');
+    setFormGoogleApiKey('');
     setFormCostLimit(user.cost_limit ?? '');
     setEditingUser(user);
     setShowForm(true);
@@ -91,6 +108,7 @@ export default function AdminUsers() {
         };
         if (formPassword) body.password = formPassword;
         if (formApiKey) body.mistralApiKey = formApiKey;
+        if (formGoogleApiKey) body.googleApiKey = formGoogleApiKey;
         if (formCostLimit !== '' && formCostLimit !== editingUser.cost_limit) {
           body.costLimit = formCostLimit === '' ? null : parseFloat(formCostLimit);
         }
@@ -144,7 +162,13 @@ export default function AdminUsers() {
   }
 
   async function handleDelete(user) {
-    if (!confirm(`User "${user.email}" wirklich löschen? Alle Daten werden gelöscht.`)) return;
+    const approved = await confirm({
+      title: 'Benutzer löschen',
+      message: `User "${user.email}" wirklich löschen? Alle Daten werden gelöscht.`,
+      confirmLabel: 'Benutzer löschen',
+      danger: true,
+    });
+    if (!approved) return;
 
     try {
       const res = await fetch(`/api/admin/users/${user.id}`, { method: 'DELETE' });
@@ -154,15 +178,17 @@ export default function AdminUsers() {
         return;
       }
       setSuccess('User gelöscht');
+      showToast('User gelöscht', 'success');
       loadUsers();
       setTimeout(() => setSuccess(''), 3000);
     } catch {
       setError('Ein Fehler ist aufgetreten');
+      showToast('Ein Fehler ist aufgetreten', 'error');
     }
   }
 
-  if (status === 'loading' || loading) return null;
-  if (!session || session.user.role !== 'admin') return null;
+  if (status === 'loading' || loading) return <LoadingSpinner />;
+  if (!session || session.user.role !== 'admin') return <LoadingSpinner />;
 
   return (
     <>
@@ -201,8 +227,9 @@ export default function AdminUsers() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Name</label>
+                <label htmlFor="admin-user-name" className="block text-sm font-medium text-text-secondary mb-1.5">Name</label>
                 <input
+                  id="admin-user-name"
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
@@ -212,8 +239,9 @@ export default function AdminUsers() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Email *</label>
+                <label htmlFor="admin-user-email" className="block text-sm font-medium text-text-secondary mb-1.5">Email *</label>
                 <input
+                  id="admin-user-email"
                   type="email"
                   value={formEmail}
                   onChange={(e) => setFormEmail(e.target.value)}
@@ -223,10 +251,11 @@ export default function AdminUsers() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                <label htmlFor="admin-user-password" className="block text-sm font-medium text-text-secondary mb-1.5">
                   Passwort {editingUser ? '(leer = unverändert)' : '*'}
                 </label>
                 <input
+                  id="admin-user-password"
                   type="password"
                   value={formPassword}
                   onChange={(e) => setFormPassword(e.target.value)}
@@ -237,8 +266,9 @@ export default function AdminUsers() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Rolle</label>
+                <label htmlFor="admin-user-role" className="block text-sm font-medium text-text-secondary mb-1.5">Rolle</label>
                 <select
+                  id="admin-user-role"
                   value={formRole}
                   onChange={(e) => setFormRole(e.target.value)}
                   className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
@@ -250,12 +280,13 @@ export default function AdminUsers() {
             </div>
 
             {editingUser && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/[0.06] pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-white/[0.06] pt-4">
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  <label htmlFor="admin-user-api-key" className="block text-sm font-medium text-text-secondary mb-1.5">
                     Mistral API-Key {editingUser.api_key_configured && '(konfiguriert)'}
                   </label>
                   <input
+                    id="admin-user-api-key"
                     type="password"
                     value={formApiKey}
                     onChange={(e) => setFormApiKey(e.target.value)}
@@ -265,10 +296,25 @@ export default function AdminUsers() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  <label htmlFor="admin-user-google-api-key" className="block text-sm font-medium text-text-secondary mb-1.5">
+                    Google API-Key {editingUser.google_api_key_configured && '(konfiguriert)'}
+                  </label>
+                  <input
+                    id="admin-user-google-api-key"
+                    type="password"
+                    value={formGoogleApiKey}
+                    onChange={(e) => setFormGoogleApiKey(e.target.value)}
+                    placeholder={editingUser.google_api_key_configured ? 'Neuen Key eingeben zum Ändern' : 'Google API-Key eingeben'}
+                    className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="admin-user-cost-limit" className="block text-sm font-medium text-text-secondary mb-1.5">
                     Monatliches Kostenlimit (€)
                   </label>
                   <input
+                    id="admin-user-cost-limit"
                     type="number"
                     step="0.01"
                     min="0"
@@ -320,7 +366,12 @@ export default function AdminUsers() {
                 )}
                 {user.api_key_configured && (
                   <span className="text-xs bg-accent-green/20 text-accent-green px-2 py-0.5 rounded-full">
-                    API-Key
+                    Mistral API
+                  </span>
+                )}
+                {user.google_api_key_configured && (
+                  <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full">
+                    Google API
                   </span>
                 )}
                 {user.cost_limit !== null && user.cost_limit !== undefined && (
@@ -357,6 +408,17 @@ export default function AdminUsers() {
           <p className="text-text-secondary text-sm">Keine User vorhanden.</p>
         </div>
       )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
+      <ConfirmDialog
+        open={Boolean(confirmDialog)}
+        title={confirmDialog?.title}
+        message={confirmDialog?.message}
+        confirmLabel={confirmDialog?.confirmLabel}
+        cancelLabel={confirmDialog?.cancelLabel}
+        danger={confirmDialog?.danger}
+        onConfirm={acceptConfirm}
+        onCancel={closeConfirm}
+      />
     </>
   );
 }

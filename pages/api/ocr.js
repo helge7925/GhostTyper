@@ -6,13 +6,22 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { query } from '../../lib/db';
 import { performOCR, analyzeTranscription } from '../../lib/ai-service';
-import { CostLimitExceededError, logUsage, checkCostLimit, withUserCostLock } from '../../lib/usage';
+import {
+  CostLimitCheckUnavailableError,
+  CostLimitExceededError,
+  logUsage,
+  checkCostLimit,
+  withUserCostLock,
+} from '../../lib/usage';
 import { ACCEPTED_OCR_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE } from '../../lib/constants';
 import { resolveChatModel } from '../../lib/model-policy';
 import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { addTranscriptionEvent } from '../../lib/transcription-events';
 import { resolveTemplate } from '../../lib/template-service';
+import { scanFileForViruses } from '../../lib/virus-scan';
+import { detectOcrMimeType, extensionFromDetectedMime } from '../../lib/file-signature';
+import { normalizeDataTableAnalysis } from '../../lib/data-table';
 
 export const config = {
   api: {
@@ -24,6 +33,11 @@ const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 
 async function ensureUploadDir() {
   await mkdir(UPLOAD_DIR, { recursive: true });
+}
+
+async function safeUnlink(filePath) {
+  if (!filePath) return;
+  await unlink(filePath).catch(() => {});
 }
 
 function parseForm(req) {
@@ -58,7 +72,7 @@ export default async function handler(req, res) {
   }, 'Zu viele OCR-Anfragen. Bitte später erneut versuchen.');
   if (!allowed) return;
 
-  let filePath = '';
+  let persistedFilePath = '';
   let tempUploadPath = '';
   try {
     await ensureUploadDir();
@@ -70,17 +84,28 @@ export default async function handler(req, res) {
     }
 
     tempUploadPath = file.filepath || '';
-    if (!ACCEPTED_OCR_TYPES.includes(file.mimetype)) {
-      if (tempUploadPath) await unlink(tempUploadPath).catch(() => {});
+    const detectedMimeType = await detectOcrMimeType(tempUploadPath);
+    if (!detectedMimeType || !ACCEPTED_OCR_TYPES.includes(detectedMimeType)) {
+      await safeUnlink(tempUploadPath);
+      tempUploadPath = '';
       return res.status(400).json({ message: 'Ungültiges Dateiformat. Erlaubt sind PDF, PNG, JPG, WEBP.' });
     }
 
-    const ext = path.extname(file.originalFilename || '.pdf');
+    const scanResult = await scanFileForViruses(file.filepath);
+    if (!scanResult.clean) {
+      await safeUnlink(tempUploadPath);
+      tempUploadPath = '';
+      return res.status(400).json({ message: 'Datei wurde vom Sicherheits-Scan blockiert' });
+    }
+
+    const ext = extensionFromDetectedMime(detectedMimeType) || '.bin';
     const filename = `${randomUUID()}${ext}`;
-    filePath = path.join(UPLOAD_DIR, filename);
+    const filePath = path.join(UPLOAD_DIR, filename);
 
     await copyFile(file.filepath, filePath);
-    await unlink(file.filepath).catch(() => {});
+    persistedFilePath = filePath;
+    await safeUnlink(tempUploadPath);
+    tempUploadPath = '';
 
     const settingsRow = await getSettingsRow(session.user.id);
     const apiKey = resolveStoredApiKey(settingsRow) || process.env.MISTRAL_API_KEY;
@@ -88,25 +113,60 @@ export default async function handler(req, res) {
     const language = settingsRow?.language || 'de';
 
     if (!apiKey) {
+      await safeUnlink(persistedFilePath);
+      persistedFilePath = '';
       return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert' });
     }
     if (!preferredModel) {
+      await safeUnlink(persistedFilePath);
+      persistedFilePath = '';
       return res.status(400).json({ message: 'Ungültiges Standardmodell in den Einstellungen' });
     }
 
     const shouldAnalyze = (fields.analyze?.[0] || fields.analyze) === 'true';
     const template = fields.template?.[0] || fields.template || 'generic';
     const customPrompt = fields.customPrompt?.[0] || fields.customPrompt || '';
+    const analysisFocus = fields.analysisFocus?.[0] || fields.analysisFocus || '';
+    const documentScope = fields.documentScope?.[0] || fields.documentScope || '';
     if (typeof customPrompt === 'string' && customPrompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
-      await unlink(filePath).catch(() => {});
+      await safeUnlink(persistedFilePath);
+      persistedFilePath = '';
       return res.status(400).json({ message: `Zusätzlicher Kontext ist zu lang (max. ${MAX_CUSTOM_PROMPT_LENGTH} Zeichen)` });
+    }
+    if (typeof analysisFocus === 'string' && analysisFocus.length > MAX_CUSTOM_PROMPT_LENGTH) {
+      await safeUnlink(persistedFilePath);
+      persistedFilePath = '';
+      return res.status(400).json({ message: `Fokus der Analyse ist zu lang (max. ${MAX_CUSTOM_PROMPT_LENGTH} Zeichen)` });
+    }
+    if (typeof documentScope === 'string' && documentScope.length > MAX_CUSTOM_PROMPT_LENGTH) {
+      await safeUnlink(persistedFilePath);
+      persistedFilePath = '';
+      return res.status(400).json({ message: `PDF-Bezug ist zu lang (max. ${MAX_CUSTOM_PROMPT_LENGTH} Zeichen)` });
+    }
+
+    const normalizedCustomPrompt = typeof customPrompt === 'string' ? customPrompt.trim() : '';
+    const normalizedAnalysisFocus = typeof analysisFocus === 'string' ? analysisFocus.trim() : '';
+    const normalizedDocumentScope = typeof documentScope === 'string' ? documentScope.trim() : '';
+    const documentScopeLabel = language === 'en' ? 'PDF scope' : 'Bezug im PDF';
+    const analysisFocusLabel = language === 'en' ? 'Analysis focus' : 'Fokus der Analyse';
+    const effectiveCustomPrompt = [
+      normalizedCustomPrompt,
+      normalizedAnalysisFocus ? `${analysisFocusLabel}:\n${normalizedAnalysisFocus}` : '',
+      normalizedDocumentScope ? `${documentScopeLabel}:\n${normalizedDocumentScope}` : '',
+    ].filter(Boolean).join('\n\n');
+
+    if (effectiveCustomPrompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
+      await safeUnlink(persistedFilePath);
+      persistedFilePath = '';
+      return res.status(400).json({ message: `Kombinierter Kontext ist zu lang (max. ${MAX_CUSTOM_PROMPT_LENGTH} Zeichen)` });
     }
     const requestModel = fields.model?.[0] || fields.model;
     const selectedModelForAnalysis = shouldAnalyze
       ? resolveChatModel(requestModel || preferredModel)
       : preferredModel;
     if (shouldAnalyze && !selectedModelForAnalysis) {
-      await unlink(filePath).catch(() => {});
+      await safeUnlink(persistedFilePath);
+      persistedFilePath = '';
       return res.status(400).json({ message: 'Ungültiges KI-Modell' });
     }
 
@@ -116,7 +176,7 @@ export default async function handler(req, res) {
         throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
       }
 
-      const { markdown: markdownValue, usage: ocrUsage, model: ocrModel } = await performOCR(filePath, apiKey, file.mimetype);
+      const { markdown: markdownValue, usage: ocrUsage, model: ocrModel } = await performOCR(filePath, apiKey, detectedMimeType);
       await logUsage(session.user.id, ocrModel, 'ocr', ocrUsage);
 
       if (!shouldAnalyze || !markdownValue.trim()) {
@@ -132,7 +192,7 @@ export default async function handler(req, res) {
         markdownValue,
         resolvedTemplate,
         apiKey,
-        customPrompt,
+        effectiveCustomPrompt,
         selectedModelForAnalysis,
         language
       );
@@ -145,10 +205,23 @@ export default async function handler(req, res) {
       };
     });
 
+    let analysisType = 'text';
+    let analysisPayload = analysis;
+    let analysisMeta = null;
+    let tableSchema = null;
+
+    if (shouldAnalyze && template === 'data_table' && analysis) {
+      const tableAnalysis = normalizeDataTableAnalysis(analysis, language);
+      analysisType = 'table';
+      analysisPayload = { rows: tableAnalysis.rows };
+      analysisMeta = tableAnalysis.meta;
+      tableSchema = tableAnalysis.schema;
+    }
+
     // Save OCR result as a transcription record in the history
     const transcriptionResult = await query(
-      `INSERT INTO transcriptions (user_id, filename, original_name, file_path, file_size, mime_type, template, model, custom_prompt, status, text, analysis)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'completed', $10, $11)
+      `INSERT INTO transcriptions (user_id, filename, original_name, file_path, file_size, mime_type, template, model, custom_prompt, status, text, analysis, analysis_type, analysis_meta, table_schema)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'completed', $10, $11, $12, $13, $14)
        RETURNING id`,
       [
         session.user.id,
@@ -156,12 +229,15 @@ export default async function handler(req, res) {
         file.originalFilename,
         filePath,
         file.size,
-        file.mimetype,
+        detectedMimeType,
         fields.template?.[0] || fields.template || 'generic',
         selectedModelForSave,
-        fields.customPrompt?.[0] || fields.customPrompt || '',
+        effectiveCustomPrompt,
         markdown,
-        analysis ? JSON.stringify(analysis) : null
+        analysisPayload ? JSON.stringify(analysisPayload) : null,
+        analysisType,
+        analysisMeta ? JSON.stringify(analysisMeta) : null,
+        tableSchema ? JSON.stringify(tableSchema) : null,
       ]
     );
 
@@ -177,14 +253,19 @@ export default async function handler(req, res) {
 
     // Local file cleanup is handled by transcription detail deletion eventually,
     // but for now we keep it as it's the source.
+    persistedFilePath = '';
 
     return res.status(200).json({ transcriptionId, markdown, analysis });
   } catch (error) {
     if (error?.code === 'COST_LIMIT_EXCEEDED') {
       return res.status(429).json({ message: error.message });
     }
+    if (error instanceof CostLimitCheckUnavailableError || error?.code === 'COST_CHECK_UNAVAILABLE') {
+      return res.status(503).json({ message: error.message });
+    }
     logApiError('OCR error', error);
-    if (filePath) await unlink(filePath).catch(() => {});
+    await safeUnlink(tempUploadPath);
+    await safeUnlink(persistedFilePath);
     return serverError(res, 'OCR fehlgeschlagen');
   }
 }

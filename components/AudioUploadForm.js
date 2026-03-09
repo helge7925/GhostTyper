@@ -3,7 +3,20 @@ import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE, normalizeDefaultTemplate } from '.
 import { uploadAudio, getTemplates, getSettings } from '../lib/api';
 import AudioRecorder from './AudioRecorder';
 
-export default function AudioUploadForm({ onSuccess }) {
+const BUILTIN_TEMPLATE_VALUES = new Set(['generic', 'meeting', 'aufmass', 'knowledge_graph', 'mindmap', 'data_table']);
+const ALLOWED_CHAT_MODELS = new Set(['mistral-small-latest', 'mistral-medium-latest', 'mistral-large-latest']);
+const ALLOWED_UPLOAD_MODES = new Set(['file', 'record']);
+
+function resolvePresetTemplate(templateValue, templates) {
+  const raw = String(templateValue || '').trim();
+  if (!raw) return null;
+  if (BUILTIN_TEMPLATE_VALUES.has(raw)) return raw;
+  if (!raw.startsWith('custom-')) return null;
+  const customId = raw.slice('custom-'.length);
+  return templates.some((entry) => String(entry.id) === customId) ? raw : null;
+}
+
+export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTemplate = false, templateLabel = '' }) {
   const [file, setFile] = useState(null);
   const [template, setTemplate] = useState('generic');
   const [model, setModel] = useState('mistral-large-latest');
@@ -11,6 +24,7 @@ export default function AudioUploadForm({ onSuccess }) {
   const [diarize, setDiarize] = useState(false);
   const [autoAnalyze, setAutoAnalyze] = useState(true);
   const [customPrompt, setCustomPrompt] = useState('');
+  const [analysisFocus, setAnalysisFocus] = useState('');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [uploadMode, setUploadMode] = useState('file');
   const [dragActive, setDragActive] = useState(false);
@@ -24,10 +38,49 @@ export default function AudioUploadForm({ onSuccess }) {
     Promise.all([getTemplates(), getSettings()])
       .then(([templatesData, settingsData]) => {
         setTemplates(templatesData);
-        setTemplate(normalizeDefaultTemplate(settingsData.defaultTemplate));
+        let nextTemplate = normalizeDefaultTemplate(settingsData.defaultTemplate);
+        const presetTemplate = resolvePresetTemplate(presetConfig?.template, templatesData || []);
+        if (presetTemplate) {
+          nextTemplate = presetTemplate;
+        }
+        setTemplate(nextTemplate);
+        if (ALLOWED_CHAT_MODELS.has(presetConfig?.model)) {
+          setModel(presetConfig.model);
+        }
+        if (ALLOWED_UPLOAD_MODES.has(presetConfig?.uploadMode)) {
+          setUploadMode(presetConfig.uploadMode);
+        }
+        if (typeof presetConfig?.autoAnalyze === 'boolean') {
+          setAutoAnalyze(presetConfig.autoAnalyze);
+        }
+        if (typeof presetConfig?.diarize === 'boolean') {
+          setDiarize(presetConfig.diarize);
+        }
+        if (typeof presetConfig?.customPrompt === 'string') {
+          setCustomPrompt(presetConfig.customPrompt);
+        }
+        if (typeof presetConfig?.analysisFocus === 'string') {
+          setAnalysisFocus(presetConfig.analysisFocus);
+        }
+        if (presetConfig?.showAdvancedOptions) {
+          setShowAdvancedOptions(true);
+        }
       })
       .catch(err => console.error('Error loading upload options:', err));
-  }, []);
+  }, [presetConfig]);
+
+  useEffect(() => {
+    if (!presetConfig) return;
+    const presetTemplate = resolvePresetTemplate(presetConfig.template, templates);
+    if (presetTemplate) setTemplate(presetTemplate);
+    if (ALLOWED_CHAT_MODELS.has(presetConfig.model)) setModel(presetConfig.model);
+    if (ALLOWED_UPLOAD_MODES.has(presetConfig.uploadMode)) setUploadMode(presetConfig.uploadMode);
+    if (typeof presetConfig.autoAnalyze === 'boolean') setAutoAnalyze(presetConfig.autoAnalyze);
+    if (typeof presetConfig.diarize === 'boolean') setDiarize(presetConfig.diarize);
+    if (typeof presetConfig.customPrompt === 'string') setCustomPrompt(presetConfig.customPrompt);
+    if (typeof presetConfig.analysisFocus === 'string') setAnalysisFocus(presetConfig.analysisFocus);
+    if (presetConfig.showAdvancedOptions) setShowAdvancedOptions(true);
+  }, [presetConfig, templates]);
 
   function validateFile(f) {
     const type = f.type.split(';')[0];
@@ -58,6 +111,13 @@ export default function AudioUploadForm({ onSuccess }) {
     }
   }
 
+  function handleFileZoneKeyDown(event) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      inputRef.current?.click();
+    }
+  }
+
   function handleRecordingComplete(blob) {
     const extension = blob.type.includes('mp4') ? 'mp4' : 
                       blob.type.includes('webm') ? 'webm' : 
@@ -81,7 +141,7 @@ export default function AudioUploadForm({ onSuccess }) {
         setProgress((prev) => Math.min(prev + 10, 90));
       }, 200);
 
-      const result = await uploadAudio(file, { template, model, diarize, customPrompt, autoAnalyze });
+      const result = await uploadAudio(file, { template, model, diarize, customPrompt, analysisFocus, autoAnalyze });
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -135,6 +195,10 @@ export default function AudioUploadForm({ onSuccess }) {
           onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
           onDragLeave={() => setDragActive(false)}
           onClick={() => inputRef.current?.click()}
+          onKeyDown={handleFileZoneKeyDown}
+          role="button"
+          tabIndex={0}
+          aria-label="Audio-Datei auswählen oder per Drag-and-drop hochladen"
           className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
             dragActive
               ? 'border-accent-orange bg-accent-orange/10'
@@ -204,32 +268,59 @@ export default function AudioUploadForm({ onSuccess }) {
       {showAdvancedOptions && (
         <div className="space-y-4 bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="upload-template" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Analyse-Modus</label>
-              <select id="upload-template" value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
-                <optgroup label="Standard"><option value="generic">Zusammenfassung</option><option value="meeting">Meeting-Protokoll</option><option value="aufmass">Aufmaß</option></optgroup>
-                {templates.length > 0 && <optgroup label="Eigene Vorlagen">{templates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}</optgroup>}
-              </select>
-            </div>
+            {!lockTemplate ? (
+              <div>
+                <label htmlFor="upload-template" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Analyse-Modus</label>
+                <select id="upload-template" value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
+                  <optgroup label="Standard"><option value="generic">Zusammenfassung</option><option value="meeting">Meeting-Protokoll</option><option value="aufmass">Aufmaß</option></optgroup>
+                  {templates.length > 0 && <optgroup label="Eigene Vorlagen">{templates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}</optgroup>}
+                </select>
+              </div>
+            ) : (
+              <div className="md:col-span-1">
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Analyse-Modus</label>
+                <div className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary">
+                  {templateLabel || template}
+                </div>
+              </div>
+            )}
             <div>
               <label htmlFor="upload-model" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">KI-Modell</label>
               <select id="upload-model" value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
-                <option value="mistral-large-latest">Mistral Large</option>
-                <option value="mistral-medium-latest">Mistral Medium</option>
-                <option value="mistral-small-latest">Mistral Small</option>
+                <option value="mistral-small-latest">Kostengünstig / Schnell</option>
+                <option value="mistral-medium-latest">Ausgewogen</option>
+                <option value="mistral-large-latest">Qualität</option>
               </select>
+              <p className="mt-1 text-[11px] text-text-secondary">Einfach wählen: Kostengünstig / Schnell, Ausgewogen oder Qualität.</p>
             </div>
           </div>
           <div>
             <label htmlFor="upload-prompt" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Zusätzlicher Kontext</label>
             <textarea id="upload-prompt" value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Teilnehmer, Projekte, Hinweise..." rows={2} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none resize-none" />
           </div>
+          <div>
+            <label htmlFor="upload-analysis-focus" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Fokus der Analyse</label>
+            <textarea
+              id="upload-analysis-focus"
+              value={analysisFocus}
+              onChange={(e) => setAnalysisFocus(e.target.value)}
+              placeholder="Worauf soll sich die Analyse konzentrieren?"
+              rows={2}
+              className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none resize-none"
+            />
+          </div>
         </div>
       )}
 
       {error && <div className="bg-accent-red/10 border border-accent-red/20 text-accent-red px-4 py-3 rounded-lg text-sm">{error}</div>}
 
-      {uploading && <div className="w-full bg-white/[0.06] rounded-full h-1.5"><div className="gradient-accent h-1.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} /></div>}
+      {uploading && (
+        <progress
+          className="upload-progress w-full"
+          value={Math.max(0, Math.min(progress, 100))}
+          max={100}
+        />
+      )}
 
       <button type="submit" disabled={!file || uploading} className="w-full gradient-accent text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-accent-orange/20 disabled:opacity-30 transition-all hover:scale-[1.01]">
         {uploading ? 'Wird hochgeladen...' : 'Vorgang starten'}

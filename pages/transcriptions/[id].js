@@ -5,8 +5,12 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import StatusBadge from '../../components/StatusBadge';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Toast from '../../components/Toast';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import DocumentEditor from '../../components/DocumentEditor';
+import TableRenderer from '../../components/TableRenderer';
 import ProcessStatusCard from '../../components/ProcessStatusCard';
+import KnowledgeGraphRenderer from '../../components/KnowledgeGraphRenderer';
+import MindmapRenderer from '../../components/MindmapRenderer';
 import { getTranscription, deleteTranscription, updateSpeakers, startAnalysis } from '../../lib/api';
 import { STATUS } from '../../lib/constants';
 import { analysisToHtml } from '../../lib/export-utils';
@@ -70,19 +74,19 @@ function eventDotClass(stage) {
  */
 function SpeakerInput({ sid, value, onChange }) {
   const [localValue, setLocalValue] = useState(value);
-  
+
   useEffect(() => {
     setLocalValue(value);
   }, [value]);
 
   return (
-    <input 
-      type="text" 
-      value={localValue || ''} 
+    <input
+      type="text"
+      value={localValue || ''}
       onChange={e => setLocalValue(e.target.value)}
       onBlur={() => onChange(sid, localValue)}
-      placeholder={sid} 
-      className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-1.5 text-xs text-text-primary outline-none focus:ring-1 focus:ring-accent-orange" 
+      placeholder={sid}
+      className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-1.5 text-xs text-text-primary outline-none focus:ring-1 focus:ring-accent-orange"
     />
   );
 }
@@ -97,10 +101,12 @@ export default function TranscriptionDetail() {
   const [speakerNames, setSpeakerNames] = useState({});
   const [savingSpeakers, setSavingSpeakers] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisFocus, setAnalysisFocus] = useState('');
   const [toast, setToast] = useState(null);
   const [startingProcessing, setStartingProcessing] = useState(false);
   const [processingStartError, setProcessingStartError] = useState('');
   const statusRef = useRef(null);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   // Editor state
   const [showEditor, setShowEditor] = useState(false);
@@ -219,12 +225,12 @@ export default function TranscriptionDetail() {
     setAnalyzing(true);
     try {
       await updateSpeakers(id, speakerNames);
-      await startAnalysis(id);
+      await startAnalysis(id, { analysisFocus });
       setTranscription(prev => ({ ...prev, status: STATUS.ANALYZING }));
     } catch {
       setAnalyzing(false);
     }
-  }, [id, speakerNames]);
+  }, [id, speakerNames, analysisFocus]);
 
   const handleStartProcessing = useCallback(async () => {
     setStartingProcessing(true);
@@ -268,10 +274,37 @@ export default function TranscriptionDetail() {
     setSpeakerNames(prev => ({ ...prev, [sid]: name }));
   }, []);
 
+  const handleDeleteTranscription = useCallback(async () => {
+    setDeleting(true);
+    try {
+      await deleteTranscription(id);
+      router.push('/transcriptions');
+    } catch (err) {
+      setToast({ message: err.message || 'Eintrag konnte nicht gelöscht werden.', type: 'error' });
+    } finally {
+      setDeleting(false);
+      setConfirmDialogOpen(false);
+    }
+  }, [id, router]);
+
   const transcriptionHtml = useMemo(() => {
     if (!transcription) return '';
     return editorHtml || analysisToHtml(transcription);
   }, [transcription, editorHtml]);
+
+  // Check if this is a table analysis
+  const isTableAnalysis = useMemo(() => {
+    return transcription?.analysis_type === 'table' && transcription?.table_schema;
+  }, [transcription]);
+
+  // Check if this is a knowledge graph analysis
+  const isKnowledgeGraphAnalysis = useMemo(() => {
+    return transcription?.template === 'knowledge_graph' && transcription?.analysis;
+  }, [transcription]);
+
+  const isMindmapAnalysis = useMemo(() => {
+    return transcription?.template === 'mindmap' && transcription?.analysis;
+  }, [transcription]);
 
   const workflowState = useMemo(() => {
     if (!transcription) return null;
@@ -350,11 +383,24 @@ export default function TranscriptionDetail() {
   }, [transcription]);
 
   if (authStatus === 'loading' || loading) return <LoadingSpinner />;
-  if (!transcription) return null;
+  if (!transcription) return <LoadingSpinner />;
 
   const isOCR = transcription.mime_type?.startsWith('image/') || transcription.mime_type === 'application/pdf';
   const typeLabel = isOCR ? 'Dokument' : 'Transkription';
   const rawTextLabel = isOCR ? 'Extrahierter Text' : 'Transkription';
+  const templateLabel = transcription.template === 'generic'
+    ? 'Zusammenfassung'
+    : transcription.template === 'meeting'
+      ? 'Meeting'
+      : transcription.template === 'aufmass'
+        ? 'Aufmaß'
+        : transcription.template === 'knowledge_graph'
+          ? 'Wissensgraph'
+          : transcription.template === 'mindmap'
+            ? 'Mindmap'
+            : transcription.template === 'data_table'
+              ? 'Datentabelle'
+          : transcription.template;
   const timelineEvents = Array.isArray(transcription.events) ? transcription.events : [];
 
   return (
@@ -377,12 +423,17 @@ export default function TranscriptionDetail() {
                 <p className="text-[10px] text-text-secondary uppercase tracking-widest mt-1">
                   {new Date(transcription.created_at).toLocaleDateString('de-DE')} &bull; {typeLabel}
                 </p>
-                
+
                 {/* Context & Settings */}
                 <div className="mt-6 pt-6 border-t border-white/[0.06] space-y-4">
                   <div>
                     <label className="text-[10px] font-bold text-text-secondary uppercase opacity-50">Analyse-Modus</label>
-                    <p className="text-sm text-text-primary capitalize">{transcription.template === 'generic' ? 'Zusammenfassung' : transcription.template}</p>
+                    <p className="text-sm text-text-primary capitalize">{templateLabel || '-'}</p>
+                    {transcription.analysis_type === 'table' && (
+                      <p className="text-[10px] text-accent-orange mt-2">
+                        {transcription.template === 'data_table' ? 'Datentabellen-Extraktion' : 'Tabellen-Extraktion'}
+                      </p>
+                    )}
                   </div>
                   {transcription.custom_prompt && (
                     <div>
@@ -402,7 +453,7 @@ export default function TranscriptionDetail() {
                       {startingProcessing ? 'Startet…' : 'Verarbeitung starten'}
                     </button>
                   )}
-                  <button 
+                  <button
                     onClick={() => {
                       setShowEditor(true);
                     }}
@@ -411,9 +462,16 @@ export default function TranscriptionDetail() {
                   >
                     Im Editor öffnen
                   </button>
-                  <button onClick={() => { if(confirm(`${typeLabel} wirklich löschen?`)) deleteTranscription(id).then(() => router.push('/transcriptions')) }} className="text-text-secondary hover:text-accent-red py-2 text-xs transition-colors">
-                    {typeLabel} löschen
-                  </button>
+                  <div className="mt-3 pt-3 border-t border-accent-red/20">
+                    <p className="text-[10px] font-bold text-accent-red/70 uppercase tracking-widest mb-2">Danger Zone</p>
+                    <button
+                      onClick={() => setConfirmDialogOpen(true)}
+                      className="w-full text-accent-red hover:text-red-300 bg-accent-red/10 border border-accent-red/30 py-2 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50"
+                      disabled={deleting}
+                    >
+                      {deleting ? `${typeLabel} wird gelöscht...` : `${typeLabel} löschen`}
+                    </button>
+                  </div>
                 </div>
                 {processingStartError && (
                   <div className="mt-3 bg-accent-red/10 border border-accent-red/25 text-accent-red rounded-xl p-3 text-xs">
@@ -428,13 +486,25 @@ export default function TranscriptionDetail() {
                   <h3 className="text-xs font-bold text-text-primary uppercase mb-4">Sprecher</h3>
                   <div className="space-y-3">
                     {speakerIds.map(sid => (
-                      <SpeakerInput 
-                        key={sid} 
-                        sid={sid} 
-                        value={speakerNames[sid]} 
-                        onChange={handleSpeakerChange} 
+                      <SpeakerInput
+                        key={sid}
+                        sid={sid}
+                        value={speakerNames[sid]}
+                        onChange={handleSpeakerChange}
                       />
                     ))}
+                  </div>
+                  <div className="mt-4">
+                    <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1.5">
+                      Fokus der Analyse
+                    </label>
+                    <textarea
+                      value={analysisFocus}
+                      onChange={(event) => setAnalysisFocus(event.target.value)}
+                      rows={2}
+                      placeholder="Worauf soll sich das KI-Modell bei der Analyse konzentrieren?"
+                      className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary outline-none focus:ring-1 focus:ring-accent-orange resize-y"
+                    />
                   </div>
                   <button onClick={handleStartAnalysis} disabled={analyzing} className="w-full mt-4 bg-white/5 hover:bg-white/10 text-text-primary py-2 rounded-xl text-xs font-bold border border-white/[0.06] transition-all">
                     {analyzing ? 'Analyse läuft...' : 'Analyse starten'}
@@ -488,18 +558,101 @@ export default function TranscriptionDetail() {
                 </div>
               )}
 
-              {/* Analysis Preview */}
-              {transcription.analysis && (
+              {/* Table Analysis */}
+              {isTableAnalysis && transcription.analysis && (
+                <div className="bg-dark-card border border-accent-orange/20 rounded-2xl p-6 shadow-2xl shadow-accent-orange/5">
+                  <h2 className="text-xs font-bold text-accent-orange uppercase tracking-widest mb-4">
+                    {transcription.template === 'data_table' ? 'Datentabelle' : 'Tabellen-Ergebnis'}
+                  </h2>
+                  <TableRenderer
+                    initialData={{
+                      ...(transcription.analysis || {}),
+                      ...(transcription.analysis_meta || {}),
+                    }}
+                    schema={transcription.table_schema}
+                    filename={transcription.original_name.replace(/\.[^/.]+$/, '')}
+                    onChange={(updatedRows) => {
+                      console.log('Rows updated:', updatedRows);
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Knowledge Graph Analysis */}
+              {isKnowledgeGraphAnalysis && (
+                <div className="mb-6">
+                  <h2 className="text-xs font-bold text-accent-orange uppercase tracking-widest mb-4 pl-2">
+                    Wissensgraph
+                  </h2>
+                  <KnowledgeGraphRenderer
+                    data={transcription.analysis}
+                    title={transcription.original_name.replace(/\.[^/.]+$/, '')}
+                  />
+                  {transcription.analysis.zusammenfassung && (
+                    <div className="mt-4 bg-dark-card border border-accent-orange/20 rounded-2xl p-6 shadow-2xl shadow-accent-orange/5">
+                      <p className="text-sm text-text-primary leading-relaxed italic border-l-2 border-accent-orange/30 pl-4">
+                        {transcription.analysis.zusammenfassung}
+                      </p>
+                    </div>
+                  )}
+                  {transcription.analysis.offene_fragen && transcription.analysis.offene_fragen.length > 0 && (
+                    <div className="mt-4 bg-dark-card border border-white/[0.06] rounded-2xl p-6">
+                      <h3 className="text-xs font-bold text-text-primary uppercase tracking-widest opacity-60 mb-3">Offene Fragen</h3>
+                      <ul className="list-none space-y-2">
+                        {transcription.analysis.offene_fragen.map((q, i) => (
+                          <li key={i} className="text-sm text-text-secondary flex gap-2">
+                            <span className="text-accent-orange">?</span> {q}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {isMindmapAnalysis && (
+                <div className="mb-6">
+                  <h2 className="text-xs font-bold text-accent-cyan uppercase tracking-widest mb-4 pl-2">
+                    Mindmap
+                  </h2>
+                  <MindmapRenderer
+                    data={transcription.analysis}
+                    title={transcription.original_name.replace(/\.[^/.]+$/, '')}
+                  />
+                  {transcription.analysis.zusammenfassung && (
+                    <div className="mt-4 bg-dark-card border border-accent-cyan/20 rounded-2xl p-6 shadow-2xl shadow-accent-cyan/5">
+                      <p className="text-sm text-text-primary leading-relaxed italic border-l-2 border-accent-cyan/30 pl-4">
+                        {transcription.analysis.zusammenfassung}
+                      </p>
+                    </div>
+                  )}
+                  {transcription.analysis.offene_fragen && transcription.analysis.offene_fragen.length > 0 && (
+                    <div className="mt-4 bg-dark-card border border-white/[0.06] rounded-2xl p-6">
+                      <h3 className="text-xs font-bold text-text-primary uppercase tracking-widest opacity-60 mb-3">Offene Fragen</h3>
+                      <ul className="list-none space-y-2">
+                        {transcription.analysis.offene_fragen.map((q, i) => (
+                          <li key={i} className="text-sm text-text-secondary flex gap-2">
+                            <span className="text-accent-cyan">?</span> {q}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Text Analysis Preview */}
+              {transcription.analysis && !isTableAnalysis && !isKnowledgeGraphAnalysis && !isMindmapAnalysis && (
                 <div className="bg-dark-card border border-accent-orange/20 rounded-2xl p-6 shadow-2xl shadow-accent-orange/5">
                   <h2 className="text-xs font-bold text-accent-orange uppercase tracking-widest mb-4">Ergebnis</h2>
                   <div className="space-y-4">
                     {transcription.analysis.zusammenfassung && (
-                      <p className="text-sm text-text-primary leading-relaxed italic border-l-2 border-accent-orange/30 pl-4">{transcription.analysis.zusammenfassung}</p>
+                      <p className="text-sm text-text-primary leading-relaxed italic border-l-2 border-accent-orange/30 pl-4">
+                        {transcription.analysis.zusammenfassung}
+                      </p>
                     )}
-                    <button 
-                      onClick={() => {
-                        setShowEditor(true);
-                      }}
+                    <button
+                      onClick={() => setShowEditor(true)}
                       className="text-xs text-accent-orange hover:text-accent-cyan transition-colors font-bold flex items-center gap-1"
                     >
                       Vollständige Analyse im Editor bearbeiten &rarr;
@@ -525,7 +678,7 @@ export default function TranscriptionDetail() {
           </div>
         </div>
       ) : (
-        <DocumentEditor 
+        <DocumentEditor
           initialHtml={transcriptionHtml}
           filename={transcription.original_name}
           sidebarContent={transcription.text}
@@ -536,6 +689,16 @@ export default function TranscriptionDetail() {
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmDialog
+        open={confirmDialogOpen}
+        title={`${typeLabel} löschen`}
+        message={`${typeLabel} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`}
+        confirmLabel={`${typeLabel} löschen`}
+        danger
+        busy={deleting}
+        onConfirm={handleDeleteTranscription}
+        onCancel={() => setConfirmDialogOpen(false)}
+      />
     </>
   );
 }

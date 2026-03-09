@@ -1,11 +1,19 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { query } from '../../lib/db';
-import { CostLimitExceededError, logUsage, checkCostLimit, withUserCostLock } from '../../lib/usage';
+import {
+  CostLimitCheckUnavailableError,
+  CostLimitExceededError,
+  enforceProjectedBudgetGuardrail,
+  estimateTextTransformCost,
+  logUsage,
+  checkCostLimit,
+  withUserCostLock,
+} from '../../lib/usage';
 import { resolveTextAiModel } from '../../lib/model-policy';
 import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service';
 import { MAX_TEXT_AI_INPUT_LENGTH } from '../../lib/constants';
-import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
+import { enforceRateLimit, fetchWithTimeout, logApiError, serverError } from '../../lib/api-utils';
 
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1';
 
@@ -69,8 +77,14 @@ export default async function handler(req, res) {
       if (!costCheck.allowed) {
         throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
       }
+      const estimatedCost = estimateTextTransformCost(selectedModel, text, {
+        inputBufferTokens: 110,
+        outputMultiplier: 0.75,
+        outputBufferTokens: 160,
+      });
+      await enforceProjectedBudgetGuardrail(session.user.id, estimatedCost);
 
-      const response = await fetch(`${MISTRAL_API_URL}/chat/completions`, {
+      const response = await fetchWithTimeout(`${MISTRAL_API_URL}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -100,8 +114,11 @@ ${text}` }
 
     return res.status(200).json({ resultText });
   } catch (error) {
-    if (error?.code === 'COST_LIMIT_EXCEEDED') {
+    if (error?.code === 'COST_LIMIT_EXCEEDED' || error?.code === 'BUDGET_GUARDRAIL_EXCEEDED') {
       return res.status(429).json({ message: error.message });
+    }
+    if (error instanceof CostLimitCheckUnavailableError || error?.code === 'COST_CHECK_UNAVAILABLE') {
+      return res.status(503).json({ message: error.message });
     }
     logApiError('Text AI error', error);
     return serverError(res, 'Fehler bei der Textverarbeitung');

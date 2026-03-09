@@ -2,8 +2,9 @@
 
 ## Dokumentationsstand
 - **Erstellt**: 05.02.2026
-- **Status**: Initialentwurf
-- **Version**: 0.1
+- **Letzte Aktualisierung**: 08.03.2026
+- **Status**: Inkrementell aktualisiert (Legacy-Inhalte + aktuelle Ergänzungen)
+- **Version**: 0.2
 
 ## Übersicht
 
@@ -18,6 +19,94 @@
 ### Content-Type
 - **Request**: `application/json`
 - **Response**: `application/json`
+
+## Aktuelle Ergänzungen (2026-03-08)
+
+### POST `/api/sketch-summary`
+**Beschreibung**: Erzeugt aus Lerntext eine Lernskizze als vektorbasiertes SVG über eine mehrstufige Pipeline (Semantik -> Illustrationsplanung -> Rendering).
+**Auth**: Session erforderlich (NextAuth)
+
+**Request**:
+```json
+{
+  "text": "Lerninhalt als Freitext",
+  "layoutMode": "auto|timeline|process_flow|comparison|mindmap|topic_tree",
+  "detailLevel": "compact|standard|detailed",
+  "illustrationStyle": "editorial|technical|minimal",
+  "focus": "Optionaler Fokus"
+}
+```
+
+**Response (200)**:
+```json
+{
+  "imageBase64": "PHN2ZyB4bWxucz0i...",
+  "mimeType": "image/svg+xml",
+  "fallback": false,
+  "notice": "",
+  "layout": "timeline",
+  "illustrationStyle": "editorial",
+  "blocks": 10,
+  "illustrations": 10
+}
+```
+
+**Fehler**:
+- `400`: Text fehlt/zu lang oder Fokus zu lang
+- `429`: Kostenlimit erreicht
+- `503`: Kostenprüfung temporär nicht verfügbar
+- `401`: Nicht authentifiziert
+
+Hinweise:
+- Rate-Limit: `20` Requests pro Minute und User.
+- Key-Auflösung: zuerst User-Settings (`google_api_key*`), danach Fallback auf `GEMINI_API_KEY`.
+- Bei Provider-/Quota-/Berechtigungsproblemen wird ein lokaler Fallback ausgegeben (`fallback: true`, HTTP `200`).
+
+### GET `/api/settings`
+**Beschreibung**: Lädt benutzerbezogene App- und API-Key-Settings.
+**Auth**: Session erforderlich
+
+**Response (200), relevante Felder**:
+```json
+{
+  "apiKeyConfigured": true,
+  "googleApiKeyConfigured": true,
+  "defaultTemplate": "generic",
+  "language": "de",
+  "contextBias": "Begriff A, Begriff B",
+  "preferredModel": "mistral-large-latest",
+  "defaultTranslateLanguage": "en",
+  "ocrModel": "mistral-ocr-latest",
+  "costLimit": 15.0,
+  "memberMonthlyBudgetLimit": 8.0
+}
+```
+
+### POST/PUT `/api/settings`
+**Beschreibung**: Speichert Settings (beide Methoden werden unterstützt).
+**Auth**: Session erforderlich
+
+**Request (Beispiel)**:
+```json
+{
+  "mistralApiKey": "mistral-...",
+  "googleApiKey": "AIza...",
+  "costLimit": 15,
+  "memberMonthlyBudgetLimit": 8,
+  "preferredModel": "mistral-large-latest"
+}
+```
+
+**Response (200)**:
+```json
+{
+  "message": "Einstellungen gespeichert"
+}
+```
+
+**Fehler**:
+- `400`: ungültiges Modell/OCR-Modell oder ungültige Limits
+- `500`: veraltetes DB-Schema (z. B. fehlende neue Spalten)
 
 ## Endpunkte
 

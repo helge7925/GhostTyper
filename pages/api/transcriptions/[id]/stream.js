@@ -110,6 +110,7 @@ export default async function handler(req, res) {
 
   let closed = false;
   let lastSignature = '';
+  let pollInFlight = false;
 
   const cleanup = () => {
     if (closed) return;
@@ -124,7 +125,8 @@ export default async function handler(req, res) {
   };
 
   const pushSnapshot = async () => {
-    if (closed || res.writableEnded) return;
+    if (closed || res.writableEnded || pollInFlight) return;
+    pollInFlight = true;
 
     try {
       const snapshot = await loadTranscriptionSnapshot(transId, session.user.id);
@@ -146,6 +148,8 @@ export default async function handler(req, res) {
     } catch (error) {
       logApiError('Transcription stream error', error);
       writeSseEvent(res, 'error', { message: 'Stream-Update fehlgeschlagen' });
+    } finally {
+      pollInFlight = false;
     }
   };
 

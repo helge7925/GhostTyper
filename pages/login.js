@@ -1,5 +1,4 @@
 import Head from 'next/head';
-import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
@@ -40,16 +39,16 @@ export default function Login() {
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src="/logo-text.png"
               alt="GhostTyper"
               width={180}
               height={48}
               className="h-12 w-auto mx-auto mb-2"
-              priority
             />
             <p className="text-sm text-text-secondary">
-              Your thought, decoded and distilled.
+              Ihre Gedanken, entschlüsselt und auf den Punkt gebracht.
             </p>
           </div>
           <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-8 shadow-2xl">

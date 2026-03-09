@@ -1,7 +1,46 @@
 import { query } from '../../lib/db';
-import { getObservabilitySnapshot } from '../../lib/observability';
+import { getObservabilitySnapshot, trackSecurityEvent } from '../../lib/observability';
 import { ensureTranscriptionWorkerRunning } from '../../lib/transcription-worker';
 import { enforceRateLimit } from '../../lib/api-utils';
+import { isMaintenanceRequestAllowed } from '../../lib/network-guard';
+import { normalizeSingleHeaderValue, timingSafeEqualString } from '../../lib/security';
+
+function shouldIncludeDetailedHealth(req) {
+  const requestSecret = normalizeSingleHeaderValue(req.headers['x-health-secret']);
+  const detailAttempted = process.env.HEALTH_DETAILS_PUBLIC === 'true' || Boolean(requestSecret);
+
+  if (!isMaintenanceRequestAllowed(req)) {
+    if (detailAttempted) {
+      trackSecurityEvent('health_details_denied', {
+        route: '/api/health',
+        reason: 'network_acl',
+      });
+    }
+    return false;
+  }
+
+  if (process.env.HEALTH_DETAILS_PUBLIC === 'true') {
+    return true;
+  }
+
+  const configuredSecret = process.env.HEALTH_DETAILS_SECRET;
+  if (!configuredSecret) {
+    return false;
+  }
+
+  if (!requestSecret) {
+    return false;
+  }
+
+  const validSecret = timingSafeEqualString(requestSecret, configuredSecret);
+  if (!validSecret) {
+    trackSecurityEvent('health_details_denied', {
+      route: '/api/health',
+      reason: 'invalid_secret',
+    });
+  }
+  return validSecret;
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -27,17 +66,22 @@ export default async function handler(req, res) {
   }
 
   const healthy = dbStatus === 'connected';
-  const observability = getObservabilitySnapshot();
-
-  res.status(healthy ? 200 : 503).json({
+  const includeDetails = shouldIncludeDetailedHealth(req);
+  const payload = {
     status: healthy ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
     service: 'transkription-webapp',
-    database: dbStatus,
-    observability: {
+  };
+
+  if (includeDetails) {
+    const observability = getObservabilitySnapshot();
+    payload.database = dbStatus;
+    payload.observability = {
       counters: observability.counters,
       worker: observability.worker,
       db: observability.db,
-    },
-  });
+    };
+  }
+
+  res.status(healthy ? 200 : 503).json(payload);
 }

@@ -10,6 +10,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=development
+      - HOSTNAME=0.0.0.0
       - NEXT_PUBLIC_API_URL=/api
       - DATABASE_URL=postgresql://transkription:transkription@transkription-db:5432/transkription
       - NEXTAUTH_SECRET=dev-secret-change-in-production
@@ -18,11 +19,22 @@ services:
       - SETTINGS_ENCRYPTION_KEY=dev-settings-encryption-key
       - ENABLE_DB_INIT_API=true
       - PDF_CHROMIUM_PATH=/usr/bin/chromium-browser
-      - PDF_CHROMIUM_NO_SANDBOX=false
+      - PDF_CHROMIUM_NO_SANDBOX=true
       - RATE_LIMIT_STORE=db
       - RATE_LIMIT_TRUST_PROXY=false
+      - HTTP_CLIENT_TIMEOUT_MS=30000
+      - TRANSCRIPTION_HTTP_TIMEOUT_MS=600000
+      - ANALYSIS_HTTP_TIMEOUT_MS=180000
+      - HEALTH_DETAILS_PUBLIC=true
+      - UPLOAD_VIRUS_SCAN_MODE=off
     volumes:
       - transkription-uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
       transkription-db:
         condition: service_healthy
