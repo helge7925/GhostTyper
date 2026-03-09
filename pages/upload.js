@@ -1,9 +1,10 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AudioUploadForm from '../components/AudioUploadForm';
 import ProcessStatusCard from '../components/ProcessStatusCard';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { STATUS } from '../lib/constants';
 
 const TRANSCRIPTION_LOADING_MESSAGES = [
@@ -36,6 +37,31 @@ const ANALYSIS_LOADING_MESSAGES = [
   'Die KI zieht gerade einen roten Faden durch den Text.',
 ];
 
+const UPLOAD_PRESETS = {
+  'record-summary': {
+    label: 'Browser-Aufnahme -> Zusammenfassung',
+    config: {
+      uploadMode: 'record',
+      autoAnalyze: true,
+      diarize: false,
+      template: 'generic',
+      model: 'mistral-small-latest',
+      showAdvancedOptions: true,
+    },
+  },
+  'audio-meeting': {
+    label: 'Audio-Upload -> Meeting-Protokoll',
+    config: {
+      uploadMode: 'file',
+      autoAnalyze: true,
+      diarize: false,
+      template: 'meeting',
+      model: 'mistral-medium-latest',
+      showAdvancedOptions: true,
+    },
+  },
+};
+
 export default function Upload() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -48,6 +74,10 @@ export default function Upload() {
   const [startError, setStartError] = useState('');
   const [startingProcess, setStartingProcess] = useState(false);
   const redirectStateRef = useRef({ hasAutoRedirected: false });
+  const activePreset = useMemo(() => {
+    const presetId = typeof router.query.preset === 'string' ? router.query.preset : '';
+    return UPLOAD_PRESETS[presetId] || null;
+  }, [router.query.preset]);
 
   useEffect(() => {
     redirectStateRef.current = { hasAutoRedirected };
@@ -176,7 +206,7 @@ export default function Upload() {
     };
   }, [result?.id, result?.auto_analyze, result?.diarize, autoOpenWhenReady, autoOpenEditorWhenReady, router]);
 
-  if (status === 'loading' || !session) return null;
+  if (status === 'loading' || !session) return <LoadingSpinner />;
 
   return (
     <>
@@ -191,6 +221,11 @@ export default function Upload() {
         <p className="text-sm text-text-secondary mb-6">
           Laden Sie eine Audiodatei hoch. Die Transkription startet automatisch.
         </p>
+        {activePreset && (
+          <p className="text-xs text-accent-cyan bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 mb-6">
+            Preset aktiv: {activePreset.label}
+          </p>
+        )}
 
         {result ? (
           <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6 text-center">
@@ -280,7 +315,7 @@ export default function Upload() {
           </div>
         ) : (
           <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6">
-            <AudioUploadForm onSuccess={handleSuccess} />
+            <AudioUploadForm onSuccess={handleSuccess} presetConfig={activePreset?.config || null} />
           </div>
         )}
       </div>

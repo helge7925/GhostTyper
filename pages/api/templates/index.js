@@ -3,6 +3,7 @@ import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
 import { MAX_TEMPLATE_NAME_LENGTH, MAX_TEXT_TASK_PROMPT_LENGTH } from '../../../lib/constants';
 import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
+import { validateTableSchema } from '../../../lib/table-calculations';
 
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions);
@@ -23,7 +24,10 @@ export default async function handler(req, res) {
     case 'GET': {
       try {
         const result = await query(
-          'SELECT * FROM templates WHERE user_id = $1 ORDER BY name ASC',
+          `SELECT id, user_id, name, prompt_text, template_type, table_schema, category_id, created_at, updated_at
+           FROM templates
+           WHERE user_id = $1
+           ORDER BY name ASC`,
           [userId]
         );
         return res.status(200).json(result.rows);
@@ -34,12 +38,15 @@ export default async function handler(req, res) {
     }
 
     case 'POST': {
-      const { name, prompt_text } = req.body;
+      const { name, prompt_text, template_type = 'text', table_schema = null, category_id = null } = req.body;
+      
       if (!name || !prompt_text || typeof name !== 'string' || typeof prompt_text !== 'string') {
         return res.status(400).json({ message: 'Name und Prompt-Text sind erforderlich' });
       }
+      
       const normalizedName = name.trim();
       const normalizedPrompt = prompt_text.trim();
+      
       if (!normalizedName || !normalizedPrompt) {
         return res.status(400).json({ message: 'Name und Prompt-Text sind erforderlich' });
       }
@@ -50,10 +57,29 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: `Prompt ist zu lang (max. ${MAX_TEXT_TASK_PROMPT_LENGTH} Zeichen)` });
       }
 
+      // Validate template_type
+      if (!['text', 'table'].includes(template_type)) {
+        return res.status(400).json({ message: 'Ungültiger Vorlagen-Typ' });
+      }
+      if (template_type === 'table') {
+        if (!table_schema || typeof table_schema !== 'object') {
+          return res.status(400).json({ message: 'Tabellen-Schema ist erforderlich' });
+        }
+        const schemaValidation = validateTableSchema(table_schema);
+        if (!schemaValidation.isValid) {
+          return res.status(400).json({
+            message: 'Ungültiges Tabellen-Schema',
+            errors: schemaValidation.errors,
+          });
+        }
+      }
+
       try {
         const result = await query(
-          'INSERT INTO templates (user_id, name, prompt_text) VALUES ($1, $2, $3) RETURNING *',
-          [userId, normalizedName, normalizedPrompt]
+          `INSERT INTO templates (user_id, name, prompt_text, template_type, table_schema, category_id)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING *`,
+          [userId, normalizedName, normalizedPrompt, template_type, table_schema, category_id]
         );
         return res.status(201).json(result.rows[0]);
       } catch (error) {

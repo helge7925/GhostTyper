@@ -1,12 +1,15 @@
 import Head from 'next/head';
-import { useState, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
 import { getTemplates } from '../lib/api';
 import DocumentEditor from '../components/DocumentEditor';
 import ProcessStatusCard from '../components/ProcessStatusCard';
+import LoadingSpinner from '../components/LoadingSpinner';
+import Toast from '../components/Toast';
 import { analysisToHtml } from '../lib/export-utils';
+import { useUiFeedback } from '../lib/use-ui-feedback';
 
 const OCR_LOADING_MESSAGES = [
   'Wir lesen Pixel für Pixel, damit kein Wort verloren geht.',
@@ -38,6 +41,27 @@ const OCR_ANALYSIS_MESSAGES = [
   'Klarheit in Arbeit: der Text bekommt Strukturkanten.',
 ];
 
+const OCR_PRESETS = {
+  'pdf-ocr-meeting': {
+    label: 'PDF OCR -> Meeting-Protokoll',
+    config: {
+      analyze: true,
+      template: 'meeting',
+      model: 'mistral-medium-latest',
+      showAdvancedOptions: true,
+    },
+  },
+  'ocr-summary': {
+    label: 'OCR -> Zusammenfassung',
+    config: {
+      analyze: true,
+      template: 'generic',
+      model: 'mistral-small-latest',
+      showAdvancedOptions: true,
+    },
+  },
+};
+
 export default function OCR() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -57,11 +81,17 @@ export default function OCR() {
   const [template, setTemplate] = useState('generic');
   const [model, setModel] = useState('mistral-large-latest');
   const [customPrompt, setCustomPrompt] = useState('');
+  const [analysisFocus, setAnalysisFocus] = useState('');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [templates, setTemplates] = useState([]);
 
   // Editor state
   const [showEditor, setShowEditor] = useState(false);
+  const { toast, showToast, clearToast } = useUiFeedback();
+  const activePreset = useMemo(() => {
+    const presetId = typeof router.query.preset === 'string' ? router.query.preset : '';
+    return OCR_PRESETS[presetId] || null;
+  }, [router.query.preset]);
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -82,6 +112,15 @@ export default function OCR() {
   }, [status, router]);
 
   useEffect(() => {
+    if (!activePreset) return;
+    const preset = activePreset.config;
+    if (typeof preset.analyze === 'boolean') setAnalyze(preset.analyze);
+    if (typeof preset.template === 'string') setTemplate(preset.template);
+    if (typeof preset.model === 'string') setModel(preset.model);
+    if (preset.showAdvancedOptions) setShowAdvancedOptions(true);
+  }, [activePreset]);
+
+  useEffect(() => {
     return () => {
       if (analysisStepTimeoutRef.current) {
         clearTimeout(analysisStepTimeoutRef.current);
@@ -97,6 +136,13 @@ export default function OCR() {
       return;
     }
     setFile(f);
+  }
+
+  function handleDropZoneKeyDown(event) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      fileInputRef.current?.click();
+    }
   }
 
   async function handleSubmit(e) {
@@ -119,7 +165,7 @@ export default function OCR() {
       formData.append('template', template);
       formData.append('model', model);
       if (customPrompt) formData.append('customPrompt', customPrompt);
-
+      if (analysisFocus) formData.append('analysisFocus', analysisFocus);
       if (analysisStepTimeoutRef.current) {
         clearTimeout(analysisStepTimeoutRef.current);
       }
@@ -166,14 +212,14 @@ export default function OCR() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentHtml: html }),
       });
-      alert('Dokument in Historie gespeichert.');
+      showToast('Dokument in Historie gespeichert.', 'success');
     } catch {
-      alert('Fehler beim Speichern.');
+      showToast('Fehler beim Speichern.', 'error');
     }
   }
 
-  if (status === 'loading') return null;
-  if (!session) return null;
+  if (status === 'loading') return <LoadingSpinner />;
+  if (!session) return <LoadingSpinner />;
 
   return (
     <>
@@ -185,6 +231,11 @@ export default function OCR() {
             <div>
               <h1 className="text-2xl font-bold text-text-primary">OCR</h1>
               <p className="text-sm text-text-secondary mt-1">Dokumente lesen und optional zusammenfassen</p>
+              {activePreset && (
+                <p className="text-xs text-accent-cyan bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 mt-3 inline-flex">
+                  Preset aktiv: {activePreset.label}
+                </p>
+              )}
             </div>
           </div>
 
@@ -193,6 +244,11 @@ export default function OCR() {
               className={`border-2 border-dashed rounded-3xl p-12 text-center transition-all ${
                 dragActive ? 'border-accent-orange bg-accent-orange/10 scale-[1.02]' : 'border-white/[0.08] hover:border-white/[0.15] bg-white/[0.02]'
               } ${file ? 'border-accent-green/30 bg-accent-green/5' : ''}`}
+              role="button"
+              tabIndex={0}
+              aria-label="Dokument auswählen oder per Drag-and-drop hochladen"
+              onClick={() => fileInputRef.current?.click()}
+              onKeyDown={handleDropZoneKeyDown}
               onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
               onDragLeave={() => setDragActive(false)}
               onDrop={(e) => { e.preventDefault(); setDragActive(false); handleFile(e.dataTransfer.files[0]); }}
@@ -271,11 +327,18 @@ export default function OCR() {
                         <div>
                           <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1.5 ml-1">Modell</label>
                           <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
-                            <option value="mistral-large-latest">Mistral Large</option><option value="mistral-medium-latest">Mistral Medium</option><option value="mistral-small-latest">Mistral Small</option>
+                            <option value="mistral-small-latest">Kostengünstig / Schnell</option><option value="mistral-medium-latest">Ausgewogen</option><option value="mistral-large-latest">Qualität</option>
                           </select>
                         </div>
                       </div>
                       <textarea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Zusätzliche Anweisungen..." rows={2} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-orange outline-none" />
+                      <textarea
+                        value={analysisFocus}
+                        onChange={(e) => setAnalysisFocus(e.target.value)}
+                        placeholder="Fokus der Analyse: Worauf soll sich das Modell konzentrieren?"
+                        rows={2}
+                        className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-orange outline-none"
+                      />
                     </div>
                   )}
                 </div>
@@ -326,6 +389,7 @@ export default function OCR() {
       )}
 
       {error && <div className="mt-8 p-4 bg-accent-red/10 border border-accent-red/20 text-accent-red rounded-2xl text-sm text-center animate-fade-in">{error}</div>}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
     </>
   );
 }

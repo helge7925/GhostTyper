@@ -1,7 +1,15 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { translateText } from '../../lib/ai-service';
-import { CostLimitExceededError, logUsage, checkCostLimit, withUserCostLock } from '../../lib/usage';
+import {
+  CostLimitCheckUnavailableError,
+  CostLimitExceededError,
+  enforceProjectedBudgetGuardrail,
+  estimateTextTransformCost,
+  logUsage,
+  checkCostLimit,
+  withUserCostLock,
+} from '../../lib/usage';
 import { resolveChatModel } from '../../lib/model-policy';
 import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service';
 import { MAX_TRANSLATE_INPUT_LENGTH } from '../../lib/constants';
@@ -51,6 +59,12 @@ export default async function handler(req, res) {
       if (!costCheck.allowed) {
         throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
       }
+      const estimatedCost = estimateTextTransformCost(preferredModel, text, {
+        inputBufferTokens: 90,
+        outputMultiplier: 1.1,
+        outputBufferTokens: 90,
+      });
+      await enforceProjectedBudgetGuardrail(session.user.id, estimatedCost);
 
       const { translatedText: value, usage, model } = await translateText(
         text,
@@ -66,8 +80,11 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ translatedText });
   } catch (error) {
-    if (error?.code === 'COST_LIMIT_EXCEEDED') {
+    if (error?.code === 'COST_LIMIT_EXCEEDED' || error?.code === 'BUDGET_GUARDRAIL_EXCEEDED') {
       return res.status(429).json({ message: error.message });
+    }
+    if (error instanceof CostLimitCheckUnavailableError || error?.code === 'COST_CHECK_UNAVAILABLE') {
+      return res.status(503).json({ message: error.message });
     }
     logApiError('Translation error', error);
     return serverError(res, 'Fehler bei der Übersetzung');

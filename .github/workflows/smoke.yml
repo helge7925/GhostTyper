@@ -1,0 +1,37 @@
+name: Smoke CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run full smoke suite
+        run: npm run smoke:full
+
+      - name: Dump docker logs on failure
+        if: failure()
+        run: docker compose -f config/docker-compose.dev.yml logs --tail 200
+
+      - name: Cleanup docker compose
+        if: always()
+        run: docker compose -f config/docker-compose.dev.yml down -v --remove-orphans

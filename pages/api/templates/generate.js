@@ -1,7 +1,13 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { generateTemplate } from '../../../lib/ai-service';
-import { CostLimitExceededError, logUsage, checkCostLimit, withUserCostLock } from '../../../lib/usage';
+import {
+  CostLimitCheckUnavailableError,
+  CostLimitExceededError,
+  logUsage,
+  checkCostLimit,
+  withUserCostLock,
+} from '../../../lib/usage';
 import { getSettingsRow, resolveStoredApiKey } from '../../../lib/settings-service';
 import { MAX_TEMPLATE_GENERATOR_GOAL_LENGTH } from '../../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
@@ -55,6 +61,9 @@ export default async function handler(req, res) {
   } catch (error) {
     if (error?.code === 'COST_LIMIT_EXCEEDED') {
       return res.status(429).json({ message: error.message });
+    }
+    if (error instanceof CostLimitCheckUnavailableError || error?.code === 'COST_CHECK_UNAVAILABLE') {
+      return res.status(503).json({ message: error.message });
     }
     logApiError('Error generating template', error);
     return serverError(res, 'Fehler bei der Generierung der Vorlage');

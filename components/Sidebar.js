@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useSession, signOut } from 'next-auth/react';
 import { useState, useEffect, useRef } from 'react';
@@ -14,12 +13,66 @@ const NAV_LINKS = [
       </svg>
     )
   },
+  {
+    href: '/realtime',
+    label: 'Echtzeitverarbeitung',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5V10H2v10h5m10 0v-2a4 4 0 00-8 0v2m8 0H7m10-8a3 3 0 11-6 0 3 3 0 016 0zM9 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    )
+  },
   { 
     href: '/translate', 
     label: 'Übersetzung', 
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+      </svg>
+    )
+  },
+  { 
+    href: '/ocr', 
+    label: 'OCR', 
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    )
+  },
+  {
+    href: '/wissensgraph',
+    label: 'Wissensgraph',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7a2 2 0 11-4 0 2 2 0 014 0zM9 17a2 2 0 11-4 0 2 2 0 014 0zm10 0a2 2 0 11-4 0 2 2 0 014 0zM8 16l8 0M7 15l8-7" />
+      </svg>
+    )
+  },
+  {
+    href: '/mindmap',
+    label: 'Mindmap',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5a3 3 0 100 6 3 3 0 000-6zm0 6v8m0-8l6 3m-6-3l-6 3m6 5a2 2 0 110 4 2 2 0 010-4zm6-3a2 2 0 110 4 2 2 0 010-4zM6 13a2 2 0 110 4 2 2 0 010-4z" />
+      </svg>
+    )
+  },
+  {
+    href: '/datentabelle',
+    label: 'Datentabelle',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18M6 4v16M12 4v16M18 4v16" />
+      </svg>
+    )
+  },
+  {
+    href: '/infografik',
+    label: 'Infografik',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20h9M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
       </svg>
     )
   },
@@ -33,30 +86,11 @@ const NAV_LINKS = [
     )
   },
   { 
-    href: '/ocr', 
-    label: 'OCR', 
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    )
-  },
-  { 
     href: '/transcriptions', 
     label: 'Historie', 
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    )
-  },
-  { 
-    href: '/admin/users', 
-    label: 'Admin', 
-    adminOnly: true,
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
       </svg>
     )
   },
@@ -66,35 +100,62 @@ export default function Sidebar({ isOpen, setIsOpen }) {
   const router = useRouter();
   const { data: session } = useSession();
   const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
+  const trackingGesture = useRef(false);
 
   useEffect(() => {
+    const isMobileViewport = () => window.innerWidth < 768;
+
     const handleTouchStart = (e) => {
-      touchStartX.current = e.touches[0].clientX;
+      if (!isMobileViewport()) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      const startX = touch.clientX;
+      const startY = touch.clientY;
+      const edgeOpenZone = !isOpen && startX <= 24;
+      const sidebarCloseZone = isOpen && startX <= 280;
+
+      if (!edgeOpenZone && !sidebarCloseZone) {
+        trackingGesture.current = false;
+        return;
+      }
+
+      trackingGesture.current = true;
+      touchStartX.current = startX;
+      touchStartY.current = startY;
     };
 
     const handleTouchMove = (e) => {
-      if (touchStartX.current === null) return;
-      
-      const touchEndX = e.touches[0].clientX;
-      const diff = touchEndX - touchStartX.current;
+      if (!trackingGesture.current || touchStartX.current === null || touchStartY.current === null) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      const diffX = touch.clientX - touchStartX.current;
+      const diffY = Math.abs(touch.clientY - touchStartY.current);
+      if (diffY > Math.abs(diffX)) return;
 
       // Swipe right to open
-      if (diff > 50 && !isOpen && touchStartX.current < 30) {
+      if (diffX > 60 && !isOpen) {
         setIsOpen(true);
+        trackingGesture.current = false;
       }
       // Swipe left to close
-      if (diff < -50 && isOpen) {
+      if (diffX < -60 && isOpen) {
         setIsOpen(false);
+        trackingGesture.current = false;
       }
     };
 
     const handleTouchEnd = () => {
       touchStartX.current = null;
+      touchStartY.current = null;
+      trackingGesture.current = false;
     };
 
-    window.addEventListener('touchstart', handleTouchStart);
-    window.addEventListener('touchmove', handleTouchMove);
-    window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd, { passive: true });
 
     return () => {
       window.removeEventListener('touchstart', handleTouchStart);
@@ -124,13 +185,13 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         {/* Logo Section */}
         <div className="p-6">
           <Link href="/" className="flex items-center gap-3" onClick={() => setIsOpen(false)}>
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src="/logo.png"
               alt="GhostTyper Logo"
               width={32}
               height={32}
               className="w-8 h-8"
-              priority
             />
             <span className="text-xl font-bold tracking-tight text-text-primary">GhostTyper</span>
           </Link>
@@ -178,6 +239,23 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             </svg>
             Einstellungen
           </Link>
+
+          {session.user.role === 'admin' && (
+            <Link
+              href="/admin/users"
+              onClick={() => setIsOpen(false)}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                router.pathname.startsWith('/admin')
+                  ? 'bg-white/[0.06] text-text-primary'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-white/[0.04]'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              Admin
+            </Link>
+          )}
 
           {/* Profile Section */}
           <Link 

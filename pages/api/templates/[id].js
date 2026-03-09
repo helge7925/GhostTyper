@@ -3,6 +3,7 @@ import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
 import { MAX_TEMPLATE_NAME_LENGTH, MAX_TEXT_TASK_PROMPT_LENGTH } from '../../../lib/constants';
 import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
+import { validateTableSchema } from '../../../lib/table-calculations';
 
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions);
@@ -22,12 +23,15 @@ export default async function handler(req, res) {
 
   switch (req.method) {
     case 'PUT': {
-      const { name, prompt_text } = req.body;
+      const { name, prompt_text, template_type = 'text', table_schema = null, category_id = null } = req.body;
+      
       if (!name || !prompt_text || typeof name !== 'string' || typeof prompt_text !== 'string') {
         return res.status(400).json({ message: 'Name und Prompt-Text sind erforderlich' });
       }
+      
       const normalizedName = name.trim();
       const normalizedPrompt = prompt_text.trim();
+      
       if (!normalizedName || !normalizedPrompt) {
         return res.status(400).json({ message: 'Name und Prompt-Text sind erforderlich' });
       }
@@ -38,10 +42,30 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: `Prompt ist zu lang (max. ${MAX_TEXT_TASK_PROMPT_LENGTH} Zeichen)` });
       }
 
+      // Validate template_type
+      if (!['text', 'table'].includes(template_type)) {
+        return res.status(400).json({ message: 'Ungültiger Vorlagen-Typ' });
+      }
+      if (template_type === 'table') {
+        if (!table_schema || typeof table_schema !== 'object') {
+          return res.status(400).json({ message: 'Tabellen-Schema ist erforderlich' });
+        }
+        const schemaValidation = validateTableSchema(table_schema);
+        if (!schemaValidation.isValid) {
+          return res.status(400).json({
+            message: 'Ungültiges Tabellen-Schema',
+            errors: schemaValidation.errors,
+          });
+        }
+      }
+
       try {
         const result = await query(
-          'UPDATE templates SET name = $1, prompt_text = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND user_id = $4 RETURNING *',
-          [normalizedName, normalizedPrompt, id, userId]
+          `UPDATE templates
+           SET name = $1, prompt_text = $2, template_type = $3, table_schema = $4, category_id = $5, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $6 AND user_id = $7
+           RETURNING *`,
+          [normalizedName, normalizedPrompt, template_type, table_schema, category_id, id, userId]
         );
 
         if (result.rowCount === 0) {

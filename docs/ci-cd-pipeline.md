@@ -1,14 +1,17 @@
 # CI/CD Pipeline
 
-Stand: 2026-02-11
+Stand: 2026-02-20
 
 Dieses Dokument beschreibt den aktuellen CI/CD-Status und eine empfohlene Zielpipeline.
 
 ## 1. Aktueller Stand
 
-- Es gibt noch keine vollständig standardisierte, verpflichtende CI-Pipeline im Repository.
-- Build und Tests werden aktuell primär lokal bzw. in der Laufzeitumgebung ausgeführt.
-- `npm run lint` ist derzeit nicht CI-stabil, da ohne feste ESLint-Konfiguration ein interaktiver Setup-Dialog erscheinen kann.
+- Es gibt eine aktive GitHub-Actions-Pipeline: `.github/workflows/smoke.yml`.
+- Die Pipeline läuft bei `push` und `pull_request`.
+- Der Job führt aus:
+  1. `npm ci`
+  2. `npm run smoke:full` (inkl. `test`, `lint`, `build`, Docker/API-Smoke, PDF-Renderer-Check)
+- Bei Fehlern werden Docker-Logs ausgegeben; anschließend wird der Compose-Stack bereinigt.
 
 ## 2. Zielbild der Pipeline
 
@@ -65,9 +68,9 @@ curl -X POST http://localhost:3000/api/db-init -H "x-init-secret: dev-db-init-se
 
 ## 6. Nächste Schritte
 
-1. GitHub Actions Workflow mit `validate` Job einführen.
-2. ESLint non-interaktiv machen und in CI verpflichtend schalten.
-3. Optional Docker-basierte Integrationstests in CI ergänzen.
+1. Branch Protection aktivieren und Workflow `Smoke CI` als Required Check markieren.
+2. Optional separaten Schnell-Job (`npm test` + `npm run lint`) für kürzere PR-Feedbackzeiten ergänzen.
+3. Optional Nightly-Job mit zusätzlichen End-to-End-Tests ergänzen.
 
 ## 7. Referenzen
 

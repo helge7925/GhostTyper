@@ -50,7 +50,8 @@ export default async function handler(req, res) {
         const result = await query(
           `SELECT id, original_name, filename, status, template, diarize, auto_analyze, custom_prompt,
                   mime_type, model,
-                  text, segments, speakers, analysis, error, folder_id, is_favorite, created_at, updated_at
+                  text, segments, speakers, analysis, analysis_type, analysis_meta, table_schema, document_html,
+                  error, folder_id, is_favorite, created_at, updated_at
            FROM transcriptions
            WHERE id = $1 AND user_id = $2`,
           [transId, session.user.id]

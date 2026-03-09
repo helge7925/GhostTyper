@@ -1,23 +1,37 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import TranscriptionCard from '../components/TranscriptionCard';
 import LoadingSpinner from '../components/LoadingSpinner';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { getTranscriptions, getFolders, createFolder, updateFolder, deleteFolder, updateTranscription, deleteTranscription } from '../lib/api';
+import { useUiFeedback } from '../lib/use-ui-feedback';
 
 export default function Transcriptions() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [transcriptions, setTranscriptions] = useState([]);
   const [folders, setFolders] = useState([]);
-  const [activeFolderId, setActiveFolderId] = useState(null); // null means root/all
+  const [activeFolderId, setActiveFolderId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [editingFolderId, setEditingFolderId] = useState(null);
   const [editFolderName, setEditFolderName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const searchTimeoutRef = useRef(null);
+  const {
+    toast,
+    showToast,
+    clearToast,
+    confirmDialog,
+    confirm,
+    closeConfirm,
+    acceptConfirm,
+  } = useUiFeedback();
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -26,7 +40,7 @@ export default function Transcriptions() {
     }
     if (status !== 'authenticated') return;
 
-    Promise.all([getTranscriptions(), getFolders()])
+    Promise.all([getTranscriptions('', { limit: 500 }), getFolders()])
       .then(([transcripts, foldersData]) => {
         setTranscriptions(transcripts);
         setFolders(foldersData);
@@ -38,6 +52,40 @@ export default function Transcriptions() {
       .finally(() => setLoading(false));
   }, [status, router]);
 
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    const query = searchQuery.trim();
+    if (query === '') {
+      setSearching(true);
+      getTranscriptions('', { limit: 500 })
+        .then((results) => setTranscriptions(results))
+        .catch(() => {})
+        .finally(() => setSearching(false));
+      return;
+    }
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const results = await getTranscriptions(query, { scope: 'full', limit: 200, offset: 0 });
+        setTranscriptions(results);
+      } catch {
+        // ignore
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
+
   const handleCreateFolder = useCallback(async (e) => {
     if (e) e.preventDefault();
     if (!newFolderName.trim()) return;
@@ -47,9 +95,9 @@ export default function Transcriptions() {
       setNewFolderName('');
       setIsCreatingFolder(false);
     } catch (err) {
-      alert('Ordner konnte nicht erstellt werden');
+      showToast('Ordner konnte nicht erstellt werden', 'error');
     }
-  }, [newFolderName]);
+  }, [newFolderName, showToast]);
 
   const handleRenameFolder = useCallback(async (id) => {
     if (!editFolderName.trim()) return;
@@ -58,62 +106,69 @@ export default function Transcriptions() {
       setFolders(prev => prev.map(f => f.id === id ? updated : f));
       setEditingFolderId(null);
     } catch (err) {
-      alert('Ordner konnte nicht umbenannt werden');
+      showToast('Ordner konnte nicht umbenannt werden', 'error');
     }
-  }, [editFolderName]);
+  }, [editFolderName, showToast]);
 
   const handleDeleteFolder = useCallback(async (id) => {
-    if (!confirm('Ordner wirklich löschen? Die Dateien darin werden in die Hauptliste verschoben.')) return;
+    const approved = await confirm({
+      title: 'Ordner löschen',
+      message: 'Ordner wirklich löschen? Die Dateien darin werden in die Hauptliste verschoben.',
+      confirmLabel: 'Ordner löschen',
+      danger: true,
+    });
+    if (!approved) return;
     try {
       await deleteFolder(id);
       setFolders(prev => prev.filter(f => f.id !== id));
       setTranscriptions(prev => prev.map(t => t.folder_id === id ? { ...t, folder_id: null } : t));
       if (activeFolderId === id) setActiveFolderId(null);
     } catch (err) {
-      alert('Ordner konnte nicht gelöscht werden');
+      showToast('Ordner konnte nicht gelöscht werden', 'error');
     }
-  }, [activeFolderId]);
+  }, [activeFolderId, confirm, showToast]);
 
   const handleMoveToFolder = useCallback(async (transcriptionId, folderId) => {
     try {
       await updateTranscription(transcriptionId, { folderId });
       setTranscriptions(prev => prev.map(t => t.id === transcriptionId ? { ...t, folder_id: folderId } : t));
     } catch (err) {
-      alert('Datei konnte nicht verschoben werden');
+      showToast('Datei konnte nicht verschoben werden', 'error');
     }
-  }, []);
+  }, [showToast]);
 
   const handleToggleFavorite = useCallback(async (transcriptionId, currentStatus) => {
     try {
       await updateTranscription(transcriptionId, { isFavorite: !currentStatus });
       setTranscriptions(prev => prev.map(t => t.id === transcriptionId ? { ...t, is_favorite: !currentStatus } : t));
     } catch (err) {
-      alert('Favoriten-Status konnte nicht geändert werden');
+      showToast('Favoriten-Status konnte nicht geändert werden', 'error');
     }
-  }, []);
+  }, [showToast]);
 
   const handleDeleteTranscription = useCallback(async (id) => {
-    if (!confirm('Datei unwiderruflich löschen?')) return;
+    const approved = await confirm({
+      title: 'Datei löschen',
+      message: 'Datei unwiderruflich löschen?',
+      confirmLabel: 'Datei löschen',
+      danger: true,
+    });
+    if (!approved) return;
     try {
       await deleteTranscription(id);
       setTranscriptions(prev => prev.filter(t => t.id !== id));
     } catch (err) {
-      alert('Fehler beim Löschen: ' + (err.message || 'Unbekannter Fehler'));
+      showToast('Fehler beim Löschen: ' + (err.message || 'Unbekannter Fehler'), 'error');
     }
-  }, []);
+  }, [confirm, showToast]);
 
   const filteredTranscriptions = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
     return transcriptions.filter(t => {
-      const matchesFolder = activeFolderId === null || t.folder_id === activeFolderId;
-      const matchesSearch = normalizedQuery === ''
-        ? true
-        : (t.original_name || t.filename || '').toLowerCase().includes(normalizedQuery);
-      return matchesFolder && matchesSearch;
+      return activeFolderId === null || t.folder_id === activeFolderId;
     });
-  }, [transcriptions, activeFolderId, searchQuery]);
+  }, [transcriptions, activeFolderId]);
 
-  if (status === 'loading' || (status === 'unauthenticated')) return null;
+  if (status === 'loading' || (status === 'unauthenticated')) return <LoadingSpinner />;
 
   return (
     <>
@@ -130,6 +185,7 @@ export default function Transcriptions() {
               onClick={() => setIsCreatingFolder(true)} 
               className="p-1 hover:bg-white/5 rounded text-accent-orange transition-colors"
               title="Neuer Ordner"
+              aria-label="Neuen Ordner erstellen"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             </button>
@@ -186,12 +242,14 @@ export default function Transcriptions() {
                       <button 
                         onClick={() => { setEditingFolderId(folder.id); setEditFolderName(folder.name); }}
                         className="p-1 text-text-secondary hover:text-white"
+                        aria-label={`Ordner ${folder.name} umbenennen`}
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                       </button>
                       <button 
                         onClick={() => handleDeleteFolder(folder.id)}
                         className="p-1 text-text-secondary hover:text-accent-red"
+                        aria-label={`Ordner ${folder.name} löschen`}
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
@@ -212,12 +270,18 @@ export default function Transcriptions() {
             
             <div className="flex items-center gap-3 w-full lg:w-auto min-w-0">
               <div className="relative flex-1 lg:flex-initial min-w-0">
-                <svg className="w-4 h-4 text-text-secondary absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                {searching ? (
+                  <div className="w-4 h-4 border-2 border-white/20 border-t-accent-orange rounded-full animate-spin absolute left-3 top-1/2 -translate-y-1/2" />
+                ) : (
+                  <svg className="w-4 h-4 text-text-secondary absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                )}
+                <label htmlFor="transcription-search" className="sr-only">Dateien durchsuchen</label>
                 <input 
+                  id="transcription-search"
                   type="text" 
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Suchen..." 
+                  placeholder="Dateien durchsuchen..." 
                   className="bg-dark-input border border-white/[0.1] rounded-xl pl-9 pr-4 py-2 text-xs text-text-primary outline-none focus:ring-1 focus:ring-accent-orange w-full lg:w-64"
                 />
               </div>
@@ -259,6 +323,17 @@ export default function Transcriptions() {
           )}
         </div>
       </div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
+      <ConfirmDialog
+        open={Boolean(confirmDialog)}
+        title={confirmDialog?.title}
+        message={confirmDialog?.message}
+        confirmLabel={confirmDialog?.confirmLabel}
+        cancelLabel={confirmDialog?.cancelLabel}
+        danger={confirmDialog?.danger}
+        onConfirm={acceptConfirm}
+        onCancel={closeConfirm}
+      />
     </>
   );
 }

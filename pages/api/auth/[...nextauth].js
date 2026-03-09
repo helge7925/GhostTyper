@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { query } from '../../../lib/db';
 import { checkRateLimit } from '../../../lib/rate-limit';
+import { normalizeEmail } from '../../../lib/email';
 
 if (!process.env.NEXTAUTH_SECRET) {
   throw new Error('NEXTAUTH_SECRET ist nicht gesetzt. Bitte Umgebungsvariablen prüfen.');
@@ -26,13 +27,14 @@ export const authOptions = {
           return null;
         }
 
-        if (!credentials?.email || !credentials?.password) {
+        const normalizedEmail = normalizeEmail(credentials?.email);
+        if (!normalizedEmail || !credentials?.password) {
           return null;
         }
 
         const result = await query(
-          'SELECT id, email, name, password_hash, role FROM users WHERE email = $1',
-          [credentials.email]
+          'SELECT id, email, name, password_hash, role FROM users WHERE lower(email) = $1',
+          [normalizedEmail]
         );
 
         const user = result.rows[0];

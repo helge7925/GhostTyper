@@ -463,14 +463,11 @@ export default function AudioRecorder({ onRecordingComplete }) {
                 <span>Mikrofonpegel</span>
                 <span>{inputLevel}%</span>
               </div>
-              <div className="h-1.5 w-full bg-white/[0.08] rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-100 ${
-                    hasSignal ? 'bg-accent-green' : 'bg-accent-yellow'
-                  }`}
-                  style={{ width: `${Math.max(inputLevel, 2)}%` }}
-                />
-              </div>
+              <progress
+                className={`mic-level-meter w-full ${hasSignal ? 'mic-level-ok' : 'mic-level-listening'}`}
+                value={Math.max(inputLevel, 2)}
+                max={100}
+              />
               <p className="text-[10px] mt-1 text-text-secondary">
                 {visualizerUnavailable
                   ? 'Pegelanzeige aktuell nicht verfügbar. Aufnahme läuft trotzdem.'

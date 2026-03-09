@@ -2,7 +2,6 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { renderPdfBufferFromHtml } from '../../../lib/pdf-export';
-import { getSettingsRow } from '../../../lib/settings-service';
 import { withPdfRenderSlot } from '../../../lib/pdf-render-limiter';
 import { normalizePdfFontPreset, normalizePdfTheme } from '../../../lib/pdf-print-style';
 
@@ -35,11 +34,6 @@ function normalizeDocumentTitle(filename) {
   return value || 'Dokument';
 }
 
-function normalizePremiumLayout(value) {
-  if (value === true || value === 'true') return true;
-  return false;
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
@@ -60,7 +54,7 @@ export default async function handler(req, res) {
   if (!allowed) return;
 
   try {
-    const { html, filename, theme, fontPreset, premiumLayout } = req.body || {};
+    const { html, filename, theme, fontPreset } = req.body || {};
     if (!html || typeof html !== 'string') {
       return res.status(400).json({ message: 'HTML-Inhalt fehlt.' });
     }
@@ -68,23 +62,9 @@ export default async function handler(req, res) {
       return res.status(413).json({ message: 'HTML-Inhalt ist zu groß für den PDF-Export.' });
     }
 
-    const settings = await getSettingsRow(session.user.id);
-    const premiumProfile = settings
-      ? {
-          project: settings.pdf_premium_company,
-          company: settings.pdf_premium_company,
-          name: settings.pdf_premium_name,
-          role: settings.pdf_premium_role,
-          contact: settings.pdf_premium_contact,
-          footer: settings.pdf_premium_footer,
-        }
-      : null;
-
     const pdfBuffer = await withPdfRenderSlot(() => renderPdfBufferFromHtml(html, {
       theme: normalizePdfTheme(theme),
       fontPreset: normalizePdfFontPreset(fontPreset),
-      premiumLayout: normalizePremiumLayout(premiumLayout),
-      premiumProfile,
       documentTitle: normalizeDocumentTitle(filename),
     }));
     const safeName = `${normalizeFilename(filename)}.pdf`;

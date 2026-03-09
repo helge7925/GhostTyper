@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { exportToDoc } from '../lib/export-utils';
 import DOMPurify from 'dompurify';
 import { buildPdfPrintStyles } from '../lib/pdf-print-style';
+import Toast from './Toast';
 
 const LANGUAGES = [
   { code: 'German', label: 'Deutsch' },
@@ -28,12 +29,12 @@ export default function DocumentEditor({
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const [pdfPremiumEnabled, setPdfPremiumEnabled] = useState(false);
-  const [pdfSettingsLoading, setPdfSettingsLoading] = useState(true);
   const [focusMode, setFocusMode] = useState(false);
   const [focusPreset, setFocusPreset] = useState('paper');
   const [showSourceContent, setShowSourceContent] = useState(false);
+  const [toast, setToast] = useState(null);
   const editorRef = useRef(null);
+  const selectionRef = useRef(null);
 
   const sanitizeEditorHtml = useCallback((value) => {
     if (typeof window === 'undefined') return String(value || '');
@@ -63,35 +64,37 @@ export default function DocumentEditor({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [focusMode]);
 
-  useEffect(() => {
-    let active = true;
-
-    const loadPdfSettings = async () => {
-      try {
-        const res = await fetch('/api/settings');
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!active) return;
-        setPdfPremiumEnabled(Boolean(data?.pdfPremiumEnabledDefault));
-      } catch (_) {
-        // Keep default off if settings are temporarily unavailable.
-      } finally {
-        if (active) {
-          setPdfSettingsLoading(false);
-        }
-      }
-    };
-
-    loadPdfSettings();
-    return () => {
-      active = false;
-    };
+  const captureSelection = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    if (!editor.contains(range.commonAncestorContainer)) return;
+    selectionRef.current = range.cloneRange();
   }, []);
 
-  const execCommand = (command, value = null) => {
-    if (editorRef.current) editorRef.current.focus();
+  const restoreSelection = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor || !selectionRef.current) return;
+    const selection = window.getSelection();
+    if (!selection) return;
+    selection.removeAllRanges();
+    selection.addRange(selectionRef.current);
+  }, []);
+
+  const execCommand = useCallback((command, value = null) => {
+    if (typeof document.execCommand !== 'function') {
+      setToast({ message: 'Diese Browserfunktion wird nicht mehr unterstützt.', type: 'error' });
+      return;
+    }
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+    restoreSelection();
     document.execCommand(command, false, value);
-  };
+    captureSelection();
+  }, [captureSelection, restoreSelection]);
 
   const handleCopy = async () => {
     const currentText = editorRef.current?.innerText || "";
@@ -301,7 +304,6 @@ export default function DocumentEditor({
           filename,
           theme: FIXED_PDF_THEME,
           fontPreset: FIXED_PDF_FONT,
-          premiumLayout: pdfPremiumEnabled,
         }),
       });
 
@@ -336,7 +338,7 @@ export default function DocumentEditor({
       if (!res.ok) throw new Error(data.message);
       setHtml(sanitizeEditorHtml(data.translatedText));
     } catch (err) {
-      alert('Fehler bei der Übersetzung: ' + err.message);
+      setToast({ message: 'Fehler bei der Übersetzung: ' + err.message, type: 'error' });
     } finally {
       setIsTranslating(false);
     }
@@ -345,7 +347,8 @@ export default function DocumentEditor({
   const handleEditorInput = useCallback((event) => {
     const rawHtml = event.currentTarget.innerHTML || '';
     setHtml(rawHtml);
-  }, []);
+    captureSelection();
+  }, [captureSelection]);
 
   const handleEditorPaste = useCallback((event) => {
     event.preventDefault();
@@ -362,8 +365,23 @@ export default function DocumentEditor({
     const pastedText = clipboard.getData('text/plain');
     if (pastedText) {
       document.execCommand('insertText', false, pastedText);
+      captureSelection();
     }
-  }, [sanitizeEditorHtml]);
+  }, [sanitizeEditorHtml, captureSelection]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return undefined;
+    const syncSelection = () => captureSelection();
+    editor.addEventListener('keyup', syncSelection);
+    editor.addEventListener('mouseup', syncSelection);
+    editor.addEventListener('focus', syncSelection);
+    return () => {
+      editor.removeEventListener('keyup', syncSelection);
+      editor.removeEventListener('mouseup', syncSelection);
+      editor.removeEventListener('focus', syncSelection);
+    };
+  }, [captureSelection]);
 
   return (
     <div className={`fixed inset-0 z-[100] bg-dark-bg flex flex-col animate-fade-in print-root ${focusMode ? `focus-mode focus-theme-${focusPreset}` : ''}`}>
@@ -418,6 +436,7 @@ export default function DocumentEditor({
           <>
             <div className="flex items-center gap-3 md:gap-4 min-w-0">
               <button onClick={onCancel} className="p-2 rounded-full transition-all text-text-secondary hover:text-accent-orange bg-white/5">
+                <span className="sr-only">Editor schließen</span>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               </button>
               <div className="flex flex-col">
@@ -457,6 +476,7 @@ export default function DocumentEditor({
                 <button
                   onClick={handleTranslateAction}
                   disabled={isTranslating}
+                  aria-label="Text im Editor übersetzen"
                   className="text-[10px] font-bold text-accent-orange hover:text-white transition-colors uppercase tracking-wider px-2"
                 >
                   {isTranslating ? '...' : 'Übersetzen'}
@@ -470,17 +490,6 @@ export default function DocumentEditor({
               >
                 {copyFeedback ? 'Kopiert!' : 'Text kopieren'}
               </button>
-
-              <label className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wide border-white/10 bg-white/5 text-text-secondary">
-            <span>Kopfbereich</span>
-            <input
-              type="checkbox"
-              checked={pdfPremiumEnabled}
-              onChange={(e) => setPdfPremiumEnabled(e.target.checked)}
-              disabled={pdfSettingsLoading}
-              className="h-3.5 w-3.5 accent-accent-orange"
-            />
-          </label>
 
               <button
                 onClick={() => setFocusMode(true)}
@@ -504,25 +513,25 @@ export default function DocumentEditor({
           {/* Formatting Bar - Fixed bottom on mobile, sticky top on desktop */}
           <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 md:sticky md:top-6 md:bottom-auto md:translate-x-0 mb-4 no-print ${focusMode ? 'hidden' : ''}`}>
             <div className="bg-dark-card/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl p-1.5 shadow-2xl flex items-center gap-0.5 max-w-[95vw] overflow-x-auto no-scrollbar">
-              <button onMouseDown={(e) => { e.preventDefault(); execCommand('bold'); }} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl font-bold">B</button>
-              <button onMouseDown={(e) => { e.preventDefault(); execCommand('italic'); }} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl italic">I</button>
-              <button onMouseDown={(e) => { e.preventDefault(); execCommand('underline'); }} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl underline">U</button>
+              <button type="button" onClick={() => execCommand('bold')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl font-bold" aria-label="Fett">B</button>
+              <button type="button" onClick={() => execCommand('italic')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl italic" aria-label="Kursiv">I</button>
+              <button type="button" onClick={() => execCommand('underline')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl underline" aria-label="Unterstrichen">U</button>
               <div className="w-px h-4 bg-white/10 mx-1.5" />
-              <button onMouseDown={(e) => { e.preventDefault(); execCommand('formatBlock', 'h2'); }} className="p-2 text-text-secondary hover:text-accent-orange rounded-xl text-xs font-bold">H2</button>
-              <button onMouseDown={(e) => { e.preventDefault(); execCommand('formatBlock', 'h3'); }} className="p-2 text-text-secondary hover:text-accent-orange rounded-xl text-[10px] font-bold">H3</button>
-              <button onMouseDown={(e) => { e.preventDefault(); execCommand('formatBlock', 'p'); }} className="p-2 text-text-secondary hover:text-accent-orange rounded-xl text-[10px] font-bold">P</button>
+              <button type="button" onClick={() => execCommand('formatBlock', 'h2')} className="p-2 text-text-secondary hover:text-accent-orange rounded-xl text-xs font-bold" aria-label="Überschrift Ebene 2">H2</button>
+              <button type="button" onClick={() => execCommand('formatBlock', 'h3')} className="p-2 text-text-secondary hover:text-accent-orange rounded-xl text-[10px] font-bold" aria-label="Überschrift Ebene 3">H3</button>
+              <button type="button" onClick={() => execCommand('formatBlock', 'p')} className="p-2 text-text-secondary hover:text-accent-orange rounded-xl text-[10px] font-bold" aria-label="Absatz">P</button>
               <div className="w-px h-4 bg-white/10 mx-1.5" />
-              <button onMouseDown={(e) => { e.preventDefault(); execCommand('insertUnorderedList'); }} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl">
+              <button type="button" onClick={() => execCommand('insertUnorderedList')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl" aria-label="Aufzählungsliste">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
               </button>
-              <button onMouseDown={(e) => { e.preventDefault(); execCommand('insertOrderedList'); }} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl">
+              <button type="button" onClick={() => execCommand('insertOrderedList')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl" aria-label="Nummerierte Liste">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h10M7 16h10M4 8h.01M4 12h.01M4 16h.01" /></svg>
               </button>
               <div className="w-px h-4 bg-white/10 mx-1.5" />
-              <button onMouseDown={(e) => { e.preventDefault(); execCommand('indent'); }} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl" title="Einrücken">
+              <button type="button" onClick={() => execCommand('indent')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl" title="Einrücken" aria-label="Einrücken">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16M13 9l3 3-3 3" /></svg>
               </button>
-              <button onMouseDown={(e) => { e.preventDefault(); execCommand('outdent'); }} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl" title="Ausrücken">
+              <button type="button" onClick={() => execCommand('outdent')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl" title="Ausrücken" aria-label="Ausrücken">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16M11 9l-3 3 3 3" /></svg>
               </button>
             </div>
@@ -737,6 +746,7 @@ export default function DocumentEditor({
           margin-top: 3rem !important;
         }
       `}</style>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

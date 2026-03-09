@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import Link from 'next/link';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import DocumentEditor from '../components/DocumentEditor';
@@ -34,14 +35,18 @@ export default function TextAI() {
 
   useEffect(() => {
     if (status === 'authenticated') {
-      getTextTasks().then(setTasks).catch(() => {});
+      getTextTasks()
+        .then((tasksData) => {
+          setTasks(tasksData);
+        })
+        .catch(() => {});
     }
   }, [status]);
 
   if (status === 'loading') return <LoadingSpinner />;
   if (status === 'unauthenticated') {
     router.push('/login');
-    return null;
+    return <LoadingSpinner />;
   }
 
   async function handleAction(taskId) {
@@ -161,9 +166,13 @@ export default function TextAI() {
                       onChange={e => setSelectedModel(e.target.value)}
                       className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none"
                     >
-                      <option value="mistral-small-latest">Mistral Small</option>
-                      <option value="mistral-medium-latest">Mistral Medium</option>
+                      <option value="mistral-small-latest">Kostengünstig / Schnell</option>
+                      <option value="mistral-medium-latest">Ausgewogen</option>
+                      <option value="mistral-large-latest">Qualität</option>
                     </select>
+                    <p className="mt-2 text-[11px] text-text-secondary">
+                      Eine Auswahl reicht: Kostengünstig / Schnell, Ausgewogen oder Qualität.
+                    </p>
                   </div>
                 )}
                 
@@ -200,6 +209,9 @@ export default function TextAI() {
               <div className="px-1">
                 <p className="text-xs text-text-secondary/80 leading-relaxed">
                   Wählen Sie eine Aktion. Das Ergebnis wird im Editor geöffnet.
+                </p>
+                <p className="text-xs text-text-secondary/70 leading-relaxed mt-2">
+                  Für kombinierte Abläufe: <Link href="/" className="text-accent-cyan hover:text-accent-orange transition-colors">Dashboard-Presets öffnen</Link>.
                 </p>
               </div>
             </div>

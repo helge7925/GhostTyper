@@ -4,11 +4,13 @@ import pool from '../../lib/db';
 import {
   getSettingsRow,
   hasStoredApiKey,
+  hasStoredGoogleApiKey,
   serializeApiKeyForStorage,
 } from '../../lib/settings-service';
 import { normalizeDefaultTemplate } from '../../lib/constants';
 import { resolveChatModel, resolveOcrModel } from '../../lib/model-policy';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
+import { logAuditEvent } from '../../lib/audit-log';
 
 function normalizeCostLimit(costLimit) {
   if (costLimit === null || costLimit === '') return null;
@@ -23,14 +25,7 @@ function hasOwnValue(target, key) {
   return Object.prototype.hasOwnProperty.call(target || {}, key);
 }
 
-function normalizeBoolean(value) {
-  if (value === true || value === false) return value;
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-  return null;
-}
-
-function normalizeOptionalText(value, maxLength) {
+function normalizeContextBias(value) {
   if (value === null || value === undefined) {
     return { valid: true, value: null };
   }
@@ -38,14 +33,29 @@ function normalizeOptionalText(value, maxLength) {
     return { valid: false, value: null };
   }
 
-  const trimmed = value.trim();
-  if (!trimmed) {
+  const parts = value
+    .split(/[\n,;]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  const seen = new Set();
+  const unique = [];
+
+  for (const part of parts) {
+    const normalizedPart = part.slice(0, 80);
+    const key = normalizedPart.toLocaleLowerCase('de-DE');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(normalizedPart);
+  }
+
+  if (unique.length === 0) {
     return { valid: true, value: null };
   }
 
   return {
     valid: true,
-    value: trimmed.slice(0, maxLength),
+    value: unique.join(', '),
   };
 }
 
@@ -76,6 +86,7 @@ export default async function handler(req, res) {
         if (!settings) {
           return res.status(200).json({
             apiKeyConfigured: false,
+            googleApiKeyConfigured: false,
             defaultTemplate: 'generic',
             language: 'de',
             contextBias: '',
@@ -83,50 +94,38 @@ export default async function handler(req, res) {
             defaultTranslateLanguage: 'en',
             ocrModel: 'mistral-ocr-latest',
             costLimit: null,
-            pdfPremiumEnabledDefault: false,
-            pdfPremiumCompany: '',
-            pdfPremiumName: '',
-            pdfPremiumRole: '',
-            pdfPremiumContact: '',
-            pdfPremiumFooter: '',
+            memberMonthlyBudgetLimit: null,
           });
         }
 
         return res.status(200).json({
           apiKeyConfigured: hasStoredApiKey(settings),
+          googleApiKeyConfigured: hasStoredGoogleApiKey(settings),
           defaultTemplate: normalizeDefaultTemplate(settings.default_template),
           language: settings.language,
-          contextBias: settings.context_bias || '',
+          contextBias: normalizeContextBias(settings.context_bias).value || '',
           preferredModel: settings.preferred_model || 'mistral-large-latest',
           defaultTranslateLanguage: settings.default_translate_language || 'en',
           ocrModel: settings.ocr_model || 'mistral-ocr-latest',
           costLimit: settings.cost_limit,
-          pdfPremiumEnabledDefault: Boolean(settings.pdf_premium_enabled_default),
-          pdfPremiumCompany: settings.pdf_premium_company || '',
-          pdfPremiumName: settings.pdf_premium_name || '',
-          pdfPremiumRole: settings.pdf_premium_role || '',
-          pdfPremiumContact: settings.pdf_premium_contact || '',
-          pdfPremiumFooter: settings.pdf_premium_footer || '',
+          memberMonthlyBudgetLimit: settings.member_monthly_budget_limit,
         });
       }
 
-      case 'PUT': {
+      case 'PUT':
+      case 'POST': {
         const body = req.body || {};
         const {
           mistralApiKey,
+          googleApiKey,
           defaultTemplate,
           language,
           contextBias,
           preferredModel,
           costLimit,
+          memberMonthlyBudgetLimit,
           defaultTranslateLanguage,
           ocrModel,
-          pdfPremiumEnabledDefault,
-          pdfPremiumCompany,
-          pdfPremiumName,
-          pdfPremiumRole,
-          pdfPremiumContact,
-          pdfPremiumFooter,
         } = body;
 
         if (preferredModel !== undefined && resolveChatModel(preferredModel) === null) {
@@ -139,11 +138,14 @@ export default async function handler(req, res) {
 
         const shouldUpdateApiKey = hasOwnValue(body, 'mistralApiKey');
         const shouldClearApiKey = shouldUpdateApiKey && (mistralApiKey === null || mistralApiKey === '');
+        const shouldUpdateGoogleApiKey = hasOwnValue(body, 'googleApiKey');
+        const shouldClearGoogleApiKey = shouldUpdateGoogleApiKey && (googleApiKey === null || googleApiKey === '');
         const shouldUpdateDefaultTemplate = hasOwnValue(body, 'defaultTemplate');
         const shouldUpdateLanguage = hasOwnValue(body, 'language');
         const shouldUpdateContextBias = hasOwnValue(body, 'contextBias');
         const shouldUpdatePreferredModel = hasOwnValue(body, 'preferredModel');
         const shouldUpdateCostLimit = hasOwnValue(body, 'costLimit');
+        const shouldUpdateMemberMonthlyBudgetLimit = hasOwnValue(body, 'memberMonthlyBudgetLimit');
         const shouldUpdateDefaultTranslateLanguage = hasOwnValue(body, 'defaultTranslateLanguage');
         const shouldUpdateOcrModel = hasOwnValue(body, 'ocrModel');
 
@@ -151,55 +153,32 @@ export default async function handler(req, res) {
         if (shouldUpdateCostLimit && costLimit !== null && costLimit !== '' && normalizedCostLimit === null) {
           return res.status(400).json({ message: 'Ungültiges Kostenlimit' });
         }
-        const shouldUpdatePdfPremiumEnabled = hasOwnValue(body, 'pdfPremiumEnabledDefault');
-        const parsedPdfPremiumEnabled = shouldUpdatePdfPremiumEnabled
-          ? normalizeBoolean(pdfPremiumEnabledDefault)
-          : false;
-        if (shouldUpdatePdfPremiumEnabled && parsedPdfPremiumEnabled === null) {
-          return res.status(400).json({ message: 'Ungültige Premium-PDF-Option' });
+        const normalizedMemberMonthlyBudgetLimit = normalizeCostLimit(memberMonthlyBudgetLimit);
+        if (
+          shouldUpdateMemberMonthlyBudgetLimit
+          && memberMonthlyBudgetLimit !== null
+          && memberMonthlyBudgetLimit !== ''
+          && normalizedMemberMonthlyBudgetLimit === null
+        ) {
+          return res.status(400).json({ message: 'Ungültiges Mitglieder-Budgetlimit' });
         }
 
-        const shouldUpdatePdfPremiumCompany = hasOwnValue(body, 'pdfPremiumCompany');
-        const normalizedPdfPremiumCompany = shouldUpdatePdfPremiumCompany
-          ? normalizeOptionalText(pdfPremiumCompany, 160)
+        const normalizedContextBias = shouldUpdateContextBias
+          ? normalizeContextBias(contextBias)
           : { valid: true, value: null };
-        if (!normalizedPdfPremiumCompany.valid) {
-          return res.status(400).json({ message: 'Ungültiger Firmenname für Premium-PDF' });
-        }
-
-        const shouldUpdatePdfPremiumName = hasOwnValue(body, 'pdfPremiumName');
-        const normalizedPdfPremiumName = shouldUpdatePdfPremiumName
-          ? normalizeOptionalText(pdfPremiumName, 160)
-          : { valid: true, value: null };
-        if (!normalizedPdfPremiumName.valid) {
-          return res.status(400).json({ message: 'Ungültiger Name für Premium-PDF' });
-        }
-
-        const shouldUpdatePdfPremiumRole = hasOwnValue(body, 'pdfPremiumRole');
-        const normalizedPdfPremiumRole = shouldUpdatePdfPremiumRole
-          ? normalizeOptionalText(pdfPremiumRole, 160)
-          : { valid: true, value: null };
-        if (!normalizedPdfPremiumRole.valid) {
-          return res.status(400).json({ message: 'Ungültige Rolle für Premium-PDF' });
-        }
-
-        const shouldUpdatePdfPremiumContact = hasOwnValue(body, 'pdfPremiumContact');
-        const normalizedPdfPremiumContact = shouldUpdatePdfPremiumContact
-          ? normalizeOptionalText(pdfPremiumContact, 255)
-          : { valid: true, value: null };
-        if (!normalizedPdfPremiumContact.valid) {
-          return res.status(400).json({ message: 'Ungültiger Kontakt für Premium-PDF' });
-        }
-
-        const shouldUpdatePdfPremiumFooter = hasOwnValue(body, 'pdfPremiumFooter');
-        const normalizedPdfPremiumFooter = shouldUpdatePdfPremiumFooter
-          ? normalizeOptionalText(pdfPremiumFooter, 255)
-          : { valid: true, value: null };
-        if (!normalizedPdfPremiumFooter.valid) {
-          return res.status(400).json({ message: 'Ungültiger Footer für Premium-PDF' });
+        if (shouldUpdateContextBias && !normalizedContextBias.valid) {
+          return res.status(400).json({ message: 'Ungültiges Format für Kontext-Wörter' });
         }
 
         const client = await pool.connect();
+        const auditFlags = {
+          apiKeyChanged: shouldUpdateApiKey,
+          googleApiKeyChanged: shouldUpdateGoogleApiKey,
+          preferredModelChanged: shouldUpdatePreferredModel,
+          costLimitChanged: shouldUpdateCostLimit,
+          memberBudgetChanged: shouldUpdateMemberMonthlyBudgetLimit,
+          contextBiasChanged: shouldUpdateContextBias,
+        };
         try {
           await client.query('BEGIN');
 
@@ -220,6 +199,13 @@ export default async function handler(req, res) {
             addUpdate(updates, values, 'mistral_api_key', apiKeyPayload.plainApiKey);
             addUpdate(updates, values, 'mistral_api_key_encrypted', apiKeyPayload.encryptedApiKey);
           }
+          if (shouldUpdateGoogleApiKey) {
+            const googleApiKeyPayload = shouldClearGoogleApiKey
+              ? { encryptedApiKey: null, plainApiKey: null }
+              : serializeApiKeyForStorage(String(googleApiKey).trim());
+            addUpdate(updates, values, 'google_api_key', googleApiKeyPayload.plainApiKey);
+            addUpdate(updates, values, 'google_api_key_encrypted', googleApiKeyPayload.encryptedApiKey);
+          }
 
           if (shouldUpdateDefaultTemplate) {
             addUpdate(updates, values, 'default_template', normalizeDefaultTemplate(defaultTemplate));
@@ -228,7 +214,7 @@ export default async function handler(req, res) {
             addUpdate(updates, values, 'language', language || null);
           }
           if (shouldUpdateContextBias) {
-            addUpdate(updates, values, 'context_bias', contextBias ?? null);
+            addUpdate(updates, values, 'context_bias', normalizedContextBias.value);
           }
           if (shouldUpdatePreferredModel) {
             addUpdate(updates, values, 'preferred_model', preferredModel || null);
@@ -236,29 +222,14 @@ export default async function handler(req, res) {
           if (shouldUpdateCostLimit) {
             addUpdate(updates, values, 'cost_limit', normalizedCostLimit);
           }
+          if (shouldUpdateMemberMonthlyBudgetLimit) {
+            addUpdate(updates, values, 'member_monthly_budget_limit', normalizedMemberMonthlyBudgetLimit);
+          }
           if (shouldUpdateDefaultTranslateLanguage) {
             addUpdate(updates, values, 'default_translate_language', defaultTranslateLanguage || null);
           }
           if (shouldUpdateOcrModel) {
             addUpdate(updates, values, 'ocr_model', ocrModel || null);
-          }
-          if (shouldUpdatePdfPremiumEnabled) {
-            addUpdate(updates, values, 'pdf_premium_enabled_default', parsedPdfPremiumEnabled);
-          }
-          if (shouldUpdatePdfPremiumCompany) {
-            addUpdate(updates, values, 'pdf_premium_company', normalizedPdfPremiumCompany.value);
-          }
-          if (shouldUpdatePdfPremiumName) {
-            addUpdate(updates, values, 'pdf_premium_name', normalizedPdfPremiumName.value);
-          }
-          if (shouldUpdatePdfPremiumRole) {
-            addUpdate(updates, values, 'pdf_premium_role', normalizedPdfPremiumRole.value);
-          }
-          if (shouldUpdatePdfPremiumContact) {
-            addUpdate(updates, values, 'pdf_premium_contact', normalizedPdfPremiumContact.value);
-          }
-          if (shouldUpdatePdfPremiumFooter) {
-            addUpdate(updates, values, 'pdf_premium_footer', normalizedPdfPremiumFooter.value);
           }
 
           if (updates.length > 0) {
@@ -282,6 +253,14 @@ export default async function handler(req, res) {
         } finally {
           client.release();
         }
+
+        await logAuditEvent({
+          userId: session.user.id,
+          action: 'settings.updated',
+          targetType: 'settings',
+          targetId: String(session.user.id),
+          metadata: auditFlags,
+        });
 
         return res.status(200).json({ message: 'Einstellungen gespeichert' });
       }

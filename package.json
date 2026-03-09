@@ -1,17 +1,21 @@
 {
   "name": "ghosttyper",
-  "version": "1.0.1",
+  "version": "1.2.0",
   "description": "GhostTyper - Audio-Transkription und KI-Analyse",
   "main": "index.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "node --no-warnings --test tests/**/*.test.mjs",
+    "smoke": "bash scripts/smoke-test.sh",
+    "smoke:full": "bash scripts/smoke-test.sh --full --pdf",
     "lint": "next lint",
     "seed-admin": "node scripts/seed-admin.js",
     "migrate-api-keys": "node scripts/migrate-api-keys.js"
   },
   "dependencies": {
+    "@google/genai": "^1.44.0",
     "axios": "^1.4.0",
     "bcryptjs": "^2.4.3",
     "docx": "^8.2.2",
@@ -24,7 +28,10 @@
     "next-auth": "^4.22.1",
     "pg": "^8.11.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "vis-data": "^8.0.3",
+    "vis-network": "^10.0.2",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",

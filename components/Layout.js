@@ -1,5 +1,4 @@
 import Head from 'next/head';
-import Image from 'next/image';
 import Sidebar from './Sidebar';
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
@@ -39,13 +38,13 @@ export default function Layout({ children }) {
               </button>
               
               <Link href="/" className="flex items-center gap-2">
-                <Image
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src="/logo.png"
                   alt="GhostTyper"
                   width={28}
                   height={28}
                   className="w-7 h-7"
-                  priority
                 />
                 <span className="font-bold text-text-primary tracking-tight">GhostTyper</span>
               </Link>
@@ -63,11 +62,11 @@ export default function Layout({ children }) {
           </main>
           
           <footer className="py-12 text-center space-y-2">
-            <p className="text-[10px] text-text-secondary/50 uppercase tracking-[0.2em]">
+            <p className="text-xs text-text-secondary/60 uppercase tracking-[0.2em]">
               Your thoughts, decoded and distilled.
             </p>
-            <p className="text-[10px] text-text-secondary/30 uppercase tracking-widest">
-              Ghost Typer 2026 &bull; Made by Helge Roos
+            <p className="text-xs text-text-secondary/40 uppercase tracking-widest">
+              Ghost Typer 2026 &bull; Developed by Helge Roos
             </p>
           </footer>
         </div>
