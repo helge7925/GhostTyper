@@ -1,0 +1,13 @@
+title = "Gitleaks config"
+
+[allowlist]
+  description = "Ignore placeholder values in documentation"
+  regexes = [
+    '''your-api-key''',
+    '''<separater-secret>''',
+    '''<starkes-passwort>''',
+    '''<openssl rand''',
+  ]
+  paths = [
+    '''docs/.*\.md''',
+  ]
