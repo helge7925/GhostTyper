@@ -2,6 +2,7 @@ import Head from 'next/head';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import DOMPurify from 'dompurify';
 import AudioUploadForm from '../components/AudioUploadForm';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
@@ -522,7 +523,7 @@ export default function SketchPage() {
                       className="rounded-xl border border-white/10 shadow-lg bg-white overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
                       style={{ width: 'min(100%, 1200px)' }}
                       // eslint-disable-next-line react/no-danger
-                      dangerouslySetInnerHTML={{ __html: decodedSvgMarkup }}
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(decodedSvgMarkup, { USE_PROFILES: { svg: true } }) }}
                     />
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
