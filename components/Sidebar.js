@@ -13,15 +13,6 @@ const NAV_LINKS = [
       </svg>
     )
   },
-  {
-    href: '/realtime',
-    label: 'Echtzeitverarbeitung',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5V10H2v10h5m10 0v-2a4 4 0 00-8 0v2m8 0H7m10-8a3 3 0 11-6 0 3 3 0 016 0zM9 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    )
-  },
   { 
     href: '/translate', 
     label: 'Übersetzung', 
@@ -41,38 +32,11 @@ const NAV_LINKS = [
     )
   },
   {
-    href: '/wissensgraph',
-    label: 'Wissensgraph',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7a2 2 0 11-4 0 2 2 0 014 0zM9 17a2 2 0 11-4 0 2 2 0 014 0zm10 0a2 2 0 11-4 0 2 2 0 014 0zM8 16l8 0M7 15l8-7" />
-      </svg>
-    )
-  },
-  {
-    href: '/mindmap',
-    label: 'Mindmap',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5a3 3 0 100 6 3 3 0 000-6zm0 6v8m0-8l6 3m-6-3l-6 3m6 5a2 2 0 110 4 2 2 0 010-4zm6-3a2 2 0 110 4 2 2 0 010-4zM6 13a2 2 0 110 4 2 2 0 010-4z" />
-      </svg>
-    )
-  },
-  {
     href: '/datentabelle',
     label: 'Datentabelle',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18M6 4v16M12 4v16M18 4v16" />
-      </svg>
-    )
-  },
-  {
-    href: '/text-ai',
-    label: 'Text-Assistent', 
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
       </svg>
     )
   },

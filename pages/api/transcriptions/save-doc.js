@@ -62,7 +62,7 @@ export default async function handler(req, res) {
         'INTERNAL_DOC', // Placeholder for file_path
         0,
         'application/vnd.ghosttyper.doc',
-        template || 'text-assistant',
+        template || 'generic',
         typeof text === 'string' ? text : '',
         documentHtml
       ]

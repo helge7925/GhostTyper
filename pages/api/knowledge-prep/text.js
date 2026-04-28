@@ -17,7 +17,7 @@ import { addTranscriptionEvent } from '../../../lib/transcription-events';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { normalizeDataTableAnalysis } from '../../../lib/data-table';
 
-const ALLOWED_TEMPLATES = new Set(['knowledge_graph', 'mindmap', 'data_table']);
+const ALLOWED_TEMPLATES = new Set(['data_table']);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -104,11 +104,7 @@ export default async function handler(req, res) {
       };
     });
 
-    const titlePrefix = template === 'mindmap'
-      ? 'Mindmap'
-      : template === 'data_table'
-        ? 'Datentabelle'
-        : 'Wissensgraph';
+    const titlePrefix = 'Datentabelle';
 
     let analysisType = 'text';
     let analysisPayload = analysis || {};

@@ -1,419 +1,292 @@
 # Tabellen-Vorlagen - Technische Dokumentation
 
-Version: 1.1.0
-
----
+Stand: 2026-04-28
 
 ## Überblick
 
-Tabellen-Vorlagen ermöglichen die strukturierte Extraktion von Daten aus Audio-Transkriptionen, OCR-Ergebnissen oder Text-Dateien. Anstatt einer freien Textanalyse liefert die KI ein definiertes JSON-Schema, das als interaktive Tabelle dargestellt wird.
+Tabellen-Vorlagen ermöglichen die strukturierte Extraktion von Daten aus Audio-Transkriptionen, OCR-Ergebnissen oder Textdateien. Eine Vorlage definiert Metadatenfelder, Spalten und optional feste Zeilentitel. Das KI-Modell füllt ausschließlich Inhalte in diese Struktur ein.
 
----
+Nicht Teil des aktuellen Tabellen-Vorlagen-Flows sind Berechnungen, Formeln, Summenzeilen oder automatisch abgeleitete Werte. Die Tabellen sollen wie digitale Erfassungsbögen funktionieren.
 
 ## Use Cases
 
-| Szenario | Beschreibung | Beispiel-Spalten |
-|----------|-------------|------------------|
-| **Rechnungen** | Extraktion von Rechnungspositionen | Pos., Artikel, Menge, Preis, Gesamt |
-| **Inventar** | Lagerbestands-Erfassung | Artikel-Nr., Bezeichnung, Bestand, Lagerort |
-| **Zeiterfassung** | Stundenzettel aus Diktat | Datum, Projekt, Tätigkeit, Stunden, Kosten |
-| **Kontakte** | Adressen aus Gesprächen | Name, Firma, E-Mail, Telefon |
-| **Aufmaße** | Bau-/Handwerks-Aufmaße | Raum, Element, Breite, Höhe, Fläche |
-
----
+| Szenario | Beschreibung | Typische Struktur |
+|----------|--------------|-------------------|
+| Rechnungen | Positionen aus Rechnungen erfassen | Metadaten: Rechnungsdatum, Lieferant; Spalten: Pos., Artikel, Menge, Preis |
+| Inventar | Lagerbestände dokumentieren | Zeilen: feste Lagerplätze; Spalten: Artikel, Bestand, Zustand |
+| Zeiterfassung | Stundenzettel aus Diktat füllen | Metadaten: Zeitraum, Person; Spalten: Datum, Projekt, Tätigkeit, Stunden |
+| Kontakte | Adressdaten aus Gesprächen erfassen | Spalten: Name, Firma, E-Mail, Telefon |
+| Aufmaße | Bau-/Handwerksdaten erfassen | Metadaten: Objekt, Bearbeiter; Zeilen: Räume/Bauteile; Spalten: Länge, Breite, Höhe, Bemerkung |
 
 ## Datenbank-Schema
 
-### Erweiterung der `templates` Tabelle
+### `templates`
 
 ```sql
-ALTER TABLE templates 
-ADD COLUMN template_type VARCHAR(20) DEFAULT 'text' 
+ALTER TABLE templates
+ADD COLUMN template_type VARCHAR(20) DEFAULT 'text'
   CHECK (template_type IN ('text', 'table')),
 ADD COLUMN table_schema JSONB DEFAULT NULL;
-
-CREATE INDEX idx_templates_type ON templates(template_type);
 ```
 
-### Erweiterung der `transcriptions` Tabelle
+### `transcriptions`
 
 ```sql
-ALTER TABLE transcriptions 
+ALTER TABLE transcriptions
 ADD COLUMN analysis_type VARCHAR(20) DEFAULT 'text'
   CHECK (analysis_type IN ('text', 'table')),
 ADD COLUMN table_schema JSONB DEFAULT NULL;
 ```
 
----
+Tabellen-Ergebnisse werden zusätzlich in `analysis` gespeichert. Bei Tabellen enthält die Analyse mindestens `rows` und optional `metadata`.
 
-## JSON Schema-Struktur
-
-### Beispiel: Rechnungsvorlage
+## Schema-Struktur
 
 ```json
 {
-  "tableName": "Rechnungspositionen",
-  "description": "Extrahiert Positionen aus Rechnungen",
-  "columns": [
+  "tableName": "Aufmaß Küche",
+  "description": "Erfasst Maße je Wand",
+  "metadataFields": [
     {
-      "key": "pos",
-      "label": "Pos.",
-      "type": "number",
-      "required": true,
-      "editable": true
+      "key": "datum",
+      "label": "Datum",
+      "type": "date",
+      "required": false
     },
     {
-      "key": "artikel",
-      "label": "Artikel / Leistung",
+      "key": "bearbeiter",
+      "label": "Bearbeiter",
       "type": "text",
-      "required": true,
-      "editable": true
-    },
-    {
-      "key": "menge",
-      "label": "Menge",
-      "type": "number",
-      "required": true,
-      "editable": true
-    },
-    {
-      "key": "einzelpreis",
-      "label": "Einzelpreis",
-      "type": "currency",
-      "required": true,
-      "editable": true
+      "required": false
     }
   ],
-  "calculations": [
+  "rows": [
     {
-      "key": "gesamt",
-      "label": "Gesamt",
-      "type": "currency",
-      "formula": "menge * einzelpreis",
-      "displayInTable": true,
-      "displayInFooter": true
+      "key": "wand_1",
+      "label": "Wand 1"
+    },
+    {
+      "key": "wand_2",
+      "label": "Wand 2"
+    }
+  ],
+  "columns": [
+    {
+      "key": "laenge",
+      "label": "Länge",
+      "type": "number",
+      "required": false,
+      "editable": true
+    },
+    {
+      "key": "bemerkung",
+      "label": "Bemerkung",
+      "type": "text",
+      "required": false,
+      "editable": true
     }
   ]
 }
 ```
 
-### Feld-Typen
+### Feldtypen
 
-| Typ | Beschreibung | Beispiel | Formatierung |
-|-----|-------------|----------|--------------|
-| `text` | Freitext | "Artikel A" | - |
-| `number` | Ganze/Dezimalzahlen | 10, 5.5 | Tausender-Trennzeichen |
-| `currency` | Währungsbeträge | 19.99 | 2 Dezimalstellen + € |
-| `date` | Datum | 2025-02-18 | DD.MM.YYYY |
+| Typ | Beschreibung | Beispiel |
+|-----|--------------|----------|
+| `text` | Freitext | "Artikel A" |
+| `number` | Ganze oder dezimale Zahlen | 10, 5.5 |
+| `currency` | Geldbetrag als Wert | 19.99 |
+| `date` | Datum | 2026-04-28 |
 
-### Berechnungs-Formeln
+## KI-Prompt-Regeln
 
-Unterstützte Operatoren:
-- `+` Addition
-- `-` Subtraktion
-- `*` Multiplikation
-- `/` Division
-- `()` Klammern
-- `sum(spalte)` Aggregation
+Der Tabellen-Prompt verlangt eine gültige JSON-Antwort mit:
+- `metadata`: Werte für definierte Metadatenfelder
+- `rows`: Tabellenzeilen mit Zellwerten
+- `row_key`: bei festen Zeilentiteln zur eindeutigen Zuordnung
+- `zusammenfassung` und Hinweise zu fehlenden Daten
 
-Beispiele:
-```
-gesamt = menge * preis
-rabatt_preis = preis * (1 - rabatt / 100)
-gesamtgewicht = sum(einzelgewicht)
-```
-
----
-
-## KI-Prompt Generierung
-
-### Template für Tabellen-Extraktion
-
-```
-Du bist ein Experte für Datenextraktion. Extrahiere alle relevanten 
-Informationen aus dem folgenden Text und erstelle eine strukturierte Tabelle.
-
-TABELLE: {tableName}
-
-SPALTEN:
-- "pos": "Pos." (number, erforderlich)
-- "artikel": "Artikel / Leistung" (text, erforderlich)
-- "menge": "Menge" (number, erforderlich)
-- "einzelpreis": "Einzelpreis" (currency, erforderlich)
-
-WICHTIGE REGELN:
-- Gib das Ergebnis als gültiges JSON zurück
-- Die Hauptdaten sind im Array "rows"
-- Bei Zahlen: Punkt als Dezimaltrenner
-- Bei Währungen: Nur Zahlenwert, kein €-Zeichen
-- Bei Datum: ISO-Format YYYY-MM-DD
-
-ERFORDERLICHE JSON-STRUKTUR:
-{
-  "rows": [
-    {
-      "pos": 1,
-      "artikel": "Beispiel Artikel",
-      "menge": 5,
-      "einzelpreis": 10.00
-    }
-  ],
-  "extrahierte_zeilen_anzahl": 1,
-  "unvollstaendige_daten": [],
-  "zusammenfassung": "Kurze Zusammenfassung"
-}
-
-TEXT ZUR ANALYSE:
-"{TEXT}"
-```
-
----
+Zentrale Regeln:
+- Werte nur aus dem Quelltext ableiten.
+- Keine Rechenoperationen durchführen.
+- Keine Formeln, Summen oder Aggregationen erzeugen.
+- Spalten- und Zeilentitel der Vorlage zur Zuordnung verwenden.
+- Fehlende Informationen leer lassen oder als unvollständig melden.
 
 ## Komponenten
 
-### TableSchemaBuilder
+### `components/TableSchemaBuilder.js`
 
-**Pfad**: `components/TableSchemaBuilder.js`
+Excel-artiger Vorlagen-Editor in den Einstellungen.
 
-**Funktionen**:
-- Schnellstart-Presets (z.B. Rechnung, Zeiterfassung, Aktionsliste)
-- Spalten visuell als Tabellenaufbau bearbeiten
-- Reihenfolge per Links/Rechts-Steuerung
-- Datentyp, Pflichtfeld und Editierbarkeit je Spalte
-- Berechnungen mit Formelhilfe und Vorschau
-- Schema-Validierung + Live-Vorschau
+Funktionen:
+- Tabellenname und Beschreibung pflegen
+- Metadatenfelder hinzufügen, benennen, typisieren und löschen
+- Spalten hinzufügen, benennen, typisieren und löschen
+- feste Zeilentitel hinzufügen, benennen und löschen
+- Live-Vorschau als Raster
+- Schema-Validierung
 
-**Props**:
-```javascript
-{
-  schema: TableSchema,        // Aktuelles Schema
-  onChange: (schema) => void  // Callback bei Änderungen
-}
-```
+### `components/TableRenderer.js`
 
-### TableRenderer
+Tabellenanzeige und Inline-Bearbeitung für extrahierte Daten.
 
-**Pfad**: `components/TableRenderer.js`
+Funktionen:
+- Metadaten über der Tabelle anzeigen und bearbeiten
+- Tabellenzellen bearbeiten
+- feste Zeilentitel respektieren
+- Zeilen hinzufügen oder entfernen, wenn keine feste Zeilenstruktur definiert ist
+- Export nach CSV, Excel und HTML
+- Kopieren der Tabelle
 
-**Funktionen**:
-- Tabellarische Datenanzeige
-- Inline-Editing
-- Berechnete Felder aktualisieren
-- Zeilen hinzufügen/entfernen
-- Export (CSV, Excel, Kopieren)
+### `components/TableEditor.js`
 
-**Props**:
-```javascript
-{
-  initialData: {
-    rows: Array<Object>,
-    footerStats?: Object
-  },
-  schema: TableSchema,
-  filename: string,
-  onChange?: (rows) => void
-}
-```
+Canvas-artiger Vollbildeditor in der Transkriptionsdetailansicht.
 
----
+Funktionen:
+- Tabelle wie ein Dokument öffnen und nachbearbeiten
+- Metadaten und Zellwerte ändern
+- Änderungen per `PATCH /api/transcriptions/:id` speichern
+- zwischen Tabellenansicht und Quelltext wechseln
 
 ## Hilfsfunktionen
 
-### table-calculations.js
+### `lib/table-schema.js`
 
 | Funktion | Beschreibung |
-|----------|-------------|
-| `evaluateFormula(formula, rowData)` | Berechnet eine Formel |
-| `applyCalculations(row, calculations)` | Wendet alle Berechnungen auf eine Zeile an |
-| `calculateFooterStats(rows, columns, calculations)` | Berechnet Summen für Fußzeile |
-| `validateTableSchema(schema)` | Validiert ein Schema |
-| `buildTableExtractionPrompt(schema, lang)` | Erzeugt KI-Prompt |
+|----------|--------------|
+| `normalizeTableSchema(schema)` | Normalisiert Metadaten, Zeilen und Spalten |
+| `normalizeTableData(data, schema)` | Bringt Analysewerte in die erwartete Tabellenform |
+| `createEmptyRowsFromSchema(schema)` | Erzeugt leere Zeilen für feste Zeilentitel |
+| `deriveColumnsFromRows(rows)` | Leitet Spalten aus vorhandenen Daten ab |
 
-### table-export.js
+### `lib/table-calculations.js`
+
+Dieses Modul enthält aus Kompatibilitätsgründen noch ältere Berechnungshelfer. Der aktuelle Tabellen-Vorlagen-Flow nutzt sie nicht für neue Vorlagen. Relevant bleiben:
 
 | Funktion | Beschreibung |
-|----------|-------------|
-| `exportTableToCSV(tableData, schema, filename)` | Exportiert als CSV |
-| `exportTableToExcel(tableData, schema, filename)` | Exportiert als XLSX |
+|----------|--------------|
+| `validateTableSchema(schema)` | Validiert Tabellen-Schemas inkl. Metadaten |
+| `buildTableExtractionPrompt(schema, lang)` | Erzeugt den content-only KI-Prompt |
+
+### `lib/table-export.js`
+
+| Funktion | Beschreibung |
+|----------|--------------|
+| `exportTableToCSV(tableData, schema, filename)` | Exportiert Metadaten und Tabelle als CSV |
+| `exportTableToExcel(tableData, schema, filename)` | Exportiert als formatierte XLSX-Datei |
 | `exportTableToHTML(tableData, schema)` | Exportiert als HTML-Tabelle |
 
-### table-template-generator.js
+Der Excel-Export schreibt Metadaten oberhalb der Tabelle, setzt eine klare Kopfzeile, berücksichtigt feste Zeilentitel, schützt vor Formel-Injection und erzeugt keine Formeln.
 
-| Funktion | Beschreibung |
-|----------|-------------|
-| `generateSchemaFromDescription(description)` | Generiert Schema aus Text |
-| `buildTableSchemaGeneratorPrompt(description)` | Erzeugt KI-Prompt für Schema-Generierung |
-| `parseGeneratedSchema(aiResponse)` | Parst KI-Antwort zu Schema |
+## API-Integration
 
----
+### Tabellen-Vorlage erstellen
 
-## API Integration
-
-### Templates API
-
-**Erstellen einer Tabellen-Vorlage**:
-```javascript
+```json
 POST /api/templates
 {
-  "name": "Rechnungspositionen",
-  "prompt_text": "...",
+  "name": "Aufmaß Küche",
+  "prompt_text": "Fülle die Tabelle anhand des Diktats.",
   "template_type": "table",
   "table_schema": {
-    "tableName": "Rechnungspositionen",
-    "columns": [...],
-    "calculations": [...]
+    "tableName": "Aufmaß Küche",
+    "metadataFields": [
+      { "key": "datum", "label": "Datum", "type": "date" }
+    ],
+    "rows": [
+      { "key": "wand_1", "label": "Wand 1" }
+    ],
+    "columns": [
+      { "key": "laenge", "label": "Länge", "type": "number" }
+    ]
   }
 }
 ```
 
-### Analyse-Flow
+Serverseitig wird das Schema normalisiert. Nicht erlaubte Berechnungsfelder werden entfernt.
 
-**Analyse mit Tabellen-Vorlage**:
-1. Benutzer wählt Tabellen-Vorlage
-2. System erkennt `template_type === 'table'`
-3. `buildTableExtractionPrompt()` generiert Prompt
-4. KI liefert JSON mit `rows` Array
-5. System speichert mit `analysis_type: 'table'`
-6. Frontend rendert `TableRenderer`
+### Tabellen-Ergebnis speichern
 
----
-
-## Workflow
-
-### 1. Vorlage erstellen
-
-```
-Settings → Verarbeitungstemplates → Tabellen-Verarbeitung
-→ "+ Neue Tabellen-Vorlage"
-```
-
-**Schritte**:
-1. Name eingeben
-2. Spalten definieren (Key, Label, Typ)
-3. Optional: Berechnungen hinzufügen
-4. Speichern
-
-### 2. Transkription
-
-```
-Upload → Tabellen-Vorlage auswählen → Verarbeitung starten
-```
-
-**Ablauf**:
-1. Audio wird transkribiert
-2. KI extrahiert strukturierte Daten
-3. Berechnungen werden durchgeführt
-4. Ergebnis wird als Tabelle angezeigt
-
-### 3. Bearbeitung
-
-**Möglichkeiten**:
-- Einzelne Zellen editieren
-- Zeilen hinzufügen/entfernen
-- Berechnungen werden automatisch aktualisiert
-- Export nach CSV/Excel
-
----
-
-## Fehlerbehandlung
-
-### Schema-Validierung
-
-```javascript
-const validation = validateTableSchema(schema);
-if (!validation.isValid) {
-  // validation.errors enthält Fehlerliste
-  // z.B. "Spalten-Keys müssen eindeutig sein"
+```json
+PATCH /api/transcriptions/:id
+{
+  "tableData": {
+    "metadata": {
+      "datum": "2026-04-28"
+    },
+    "rows": [
+      {
+        "row_key": "wand_1",
+        "laenge": 3.2
+      }
+    ]
+  }
 }
 ```
 
-### KI-Extraktion
+## Workflow
 
-**Falls KI kein valides JSON liefert**:
-- Fallback auf leere Tabelle
-- Fehler wird geloggt
-- Benutzer kann manuell editieren
+### Vorlage erstellen
 
-**Falls Spalten fehlen**:
-- Fehlende Spalten werden mit leeren Werten aufgefüllt
-- Validierung zeigt unvollständige Daten an
+```text
+Einstellungen -> Verarbeitungstemplates -> Tabellen-Verarbeitung
+```
 
----
+1. Neue Tabellen-Vorlage anlegen.
+2. Metadatenfelder definieren.
+3. Spaltentitel definieren.
+4. Optional feste Zeilentitel definieren.
+5. Speichern.
 
-## Performance
+### Verarbeitung
 
-### Optimierungen
+```text
+Upload/OCR/Text -> Tabellen-Vorlage auswählen -> Verarbeitung starten
+```
 
-- **Berechnungen**: Client-seitig via `useMemo`
-- **Export**: Lazy loading der `xlsx` Bibliothek
-- **Editing**: Lokaler State, optionaler Auto-Save
+1. Quelle wird transkribiert oder per OCR erkannt.
+2. KI erhält das Tabellen-Schema.
+3. KI füllt Metadaten und Tabellenzellen.
+4. Ergebnis wird als Tabellenanalyse gespeichert.
 
-### Limits
+### Nachbearbeitung und Export
 
-- Max. 20 Spalten pro Tabelle
-- Max. 1000 Zeilen für Export
-- Formel-Komplexität: Max. 5 Operatoren
+1. Transkriptionsdetail öffnen.
+2. Tabellen-Canvas öffnen.
+3. Metadaten und Zellen korrigieren.
+4. Speichern.
+5. Als Excel, CSV oder HTML exportieren.
 
----
+## Fehlerbehandlung
+
+- Fehlende Metadaten bleiben leer.
+- Fehlende Zellen bleiben leer.
+- Unerwartete Spalten werden nur übernommen, wenn kein Schema vorhanden ist.
+- Bei fest definierten Zeilen werden Werte anhand von `row_key` oder Zeilentitel eingeordnet.
+- Ungültige Schema-Bestandteile werden serverseitig normalisiert.
 
 ## Testing
 
-### Manuelle Tests
+Automatisierte Tests:
 
-1. **Schema-Editor**:
-   - Spalten hinzufügen/entfernen
-   - Reihenfolge ändern
-   - Berechnungen definieren
-
-2. **KI-Extraktion**:
-   - Verschiedene Audio-Dateien
-   - Unterschiedliche Vorlagen
-   - Edge Cases (leere Daten)
-
-3. **Export**:
-   - CSV mit Sonderzeichen
-   - Excel mit Formatierung
-   - HTML mit Styling
-
-### Automatisierte Tests
-
-```javascript
-// Beispiel: Formel-Berechnung
-test('evaluateFormula', () => {
-  expect(evaluateFormula('menge * preis', { menge: 2, preis: 10 })).toBe(20);
-});
-
-// Beispiel: Schema-Validierung
-test('validateTableSchema', () => {
-  const invalidSchema = { tableName: '', columns: [] };
-  expect(validateTableSchema(invalidSchema).isValid).toBe(false);
-});
+```bash
+npm test
 ```
 
----
+Aktuell relevant:
+- Schema-Validierung
+- Prompt-Generierung
+- Metadaten im Prompt
+- Verbot von Berechnungen im Tabellen-Prompt
+- Legacy-Berechnungshelfer als Kompatibilitätstest
 
-## Zukünftige Erweiterungen
+Manuelle QA:
+- Vorlage mit Metadaten, Zeilen und Spalten erstellen
+- Audio-/Text-/OCR-Flow mit Tabellen-Vorlage verarbeiten
+- Tabellen-Canvas öffnen und speichern
+- Excel-Export prüfen
 
-### Geplant
+## Zukünftige Erweiterung
 
-- [ ] **Bedingte Formatierung**: Zellen einfärben basierend auf Werten
-- [ ] **Validierungsregeln**: Min/Max Werte, Pflichtfelder
-- [ ] **Beziehungen**: Referenzen zwischen Tabellen
-- [ ] **Templates teilen**: Import/Export von Vorlagen
-- [ ] **Bulk-Import**: Mehrere Dateien gleichzeitig verarbeiten
-
-### Ideen
-
-- Pivot-Tabellen
-- Diagramme/Charts
-- API-Webhooks für externe Integrationen
-- Kollaboratives Editing
-
----
-
-## Referenzen
-
-- **Code**: `lib/table-calculations.js`, `lib/table-export.js`
-- **Komponenten**: `components/TableSchemaBuilder.js`, `components/TableRenderer.js`
-- **API**: `pages/api/templates/index.js`, `pages/api/templates/[id].js`
-- **Changelog**: `CHANGELOG.md`
+Siehe Konzept: `konzept-automatische-tabellengenerierung-aus-foto.md`.

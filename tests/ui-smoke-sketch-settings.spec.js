@@ -1,1 +1,0 @@
-// This test file has been removed - Infografik feature deleted

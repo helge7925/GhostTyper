@@ -86,11 +86,11 @@ export default async function handler(req, res) {
     }
 
     case 'PATCH': {
-      const { speakers, text, documentHtml, folderId, isFavorite } = req.body;
+      const { speakers, text, documentHtml, tableData, folderId, isFavorite } = req.body;
 
       try {
         const existing = await query(
-          'SELECT id FROM transcriptions WHERE id = $1 AND user_id = $2',
+          'SELECT id, table_schema FROM transcriptions WHERE id = $1 AND user_id = $2',
           [transId, session.user.id]
         );
 
@@ -130,6 +130,44 @@ export default async function handler(req, res) {
           }
           updates.push(`document_html = $${paramIndex++}`);
           values.push(documentHtml);
+        }
+
+        if (tableData !== undefined) {
+          if (!existing.rows[0].table_schema) {
+            return res.status(400).json({ message: 'Diese Transkription enthält keine Tabelle' });
+          }
+          if (!tableData || typeof tableData !== 'object' || Array.isArray(tableData)) {
+            return res.status(400).json({ message: 'tableData muss ein Objekt sein' });
+          }
+          const rows = Array.isArray(tableData.rows)
+            ? tableData.rows.filter((row) => row && typeof row === 'object' && !Array.isArray(row))
+            : null;
+          const metadata = tableData.metadata && typeof tableData.metadata === 'object' && !Array.isArray(tableData.metadata)
+            ? tableData.metadata
+            : {};
+          if (!rows) {
+            return res.status(400).json({ message: 'tableData.rows muss ein Array sein' });
+          }
+
+          const tableAnalysis = {
+            metadata,
+            rows,
+          };
+          const tableMeta = {
+            missing_fields_by_row: Array.isArray(tableData.missing_fields_by_row) ? tableData.missing_fields_by_row : [],
+            missing_metadata_fields: Array.isArray(tableData.missing_metadata_fields) ? tableData.missing_metadata_fields : [],
+          };
+          const serializedAnalysis = JSON.stringify(tableAnalysis);
+          const serializedMeta = JSON.stringify(tableMeta);
+          if (serializedAnalysis.length > MAX_DOCUMENT_HTML_LENGTH || serializedMeta.length > MAX_DOCUMENT_TEXT_LENGTH) {
+            return res.status(400).json({ message: 'Tabellendaten sind zu groß' });
+          }
+          updates.push(`analysis = $${paramIndex++}`);
+          values.push(serializedAnalysis);
+          updates.push(`analysis_meta = $${paramIndex++}`);
+          values.push(serializedMeta);
+          updates.push(`analysis_type = $${paramIndex++}`);
+          values.push('table');
         }
 
         if (folderId !== undefined) {

@@ -6,16 +6,6 @@ import LoadingSpinner from './LoadingSpinner';
 
 const MODE_OPTIONS = [
   {
-    value: 'knowledge_graph',
-    label: 'Wissensgraph',
-    description: 'Entitäten und Beziehungen als Graph',
-  },
-  {
-    value: 'mindmap',
-    label: 'Mindmap',
-    description: 'Hierarchische Struktur mit Haupt- und Unterästen',
-  },
-  {
     value: 'data_table',
     label: 'Datentabelle',
     description: 'Strukturierte Tabelle mit extrahierten Datensätzen',
@@ -34,53 +24,20 @@ const MODEL_OPTIONS = [
   { value: 'mistral-large-latest', label: 'Qualität' },
 ];
 
-function joinPrompt(basePrompt, appendix) {
-  const base = String(basePrompt || '').trim();
-  const extra = String(appendix || '').trim();
-  return [base, extra].filter(Boolean).join('\n\n');
-}
-
-function buildMindmapDetailInstruction(level) {
-  if (level === 'compact') {
-    return [
-      'Mindmap-Inhaltstiefe: KOMPAKT (verbindlich).',
-      'Diese Vorgabe überschreibt allgemeine Mengenregeln.',
-      '- Erzeuge streng nur 8 bis 14 Knoten.',
-      '- Genau 3 bis 5 Hauptäste.',
-      '- Maximale Tiefe: 2 Ebenen unter dem Zentralthema (hauptast -> unterast).',
-      '- Detail-Knoten nur wenn zwingend nötig, maximal 2 insgesamt.',
-      '- Fokus auf Kernideen, keine Beispiele oder Randaspekte.',
-      '- Verwandte Punkte zusammenfassen statt aufzuteilen.',
-    ].join('\n');
-  }
-  return [
-    'Mindmap-Inhaltstiefe: DETAILLIERT (verbindlich).',
-    'Diese Vorgabe überschreibt allgemeine Mengenregeln.',
-    '- Erzeuge 24 bis 32 Knoten.',
-    '- 5 bis 8 Hauptäste.',
-    '- Tiefe: bis zu 3 Ebenen unter dem Zentralthema (hauptast -> unterast -> detail).',
-    '- Für mindestens 60% der Hauptäste mindestens 2 Unteräste.',
-    '- Nutze Detail-Knoten aktiv für Beispiele, Bedingungen, Abhängigkeiten oder Konsequenzen.',
-    '- Inhalte nicht nur aufzählen, sondern logisch in Lernstruktur gliedern.',
-  ].join('\n');
-}
-
 export default function KnowledgePrepWorkspace({
   fixedMode = null,
-  heading = 'Wissensaufbereitung',
+  heading = 'Datentabelle',
   showModeSelector = true,
 }) {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  const [mode, setMode] = useState(fixedMode || 'knowledge_graph');
+  const [mode, setMode] = useState(fixedMode || 'data_table');
   const effectiveMode = fixedMode || mode;
   const [source, setSource] = useState('audio');
   const [error, setError] = useState('');
 
   const [audioStarting, setAudioStarting] = useState(false);
-
-  const [detailLevel, setDetailLevel] = useState('');
 
   const [textInput, setTextInput] = useState('');
   const [textModel, setTextModel] = useState('mistral-large-latest');
@@ -113,12 +70,6 @@ export default function KnowledgePrepWorkspace({
   );
 
   const availableSourceOptions = SOURCE_OPTIONS;
-  const requiresMindmapDetailSelection = effectiveMode === 'mindmap' && !detailLevel;
-
-  const mindmapDetailPrompt = useMemo(
-    () => (effectiveMode === 'mindmap' ? buildMindmapDetailInstruction(detailLevel) : ''),
-    [effectiveMode, detailLevel]
-  );
 
   async function handleAudioSuccess(uploadResult) {
     if (!uploadResult?.id) return;
@@ -142,10 +93,6 @@ export default function KnowledgePrepWorkspace({
 
   async function handleTextSubmit(event) {
     event.preventDefault();
-    if (requiresMindmapDetailSelection) {
-      setError('Bitte zuerst die Inhaltstiefe (Kompakt oder Detailliert) wählen.');
-      return;
-    }
     const trimmedText = textInput.trim();
     if (!trimmedText) {
       setError('Bitte Text eingeben.');
@@ -162,7 +109,7 @@ export default function KnowledgePrepWorkspace({
           template: effectiveMode,
           text: trimmedText,
           model: textModel,
-          customPrompt: joinPrompt(textPrompt, mindmapDetailPrompt),
+          customPrompt: textPrompt,
           analysisFocus: textAnalysisFocus,
         }),
       });
@@ -180,10 +127,6 @@ export default function KnowledgePrepWorkspace({
 
   async function handleDocumentSubmit(event) {
     event.preventDefault();
-    if (requiresMindmapDetailSelection) {
-      setError('Bitte zuerst die Inhaltstiefe (Kompakt oder Detailliert) wählen.');
-      return;
-    }
     if (!documentFile) {
       setError('Bitte eine PDF- oder Bilddatei auswählen.');
       return;
@@ -197,7 +140,7 @@ export default function KnowledgePrepWorkspace({
       formData.append('analyze', 'true');
       formData.append('template', effectiveMode);
       formData.append('model', documentModel);
-      const mergedPrompt = joinPrompt(documentPrompt, mindmapDetailPrompt);
+      const mergedPrompt = documentPrompt.trim();
       if (mergedPrompt) {
         formData.append('customPrompt', mergedPrompt);
       }
@@ -260,49 +203,6 @@ export default function KnowledgePrepWorkspace({
         </div>
       )}
 
-      {effectiveMode === 'mindmap' && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
-            Inhaltstiefe vor Generierung wählen
-          </p>
-          <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-2 inline-flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setDetailLevel('compact');
-                setError('');
-              }}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                detailLevel === 'compact'
-                  ? 'bg-accent-orange/20 text-accent-orange border border-accent-orange/30'
-                  : 'text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              Kompakt (8-14 Knoten)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setDetailLevel('detailed');
-                setError('');
-              }}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                detailLevel === 'detailed'
-                  ? 'bg-accent-orange/20 text-accent-orange border border-accent-orange/30'
-                  : 'text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              Detailliert (24-32 Knoten)
-            </button>
-          </div>
-          {requiresMindmapDetailSelection && (
-            <p className="text-xs text-accent-orange">
-              Ohne Auswahl wird keine Mindmap gestartet.
-            </p>
-          )}
-        </div>
-      )}
-
       <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-2 inline-flex gap-2">
         {availableSourceOptions.map((option) => (
           <button
@@ -326,26 +226,19 @@ export default function KnowledgePrepWorkspace({
           <p className="text-xs text-text-secondary mb-4">
             Lädt Audio hoch und startet direkt die Verarbeitung. Danach wird die Detailseite geöffnet.
           </p>
-          {requiresMindmapDetailSelection ? (
-            <div className="text-xs text-accent-orange bg-accent-orange/10 border border-accent-orange/20 rounded-xl px-3 py-2">
-              Bitte zuerst oben die Inhaltstiefe wählen.
-            </div>
-          ) : (
-            <AudioUploadForm
-              key={`audio-${effectiveMode}-${detailLevel}`}
-              onSuccess={handleAudioSuccess}
-              lockTemplate
-              templateLabel={modeMeta.label}
-              presetConfig={{
-                uploadMode: 'file',
-                autoAnalyze: true,
-                diarize: false,
-                template: effectiveMode,
-                model: 'mistral-large-latest',
-                customPrompt: mindmapDetailPrompt,
-              }}
-            />
-          )}
+          <AudioUploadForm
+            key={`audio-${effectiveMode}`}
+            onSuccess={handleAudioSuccess}
+            lockTemplate
+            templateLabel={modeMeta.label}
+            presetConfig={{
+              uploadMode: 'file',
+              autoAnalyze: true,
+              diarize: false,
+              template: effectiveMode,
+              model: 'mistral-large-latest',
+            }}
+          />
           {audioStarting && (
             <p className="text-xs text-accent-cyan mt-3">Verarbeitung wird gestartet…</p>
           )}
@@ -397,7 +290,7 @@ export default function KnowledgePrepWorkspace({
           </div>
           <button
             type="submit"
-            disabled={textSubmitting || requiresMindmapDetailSelection}
+            disabled={textSubmitting}
             className="gradient-accent text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-accent-orange/20 disabled:opacity-40"
           >
             {textSubmitting ? 'Wird erzeugt…' : `${modeMeta.label} aus Text erzeugen`}
@@ -481,7 +374,7 @@ export default function KnowledgePrepWorkspace({
           </div>
           <button
             type="submit"
-            disabled={documentSubmitting || requiresMindmapDetailSelection}
+            disabled={documentSubmitting}
             className="gradient-accent text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-accent-orange/20 disabled:opacity-40"
           >
             {documentSubmitting ? 'Wird verarbeitet…' : `${modeMeta.label} aus PDF/Bild erzeugen`}

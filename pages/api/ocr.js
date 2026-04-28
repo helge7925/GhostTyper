@@ -13,7 +13,7 @@ import {
   checkCostLimit,
   withUserCostLock,
 } from '../../lib/usage';
-import { ACCEPTED_OCR_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE } from '../../lib/constants';
+import { ACCEPTED_OCR_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE, normalizeAnalysisTemplate } from '../../lib/constants';
 import { resolveChatModel } from '../../lib/model-policy';
 import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
@@ -22,6 +22,7 @@ import { resolveTemplate } from '../../lib/template-service';
 import { scanFileForViruses } from '../../lib/virus-scan';
 import { detectOcrMimeType, extensionFromDetectedMime } from '../../lib/file-signature';
 import { normalizeDataTableAnalysis } from '../../lib/data-table';
+import { normalizeAndValidateTableAnalysis } from '../../lib/table-analysis';
 
 export const config = {
   api: {
@@ -124,7 +125,7 @@ export default async function handler(req, res) {
     }
 
     const shouldAnalyze = (fields.analyze?.[0] || fields.analyze) === 'true';
-    const template = fields.template?.[0] || fields.template || 'generic';
+    const template = normalizeAnalysisTemplate(fields.template?.[0] || fields.template || 'generic');
     const customPrompt = fields.customPrompt?.[0] || fields.customPrompt || '';
     const analysisFocus = fields.analysisFocus?.[0] || fields.analysisFocus || '';
     const documentScope = fields.documentScope?.[0] || fields.documentScope || '';
@@ -170,6 +171,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Ungültiges KI-Modell' });
     }
 
+    let resolvedTemplateForAnalysis = null;
     const { markdown, analysis, selectedModelForSave } = await withUserCostLock(session.user.id, async () => {
       const costCheck = await checkCostLimit(session.user.id);
       if (!costCheck.allowed) {
@@ -187,10 +189,10 @@ export default async function handler(req, res) {
         };
       }
 
-      const resolvedTemplate = await resolveTemplate(template, session.user.id);
+      resolvedTemplateForAnalysis = await resolveTemplate(template, session.user.id);
       const analysisResult = await analyzeTranscription(
         markdownValue,
-        resolvedTemplate,
+        resolvedTemplateForAnalysis,
         apiKey,
         effectiveCustomPrompt,
         selectedModelForAnalysis,
@@ -210,7 +212,19 @@ export default async function handler(req, res) {
     let analysisMeta = null;
     let tableSchema = null;
 
-    if (shouldAnalyze && template === 'data_table' && analysis) {
+    if (shouldAnalyze && resolvedTemplateForAnalysis?.template_type === 'table' && resolvedTemplateForAnalysis?.table_schema && analysis) {
+      const tableAnalysis = normalizeAndValidateTableAnalysis(analysis, resolvedTemplateForAnalysis.table_schema);
+      analysisType = 'table';
+      analysisPayload = { metadata: tableAnalysis.metadata, rows: tableAnalysis.rows };
+      analysisMeta = {
+        missing_fields_by_row: tableAnalysis.missing_fields_by_row,
+        missing_metadata_fields: tableAnalysis.missing_metadata_fields,
+        unvollstaendige_daten: tableAnalysis.unvollstaendige_daten,
+        extrahierte_zeilen_anzahl: tableAnalysis.extrahierte_zeilen_anzahl,
+        zusammenfassung: tableAnalysis.zusammenfassung,
+      };
+      tableSchema = resolvedTemplateForAnalysis.table_schema;
+    } else if (shouldAnalyze && template === 'data_table' && analysis) {
       const tableAnalysis = normalizeDataTableAnalysis(analysis, language);
       analysisType = 'table';
       analysisPayload = { rows: tableAnalysis.rows };
@@ -230,7 +244,7 @@ export default async function handler(req, res) {
         filePath,
         file.size,
         detectedMimeType,
-        fields.template?.[0] || fields.template || 'generic',
+        template,
         selectedModelForSave,
         effectiveCustomPrompt,
         markdown,

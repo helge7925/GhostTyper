@@ -1,6 +1,6 @@
 # GhostTyper Dokumentation
 
-Stand: 2026-03-08
+Stand: 2026-04-28
 
 ## Start hier
 
@@ -28,15 +28,26 @@ Stand: 2026-03-08
 ### Datentabelle + Dashboard API-Status
 - Neue Seite: `/datentabelle`
 - Extraktion als Datentabelle aus Audio, Text und OCR
-- Dashboard zeigt API-Status separat für Mistral und Google
 - Rollout-/Abnahmedetails: `datentabelle-rollout-2026-03-08.md`
 
 ### Settings & Migration
-- Neues Settings-Feld in der UI: **Google API-Key (Gemini)**
-- Neue DB-Spalten in `settings`:
-  - `google_api_key`
-  - `google_api_key_encrypted`
-  - `member_monthly_budget_limit`
+- Neues Settings-Feld in der UI: Mitglieder-Budgetlimit
+- Neue DB-Spalte in `settings`: `member_monthly_budget_limit`
+
+## Update (2026-04-28)
+
+### Funktionsbereinigung
+- Entfernt: Echtzeitverarbeitung, Wissensgraph, Mindmap, Infografik/Sketch, Text-Assistent und Workflow-Seiten.
+- Google/Gemini-Key-Verwaltung wurde aus UI, API und Abhängigkeiten entfernt.
+- Die aktive App konzentriert sich auf Upload/OCR, Transkription, Übersetzung, Zusammenfassung, Datentabellen, Editor und Export.
+
+### Tabellen-Vorlagen und Excel-Export
+- Tabellen-Vorlagen sind content-only: keine Berechnungen, Formeln oder Summen durch das KI-Modell.
+- Neuer Excel-artiger Editor für Metadaten, Spaltentitel und Zeilentitel in den Einstellungen.
+- Befüllte Tabellen sind in der Transkriptionsdetailansicht in einem Canvas-artigen Tabelleneditor bearbeitbar.
+- Export nach CSV, HTML und sauber formatiertem Excel (`.xlsx`) mit Metadaten oberhalb der Tabelle.
+- Technische Details: `TABLE_TEMPLATES.md`
+- Konzept nächste Ausbaustufe: `konzept-automatische-tabellengenerierung-aus-foto.md`
 
 ## Reviews & Prioritäten
 
@@ -60,6 +71,8 @@ Stand: 2026-03-08
 
 - Features (Kurzfassung im README): `../README.md`
 - Feature-Index/Weiterführende Links: `features-and-improvements.md`
+- Tabellen-Vorlagen: `TABLE_TEMPLATES.md`
+- Konzept Foto-zu-Tabellenvorlage: `konzept-automatische-tabellengenerierung-aus-foto.md`
 - Audio-Flow: `audio-upload.md`
 - KI-Integration: `ai-integration.md`
 

@@ -6,9 +6,7 @@ import { recommendModelPlan } from '../../lib/model-assistant';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 
 const ALLOWED_TASK_TYPES = new Set([
-  'text-ai',
   'translation',
-  'workflow',
   'transcription-analysis',
 ]);
 
@@ -36,7 +34,6 @@ export default async function handler(req, res) {
       goal,
       inputText,
       fileSizeBytes,
-      workflowSteps,
       includePostAnalysis,
     } = req.body || {};
 
@@ -52,7 +49,6 @@ export default async function handler(req, res) {
       goal,
       inputText,
       fileSizeBytes,
-      workflowSteps,
       includePostAnalysis: includePostAnalysis === true,
       preferredModel: settings?.preferred_model || null,
       currentCost: cost.currentCost,
