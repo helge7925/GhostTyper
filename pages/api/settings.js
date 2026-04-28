@@ -4,7 +4,6 @@ import pool from '../../lib/db';
 import {
   getSettingsRow,
   hasStoredApiKey,
-  hasStoredGoogleApiKey,
   serializeApiKeyForStorage,
 } from '../../lib/settings-service';
 import { normalizeDefaultTemplate } from '../../lib/constants';
@@ -86,7 +85,6 @@ export default async function handler(req, res) {
         if (!settings) {
           return res.status(200).json({
             apiKeyConfigured: false,
-            googleApiKeyConfigured: false,
             defaultTemplate: 'generic',
             language: 'de',
             contextBias: '',
@@ -100,7 +98,6 @@ export default async function handler(req, res) {
 
         return res.status(200).json({
           apiKeyConfigured: hasStoredApiKey(settings),
-          googleApiKeyConfigured: hasStoredGoogleApiKey(settings),
           defaultTemplate: normalizeDefaultTemplate(settings.default_template),
           language: settings.language,
           contextBias: normalizeContextBias(settings.context_bias).value || '',
@@ -117,7 +114,6 @@ export default async function handler(req, res) {
         const body = req.body || {};
         const {
           mistralApiKey,
-          googleApiKey,
           defaultTemplate,
           language,
           contextBias,
@@ -138,8 +134,6 @@ export default async function handler(req, res) {
 
         const shouldUpdateApiKey = hasOwnValue(body, 'mistralApiKey');
         const shouldClearApiKey = shouldUpdateApiKey && (mistralApiKey === null || mistralApiKey === '');
-        const shouldUpdateGoogleApiKey = hasOwnValue(body, 'googleApiKey');
-        const shouldClearGoogleApiKey = shouldUpdateGoogleApiKey && (googleApiKey === null || googleApiKey === '');
         const shouldUpdateDefaultTemplate = hasOwnValue(body, 'defaultTemplate');
         const shouldUpdateLanguage = hasOwnValue(body, 'language');
         const shouldUpdateContextBias = hasOwnValue(body, 'contextBias');
@@ -173,7 +167,6 @@ export default async function handler(req, res) {
         const client = await pool.connect();
         const auditFlags = {
           apiKeyChanged: shouldUpdateApiKey,
-          googleApiKeyChanged: shouldUpdateGoogleApiKey,
           preferredModelChanged: shouldUpdatePreferredModel,
           costLimitChanged: shouldUpdateCostLimit,
           memberBudgetChanged: shouldUpdateMemberMonthlyBudgetLimit,
@@ -198,13 +191,6 @@ export default async function handler(req, res) {
               : serializeApiKeyForStorage(String(mistralApiKey).trim());
             addUpdate(updates, values, 'mistral_api_key', apiKeyPayload.plainApiKey);
             addUpdate(updates, values, 'mistral_api_key_encrypted', apiKeyPayload.encryptedApiKey);
-          }
-          if (shouldUpdateGoogleApiKey) {
-            const googleApiKeyPayload = shouldClearGoogleApiKey
-              ? { encryptedApiKey: null, plainApiKey: null }
-              : serializeApiKeyForStorage(String(googleApiKey).trim());
-            addUpdate(updates, values, 'google_api_key', googleApiKeyPayload.plainApiKey);
-            addUpdate(updates, values, 'google_api_key_encrypted', googleApiKeyPayload.encryptedApiKey);
           }
 
           if (shouldUpdateDefaultTemplate) {

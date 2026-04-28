@@ -163,12 +163,6 @@ Abgedeckt ist aktuell:
   - `docker compose -f config/docker-compose.dev.yml up -d --build transkription-webapp` -> erfolgreich.
 - API-Health:
   - `GET /api/health` -> `200`.
-- UI-Smoke (neu für Sketch + Settings):
-  - `npx playwright test tests/ui-smoke-sketch-settings.spec.js --reporter=line --workers=1` -> erfolgreich.
-  - Ergebnis: `2 passed`.
-  - Abgedeckt:
-    - Desktop: Login, `/settings?tab=account`, `/sketch`.
-    - Mobile (`iPhone 13`): Sidebar-Navigation, `/sketch`, `/settings?tab=account`.
 
 ## 9. Referenzen
 
@@ -179,4 +173,4 @@ Abgedeckt ist aktuell:
 - `external-review-2026-02-12.md`
 - `code-review-priorities-p0-p3-2026-02-12.md`
 - `features-and-improvements.md`
-- `sketch-summary-rollout-2026-03-08.md`
+

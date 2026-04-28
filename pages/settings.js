@@ -72,7 +72,6 @@ export default function Settings() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [apiKey, setApiKey] = useState('');
-  const [googleApiKey, setGoogleApiKey] = useState('');
   const [defaultTemplate, setDefaultTemplate] = useState('generic');
   const [language, setLanguage] = useState('de');
   const [contextBias, setContextBias] = useState('');
@@ -82,10 +81,8 @@ export default function Settings() {
   const [defaultTranslateLanguage, setDefaultTranslateLanguage] = useState('en');
   const [ocrModel, setOcrModel] = useState('mistral-ocr-latest');
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
-  const [googleApiKeyConfigured, setGoogleApiKeyConfigured] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isClearingMistralKey, setIsClearingMistralKey] = useState(false);
-  const [isClearingGoogleKey, setIsClearingGoogleKey] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -176,7 +173,6 @@ export default function Settings() {
         ]);
 
         setApiKeyConfigured(settingsData.apiKeyConfigured);
-        setGoogleApiKeyConfigured(Boolean(settingsData.googleApiKeyConfigured));
         setDefaultTemplate(normalizeDefaultTemplate(settingsData.defaultTemplate));
         setLanguage(settingsData.language || 'de');
         setContextBias(settingsData.contextBias || '');
@@ -227,7 +223,6 @@ export default function Settings() {
       };
 
       if (apiKey !== '') payload.mistralApiKey = apiKey;
-      if (googleApiKey !== '') payload.googleApiKey = googleApiKey;
 
       await updateSettings(payload);
 
@@ -235,10 +230,6 @@ export default function Settings() {
       if (apiKey) {
         setApiKeyConfigured(true);
         setApiKey('');
-      }
-      if (googleApiKey) {
-        setGoogleApiKeyConfigured(true);
-        setGoogleApiKey('');
       }
       setTimeout(() => setSaved(false), 3000);
     } catch {
@@ -260,21 +251,6 @@ export default function Settings() {
       showToast('Mistral API-Key konnte nicht entfernt werden.', 'error');
     } finally {
       setIsClearingMistralKey(false);
-    }
-  }
-
-  async function handleClearGoogleApiKey() {
-    if (!googleApiKeyConfigured && !googleApiKey.trim()) return;
-    setIsClearingGoogleKey(true);
-    try {
-      await updateSettings({ googleApiKey: '' });
-      setGoogleApiKey('');
-      setGoogleApiKeyConfigured(false);
-      showToast('Google API-Key wurde entfernt.', 'success');
-    } catch {
-      showToast('Google API-Key konnte nicht entfernt werden.', 'error');
-    } finally {
-      setIsClearingGoogleKey(false);
     }
   }
 
@@ -1372,29 +1348,6 @@ export default function Settings() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-text-secondary mb-1.5">Google API-Key (Gemini)</label>
-                      <input
-                        type="password"
-                        value={googleApiKey}
-                        onChange={e => setGoogleApiKey(e.target.value)}
-                        placeholder={googleApiKeyConfigured ? '••••••••••••••••' : 'Key eingeben'}
-                        className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none focus:ring-1 focus:ring-accent-orange"
-                      />
-                      <div className="mt-2 flex items-center justify-between gap-3">
-                        <span className={`text-[11px] ${googleApiKeyConfigured ? 'text-accent-green' : 'text-text-secondary'}`}>
-                          {googleApiKeyConfigured ? 'API-Key hinterlegt' : 'Kein API-Key hinterlegt'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={handleClearGoogleApiKey}
-                          disabled={isClearingGoogleKey || isSavingSettings || !googleApiKeyConfigured}
-                          className="text-[11px] text-accent-red hover:text-red-300 disabled:opacity-40"
-                        >
-                          {isClearingGoogleKey ? 'Entferne...' : 'Key entfernen'}
-                        </button>
-                      </div>
-                    </div>
-                    <div>
                       <label className="block text-xs font-medium text-text-secondary mb-1.5">Monatliches Kostenlimit (€)</label>
                       <input type="number" value={costLimit} onChange={e => setCostLimit(e.target.value)} placeholder="Kein Limit" className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none" />
                     </div>
@@ -1412,7 +1365,7 @@ export default function Settings() {
                 </div>
                 <button
                   onClick={handleSaveSettings}
-                  disabled={isSavingSettings || isClearingMistralKey || isClearingGoogleKey}
+                  disabled={isSavingSettings || isClearingMistralKey}
                   className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent-orange/20 transition-all hover:scale-[1.01] disabled:opacity-40"
                 >
                   {isSavingSettings ? 'Speichert...' : 'Speichern'}

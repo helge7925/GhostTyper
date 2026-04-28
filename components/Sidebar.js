@@ -68,16 +68,7 @@ const NAV_LINKS = [
     )
   },
   {
-    href: '/infografik',
-    label: 'Infografik',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20h9M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
-      </svg>
-    )
-  },
-  { 
-    href: '/text-ai', 
+    href: '/text-ai',
     label: 'Text-Assistent', 
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

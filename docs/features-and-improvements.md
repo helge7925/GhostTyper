@@ -14,8 +14,6 @@ Dieses Dokument ist bewusst kurz gehalten. Der produktnahe Feature-Überblick st
   - Auto-Glossar (Vorschläge aus eigener Historie)
   - Intelligente Modellauswahl mit Kostenvorschau vor Start
   - 1-Klick-Workflows im Text-Assistenten
-  - Sketch Summary (`/sketch`) als direkt generierte PNG-Lernübersicht via Gemini
-  - Lernskizze UX-Optimierungen (klarere Ladezustände, mobile-safe Toasts, Download-Schutz während Generierung)
   - Workflow-Editor mit Versionierung/Rollback
   - Budget-Guardrails + Traffic-Light vor Start
   - Team-Realtime-Finalisierung + Audit-Log + Upload-Sicherheits-Hook

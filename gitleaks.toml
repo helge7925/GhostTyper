@@ -1,13 +1,28 @@
 title = "Gitleaks config"
 
-[allowlist]
-  description = "Ignore placeholder values in documentation"
+[extend]
+  useDefault = true
+
+[[allowlists]]
+  description = "Ignore documented placeholder credentials and example auth headers"
+  targetRules = [
+    "generic-api-key",
+    "curl-auth-header",
+  ]
   regexes = [
     '''your-api-key''',
+    '''api-key-here''',
+    '''neuer-api-key-here''',
+    '''Bearer <token>''',
+    '''jwt\.token\.here''',
+    '''expired\.jwt\.token''',
+    '''new\.jwt\.token''',
+    '''AIza\.\.\.''',
     '''<separater-secret>''',
     '''<starkes-passwort>''',
     '''<openssl rand''',
   ]
   paths = [
-    '''docs/.*\.md''',
+    '''docs/vps-deployment-guide\.md''',
+    '''docs/api-specification\.md''',
   ]

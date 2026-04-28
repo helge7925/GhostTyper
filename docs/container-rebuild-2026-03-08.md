@@ -4,7 +4,7 @@ Stand: 2026-03-08
 
 ## Ziel
 
-Dokumentation des erneuten Dev-Container-Rebuilds nach den Infografik-/Pipeline-Anpassungen.
+Dokumentation des erneuten Dev-Container-Rebuilds nach den Anpassungen.
 
 ## Ausgeführte Kommandos
 
@@ -28,17 +28,10 @@ curl -sS -i http://localhost:3000/api/health
 
 - App-Build in Docker erfolgreich durchgelaufen.
 - Relevante Routen enthalten u. a.:
-  - `/sketch`
-  - `/infografik`
   - `/datentabelle`
   - `/realtime`
-  - `POST /api/sketch-summary`
 
 ## Zugehoerige Fachdokumentation
 
-- Rollout/Architektur Infografik:
-  - `docs/sketch-summary-rollout-2026-03-08.md`
-- API-Details:
-  - `docs/api-specification.md` (`POST /api/sketch-summary`)
 - Changelog:
   - `CHANGELOG.md` (`[Unreleased]`)
