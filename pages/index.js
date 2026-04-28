@@ -140,7 +140,7 @@ export default function Home() {
               {welcomeLine}
             </p>
             <p className="mt-2 text-sm text-text-secondary max-w-2xl">
-              Starten Sie direkt mit Transkription, OCR, Übersetzung oder Infografik.
+              Starten Sie direkt mit Transkription, OCR oder Übersetzung.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -152,12 +152,6 @@ export default function Home() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
-              </Link>
-              <Link
-                href="/infografik"
-                className="inline-flex items-center gap-2 border border-white/[0.14] text-text-primary px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/[0.05] transition-colors"
-              >
-                Infografik öffnen
               </Link>
               <Link
                 href="/settings?tab=transcription"
@@ -216,12 +210,6 @@ export default function Home() {
             <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Mistral API</p>
             <p className={`text-sm mt-2 ${settingsInfo?.apiKeyConfigured ? 'text-accent-green' : 'text-text-secondary'}`}>
               {settingsInfo?.apiKeyConfigured ? 'Konfiguriert' : 'Nicht konfiguriert'}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.08] bg-dark-card px-5 py-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Google API</p>
-            <p className={`text-sm mt-2 ${settingsInfo?.googleApiKeyConfigured ? 'text-accent-green' : 'text-text-secondary'}`}>
-              {settingsInfo?.googleApiKeyConfigured ? 'Konfiguriert' : 'Nicht konfiguriert'}
             </p>
           </div>
         </section>

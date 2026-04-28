@@ -22,46 +22,6 @@
 
 ## Aktuelle Ergänzungen (2026-03-08)
 
-### POST `/api/sketch-summary`
-**Beschreibung**: Erzeugt aus Lerntext eine Lernskizze als vektorbasiertes SVG über eine mehrstufige Pipeline (Semantik -> Illustrationsplanung -> Rendering).
-**Auth**: Session erforderlich (NextAuth)
-
-**Request**:
-```json
-{
-  "text": "Lerninhalt als Freitext",
-  "layoutMode": "auto|timeline|process_flow|comparison|mindmap|topic_tree",
-  "detailLevel": "compact|standard|detailed",
-  "illustrationStyle": "editorial|technical|minimal",
-  "focus": "Optionaler Fokus"
-}
-```
-
-**Response (200)**:
-```json
-{
-  "imageBase64": "PHN2ZyB4bWxucz0i...",
-  "mimeType": "image/svg+xml",
-  "fallback": false,
-  "notice": "",
-  "layout": "timeline",
-  "illustrationStyle": "editorial",
-  "blocks": 10,
-  "illustrations": 10
-}
-```
-
-**Fehler**:
-- `400`: Text fehlt/zu lang oder Fokus zu lang
-- `429`: Kostenlimit erreicht
-- `503`: Kostenprüfung temporär nicht verfügbar
-- `401`: Nicht authentifiziert
-
-Hinweise:
-- Rate-Limit: `20` Requests pro Minute und User.
-- Key-Auflösung: zuerst User-Settings (`google_api_key*`), danach Fallback auf `GEMINI_API_KEY`.
-- Bei Provider-/Quota-/Berechtigungsproblemen wird ein lokaler Fallback ausgegeben (`fallback: true`, HTTP `200`).
-
 ### GET `/api/settings`
 **Beschreibung**: Lädt benutzerbezogene App- und API-Key-Settings.
 **Auth**: Session erforderlich

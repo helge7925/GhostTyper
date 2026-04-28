@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
   switch (req.method) {
     case 'PUT': {
-      const { email, name, password, role, mistralApiKey, googleApiKey, costLimit } = req.body;
+      const { email, name, password, role, mistralApiKey, costLimit } = req.body;
       const shouldUpdateEmail = email !== undefined;
       const normalizedEmail = shouldUpdateEmail ? normalizeEmail(email) : null;
       if (password) {
@@ -40,8 +40,6 @@ export default async function handler(req, res) {
       const shouldUpdateCostLimit = costLimit !== undefined;
       const shouldUpdateApiKey = mistralApiKey !== undefined;
       const shouldClearApiKey = shouldUpdateApiKey && (mistralApiKey === null || mistralApiKey === '');
-      const shouldUpdateGoogleApiKey = googleApiKey !== undefined;
-      const shouldClearGoogleApiKey = shouldUpdateGoogleApiKey && (googleApiKey === null || googleApiKey === '');
 
       let normalizedCostLimit = null;
       if (shouldUpdateCostLimit && costLimit !== null && costLimit !== '') {
@@ -58,9 +56,6 @@ export default async function handler(req, res) {
         await client.query('BEGIN');
         const apiKeyPayload = shouldUpdateApiKey && !shouldClearApiKey
           ? serializeApiKeyForStorage(String(mistralApiKey).trim())
-          : { plainApiKey: null, encryptedApiKey: null };
-        const googleApiKeyPayload = shouldUpdateGoogleApiKey && !shouldClearGoogleApiKey
-          ? serializeApiKeyForStorage(String(googleApiKey).trim())
           : { plainApiKey: null, encryptedApiKey: null };
 
         const existing = await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
@@ -119,41 +114,29 @@ export default async function handler(req, res) {
           );
         }
 
-        if (shouldUpdateApiKey || shouldUpdateGoogleApiKey || shouldUpdateCostLimit) {
+        if (shouldUpdateApiKey || shouldUpdateCostLimit) {
           await client.query(
             `INSERT INTO settings (
                user_id,
                mistral_api_key,
                mistral_api_key_encrypted,
-               google_api_key,
-               google_api_key_encrypted,
                cost_limit,
                updated_at
              )
-             VALUES ($1, $2, $3, $4, $5, $6, NOW())
+             VALUES ($1, $2, $3, $4, NOW())
              ON CONFLICT (user_id) DO UPDATE SET
                mistral_api_key = CASE
-                 WHEN $7 THEN NULL
-                 WHEN $8 THEN $2
+                 WHEN $5 THEN NULL
+                 WHEN $6 THEN $2
                  ELSE settings.mistral_api_key
                END,
                mistral_api_key_encrypted = CASE
-                 WHEN $7 THEN NULL
-                 WHEN $8 THEN $3
+                 WHEN $5 THEN NULL
+                 WHEN $6 THEN $3
                  ELSE settings.mistral_api_key_encrypted
                END,
-               google_api_key = CASE
-                 WHEN $9 THEN NULL
-                 WHEN $10 THEN $4
-                 ELSE settings.google_api_key
-               END,
-               google_api_key_encrypted = CASE
-                 WHEN $9 THEN NULL
-                 WHEN $10 THEN $5
-                 ELSE settings.google_api_key_encrypted
-               END,
                cost_limit = CASE
-                 WHEN $11 THEN $6
+                 WHEN $7 THEN $4
                  ELSE settings.cost_limit
                END,
                updated_at = NOW()`,
@@ -161,13 +144,9 @@ export default async function handler(req, res) {
               userId,
               apiKeyPayload.plainApiKey,
               apiKeyPayload.encryptedApiKey,
-              googleApiKeyPayload.plainApiKey,
-              googleApiKeyPayload.encryptedApiKey,
               normalizedCostLimit,
               shouldClearApiKey,
               shouldUpdateApiKey,
-              shouldClearGoogleApiKey,
-              shouldUpdateGoogleApiKey,
               shouldUpdateCostLimit,
             ]
           );
@@ -177,7 +156,6 @@ export default async function handler(req, res) {
         const result = await client.query(
           `SELECT u.id, u.email, u.name, u.role, u.created_at,
                   (s.mistral_api_key IS NOT NULL OR s.mistral_api_key_encrypted IS NOT NULL) AS api_key_configured,
-                  (s.google_api_key IS NOT NULL OR s.google_api_key_encrypted IS NOT NULL) AS google_api_key_configured,
                   s.preferred_model, s.cost_limit
            FROM users u
            LEFT JOIN settings s ON s.user_id = u.id

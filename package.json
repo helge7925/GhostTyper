@@ -16,29 +16,30 @@
   },
   "dependencies": {
     "@google/genai": "^1.44.0",
-    "axios": "^1.4.0",
+    "axios": "^1.15.2",
     "bcryptjs": "^2.4.3",
     "docx": "^8.2.2",
-    "dompurify": "^3.3.1",
+    "dompurify": "^3.4.1",
+    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "fluent-ffmpeg": "^2.1.2",
     "formidable": "^3.5.1",
     "marked": "^17.0.1",
     "next": "^13.4.0",
-    "next-auth": "^4.22.1",
+    "next-auth": "^4.24.14",
     "pg": "^8.11.0",
+    "protobufjs": "^7.5.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "vis-data": "^8.0.3",
-    "vis-network": "^10.0.2",
-    "exceljs": "^4.4.0"
+    "vis-network": "^10.0.2"
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",
     "autoprefixer": "^10.4.14",
     "eslint": "^8.40.0",
     "eslint-config-next": "^13.4.0",
-    "postcss": "^8.4.24",
+    "postcss": "^8.5.12",
     "tailwindcss": "^3.3.2"
   }
 }

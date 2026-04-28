@@ -25,17 +25,6 @@ Stand: 2026-03-08
 
 ## Update (2026-03-08)
 
-### Sketch Summary mit Gemini
-- Neue Seite: `/sketch`
-- API: `POST /api/sketch-summary`
-- Modellgestützte Mehrstufen-Pipeline:
-  - Struktur-JSON (Semantik)
-  - Illustrationsplanung
-  - deterministisches SVG-Rendering
-- Ausgabe: Vektor-SVG (Base64), Querformat
-- Rollout-/Abnahmedetails: `sketch-summary-rollout-2026-03-08.md`
-- Container-Rebuild-Log: `container-rebuild-2026-03-08.md`
-
 ### Datentabelle + Dashboard API-Status
 - Neue Seite: `/datentabelle`
 - Extraktion als Datentabelle aus Audio, Text und OCR
