@@ -3,7 +3,7 @@ import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE, normalizeDefaultTemplate } from '.
 import { uploadAudio, getTemplates, getSettings } from '../lib/api';
 import AudioRecorder from './AudioRecorder';
 
-const BUILTIN_TEMPLATE_VALUES = new Set(['generic', 'meeting', 'aufmass', 'knowledge_graph', 'mindmap', 'data_table']);
+const BUILTIN_TEMPLATE_VALUES = new Set(['generic', 'meeting', 'aufmass', 'data_table']);
 const ALLOWED_CHAT_MODELS = new Set(['mistral-small-latest', 'mistral-medium-latest', 'mistral-large-latest']);
 const ALLOWED_UPLOAD_MODES = new Set(['file', 'record']);
 

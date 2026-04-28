@@ -1,9 +1,10 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
-import { MAX_TEMPLATE_NAME_LENGTH, MAX_TEXT_TASK_PROMPT_LENGTH } from '../../../lib/constants';
+import { MAX_TEMPLATE_NAME_LENGTH, MAX_TEMPLATE_PROMPT_LENGTH } from '../../../lib/constants';
 import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
 import { validateTableSchema } from '../../../lib/table-calculations';
+import { normalizeTableSchema } from '../../../lib/table-schema';
 
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions);
@@ -53,25 +54,28 @@ export default async function handler(req, res) {
       if (normalizedName.length > MAX_TEMPLATE_NAME_LENGTH) {
         return res.status(400).json({ message: `Vorlagenname ist zu lang (max. ${MAX_TEMPLATE_NAME_LENGTH} Zeichen)` });
       }
-      if (normalizedPrompt.length > MAX_TEXT_TASK_PROMPT_LENGTH) {
-        return res.status(400).json({ message: `Prompt ist zu lang (max. ${MAX_TEXT_TASK_PROMPT_LENGTH} Zeichen)` });
+      if (normalizedPrompt.length > MAX_TEMPLATE_PROMPT_LENGTH) {
+        return res.status(400).json({ message: `Prompt ist zu lang (max. ${MAX_TEMPLATE_PROMPT_LENGTH} Zeichen)` });
       }
 
       // Validate template_type
       if (!['text', 'table'].includes(template_type)) {
         return res.status(400).json({ message: 'Ungültiger Vorlagen-Typ' });
       }
+      let tableSchemaForSave = null;
       if (template_type === 'table') {
         if (!table_schema || typeof table_schema !== 'object') {
           return res.status(400).json({ message: 'Tabellen-Schema ist erforderlich' });
         }
-        const schemaValidation = validateTableSchema(table_schema);
+        const normalizedTableSchema = normalizeTableSchema(table_schema);
+        const schemaValidation = validateTableSchema(normalizedTableSchema);
         if (!schemaValidation.isValid) {
           return res.status(400).json({
             message: 'Ungültiges Tabellen-Schema',
             errors: schemaValidation.errors,
           });
         }
+        tableSchemaForSave = normalizedTableSchema;
       }
 
       try {
@@ -79,7 +83,7 @@ export default async function handler(req, res) {
           `INSERT INTO templates (user_id, name, prompt_text, template_type, table_schema, category_id)
            VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING *`,
-          [userId, normalizedName, normalizedPrompt, template_type, table_schema, category_id]
+          [userId, normalizedName, normalizedPrompt, template_type, tableSchemaForSave, category_id]
         );
         return res.status(201).json(result.rows[0]);
       } catch (error) {

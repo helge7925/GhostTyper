@@ -15,7 +15,6 @@
     "migrate-api-keys": "node scripts/migrate-api-keys.js"
   },
   "dependencies": {
-    "@google/genai": "^1.44.0",
     "axios": "^1.15.2",
     "bcryptjs": "^2.4.3",
     "docx": "^8.2.2",
@@ -30,9 +29,7 @@
     "pg": "^8.11.0",
     "protobufjs": "^7.5.6",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "vis-data": "^8.0.3",
-    "vis-network": "^10.0.2"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",

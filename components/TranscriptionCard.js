@@ -7,7 +7,6 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
   const date = created_at || createdAt;
 
   const isOCR = mime_type?.startsWith('image/') || mime_type === 'application/pdf';
-  const isTextAssistant = template === 'text-assistant';
   const isTranslation = template === 'translation';
   const templateLabel = template === 'generic'
     ? 'Zusammenfassung'
@@ -15,12 +14,8 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
       ? 'Meeting'
         : template === 'aufmass'
         ? 'Aufmaß'
-        : template === 'knowledge_graph'
-          ? 'Wissensgraph'
-          : template === 'mindmap'
-            ? 'Mindmap'
-            : template === 'data_table'
-              ? 'Datentabelle'
+        : template === 'data_table'
+          ? 'Datentabelle'
           : template;
 
   let typeLabel = 'Transkription';
@@ -45,14 +40,6 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
     Icon = (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-      </svg>
-    );
-  } else if (isTextAssistant) {
-    typeLabel = 'Text-Assistent';
-    iconColor = 'bg-accent-yellow/10 text-accent-yellow';
-    Icon = (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
       </svg>
     );
   }

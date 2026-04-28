@@ -2,7 +2,7 @@
 
 ## Dokumentationsstand
 - **Erstellt**: 05.02.2026
-- **Letzte Aktualisierung**: 08.03.2026
+- **Letzte Aktualisierung**: 28.04.2026
 - **Status**: Inkrementell aktualisiert (Legacy-Inhalte + aktuelle Ergänzungen)
 - **Version**: 0.2
 
@@ -20,7 +20,13 @@
 - **Request**: `application/json`
 - **Response**: `application/json`
 
-## Aktuelle Ergänzungen (2026-03-08)
+## Aktuelle Ergänzungen (2026-04-28)
+
+### Funktionsbereinigung
+- Entfernte App-Bereiche: Echtzeitverarbeitung, Wissensgraph, Mindmap, Infografik/Sketch, Text-Assistent und Workflows.
+- Entfernte API-Bereiche: `/api/realtime/*`, `/api/workflows/*`, `/api/text-ai`, `/api/text-tasks/*`, `/api/sketch-summary`.
+- Google/Gemini-Key-Verwaltung ist nicht mehr Teil der Settings-API. Die aktive KI-/OCR-Konfiguration basiert auf Mistral.
+- Tabellen-Vorlagen sind content-only: API und Prompting lassen keine Berechnungen, Formeln oder Summen für neue Tabellen-Vorlagen zu.
 
 ### GET `/api/settings`
 **Beschreibung**: Lädt benutzerbezogene App- und API-Key-Settings.
@@ -30,7 +36,6 @@
 ```json
 {
   "apiKeyConfigured": true,
-  "googleApiKeyConfigured": true,
   "defaultTemplate": "generic",
   "language": "de",
   "contextBias": "Begriff A, Begriff B",
@@ -50,7 +55,6 @@
 ```json
 {
   "mistralApiKey": "mistral-...",
-  "googleApiKey": "AIza...",
   "costLimit": 15,
   "memberMonthlyBudgetLimit": 8,
   "preferredModel": "mistral-large-latest"
@@ -67,6 +71,71 @@
 **Fehler**:
 - `400`: ungültiges Modell/OCR-Modell oder ungültige Limits
 - `500`: veraltetes DB-Schema (z. B. fehlende neue Spalten)
+
+### PATCH `/api/transcriptions/:id`
+**Beschreibung**: Speichert Änderungen am Dokument oder an einer Tabellenanalyse.
+**Auth**: Session erforderlich
+
+**Request für Tabellenanalyse**:
+```json
+{
+  "tableData": {
+    "metadata": {
+      "datum": "2026-04-28",
+      "bearbeiter": "Max Mustermann"
+    },
+    "rows": [
+      {
+        "row_key": "wand_1",
+        "laenge": 3.2,
+        "breite": 2.4,
+        "bemerkung": "nachgemessen"
+      }
+    ]
+  }
+}
+```
+
+**Response (200)**:
+```json
+{
+  "message": "Transkription aktualisiert"
+}
+```
+
+### POST/PUT `/api/templates` mit `template_type: "table"`
+**Beschreibung**: Erstellt oder aktualisiert eine Tabellen-Vorlage.
+**Auth**: Session erforderlich
+
+**Request (Beispiel)**:
+```json
+{
+  "name": "Aufmaß Küche",
+  "prompt_text": "Fülle die Tabelle anhand des Diktats.",
+  "template_type": "table",
+  "table_schema": {
+    "tableName": "Aufmaß Küche",
+    "metadataFields": [
+      { "key": "datum", "label": "Datum", "type": "date" },
+      { "key": "bearbeiter", "label": "Bearbeiter", "type": "text" }
+    ],
+    "rows": [
+      { "key": "wand_1", "label": "Wand 1" },
+      { "key": "wand_2", "label": "Wand 2" }
+    ],
+    "columns": [
+      { "key": "laenge", "label": "Länge", "type": "number" },
+      { "key": "breite", "label": "Breite", "type": "number" },
+      { "key": "bemerkung", "label": "Bemerkung", "type": "text" }
+    ]
+  }
+}
+```
+
+Hinweis:
+- `table_schema` wird serverseitig normalisiert.
+- Nicht erlaubte Felder wie `calculations` werden entfernt.
+- Tabellen-Vorlagen speichern Struktur, keine berechneten Ergebnisse.
 
 ## Endpunkte
 

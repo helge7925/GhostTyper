@@ -137,6 +137,10 @@ test('buildTableExtractionPrompt includes row_key instructions when rows are def
   const schema = {
     tableName: 'Kennzahlen',
     description: 'Extrahiere Kennzahlen nach Zeilentyp',
+    metadata: [
+      { key: 'datum', label: 'Datum', type: 'date', required: true },
+      { key: 'person', label: 'Person', type: 'text', required: false },
+    ],
     columns: [
       { key: 'wert', label: 'Wert', type: 'number', required: true },
     ],
@@ -148,6 +152,9 @@ test('buildTableExtractionPrompt includes row_key instructions when rows are def
 
   const prompt = buildTableExtractionPrompt(schema, 'de');
   assert.ok(prompt.includes('VORDEFINIERTE ZEILEN'));
+  assert.ok(prompt.includes('METADATEN OBERHALB DER TABELLE'));
+  assert.ok(prompt.includes('"metadata"'));
   assert.ok(prompt.includes('"row_key"'));
   assert.ok(prompt.includes('umsatz'));
+  assert.ok(prompt.includes('Berechne nichts'));
 });

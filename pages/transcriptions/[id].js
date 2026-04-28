@@ -7,10 +7,9 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import Toast from '../../components/Toast';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import DocumentEditor from '../../components/DocumentEditor';
+import TableEditor from '../../components/TableEditor';
 import TableRenderer from '../../components/TableRenderer';
 import ProcessStatusCard from '../../components/ProcessStatusCard';
-import KnowledgeGraphRenderer from '../../components/KnowledgeGraphRenderer';
-import MindmapRenderer from '../../components/MindmapRenderer';
 import { getTranscription, deleteTranscription, updateSpeakers, startAnalysis } from '../../lib/api';
 import { STATUS } from '../../lib/constants';
 import { analysisToHtml } from '../../lib/export-utils';
@@ -270,6 +269,32 @@ export default function TranscriptionDetail() {
     }
   }, [id]);
 
+  const handleSaveTableData = useCallback(async (tableData) => {
+    const response = await fetch(`/api/transcriptions/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tableData }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.message || 'Tabelle konnte nicht gespeichert werden.');
+    }
+    setTranscription((prev) => prev ? {
+      ...prev,
+      analysis: {
+        metadata: tableData.metadata || {},
+        rows: tableData.rows || [],
+      },
+      analysis_meta: {
+        ...(prev.analysis_meta || {}),
+        missing_fields_by_row: tableData.missing_fields_by_row || [],
+        missing_metadata_fields: tableData.missing_metadata_fields || [],
+      },
+      updated_at: new Date().toISOString(),
+    } : prev);
+    setToast({ message: 'Tabelle gespeichert.', type: 'success' });
+  }, [id]);
+
   const handleSpeakerChange = useCallback((sid, name) => {
     setSpeakerNames(prev => ({ ...prev, [sid]: name }));
   }, []);
@@ -292,21 +317,20 @@ export default function TranscriptionDetail() {
     return editorHtml || analysisToHtml(transcription);
   }, [transcription, editorHtml]);
 
+  const tableEditorData = useMemo(() => {
+    if (!transcription) return { metadata: {}, rows: [] };
+    return {
+      ...(transcription.analysis || {}),
+      ...(transcription.analysis_meta || {}),
+    };
+  }, [transcription]);
+
   // Check if this is a table analysis
   const isTableAnalysis = useMemo(() => {
     return transcription?.analysis_type === 'table' && transcription?.table_schema;
   }, [transcription]);
 
-  // Check if this is a knowledge graph analysis
-  const isKnowledgeGraphAnalysis = useMemo(() => {
-    return transcription?.template === 'knowledge_graph' && transcription?.analysis;
-  }, [transcription]);
-
-  const isMindmapAnalysis = useMemo(() => {
-    return transcription?.template === 'mindmap' && transcription?.analysis;
-  }, [transcription]);
-
-  const workflowState = useMemo(() => {
+  const processState = useMemo(() => {
     if (!transcription) return null;
 
     const hasAutoAnalysis = transcription.auto_analyze !== false;
@@ -364,7 +388,7 @@ export default function TranscriptionDetail() {
     return { title, description, steps, activeStep, done };
   }, [transcription]);
 
-  const workflowMessages = useMemo(() => {
+  const processMessages = useMemo(() => {
     if (!transcription) return [];
 
     if (transcription.status === STATUS.ANALYZING) {
@@ -394,12 +418,8 @@ export default function TranscriptionDetail() {
       ? 'Meeting'
       : transcription.template === 'aufmass'
         ? 'Aufmaß'
-        : transcription.template === 'knowledge_graph'
-          ? 'Wissensgraph'
-          : transcription.template === 'mindmap'
-            ? 'Mindmap'
-            : transcription.template === 'data_table'
-              ? 'Datentabelle'
+        : transcription.template === 'data_table'
+          ? 'Datentabelle'
           : transcription.template;
   const timelineEvents = Array.isArray(transcription.events) ? transcription.events : [];
 
@@ -460,7 +480,7 @@ export default function TranscriptionDetail() {
                     disabled={!transcription.text && !transcription.analysis}
                     className="gradient-accent text-white py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent-orange/20 transition-all hover:scale-[1.02] active:scale-100 disabled:opacity-30"
                   >
-                    Im Editor öffnen
+                    {isTableAnalysis ? 'Tabelle im Editor öffnen' : 'Im Editor öffnen'}
                   </button>
                   <div className="mt-3 pt-3 border-t border-accent-red/20">
                     <p className="text-[10px] font-bold text-accent-red/70 uppercase tracking-widest mb-2">Danger Zone</p>
@@ -515,16 +535,16 @@ export default function TranscriptionDetail() {
 
             {/* Right: Preview Area */}
             <div className="lg:col-span-2 space-y-6">
-              {workflowState && [STATUS.PENDING, STATUS.QUEUED, STATUS.PROCESSING, STATUS.ANALYZING].includes(transcription.status) && (
+              {processState && [STATUS.PENDING, STATUS.QUEUED, STATUS.PROCESSING, STATUS.ANALYZING].includes(transcription.status) && (
                 <ProcessStatusCard
-                  title={workflowState.title}
-                  description={workflowState.description}
-                  steps={workflowState.steps}
-                  activeStep={workflowState.activeStep}
-                  done={workflowState.done}
+                  title={processState.title}
+                  description={processState.description}
+                  steps={processState.steps}
+                  activeStep={processState.activeStep}
+                  done={processState.done}
                   startedAt={transcription.updated_at}
                   etaSeconds={transcription.status === STATUS.ANALYZING ? 20 : transcription.status === STATUS.PENDING ? 10 : 40}
-                  messages={workflowMessages}
+                  messages={processMessages}
                 />
               )}
 
@@ -565,84 +585,16 @@ export default function TranscriptionDetail() {
                     {transcription.template === 'data_table' ? 'Datentabelle' : 'Tabellen-Ergebnis'}
                   </h2>
                   <TableRenderer
-                    initialData={{
-                      ...(transcription.analysis || {}),
-                      ...(transcription.analysis_meta || {}),
-                    }}
+                    initialData={tableEditorData}
                     schema={transcription.table_schema}
                     filename={transcription.original_name.replace(/\.[^/.]+$/, '')}
-                    onChange={(updatedRows) => {
-                      console.log('Rows updated:', updatedRows);
-                    }}
+                    editable={false}
                   />
-                </div>
-              )}
-
-              {/* Knowledge Graph Analysis */}
-              {isKnowledgeGraphAnalysis && (
-                <div className="mb-6">
-                  <h2 className="text-xs font-bold text-accent-orange uppercase tracking-widest mb-4 pl-2">
-                    Wissensgraph
-                  </h2>
-                  <KnowledgeGraphRenderer
-                    data={transcription.analysis}
-                    title={transcription.original_name.replace(/\.[^/.]+$/, '')}
-                  />
-                  {transcription.analysis.zusammenfassung && (
-                    <div className="mt-4 bg-dark-card border border-accent-orange/20 rounded-2xl p-6 shadow-2xl shadow-accent-orange/5">
-                      <p className="text-sm text-text-primary leading-relaxed italic border-l-2 border-accent-orange/30 pl-4">
-                        {transcription.analysis.zusammenfassung}
-                      </p>
-                    </div>
-                  )}
-                  {transcription.analysis.offene_fragen && transcription.analysis.offene_fragen.length > 0 && (
-                    <div className="mt-4 bg-dark-card border border-white/[0.06] rounded-2xl p-6">
-                      <h3 className="text-xs font-bold text-text-primary uppercase tracking-widest opacity-60 mb-3">Offene Fragen</h3>
-                      <ul className="list-none space-y-2">
-                        {transcription.analysis.offene_fragen.map((q, i) => (
-                          <li key={i} className="text-sm text-text-secondary flex gap-2">
-                            <span className="text-accent-orange">?</span> {q}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {isMindmapAnalysis && (
-                <div className="mb-6">
-                  <h2 className="text-xs font-bold text-accent-cyan uppercase tracking-widest mb-4 pl-2">
-                    Mindmap
-                  </h2>
-                  <MindmapRenderer
-                    data={transcription.analysis}
-                    title={transcription.original_name.replace(/\.[^/.]+$/, '')}
-                  />
-                  {transcription.analysis.zusammenfassung && (
-                    <div className="mt-4 bg-dark-card border border-accent-cyan/20 rounded-2xl p-6 shadow-2xl shadow-accent-cyan/5">
-                      <p className="text-sm text-text-primary leading-relaxed italic border-l-2 border-accent-cyan/30 pl-4">
-                        {transcription.analysis.zusammenfassung}
-                      </p>
-                    </div>
-                  )}
-                  {transcription.analysis.offene_fragen && transcription.analysis.offene_fragen.length > 0 && (
-                    <div className="mt-4 bg-dark-card border border-white/[0.06] rounded-2xl p-6">
-                      <h3 className="text-xs font-bold text-text-primary uppercase tracking-widest opacity-60 mb-3">Offene Fragen</h3>
-                      <ul className="list-none space-y-2">
-                        {transcription.analysis.offene_fragen.map((q, i) => (
-                          <li key={i} className="text-sm text-text-secondary flex gap-2">
-                            <span className="text-accent-cyan">?</span> {q}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                 </div>
               )}
 
               {/* Text Analysis Preview */}
-              {transcription.analysis && !isTableAnalysis && !isKnowledgeGraphAnalysis && !isMindmapAnalysis && (
+              {transcription.analysis && !isTableAnalysis && (
                 <div className="bg-dark-card border border-accent-orange/20 rounded-2xl p-6 shadow-2xl shadow-accent-orange/5">
                   <h2 className="text-xs font-bold text-accent-orange uppercase tracking-widest mb-4">Ergebnis</h2>
                   <div className="space-y-4">
@@ -678,14 +630,26 @@ export default function TranscriptionDetail() {
           </div>
         </div>
       ) : (
-        <DocumentEditor
-          initialHtml={transcriptionHtml}
-          filename={transcription.original_name}
-          sidebarContent={transcription.text}
-          sourceLabel={rawTextLabel}
-          onSave={handleSaveDocument}
-          onCancel={() => setShowEditor(false)}
-        />
+        isTableAnalysis ? (
+          <TableEditor
+            initialData={tableEditorData}
+            schema={transcription.table_schema}
+            filename={transcription.original_name}
+            sidebarContent={transcription.text}
+            sourceLabel={rawTextLabel}
+            onSave={handleSaveTableData}
+            onCancel={() => setShowEditor(false)}
+          />
+        ) : (
+          <DocumentEditor
+            initialHtml={transcriptionHtml}
+            filename={transcription.original_name}
+            sidebarContent={transcription.text}
+            sourceLabel={rawTextLabel}
+            onSave={handleSaveDocument}
+            onCancel={() => setShowEditor(false)}
+          />
+        )
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

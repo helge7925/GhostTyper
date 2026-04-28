@@ -1,6 +1,6 @@
 # Datentabelle Rollout (2026-03-08)
 
-Stand: 2026-03-08
+Stand: 2026-04-28
 
 ## Ziel
 
@@ -48,10 +48,8 @@ strukturierte Tabellen extrahiert und in der bestehenden Tabellen-UI anzeigt.
 - Historie-Karten zeigen `Datentabelle` als Template-Label.
 - Detailansicht zeigt bei diesem Template Titel/Badge passend als Datentabelle.
 
-### 6. Dashboard API-Status erweitert
-- Dashboard zeigt nun zwei getrennte API-Status-Kacheln:
-  - **Mistral API**
-  - **Google API**
+### 6. Dashboard API-Status
+- Dashboard zeigt den Mistral-API-Status.
 
 ## Wichtige Dateien
 
@@ -104,3 +102,24 @@ Resultat:
 - `transkription-webapp`: **healthy**
 - `transkription-db`: **healthy**
 - Health-Endpunkt: `HTTP/1.1 200 OK`
+
+## Update 2026-04-28: Content-only Tabellen-Vorlagen
+
+Die Datentabellen-Funktion wurde um einen praxisnäheren Vorlagenfluss erweitert:
+
+- Tabellen-Vorlagen definieren jetzt Metadatenfelder, feste Zeilentitel und Spaltentitel.
+- Das KI-Modell füllt ausschließlich Inhalte in diese Felder.
+- Berechnungen, Formeln, Summen und abgeleitete Werte sind im neuen Vorlagenfluss nicht vorgesehen.
+- Der Vorlagen-Editor in den Einstellungen wurde als Excel-artiger Rastereditor umgesetzt.
+- Befüllte Tabellen können in der Transkriptionsdetailansicht in einem Canvas-artigen Tabelleneditor nachbearbeitet und gespeichert werden.
+- Der Excel-Export erzeugt eine saubere XLSX-Datei mit Metadaten oberhalb der Tabelle, formatierter Kopfzeile, Zeilentiteln und Schutz vor Formel-Injection.
+
+Ergänzende Dokumente:
+- Technische Tabellen-Dokumentation: `TABLE_TEMPLATES.md`
+- Konzept Foto-zu-Tabellenvorlage: `konzept-automatische-tabellengenerierung-aus-foto.md`
+
+Verifikation am 2026-04-28:
+- `npm test`
+- `npm run lint`
+- `npm run build`
+- `npm run smoke`

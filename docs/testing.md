@@ -103,6 +103,8 @@ Abgedeckt ist aktuell:
 - Footer-Aggregationen (`calculateFooterStats`)
 - Schema-Validierung (`validateTableSchema`)
 - Prompt-Generierung für Tabellenvorlagen (`buildTableExtractionPrompt`)
+- Metadatenfelder in Tabellen-Prompts
+- Content-only Regel: keine Berechnungen, Formeln oder Summen durch das KI-Modell
 
 ## 5. Mobile/Responsive Testkriterien
 
@@ -173,4 +175,3 @@ Abgedeckt ist aktuell:
 - `external-review-2026-02-12.md`
 - `code-review-priorities-p0-p3-2026-02-12.md`
 - `features-and-improvements.md`
-

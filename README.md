@@ -3,11 +3,11 @@
 GhostTyper ist eine selbstgehostete Webanwendung für:
 - Audio-Transkription
 - OCR (Dokumente/Fotos)
-- KI-Zusammenfassungen und Textverarbeitung
+- KI-Zusammenfassungen und content-only Datentabellen
 - Übersetzungen
-- editor-zentrierte Dokumentbearbeitung (PDF/DOCX)
+- editor-zentrierte Dokumentbearbeitung (PDF/DOCX/XLSX für Tabellen)
 
-Stack: Next.js 13, React 18, PostgreSQL 16, NextAuth, Mistral API, Google Gemini API, Docker Compose.
+Stack: Next.js 13, React 18, PostgreSQL 16, NextAuth, Mistral API, Docker Compose.
 
 ![GhostTyper Screenshot](public/logo-text.png)
 
@@ -18,15 +18,16 @@ GhostTyper ist für Teams gedacht, die Sprache und Dokumente schnell in verwertb
 - Audio hochladen oder direkt im Browser aufnehmen, inkl. Sprechertrennung.
 - PDFs/Bilder per OCR erfassen und direkt weiterverarbeiten.
 - Inhalte mit KI zusammenfassen, strukturieren oder übersetzen.
-- Ergebnisse im zentralen Editor finalisieren und als PDF/DOCX exportieren.
+- Ergebnisse im zentralen Editor finalisieren und als PDF/DOCX exportieren; Tabellen zusätzlich sauber als Excel-Datei.
 - Historie, Favoriten und Ordner für wiederkehrende Arbeitsschritte.
 - **Volltext-Suche** über alle Transkripte und Analysen (v1.2.0).
 - **Vorlagen-Kategorien** für bessere Organisation (v1.2.0).
 - **Auto-Glossar**: Kontextwörter aus der Historie vorschlagen und mit einem Klick übernehmen.
-- **Intelligente Modellauswahl + Kostenvorschau** vor dem Start in Upload, Text-AI und Übersetzung.
-- **1-Klick-Workflows** im Text-Assistenten (z. B. Meeting -> Aktionsplan, Notizen -> Status-Update).
-- **Sketch Summary (`/sketch`)**: Lerntext wird mit Gemini als handgezeichnete Lernübersicht (PNG) generiert.
-- **Google API-Key (Gemini) in Settings**: eigener Key pro Nutzer inklusive Statusanzeige und Entfernen-Flow.
+- **Intelligente Modellauswahl + Kostenvorschau** vor dem Start in Upload und Übersetzung.
+- **Datentabelle**: Strukturierte Daten aus Audio, Text oder PDF/Bild extrahieren, mit Metadaten, Zeilentiteln, Spaltentiteln und Excel-Export.
+- **Excel-artiger Tabellen-Vorlagen-Editor**: Tabellen-Vorlagen in den Einstellungen intuitiv als Raster definieren; KI füllt ausschließlich Inhalte, keine Berechnungen.
+- **Tabellen-Canvas**: Befüllte Tabellen in der Detailansicht nachbearbeiten und speichern.
+- Konzept für die nächste Ausbaustufe: automatische Tabellen-Vorlagenerzeugung aus Foto/Scan/PDF.
 - Versionshinweis: Aktuell released `v1.2.0`; nächste Feature-Welle als `v1.3.0` dokumentiert.
 - Self-Hosted mit Next.js, PostgreSQL, NextAuth und Docker Compose.
 - Sicherheitsbasis mit Rate-Limits, verschlüsselten API-Keys und klaren Status-Übergängen.
@@ -35,9 +36,8 @@ GhostTyper ist für Teams gedacht, die Sprache und Dokumente schnell in verwertb
 
 - Auto-Glossar-API: `GET /api/glossary/suggestions`
 - Modell-Assistent: `POST /api/model-assistant`
-- Workflows:
-  - `GET /api/workflows`
-  - `POST /api/workflows/execute`
+- Tabellen-Vorlagen: Metadaten, feste Zeilentitel, Spaltenraster und content-only Prompting.
+- Tabellen-Export: CSV, HTML und sauber formatiertes XLSX mit Metadaten oberhalb der Tabelle.
 
 Hinweis zur Kompatibilität:
 - `PUT /api/settings` und `POST /api/settings` werden beide unterstützt.
@@ -113,7 +113,6 @@ Siehe `.env.example`.
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
 - `MISTRAL_API_KEY`
-- `GEMINI_API_KEY`
 - `DB_INIT_SECRET`
 - `ENABLE_DB_INIT_API`
 - `SETTINGS_ENCRYPTION_KEY`
@@ -143,21 +142,21 @@ Siehe `.env.example`.
 ## Qualitäts-/Build-Hinweis
 
 - `npm run build` kompiliert die Anwendung.
-- `npm test` führt die automatischen Unit-Tests für die Tabellenlogik aus.
+- `npm test` führt die automatischen Unit-Tests für die Tabellenlogik und Tabellen-Prompts aus.
 - `npm run smoke` führt einen Docker/API-Smoke-Test durch.
 - `npm run smoke:full` führt zusätzlich `test + lint + build` sowie PDF-Renderer-Check aus.
-- UI-Smoke (Sketch + Settings, Desktop/Mobile): `npx playwright test tests/ui-smoke-sketch-settings.spec.js --reporter=line --workers=1`
 - In restriktiven Sandbox-Umgebungen kann der Build bei `Collecting page data` mit `EPERM listen 0.0.0.0` abbrechen. Das ist umgebungsbedingt und kein Compile-Fehler der Anwendung.
 
 ## Dokumentation
 
 - Übersicht: `docs/README.md`
 - Feature-Index (kompakt): `docs/features-and-improvements.md`
+- Tabellen-Vorlagen: `docs/TABLE_TEMPLATES.md`
+- Konzept Foto-zu-Tabellenvorlage: `docs/konzept-automatische-tabellengenerierung-aus-foto.md`
 - Geplante v1.3.0 Features: `docs/v1.3.0-features.md`
 - Security Review & Hardening: `docs/code-review-hardening-2026-02-11.md`
 - Externes Review: `docs/external-review-2026-02-12.md`
 - Prioritäten-Umsetzung P0-P3: `docs/code-review-priorities-p0-p3-2026-02-12.md`
-- Sketch-Rollout (Gemini + UX/UI + Verifikation): `docs/sketch-summary-rollout-2026-03-08.md`
 - Projektplan: `PROJECT_PLAN.md`
 
 ## Lizenz

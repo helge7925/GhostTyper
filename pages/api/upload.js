@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { query } from '../../lib/db';
-import { ACCEPTED_AUDIO_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE } from '../../lib/constants';
+import { ACCEPTED_AUDIO_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE, normalizeAnalysisTemplate } from '../../lib/constants';
 import { resolveChatModel } from '../../lib/model-policy';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { addTranscriptionEvent } from '../../lib/transcription-events';
@@ -115,7 +115,7 @@ export default async function handler(req, res) {
     await safeUnlink(tempUploadPath);
     tempUploadPath = '';
 
-    const template = fields.template?.[0] || fields.template || 'generic';
+    const template = normalizeAnalysisTemplate(fields.template?.[0] || fields.template || 'generic');
     const requestedModel = fields.model?.[0] || fields.model || 'mistral-large-latest';
     const model = resolveChatModel(requestedModel);
     if (!model) {

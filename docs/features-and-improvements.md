@@ -1,6 +1,6 @@
 # GhostTyper: Features (kompakt)
 
-Stand: 2026-03-08
+Stand: 2026-04-28
 
 Dieses Dokument ist bewusst kurz gehalten. Der produktnahe Feature-Überblick steht im `README.md`.
 
@@ -13,10 +13,10 @@ Dieses Dokument ist bewusst kurz gehalten. Der produktnahe Feature-Überblick st
 - Produktivitätsfeatures:
   - Auto-Glossar (Vorschläge aus eigener Historie)
   - Intelligente Modellauswahl mit Kostenvorschau vor Start
-  - 1-Klick-Workflows im Text-Assistenten
-  - Workflow-Editor mit Versionierung/Rollback
   - Budget-Guardrails + Traffic-Light vor Start
-  - Team-Realtime-Finalisierung + Audit-Log + Upload-Sicherheits-Hook
+  - Datentabellen mit Metadaten, Zeilentiteln, Spaltentiteln und Excel-Export
+  - Excel-artiger Tabellen-Vorlagen-Editor
+  - Audit-Log + Upload-Sicherheits-Hook
 - Versionierung:
   - Aktuell released: `v1.2.0`
   - Geplante nächste Feature-Welle: `v1.3.0` (`v1.3.0-features.md`)
@@ -25,6 +25,8 @@ Dieses Dokument ist bewusst kurz gehalten. Der produktnahe Feature-Überblick st
 
 - Audio-/Upload-Flow: `audio-upload.md`
 - KI-/Provider-Details: `ai-integration.md`
+- Tabellen-Vorlagen: `TABLE_TEMPLATES.md`
+- Konzept Foto-zu-Tabellenvorlage: `konzept-automatische-tabellengenerierung-aus-foto.md`
 - Architektur/Implementierung: `implementation.md`
 - Tests/Abnahme: `testing.md`
 - Release-Änderungen: `release-notes-2026-02-12.md`
