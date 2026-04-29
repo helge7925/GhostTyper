@@ -23,6 +23,7 @@ import { scanFileForViruses } from '../../lib/virus-scan';
 import { detectOcrMimeType, extensionFromDetectedMime } from '../../lib/file-signature';
 import { normalizeDataTableAnalysis } from '../../lib/data-table';
 import { normalizeAndValidateTableAnalysis } from '../../lib/table-analysis';
+import { logAuditEvent } from '../../lib/audit-log';
 
 export const config = {
   api: {
@@ -263,6 +264,19 @@ export default async function handler(req, res) {
       message: shouldAnalyze
         ? 'OCR und KI-Analyse abgeschlossen.'
         : 'OCR abgeschlossen.',
+    });
+    await logAuditEvent({
+      userId: session.user.id,
+      action: shouldAnalyze ? 'ocr.analysis.completed' : 'ocr.completed',
+      targetType: 'transcription',
+      targetId: String(transcriptionId),
+      metadata: {
+        originalName: file.originalFilename || null,
+        mimeType: detectedMimeType,
+        template,
+        analysisType,
+        size: Number(file.size || 0),
+      },
     });
 
     // Local file cleanup is handled by transcription detail deletion eventually,

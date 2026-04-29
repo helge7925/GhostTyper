@@ -4,6 +4,11 @@ import { query } from '../../../../lib/db';
 import { validatePassword } from '../../../../lib/constants';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { isValidEmail, normalizeEmail } from '../../../../lib/email';
+import { logAuditEvent } from '../../../../lib/audit-log';
+
+function normalizeRole(role) {
+  return ['admin', 'auditor', 'user'].includes(role) ? role : 'user';
+}
 
 export default async function handler(req, res) {
   const session = await requireAdmin(req, res);
@@ -57,12 +62,20 @@ export default async function handler(req, res) {
         }
 
         const passwordHash = await bcrypt.hash(password, 12);
-        const userRole = role === 'admin' ? 'admin' : 'user';
+        const userRole = normalizeRole(role);
 
         const result = await query(
           'INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role',
           [normalizedEmail, name || null, passwordHash, userRole]
         );
+
+        await logAuditEvent({
+          userId: session.user.id,
+          action: 'admin.user.created',
+          targetType: 'user',
+          targetId: String(result.rows[0].id),
+          metadata: { email: normalizedEmail, role: userRole },
+        });
 
         return res.status(201).json(result.rows[0]);
       } catch (error) {

@@ -17,7 +17,7 @@ Wichtig: Die Vorlage beschreibt ausschließlich Inhalte. Das KI-Modell soll kein
 
 ## Nutzerfluss
 
-1. In den Einstellungen öffnet der Nutzer `Verarbeitungstemplates`.
+1. In den Einstellungen öffnet der Nutzer `Tabellen-Templates`.
 2. Bei Tabellen-Vorlagen gibt es die Aktion `Vorlage aus Foto erstellen`.
 3. Der Nutzer lädt ein Foto, einen Scan oder ein PDF hoch.
 4. GhostTyper führt OCR aus und übergibt den erkannten Text mit Layout-Hinweisen an das KI-Modell.

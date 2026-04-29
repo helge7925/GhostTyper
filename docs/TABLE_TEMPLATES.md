@@ -8,6 +8,8 @@ Tabellen-Vorlagen ermöglichen die strukturierte Extraktion von Daten aus Audio-
 
 Nicht Teil des aktuellen Tabellen-Vorlagen-Flows sind Berechnungen, Formeln, Summenzeilen oder automatisch abgeleitete Werte. Die Tabellen sollen wie digitale Erfassungsbögen funktionieren.
 
+Text-Vorlagen und Tabellen-Vorlagen sind in den Einstellungen getrennt verwaltbar, nutzen aber dieselben frei benennbaren Kategorien. Die Historie bleibt separat organisiert und nutzt Ordner für verarbeitete Dateien.
+
 ## Use Cases
 
 | Szenario | Beschreibung | Typische Struktur |
@@ -230,7 +232,7 @@ PATCH /api/transcriptions/:id
 ### Vorlage erstellen
 
 ```text
-Einstellungen -> Verarbeitungstemplates -> Tabellen-Verarbeitung
+Einstellungen -> Tabellen-Templates
 ```
 
 1. Neue Tabellen-Vorlage anlegen.

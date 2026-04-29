@@ -120,9 +120,9 @@ export default function Transcriptions() {
     if (!approved) return;
     try {
       await deleteFolder(id);
-      setFolders(prev => prev.filter(f => f.id !== id));
-      setTranscriptions(prev => prev.map(t => t.folder_id === id ? { ...t, folder_id: null } : t));
-      if (activeFolderId === id) setActiveFolderId(null);
+      setFolders(prev => prev.filter(f => String(f.id) !== String(id)));
+      setTranscriptions(prev => prev.map(t => String(t.folder_id || '') === String(id) ? { ...t, folder_id: null } : t));
+      if (String(activeFolderId) === String(id)) setActiveFolderId(null);
     } catch (err) {
       showToast('Ordner konnte nicht gelöscht werden', 'error');
     }
@@ -164,9 +164,17 @@ export default function Transcriptions() {
 
   const filteredTranscriptions = useMemo(() => {
     return transcriptions.filter(t => {
-      return activeFolderId === null || t.folder_id === activeFolderId;
+      return activeFolderId === null || String(t.folder_id || '') === String(activeFolderId);
     });
   }, [transcriptions, activeFolderId]);
+  const folderCounts = useMemo(() => {
+    return transcriptions.reduce((counts, entry) => {
+      if (!entry.folder_id) return counts;
+      const key = String(entry.folder_id);
+      counts[key] = (counts[key] || 0) + 1;
+      return counts;
+    }, {});
+  }, [transcriptions]);
 
   if (status === 'loading' || (status === 'unauthenticated')) return <LoadingSpinner />;
 
@@ -194,10 +202,13 @@ export default function Transcriptions() {
           <div className="space-y-1">
             <button
               onClick={() => setActiveFolderId(null)}
-              className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-3 ${activeFolderId === null ? 'bg-accent-orange text-white shadow-lg shadow-accent-orange/20' : 'text-text-secondary hover:bg-white/5'}`}
+              className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center justify-between gap-3 ${activeFolderId === null ? 'bg-accent-orange text-white shadow-lg shadow-accent-orange/20' : 'text-text-secondary hover:bg-white/5'}`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-              Alle Dateien
+              <span className="flex items-center gap-3 min-w-0">
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                <span className="truncate">Alle Dateien</span>
+              </span>
+              <span className="text-[10px] opacity-70">{transcriptions.length}</span>
             </button>
 
             {isCreatingFolder && (
@@ -232,10 +243,13 @@ export default function Transcriptions() {
                   <div className="flex items-center">
                     <button
                       onClick={() => setActiveFolderId(folder.id)}
-                      className={`flex-1 text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-3 min-w-0 ${activeFolderId === folder.id ? 'bg-accent-orange/20 text-accent-orange border border-accent-orange/20' : 'text-text-secondary hover:bg-white/5'}`}
+                      className={`flex-1 text-left px-3 py-2 pr-16 rounded-xl text-sm transition-all flex items-center justify-between gap-3 min-w-0 ${String(activeFolderId) === String(folder.id) ? 'bg-accent-orange/20 text-accent-orange border border-accent-orange/20' : 'text-text-secondary hover:bg-white/5'}`}
                     >
-                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-                      <span className="truncate">{folder.name}</span>
+                      <span className="flex items-center gap-3 min-w-0">
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                        <span className="truncate">{folder.name}</span>
+                      </span>
+                      <span className="text-[10px] opacity-70">{folderCounts[String(folder.id)] || 0}</span>
                     </button>
                     
                     <div className="absolute right-2 flex gap-1 transition-opacity opacity-100 md:opacity-0 md:group-hover:opacity-100">

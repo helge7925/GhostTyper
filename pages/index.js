@@ -13,6 +13,39 @@ const WELCOME_LINES = [
   'Ein guter Tag, um aus Notizen Ergebnisse zu machen.',
 ];
 
+const FEATURE_SUMMARIES = [
+  {
+    href: '/upload',
+    title: 'Transkription',
+    description: 'Audio hochladen oder aufnehmen und daraus ein Transkript mit optionaler Analyse erstellen.',
+  },
+  {
+    href: '/tabellen?mode=template',
+    title: 'Tabellen',
+    description: 'Entweder eine feste Tabellen-Vorlage aus einem Transkript befüllen oder eine freie Datentabelle aus Text, Audio oder OCR erzeugen.',
+  },
+  {
+    href: '/translate',
+    title: 'Übersetzung',
+    description: 'Text direkt übersetzen, PDF/Bilder per OCR übernehmen oder DOCX, XLSX und PPTX mit erhaltener Office-Struktur übersetzen.',
+  },
+  {
+    href: '/ocr',
+    title: 'OCR',
+    description: 'PDFs und Bilder in Text umwandeln und bei Bedarf direkt analysieren oder als Tabelleninhalt strukturieren.',
+  },
+  {
+    href: '/textoptimierung',
+    title: 'Textoptimierung',
+    description: 'E-Mails und andere Texte korrigieren, kürzen oder formeller, freundlicher und klarer formulieren.',
+  },
+  {
+    href: '/transcriptions',
+    title: 'Historie & Export',
+    description: 'Verarbeitete Dateien wiederfinden, nach Ordnern organisieren und Ergebnisse als PDF, DOCX oder Excel exportieren.',
+  },
+];
+
 function pickWelcomeLine(previousLine) {
   const candidates = WELCOME_LINES.filter((line) => line !== previousLine);
   const pool = candidates.length > 0 ? candidates : WELCOME_LINES;
@@ -73,16 +106,6 @@ export default function Home() {
     [usage]
   );
   const firstName = useMemo(() => getFirstName(session), [session]);
-  const totalInputTokens = usage?.totalInputTokens ?? 0;
-  const totalOutputTokens = usage?.totalOutputTokens ?? 0;
-  const totalTokens = totalInputTokens + totalOutputTokens;
-  const averageCostPerRequest = useMemo(() => {
-    const requestCount = usage?.totalRequests ?? 0;
-    const totalCost = usage?.totalCost ?? 0;
-    if (!requestCount) return 0;
-    return totalCost / requestCount;
-  }, [usage]);
-  const topOperationName = topOperations[0]?.operation || 'Noch keine Daten';
 
   if (status === 'loading') {
     return <LoadingSpinner />;
@@ -127,84 +150,40 @@ export default function Home() {
       </Head>
 
       <div className="mx-auto max-w-6xl animate-fade-in pb-20">
-        <section className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[radial-gradient(circle_at_20%_20%,rgba(0,206,201,0.20),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(255,89,23,0.22),transparent_42%),linear-gradient(145deg,#11131a,#0a0a0f)] p-6 md:p-10">
-          <div className="absolute -top-10 -right-8 h-44 w-44 rounded-full bg-accent-cyan/10 blur-2xl animate-pulse" />
-          <div className="absolute -bottom-12 -left-6 h-52 w-52 rounded-full bg-accent-orange/10 blur-2xl animate-pulse" />
-
-          <div className="relative">
+        <section className="rounded-2xl border border-white/[0.08] bg-dark-card p-6 md:p-10">
+          <div>
             <p className="text-[10px] uppercase tracking-[0.22em] text-text-secondary">Dashboard</p>
             <h1 className="mt-2 text-2xl md:text-3xl font-bold text-text-primary">
               Willkommen, {firstName}
             </h1>
-            <p className="mt-3 inline-flex items-center rounded-full border border-accent-cyan/30 bg-cyan-500/10 px-3 py-1 text-xs text-accent-cyan">
-              {welcomeLine}
-            </p>
-            <p className="mt-2 text-sm text-text-secondary max-w-2xl">
-              Starten Sie direkt mit Transkription, OCR oder Übersetzung.
-            </p>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                href="/upload"
-                className="inline-flex items-center gap-2 gradient-accent text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-accent-orange/25 hover:scale-[1.01] transition-transform"
-              >
-                Transkription starten
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </Link>
-              <Link
-                href="/settings?tab=transcription"
-                className="inline-flex items-center gap-2 border border-white/[0.14] text-text-primary px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/[0.05] transition-colors"
-              >
-                Einstellungen
-              </Link>
+            <div className="mt-6 rounded-2xl border border-accent-cyan/20 bg-cyan-500/[0.06] px-5 py-4 md:px-6 md:py-5">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-accent-cyan/80">Heute im Kopf</p>
+              <p className="mt-2 text-lg md:text-2xl font-semibold leading-snug text-text-primary">
+                {welcomeLine}
+              </p>
             </div>
           </div>
         </section>
 
         <section className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {FEATURE_SUMMARIES.map((feature) => (
+            <Link
+              key={feature.href}
+              href={feature.href}
+              className="rounded-2xl border border-white/[0.08] bg-dark-card px-5 py-4 hover:border-accent-orange/30 transition-colors"
+            >
+              <h2 className="text-sm font-semibold text-text-primary">{feature.title}</h2>
+              <p className="text-xs text-text-secondary mt-2 leading-relaxed">{feature.description}</p>
+            </Link>
+          ))}
+        </section>
+
+        <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="rounded-2xl border border-white/[0.08] bg-dark-card px-5 py-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Monatskosten</p>
             <p className="text-xl text-text-primary mt-2">
               {usage?.totalCost?.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }) || '0,00 €'}
             </p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.08] bg-dark-card px-5 py-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Requests</p>
-            <p className="text-xl text-text-primary mt-2">{usage?.totalRequests ?? 0}</p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.08] bg-dark-card px-5 py-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Budgetstatus</p>
-            <p className="text-sm mt-2 text-text-primary">
-              {usage?.budgetTrafficLight?.label || 'Keine Budgetampel aktiv'}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.08] bg-dark-card px-5 py-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Input-Tokens</p>
-            <p className="text-xl text-text-primary mt-2">{totalInputTokens.toLocaleString('de-DE')}</p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.08] bg-dark-card px-5 py-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Output-Tokens</p>
-            <p className="text-xl text-text-primary mt-2">{totalOutputTokens.toLocaleString('de-DE')}</p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.08] bg-dark-card px-5 py-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Gesamt-Tokens</p>
-            <p className="text-xl text-text-primary mt-2">{totalTokens.toLocaleString('de-DE')}</p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.08] bg-dark-card px-5 py-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Ø Kosten / Request</p>
-            <p className="text-xl text-text-primary mt-2">
-              {averageCostPerRequest.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.08] bg-dark-card px-5 py-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Aktivste Operation</p>
-            <p className="text-sm text-text-primary mt-2">{topOperationName}</p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.08] bg-dark-card px-5 py-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Nutzungsmonat</p>
-            <p className="text-sm text-text-primary mt-2">{usage?.month || new Date().toISOString().slice(0, 7)}</p>
           </div>
           <div className="rounded-2xl border border-white/[0.08] bg-dark-card px-5 py-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Mistral API</p>
@@ -221,7 +200,7 @@ export default function Home() {
               <div key={entry.operation} className="flex items-center justify-between text-xs">
                 <span className="text-text-primary">{entry.operation}</span>
                 <span className="text-text-secondary">
-                  {entry.cost.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} • {entry.requests} Req.
+                  {entry.cost.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                 </span>
               </div>
             ))}

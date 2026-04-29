@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { signIn } from 'next-auth/react';
-import { useState } from 'react';
+import { getProviders, signIn } from 'next-auth/react';
+import { useEffect, useState } from 'react';
 
 export default function Login() {
   const router = useRouter();
@@ -9,6 +9,11 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [providers, setProviders] = useState(null);
+
+  useEffect(() => {
+    getProviders().then((items) => setProviders(items || {})).catch(() => setProviders({}));
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -52,6 +57,17 @@ export default function Login() {
             </p>
           </div>
           <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-8 shadow-2xl">
+            {providers?.oidc && (
+              <button
+                type="button"
+                onClick={() => signIn('oidc', { callbackUrl: '/' })}
+                className="w-full gradient-accent text-white py-2.5 rounded-full text-sm font-medium transition-colors mb-5"
+              >
+                Mit Single Sign-On anmelden
+              </button>
+            )}
+
+            {providers?.credentials && (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -95,6 +111,13 @@ export default function Login() {
                 {loading ? 'Wird angemeldet...' : 'Anmelden'}
               </button>
             </form>
+            )}
+
+            {providers && !providers.credentials && !providers.oidc && (
+              <p className="text-sm text-text-secondary text-center">
+                Es ist kein Anmeldeverfahren konfiguriert. Bitte wenden Sie sich an den Administrator.
+              </p>
+            )}
 
             <p className="text-sm text-text-secondary text-center mt-6">
               Kein Konto? Wenden Sie sich an den Administrator.

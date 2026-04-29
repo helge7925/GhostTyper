@@ -5,6 +5,11 @@ import { validatePassword } from '../../../../lib/constants';
 import { serializeApiKeyForStorage } from '../../../../lib/settings-service';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { isValidEmail, normalizeEmail } from '../../../../lib/email';
+import { logAuditEvent } from '../../../../lib/audit-log';
+
+function normalizeRole(role) {
+  return ['admin', 'auditor', 'user'].includes(role) ? role : 'user';
+}
 
 export default async function handler(req, res) {
   const session = await requireAdmin(req, res);
@@ -102,7 +107,7 @@ export default async function handler(req, res) {
 
         if (role !== undefined) {
           updates.push(`role = $${paramIndex++}`);
-          values.push(role === 'admin' ? 'admin' : 'user');
+          values.push(normalizeRole(role));
         }
 
         if (updates.length > 0) {
@@ -164,6 +169,18 @@ export default async function handler(req, res) {
         );
 
         await client.query('COMMIT');
+        await logAuditEvent({
+          userId: session.user.id,
+          action: 'admin.user.updated',
+          targetType: 'user',
+          targetId: String(userId),
+          metadata: {
+            emailChanged: shouldUpdateEmail,
+            roleChanged: role !== undefined,
+            apiKeyChanged: shouldUpdateApiKey,
+            costLimitChanged: shouldUpdateCostLimit,
+          },
+        });
         return res.status(200).json(result.rows[0]);
       } catch (error) {
         try {
@@ -189,6 +206,13 @@ export default async function handler(req, res) {
         if (result.rows.length === 0) {
           return res.status(404).json({ message: 'User nicht gefunden' });
         }
+        await logAuditEvent({
+          userId: session.user.id,
+          action: 'admin.user.deleted',
+          targetType: 'user',
+          targetId: String(userId),
+          severity: 'warn',
+        });
         return res.status(200).json({ message: 'User gelöscht' });
       } catch (error) {
         logApiError('Admin delete user error', error);

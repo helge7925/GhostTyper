@@ -1,17 +1,14 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from './auth/[...nextauth]';
 import { enforceRateLimit, logApiError } from '../../lib/api-utils';
-import { listAuditEventsForUser } from '../../lib/audit-log';
+import { listAuditEvents } from '../../lib/audit-log';
+import { requireAuditReader } from '../../lib/admin';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const session = await requireAuditReader(req, res);
+  if (!session) return;
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'audit-log',
@@ -23,7 +20,7 @@ export default async function handler(req, res) {
 
   try {
     const limit = Number.parseInt(req.query.limit, 10) || 80;
-    const events = await listAuditEventsForUser(session.user.id, limit);
+    const events = await listAuditEvents(limit);
     return res.status(200).json({ events });
   } catch (error) {
     if (error?.code === '42P01' || error?.code === '42703') {

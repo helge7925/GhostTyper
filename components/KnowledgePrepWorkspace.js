@@ -7,8 +7,8 @@ import LoadingSpinner from './LoadingSpinner';
 const MODE_OPTIONS = [
   {
     value: 'data_table',
-    label: 'Datentabelle',
-    description: 'Strukturierte Tabelle mit extrahierten Datensätzen',
+    label: 'Freie Datentabelle',
+    description: 'Die KI erkennt die passende Tabellenstruktur selbst',
   },
 ];
 
