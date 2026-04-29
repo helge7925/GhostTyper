@@ -4,6 +4,7 @@ import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-uti
 import { renderPdfBufferFromHtml } from '../../../lib/pdf-export';
 import { withPdfRenderSlot } from '../../../lib/pdf-render-limiter';
 import { normalizePdfFontPreset, normalizePdfTheme } from '../../../lib/pdf-print-style';
+import { logAuditEvent } from '../../../lib/audit-log';
 
 export const config = {
   api: {
@@ -68,6 +69,16 @@ export default async function handler(req, res) {
       documentTitle: normalizeDocumentTitle(filename),
     }));
     const safeName = `${normalizeFilename(filename)}.pdf`;
+    await logAuditEvent({
+      userId: session.user.id,
+      action: 'export.pdf',
+      targetType: 'export',
+      targetId: safeName,
+      metadata: {
+        filename: safeName,
+        htmlLength: html.length,
+      },
+    });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);

@@ -7,6 +7,7 @@ import {
   MAX_DOCUMENT_TITLE_LENGTH,
 } from '../../../lib/constants';
 import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
+import { logAuditEvent } from '../../../lib/audit-log';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -67,6 +68,17 @@ export default async function handler(req, res) {
         documentHtml
       ]
     );
+
+    await logAuditEvent({
+      userId: session.user.id,
+      action: 'document.saved',
+      targetType: 'transcription',
+      targetId: String(result.rows[0].id),
+      metadata: {
+        template: template || 'generic',
+        title: title.trim(),
+      },
+    });
 
     return res.status(201).json({ id: result.rows[0].id, message: 'Dokument gespeichert' });
   } catch (error) {

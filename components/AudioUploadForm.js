@@ -32,6 +32,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState(null);
   const inputRef = useRef(null);
+  const textTemplates = templates.filter((entry) => !entry.template_type || entry.template_type === 'text');
 
   useEffect(() => {
     // Load custom templates and default settings
@@ -273,7 +274,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
                 <label htmlFor="upload-template" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Analyse-Modus</label>
                 <select id="upload-template" value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
                   <optgroup label="Standard"><option value="generic">Zusammenfassung</option><option value="meeting">Meeting-Protokoll</option><option value="aufmass">Aufmaß</option></optgroup>
-                  {templates.length > 0 && <optgroup label="Eigene Vorlagen">{templates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}</optgroup>}
+                  {textTemplates.length > 0 && <optgroup label="Eigene Text-Vorlagen">{textTemplates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}</optgroup>}
                 </select>
               </div>
             ) : (

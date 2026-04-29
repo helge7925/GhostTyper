@@ -68,6 +68,14 @@ function eventDotClass(stage) {
   return 'bg-accent-yellow';
 }
 
+function isDownloadableOfficeDocument(mimeType) {
+  return [
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  ].includes(mimeType);
+}
+
 /**
  * Optimized Speaker Input component to prevent full page re-renders on every keystroke
  */
@@ -410,8 +418,9 @@ export default function TranscriptionDetail() {
   if (!transcription) return <LoadingSpinner />;
 
   const isOCR = transcription.mime_type?.startsWith('image/') || transcription.mime_type === 'application/pdf';
-  const typeLabel = isOCR ? 'Dokument' : 'Transkription';
-  const rawTextLabel = isOCR ? 'Extrahierter Text' : 'Transkription';
+  const isOfficeDocument = isDownloadableOfficeDocument(transcription.mime_type);
+  const typeLabel = isOfficeDocument ? 'Datei' : isOCR ? 'Dokument' : 'Transkription';
+  const rawTextLabel = isOfficeDocument ? 'Datei-Hinweis' : isOCR ? 'Extrahierter Text' : 'Transkription';
   const templateLabel = transcription.template === 'generic'
     ? 'Zusammenfassung'
     : transcription.template === 'meeting'
@@ -477,11 +486,19 @@ export default function TranscriptionDetail() {
                     onClick={() => {
                       setShowEditor(true);
                     }}
-                    disabled={!transcription.text && !transcription.analysis}
+                    disabled={isOfficeDocument || (!transcription.text && !transcription.analysis)}
                     className="gradient-accent text-white py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent-orange/20 transition-all hover:scale-[1.02] active:scale-100 disabled:opacity-30"
                   >
                     {isTableAnalysis ? 'Tabelle im Editor öffnen' : 'Im Editor öffnen'}
                   </button>
+                  {isOfficeDocument && (
+                    <a
+                      href={`/api/transcriptions/${transcription.id}/download`}
+                      className="bg-white/5 hover:bg-white/10 text-text-primary py-2 rounded-xl text-sm font-bold border border-white/[0.06] text-center transition-all"
+                    >
+                      Übersetzte Datei herunterladen
+                    </a>
+                  )}
                   <div className="mt-3 pt-3 border-t border-accent-red/20">
                     <p className="text-[10px] font-bold text-accent-red/70 uppercase tracking-widest mb-2">Danger Zone</p>
                     <button

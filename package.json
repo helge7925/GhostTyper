@@ -12,7 +12,8 @@
     "smoke:full": "bash scripts/smoke-test.sh --full --pdf",
     "lint": "next lint",
     "seed-admin": "node scripts/seed-admin.js",
-    "migrate-api-keys": "node scripts/migrate-api-keys.js"
+    "migrate-api-keys": "node scripts/migrate-api-keys.js",
+    "retention:apply": "node scripts/apply-retention-policy.js"
   },
   "dependencies": {
     "axios": "^1.15.2",
@@ -23,6 +24,7 @@
     "file-saver": "^2.0.5",
     "fluent-ffmpeg": "^2.1.2",
     "formidable": "^3.5.1",
+    "jszip": "^3.10.1",
     "marked": "^17.0.1",
     "next": "^13.4.0",
     "next-auth": "^4.24.14",

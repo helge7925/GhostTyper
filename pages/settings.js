@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -24,7 +24,7 @@ import { normalizeDefaultTemplate } from '../lib/constants';
 import { DEFAULT_PROMPTS, getPrompt } from '../lib/prompts';
 import TableSchemaBuilder from '../components/TableSchemaBuilder';
 import { validateTableSchema, buildTableExtractionPrompt } from '../lib/table-calculations';
-import { normalizeTableSchema } from '../lib/table-schema';
+import { createDefaultTableSchema, normalizeTableSchema } from '../lib/table-schema';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 
 const PRICE_LIST = [
@@ -34,7 +34,7 @@ const PRICE_LIST = [
   { model: 'Mistral Voxtral Mini', input: '0,01 €', output: '0,01 €', note: 'Transkription' },
 ];
 
-const SETTINGS_TAB_IDS = ['transcription', 'analysis', 'ocr-translate', 'account'];
+const SETTINGS_TAB_IDS = ['transcription', 'text-templates', 'table-templates', 'ocr-translate', 'account'];
 const DEFAULT_TEXT_TEMPLATE_OPTIONS = [
   { key: 'meeting', label: 'Meeting-Protokoll' },
   { key: 'aufmass', label: 'Aufmaß' },
@@ -58,6 +58,16 @@ function parseContextTerms(rawValue) {
     unique.push(term);
   }
   return unique;
+}
+
+function tableSchemasEqual(a, b) {
+  return JSON.stringify(normalizeTableSchema(a || createDefaultTableSchema())) === JSON.stringify(normalizeTableSchema(b || createDefaultTableSchema()));
+}
+
+function templateMatchesCategory(template, categoryId) {
+  if (!categoryId || categoryId === 'all') return true;
+  if (categoryId === 'uncategorized') return !template.category_id;
+  return String(template.category_id || '') === String(categoryId);
 }
 
 export default function Settings() {
@@ -85,6 +95,8 @@ export default function Settings() {
   const [templateCategories, setTemplateCategories] = useState([]);
   const [activeEditor, setActiveEditor] = useState(null);
   const [templateLoading, setTemplateLoading] = useState(false);
+  const [activeTextCategoryId, setActiveTextCategoryId] = useState('all');
+  const [activeTableCategoryId, setActiveTableCategoryId] = useState('all');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
@@ -112,12 +124,14 @@ export default function Settings() {
     closeConfirm,
     acceptConfirm,
   } = useUiFeedback();
+  const canReadAudit = ['admin', 'auditor'].includes(session?.user?.role);
 
   const contextTerms = parseContextTerms(contextBias);
   useEffect(() => {
     const queryTab = typeof router.query.tab === 'string' ? router.query.tab : '';
-    if (!queryTab || !SETTINGS_TAB_IDS.includes(queryTab)) return;
-    setActiveTab(queryTab);
+    const normalizedTab = queryTab === 'analysis' ? 'text-templates' : queryTab;
+    if (!normalizedTab || !SETTINGS_TAB_IDS.includes(normalizedTab)) return;
+    setActiveTab(normalizedTab);
   }, [router.query.tab]);
 
   function handleTabChange(nextTab) {
@@ -179,10 +193,12 @@ export default function Settings() {
       .then(data => { if (data) setUsage(data); })
       .catch(() => {});
 
-    getAuditLog(60)
-      .then((payload) => setAuditEvents(payload?.events || []))
-      .catch(() => {});
-  }, [status, router]);
+    if (canReadAudit) {
+      getAuditLog(60)
+        .then((payload) => setAuditEvents(payload?.events || []))
+        .catch(() => {});
+    }
+  }, [status, router, canReadAudit]);
 
   async function handleSaveSettings(e) {
     if (e) e.preventDefault();
@@ -314,7 +330,8 @@ export default function Settings() {
             name: activeEditor.id, 
             prompt_text: normalizedPrompt,
             template_type: 'text',
-            table_schema: null
+            table_schema: null,
+            category_id: activeEditor.category_id || null
           });
           setTemplates(templates.map(t => t.id === updated.id ? updated : t));
         } else {
@@ -322,7 +339,8 @@ export default function Settings() {
             name: activeEditor.id, 
             prompt_text: normalizedPrompt,
             template_type: 'text',
-            table_schema: null
+            table_schema: null,
+            category_id: activeEditor.category_id || null
           });
           setTemplates([...templates, created]);
         }
@@ -331,7 +349,8 @@ export default function Settings() {
           name: normalizedName, 
           prompt_text: normalizedPrompt,
           template_type: 'text',
-          table_schema: null
+          table_schema: null,
+          category_id: activeEditor.category_id || null
         });
         setTemplates([...templates, created]);
       } else {
@@ -339,7 +358,8 @@ export default function Settings() {
           name: normalizedName, 
           prompt_text: normalizedPrompt,
           template_type: 'text',
-          table_schema: null
+          table_schema: null,
+          category_id: activeEditor.category_id || null
         });
         setTemplates(templates.map(t => t.id === updated.id ? updated : t));
       }
@@ -355,48 +375,77 @@ export default function Settings() {
   // Table Template Handlers
   const openTableTemplateEditor = (template = null) => {
     if (template) {
-      setTableSchema(template.table_schema || {
+      setTableSchema(normalizeTableSchema(template.table_schema || {
         tableName: template.name,
         description: '',
         metadata: [],
         columns: [],
         rows: [],
         calculations: []
-      });
+      }));
       setTableTemplateEditor({
         id: template.id,
         name: template.name,
+        category_id: template.category_id || '',
         isEditing: true
       });
     } else {
-      setTableSchema({
-        tableName: '',
-        description: '',
-        metadata: [],
-        columns: [],
-        rows: [],
-        calculations: []
-      });
+      setTableSchema(createDefaultTableSchema());
       setTableTemplateEditor({
         id: 'new',
         name: '',
+        category_id: activeTableCategoryId !== 'all' && activeTableCategoryId !== 'uncategorized' ? activeTableCategoryId : '',
         isEditing: false
       });
     }
   };
 
+  const handleTableSchemaChange = useCallback((nextSchema) => {
+    const normalizedSchema = normalizeTableSchema(nextSchema);
+    const nextTableName = String(normalizedSchema.tableName || '').trim();
+    setTableSchema((prevSchema) => (
+      tableSchemasEqual(prevSchema, normalizedSchema) ? prevSchema : normalizedSchema
+    ));
+    if (nextTableName) {
+      setTableTemplateEditor((prev) => {
+        if (!prev) return prev;
+        const currentName = String(prev.name || '').trim();
+        if (currentName) return prev;
+        return { ...prev, name: nextTableName };
+      });
+    }
+  }, []);
+
+  const handleTableTemplateNameChange = (nextName) => {
+    const previousName = String(tableTemplateEditor?.name || '').trim();
+    setTableTemplateEditor((prev) => (prev ? { ...prev, name: nextName } : prev));
+    setTableSchema((prevSchema) => {
+      const normalizedSchema = normalizeTableSchema(prevSchema || createDefaultTableSchema());
+      const currentTableName = String(normalizedSchema.tableName || '').trim();
+      if (currentTableName && currentTableName !== previousName) return prevSchema;
+      const nextSchema = normalizeTableSchema({
+        ...normalizedSchema,
+        tableName: nextName,
+      });
+      return tableSchemasEqual(prevSchema, nextSchema) ? prevSchema : nextSchema;
+    });
+  };
+
   const handleSaveTableTemplate = async () => {
     if (!tableTemplateEditor) return;
     
-    const normalizedName = String(tableTemplateEditor.name || '').trim();
+    const schemaDraft = normalizeTableSchema(tableSchema || createDefaultTableSchema());
+    const headerName = String(tableTemplateEditor.name || '').trim();
+    const schemaTableName = String(schemaDraft.tableName || '').trim();
+    const normalizedName = headerName || schemaTableName;
     if (!normalizedName) {
       showToast('Bitte einen Namen für die Vorlage eingeben.', 'error');
       return;
     }
     
     const cleanTableSchema = normalizeTableSchema({
-      ...(tableSchema || {}),
-      tableName: tableSchema?.tableName || normalizedName,
+      ...schemaDraft,
+      tableName: schemaTableName || normalizedName,
       calculations: [],
     });
     const validation = validateTableSchema(cleanTableSchema);
@@ -414,7 +463,8 @@ export default function Settings() {
         name: normalizedName,
         prompt_text: extractionPrompt,
         template_type: 'table',
-        table_schema: cleanTableSchema
+        table_schema: cleanTableSchema,
+        category_id: tableTemplateEditor.category_id || null
       };
       
       if (tableTemplateEditor.id === 'new') {
@@ -489,8 +539,10 @@ export default function Settings() {
     if (!approved) return;
     try {
       await deleteTemplateCategory(id);
-      setTemplateCategories(prev => prev.filter(c => c.id !== id));
-      setTemplates(prev => prev.map(t => t.category_id === id ? { ...t, category_id: null } : t));
+      setTemplateCategories(prev => prev.filter(c => String(c.id) !== String(id)));
+      setTemplates(prev => prev.map(t => String(t.category_id || '') === String(id) ? { ...t, category_id: null } : t));
+      if (String(activeTextCategoryId) === String(id)) setActiveTextCategoryId('all');
+      if (String(activeTableCategoryId) === String(id)) setActiveTableCategoryId('all');
       showToast('Kategorie gelöscht.', 'success');
     } catch {
       showToast('Löschen fehlgeschlagen.', 'error');
@@ -498,6 +550,7 @@ export default function Settings() {
   }
 
   async function handleReloadAudit() {
+    if (!canReadAudit) return;
     setAuditLoading(true);
     try {
       const payload = await getAuditLog(80);
@@ -516,6 +569,7 @@ export default function Settings() {
       id: key,
       name: defaultOption?.label || key,
       prompt_text: override ? override.prompt_text : getPrompt(key, language),
+      category_id: override?.category_id || '',
       isDefault: true
     });
   };
@@ -524,7 +578,8 @@ export default function Settings() {
 
   const TABS = [
     { id: 'transcription', label: 'Transkription', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg> },
-    { id: 'analysis', label: 'Verarbeitungstemplates', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
+    { id: 'text-templates', label: 'Text-Templates', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
+    { id: 'table-templates', label: 'Tabellen-Templates', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18M6 4v16M12 4v16M18 4v16" /></svg> },
     { id: 'ocr-translate', label: 'OCR & Übersetzung', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg> },
     { id: 'account', label: 'Konto & API', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg> },
   ];
@@ -532,7 +587,108 @@ export default function Settings() {
   // Separate table templates from text templates
   const textTemplates = templates.filter(t => !t.template_type || t.template_type === 'text');
   const tableTemplates = templates.filter(t => t.template_type === 'table');
+  const filteredTextTemplates = textTemplates.filter((template) => templateMatchesCategory(template, activeTextCategoryId));
+  const filteredTableTemplates = tableTemplates.filter((template) => templateMatchesCategory(template, activeTableCategoryId));
   const activeTabMeta = TABS.find((tab) => tab.id === activeTab);
+  const getCategoryName = (categoryId) => templateCategories.find((category) => String(category.id) === String(categoryId))?.name || 'Ohne Kategorie';
+
+  const renderTemplateCategoryPanel = ({ activeCategoryId, onChange, templatesForCounts }) => {
+    const uncategorizedCount = templatesForCounts.filter((template) => !template.category_id).length;
+    return (
+      <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest">Kategorien</h2>
+            <p className="text-xs text-text-secondary mt-1">Organisieren und filtern Sie Ihre Vorlagen.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => onChange('all')}
+            className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+              activeCategoryId === 'all'
+                ? 'bg-accent-orange text-white border-accent-orange'
+                : 'bg-white/5 border-white/10 text-text-primary hover:border-accent-orange/40'
+            }`}
+          >
+            Alle ({templatesForCounts.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange('uncategorized')}
+            className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+              activeCategoryId === 'uncategorized'
+                ? 'bg-accent-orange text-white border-accent-orange'
+                : 'bg-white/5 border-white/10 text-text-primary hover:border-accent-orange/40'
+            }`}
+          >
+            Ohne Kategorie ({uncategorizedCount})
+          </button>
+          {templateCategories.map((cat) => {
+            const count = templatesForCounts.filter((template) => String(template.category_id || '') === String(cat.id)).length;
+            return (
+              <div key={cat.id} className="group flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1.5">
+                {editingCategoryId === cat.id ? (
+                  <input
+                    autoFocus
+                    type="text"
+                    value={editingCategoryName}
+                    onChange={e => setEditingCategoryName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleUpdateCategory(cat.id, editingCategoryName)}
+                    onBlur={() => setEditingCategoryId(null)}
+                    className="bg-transparent border-none text-xs text-text-primary outline-none w-24"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onChange(String(cat.id))}
+                    className={`flex items-center gap-2 text-xs transition-colors ${
+                      String(activeCategoryId) === String(cat.id) ? 'text-accent-orange' : 'text-text-primary hover:text-accent-orange'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-accent-orange" />
+                    <span>{cat.name}</span>
+                    <span className="text-text-secondary">({count})</span>
+                  </button>
+                )}
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}
+                    className="text-text-secondary hover:text-white"
+                    aria-label={`Kategorie ${cat.name} bearbeiten`}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCategory(cat.id)}
+                    className="text-text-secondary hover:text-accent-red"
+                    aria-label={`Kategorie ${cat.name} löschen`}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          <form onSubmit={handleCreateCategory} className="flex items-center gap-2">
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={e => setNewCategoryName(e.target.value)}
+              placeholder="Neue Kategorie..."
+              className="bg-dark-input border border-white/10 rounded-full px-3 py-1.5 text-xs text-text-primary outline-none w-32"
+            />
+            <button type="submit" disabled={!newCategoryName.trim()} className="text-accent-orange hover:text-accent-orange/80 disabled:opacity-30" aria-label="Kategorie erstellen">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -670,65 +826,13 @@ export default function Settings() {
             </div>
           )}
 
-          {activeTab === 'analysis' && (
+          {activeTab === 'text-templates' && (
             <div className="space-y-8 animate-fade-in">
-              {/* Categories Section */}
-              <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest">Kategorien</h2>
-                    <p className="text-xs text-text-secondary mt-1">Organisieren Sie Ihre Vorlagen in Kategorien</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {templateCategories.map(cat => (
-                    <div key={cat.id} className="group flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1.5">
-                      {editingCategoryId === cat.id ? (
-                        <input
-                          autoFocus
-                          type="text"
-                          value={editingCategoryName}
-                          onChange={e => setEditingCategoryName(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && handleUpdateCategory(cat.id, editingCategoryName)}
-                          onBlur={() => setEditingCategoryId(null)}
-                          className="bg-transparent border-none text-xs text-text-primary outline-none w-24"
-                        />
-                      ) : (
-                        <>
-                          <span className="w-2 h-2 rounded-full bg-accent-orange" />
-                          <span className="text-xs text-text-primary">{cat.name}</span>
-                        </>
-                      )}
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}
-                          className="text-text-secondary hover:text-white"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteCategory(cat.id)}
-                          className="text-text-secondary hover:text-accent-red"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  <form onSubmit={handleCreateCategory} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={newCategoryName}
-                      onChange={e => setNewCategoryName(e.target.value)}
-                      placeholder="Neue Kategorie..."
-                      className="bg-dark-input border border-white/10 rounded-full px-3 py-1.5 text-xs text-text-primary outline-none w-32"
-                    />
-                    <button type="submit" disabled={!newCategoryName.trim()} className="text-accent-orange hover:text-accent-orange/80 disabled:opacity-30">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    </button>
-                  </form>
-                </div>
-              </div>
+              {renderTemplateCategoryPanel({
+                activeCategoryId: activeTextCategoryId,
+                onChange: setActiveTextCategoryId,
+                templatesForCounts: textTemplates,
+              })}
 
               {/* Text Templates Section */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -739,7 +843,13 @@ export default function Settings() {
                       <p className="text-xs text-text-secondary mt-1">Standard- und eigene Textvorlagen</p>
                     </div>
                     <button
-                      onClick={() => setActiveEditor({ id: 'new', name: '', prompt_text: '', isDefault: false })}
+                      onClick={() => setActiveEditor({
+                        id: 'new',
+                        name: '',
+                        prompt_text: '',
+                        category_id: activeTextCategoryId !== 'all' && activeTextCategoryId !== 'uncategorized' ? activeTextCategoryId : '',
+                        isDefault: false
+                      })}
                       className="gradient-accent text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg"
                     >
                       + Neue Text-Vorlage
@@ -748,7 +858,7 @@ export default function Settings() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Defaults */}
-                    {DEFAULT_TEXT_TEMPLATE_OPTIONS.map(({ key, label }) => (
+                    {activeTextCategoryId === 'all' && DEFAULT_TEXT_TEMPLATE_OPTIONS.map(({ key, label }) => (
                       <div key={key} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 group hover:border-accent-orange/30 transition-all">
                         <span className="text-sm font-medium text-text-primary capitalize">
                           {label}
@@ -757,9 +867,12 @@ export default function Settings() {
                       </div>
                     ))}
                     {/* Custom Text Templates */}
-                    {textTemplates.filter(t => !DEFAULT_TEXT_TEMPLATE_OPTIONS.some((entry) => entry.key === t.name)).map(t => (
+                    {filteredTextTemplates.filter(t => !DEFAULT_TEXT_TEMPLATE_OPTIONS.some((entry) => entry.key === t.name)).map(t => (
                       <div key={t.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 group hover:border-accent-orange/30 transition-all">
-                        <span className="text-sm font-medium text-text-primary truncate pr-4">{t.name}</span>
+                        <div className="min-w-0 pr-4">
+                          <span className="text-sm font-medium text-text-primary truncate block">{t.name}</span>
+                          <span className="text-[10px] text-text-secondary">{getCategoryName(t.category_id)}</span>
+                        </div>
                         <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => setActiveEditor({...t, isDefault: false})} className="text-[10px] font-bold text-accent-orange uppercase">Edit</button>
                           <button onClick={() => handleDelete(t.id)} className="text-[10px] font-bold text-text-secondary uppercase hover:text-accent-red">Löschen</button>
@@ -791,11 +904,22 @@ export default function Settings() {
                 </div>
               </div>
 
+            </div>
+          )}
+
+          {activeTab === 'table-templates' && (
+            <div className="space-y-8 animate-fade-in">
+              {renderTemplateCategoryPanel({
+                activeCategoryId: activeTableCategoryId,
+                onChange: setActiveTableCategoryId,
+                templatesForCounts: tableTemplates,
+              })}
+
               {/* Table Templates Section */}
               <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
                 <div className="flex items-center justify-between mb-8">
                   <div>
-                    <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest">Tabellen-Verarbeitung</h2>
+                    <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest">Tabellen-Templates</h2>
                     <p className="text-xs text-text-secondary mt-1">
                       Extrahieren Sie strukturierte Daten als Tabelle (z.B. Rechnungen, Listen)
                     </p>
@@ -808,18 +932,18 @@ export default function Settings() {
                   </button>
                 </div>
 
-                {tableTemplates.length === 0 ? (
+                {filteredTableTemplates.length === 0 ? (
                   <div className="text-center py-8 bg-white/5 rounded-xl border border-dashed border-white/10">
                     <p className="text-text-secondary text-sm">
-                      Noch keine Tabellen-Vorlagen erstellt.
+                      Keine Tabellen-Vorlagen in dieser Kategorie.
                     </p>
                     <p className="text-text-secondary/60 text-xs mt-1">
-                      Ideal für Rechnungen, Inventare, Zeiterfassung und mehr.
+                      Legen Sie eine Vorlage an oder wählen Sie eine andere Kategorie.
                     </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {tableTemplates.map(t => (
+                    {filteredTableTemplates.map(t => (
                       <div key={t.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 group hover:border-accent-orange/30 transition-all">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-lg bg-accent-orange/20 flex items-center justify-center">
@@ -830,6 +954,7 @@ export default function Settings() {
                           <div>
                             <span className="text-sm font-medium text-text-primary block">{t.name}</span>
                             <span className="text-[10px] text-text-secondary">
+                              {getCategoryName(t.category_id)} •{' '}
                               {t.table_schema?.columns?.length || 0} Spalten
                               {t.table_schema?.rows?.length > 0 && ` • ${t.table_schema.rows.length} Zeilen`}
                               {t.table_schema?.metadata?.length > 0 && ` • ${t.table_schema.metadata.length} Metadaten`}
@@ -963,6 +1088,7 @@ export default function Settings() {
                   </div>
                 )}
 
+                {canReadAudit && (
                 <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest">Audit-Log</h2>
@@ -988,6 +1114,7 @@ export default function Settings() {
                     ))}
                   </div>
                 </div>
+                )}
               </div>
             </div>
           )}
@@ -997,20 +1124,31 @@ export default function Settings() {
       {/* Text Template Editor Overlay */}
       {activeEditor && (
         <div className="fixed inset-0 z-[110] bg-dark-bg flex flex-col animate-fade-in">
-          <header className="h-16 border-b border-white/[0.06] bg-dark-card flex items-center justify-between px-6">
-            <div className="flex items-center gap-4">
+          <header className="min-h-16 border-b border-white/[0.06] bg-dark-card flex flex-wrap items-center justify-between gap-3 px-6 py-3">
+            <div className="flex items-center gap-4 min-w-0 flex-1">
               <button onClick={() => setActiveEditor(null)} className="p-2 text-text-secondary hover:text-text-primary transition-colors" aria-label="Vorlagen-Editor schließen"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
               <input 
                 type="text" 
                 value={activeEditor.name} 
                 onChange={e => setActiveEditor({...activeEditor, name: e.target.value})} 
                 disabled={activeEditor.isDefault && DEFAULT_TEXT_TEMPLATE_OPTIONS.some((entry) => entry.key === activeEditor.id)} 
-                className="bg-transparent border-none text-lg font-semibold text-text-primary outline-none focus:ring-0 w-full max-w-md" 
+                className="bg-transparent border-none text-lg font-semibold text-text-primary outline-none focus:ring-0 w-full max-w-md min-w-0"
                 placeholder="Name der Vorlage..."
               />
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-end gap-3 flex-wrap">
               {activeEditor.isDefault && DEFAULT_TEXT_TEMPLATE_OPTIONS.some((entry) => entry.key === activeEditor.id) && <span className="text-[10px] bg-accent-orange/20 text-accent-orange px-2 py-1 rounded-full uppercase">Standard-Vorlage</span>}
+              <select
+                value={activeEditor.category_id || ''}
+                onChange={e => setActiveEditor({ ...activeEditor, category_id: e.target.value })}
+                className="bg-dark-input border border-white/[0.1] rounded-xl px-3 py-2 text-xs text-text-primary outline-none"
+                aria-label="Kategorie der Text-Vorlage"
+              >
+                <option value="">Ohne Kategorie</option>
+                {templateCategories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
               <button onClick={handleSaveTemplate} disabled={templateLoading} className="gradient-accent text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent-orange/20">
                 {templateLoading ? 'Speichert...' : 'Vorlage speichern'}
               </button>
@@ -1068,8 +1206,8 @@ export default function Settings() {
       {/* Table Template Editor Overlay */}
       {tableTemplateEditor && (
         <div className="fixed inset-0 z-[110] bg-dark-bg flex flex-col animate-fade-in">
-          <header className="h-16 border-b border-white/[0.06] bg-dark-card flex items-center justify-between px-6">
-            <div className="flex items-center gap-4">
+          <header className="min-h-16 border-b border-white/[0.06] bg-dark-card flex flex-wrap items-center justify-between gap-3 px-6 py-3">
+            <div className="flex items-center gap-4 min-w-0 flex-1">
               <button onClick={() => { setTableTemplateEditor(null); setTableSchema(null); }} className="p-2 text-text-secondary hover:text-text-primary transition-colors" aria-label="Tabellen-Vorlagen-Editor schließen">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -1078,14 +1216,26 @@ export default function Settings() {
               <input 
                 type="text" 
                 value={tableTemplateEditor.name} 
-                onChange={e => setTableTemplateEditor({...tableTemplateEditor, name: e.target.value})} 
-                className="bg-transparent border-none text-lg font-semibold text-text-primary outline-none focus:ring-0 w-full max-w-md" 
+                onChange={e => handleTableTemplateNameChange(e.target.value)}
+                className="bg-transparent border-none text-lg font-semibold text-text-primary outline-none focus:ring-0 w-full max-w-md min-w-0"
                 placeholder="Name der Tabellen-Vorlage..."
               />
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-end gap-3 flex-wrap">
               <span className="text-[10px] bg-accent-orange/20 text-accent-orange px-2 py-1 rounded-full uppercase">Tabellen-Vorlage</span>
+              <select
+                value={tableTemplateEditor.category_id || ''}
+                onChange={e => setTableTemplateEditor({ ...tableTemplateEditor, category_id: e.target.value })}
+                className="bg-dark-input border border-white/[0.1] rounded-xl px-3 py-2 text-xs text-text-primary outline-none"
+                aria-label="Kategorie der Tabellen-Vorlage"
+              >
+                <option value="">Ohne Kategorie</option>
+                {templateCategories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
               <button 
+                type="button"
                 onClick={handleSaveTableTemplate} 
                 disabled={templateLoading} 
                 className="gradient-accent text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent-orange/20"
@@ -1098,7 +1248,7 @@ export default function Settings() {
             <div className="max-w-4xl mx-auto">
               <TableSchemaBuilder 
                 schema={tableSchema}
-                onChange={setTableSchema}
+                onChange={handleTableSchemaChange}
               />
             </div>
           </main>

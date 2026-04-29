@@ -129,9 +129,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
   useEffect(() => {
     const result = validateTableSchema(schema);
     setValidation(result);
-    if (result.isValid) {
-      onChange?.(schema);
-    }
+    onChange?.(schema);
   }, [schema, onChange]);
 
   const previewRows = useMemo(() => {

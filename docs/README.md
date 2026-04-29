@@ -44,6 +44,7 @@ Stand: 2026-04-28
 ### Tabellen-Vorlagen und Excel-Export
 - Tabellen-Vorlagen sind content-only: keine Berechnungen, Formeln oder Summen durch das KI-Modell.
 - Neuer Excel-artiger Editor für Metadaten, Spaltentitel und Zeilentitel in den Einstellungen.
+- Text-Templates und Tabellen-Templates sind getrennt, aber über dieselben Kategorien auffindbar.
 - Befüllte Tabellen sind in der Transkriptionsdetailansicht in einem Canvas-artigen Tabelleneditor bearbeitbar.
 - Export nach CSV, HTML und sauber formatiertem Excel (`.xlsx`) mit Metadaten oberhalb der Tabelle.
 - Technische Details: `TABLE_TEMPLATES.md`

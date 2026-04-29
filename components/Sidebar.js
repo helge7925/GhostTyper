@@ -13,6 +13,15 @@ const NAV_LINKS = [
       </svg>
     )
   },
+  {
+    href: '/tabellen',
+    label: 'Tabellen',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5h6M9 9h6M5 13h14M5 17h14M5 21h14M4 3h16a1 1 0 011 1v17H3V4a1 1 0 011-1z" />
+      </svg>
+    )
+  },
   { 
     href: '/translate', 
     label: 'Übersetzung', 
@@ -32,11 +41,11 @@ const NAV_LINKS = [
     )
   },
   {
-    href: '/datentabelle',
-    label: 'Datentabelle',
+    href: '/textoptimierung',
+    label: 'Textoptimierung',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18M6 4v16M12 4v16M18 4v16" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
       </svg>
     )
   },

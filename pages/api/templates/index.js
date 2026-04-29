@@ -5,6 +5,7 @@ import { MAX_TEMPLATE_NAME_LENGTH, MAX_TEMPLATE_PROMPT_LENGTH } from '../../../l
 import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
 import { validateTableSchema } from '../../../lib/table-calculations';
 import { normalizeTableSchema } from '../../../lib/table-schema';
+import { logAuditEvent } from '../../../lib/audit-log';
 
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions);
@@ -62,6 +63,23 @@ export default async function handler(req, res) {
       if (!['text', 'table'].includes(template_type)) {
         return res.status(400).json({ message: 'Ungültiger Vorlagen-Typ' });
       }
+
+      let categoryIdForSave = null;
+      if (category_id !== null && category_id !== undefined && category_id !== '') {
+        const parsedCategoryId = Number.parseInt(category_id, 10);
+        if (!Number.isFinite(parsedCategoryId)) {
+          return res.status(400).json({ message: 'Ungültige Kategorie' });
+        }
+        const categoryResult = await query(
+          'SELECT id FROM template_categories WHERE id = $1 AND user_id = $2',
+          [parsedCategoryId, userId]
+        );
+        if (categoryResult.rows.length === 0) {
+          return res.status(400).json({ message: 'Ungültige Kategorie' });
+        }
+        categoryIdForSave = parsedCategoryId;
+      }
+
       let tableSchemaForSave = null;
       if (template_type === 'table') {
         if (!table_schema || typeof table_schema !== 'object') {
@@ -83,8 +101,18 @@ export default async function handler(req, res) {
           `INSERT INTO templates (user_id, name, prompt_text, template_type, table_schema, category_id)
            VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING *`,
-          [userId, normalizedName, normalizedPrompt, template_type, tableSchemaForSave, category_id]
+          [userId, normalizedName, normalizedPrompt, template_type, tableSchemaForSave, categoryIdForSave]
         );
+        await logAuditEvent({
+          userId,
+          action: 'template.created',
+          targetType: 'template',
+          targetId: String(result.rows[0].id),
+          metadata: {
+            templateType: template_type,
+            categoryId: categoryIdForSave,
+          },
+        });
         return res.status(201).json(result.rows[0]);
       } catch (error) {
         logApiError('Error creating template', error);

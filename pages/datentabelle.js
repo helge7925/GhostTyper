@@ -5,11 +5,11 @@ export default function DatentabellePage() {
   return (
     <>
       <Head>
-        <title>Datentabelle - GhostTyper</title>
+        <title>Freie Datentabelle - GhostTyper</title>
       </Head>
       <KnowledgePrepWorkspace
         fixedMode="data_table"
-        heading="Datentabelle"
+        heading="Freie Datentabelle"
         showModeSelector={false}
       />
     </>

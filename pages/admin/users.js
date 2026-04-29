@@ -16,6 +16,8 @@ export default function AdminUsers() {
   const [editingUser, setEditingUser] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [retentionEnabled, setRetentionEnabled] = useState(false);
+  const [retentionDays, setRetentionDays] = useState('');
   const {
     toast,
     showToast,
@@ -47,6 +49,18 @@ export default function AdminUsers() {
     }
   }, [showToast]);
 
+  const loadEnterpriseSettings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/enterprise-settings');
+      if (!res.ok) return;
+      const data = await res.json();
+      setRetentionEnabled(Boolean(data.retentionDays));
+      setRetentionDays(data.retentionDays ?? '');
+    } catch {
+      // Non-blocking admin setting.
+    }
+  }, []);
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
@@ -58,8 +72,9 @@ export default function AdminUsers() {
         return;
       }
       loadUsers();
+      loadEnterpriseSettings();
     }
-  }, [status, session, router, loadUsers]);
+  }, [status, session, router, loadUsers, loadEnterpriseSettings]);
 
   function resetForm() {
     setFormName('');
@@ -183,6 +198,28 @@ export default function AdminUsers() {
     }
   }
 
+  async function handleSaveRetention(event) {
+    event.preventDefault();
+    try {
+      const res = await fetch('/api/admin/enterprise-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: retentionEnabled,
+          retentionDays: retentionEnabled ? retentionDays : null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Aufbewahrung konnte nicht gespeichert werden');
+      }
+      showToast('Aufbewahrung gespeichert', 'success');
+      loadEnterpriseSettings();
+    } catch (err) {
+      showToast(err.message || 'Aufbewahrung konnte nicht gespeichert werden', 'error');
+    }
+  }
+
   if (status === 'loading' || loading) return <LoadingSpinner />;
   if (!session || session.user.role !== 'admin') return <LoadingSpinner />;
 
@@ -213,6 +250,42 @@ export default function AdminUsers() {
       {error && !showForm && (
         <p className="text-sm text-accent-red mb-4">{error}</p>
       )}
+
+      <form onSubmit={handleSaveRetention} className="bg-dark-card border border-white/[0.06] rounded-xl p-6 mb-6">
+        <h2 className="text-base font-medium text-text-primary">Datenaufbewahrung</h2>
+        <p className="text-xs text-text-secondary mt-1">
+          Standardmäßig ist keine automatische Löschung aktiv. Der Cleanup läuft nur, wenn `npm run retention:apply` geplant ausgeführt wird.
+        </p>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end">
+          <label className="flex items-center gap-3 text-sm text-text-primary">
+            <input
+              type="checkbox"
+              checked={retentionEnabled}
+              onChange={(event) => setRetentionEnabled(event.target.checked)}
+              className="w-4 h-4 accent-accent-orange"
+            />
+            Automatische Aufbewahrungsfrist aktivieren
+          </label>
+          <div className="flex items-end gap-3">
+            <div>
+              <label htmlFor="retention-days" className="block text-xs text-text-secondary mb-1">Tage</label>
+              <input
+                id="retention-days"
+                type="number"
+                min="1"
+                max="3650"
+                value={retentionDays}
+                onChange={(event) => setRetentionDays(event.target.value)}
+                disabled={!retentionEnabled}
+                className="w-32 bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary outline-none disabled:opacity-50"
+              />
+            </div>
+            <button type="submit" className="bg-white/5 hover:bg-white/10 text-text-primary border border-white/[0.08] px-4 py-2 rounded-lg text-sm">
+              Speichern
+            </button>
+          </div>
+        </div>
+      </form>
 
       {showForm && (
         <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6 mb-6">
@@ -270,6 +343,7 @@ export default function AdminUsers() {
                   className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
                 >
                   <option value="user">User</option>
+                  <option value="auditor">Auditor</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
@@ -344,6 +418,11 @@ export default function AdminUsers() {
                 {user.role === 'admin' && (
                   <span className="text-xs bg-accent-orange/20 text-accent-orange px-2 py-0.5 rounded-full">
                     Admin
+                  </span>
+                )}
+                {user.role === 'auditor' && (
+                  <span className="text-xs bg-accent-cyan/20 text-accent-cyan px-2 py-0.5 rounded-full">
+                    Auditor
                   </span>
                 )}
                 {user.api_key_configured && (

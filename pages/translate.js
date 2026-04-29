@@ -54,6 +54,10 @@ export default function Translate() {
   const [loadingStartedAt, setLoadingStartedAt] = useState(null);
   const [error, setError] = useState('');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [mode, setMode] = useState('text');
+  const [officeFile, setOfficeFile] = useState(null);
+  const [officeLoading, setOfficeLoading] = useState(false);
+  const [officeResult, setOfficeResult] = useState(null);
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -117,6 +121,61 @@ export default function Translate() {
     }
   }
 
+  function getDownloadName(response, fallbackName) {
+    const disposition = response.headers.get('content-disposition') || '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    if (match?.[1]) return match[1];
+    return fallbackName.replace(/\.[^/.]+$/, '') + '_translated' + (fallbackName.match(/\.[^/.]+$/)?.[0] || '');
+  }
+
+  async function handleOfficeTranslate(event) {
+    event.preventDefault();
+    if (!officeFile || officeLoading) return;
+
+    setOfficeLoading(true);
+    setLoadingStartedAt(new Date().toISOString());
+    setOfficeResult(null);
+    setError('');
+
+    const formData = new FormData();
+    formData.append('file', officeFile);
+    formData.append('targetLanguage', targetLanguage);
+    formData.append('sourceLanguage', 'auto');
+    formData.append('model', model);
+
+    try {
+      const response = await fetch('/api/translate/file', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.message || 'Office-Dateiübersetzung fehlgeschlagen');
+      }
+
+      const blob = await response.blob();
+      const filename = getDownloadName(response, officeFile.name);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+      setOfficeResult({
+        filename,
+        historyId: response.headers.get('x-ghosttyper-history-id'),
+        warningCount: Number(response.headers.get('x-ghosttyper-layout-warnings') || 0),
+      });
+    } catch (err) {
+      setError(err.message || 'Office-Dateiübersetzung fehlgeschlagen');
+    } finally {
+      setOfficeLoading(false);
+      setLoadingStartedAt(null);
+    }
+  }
+
   async function handleSaveDocument(html) {
     try {
       await saveDocument({
@@ -143,9 +202,108 @@ export default function Translate() {
         <div className="max-w-5xl mx-auto pb-20 px-2 sm:px-0 animate-fade-in">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-text-primary">Übersetzung</h1>
-            <p className="text-sm text-text-secondary mt-1">Text übersetzen oder aus Dokument übernehmen</p>
+            <p className="text-sm text-text-secondary mt-1">Text übersetzen, PDF/Bilder per OCR übernehmen oder Office-Dateien formatwahrend übersetzen.</p>
           </div>
 
+          <div className="mb-6 inline-flex rounded-2xl border border-white/[0.08] bg-dark-card p-1">
+            <button
+              type="button"
+              onClick={() => setMode('text')}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                mode === 'text' ? 'bg-accent-orange text-white' : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Text / OCR
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('office')}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                mode === 'office' ? 'bg-accent-orange text-white' : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Office-Datei
+            </button>
+          </div>
+
+          {mode === 'office' ? (
+            <form onSubmit={handleOfficeTranslate} className="space-y-6">
+              <div className="bg-dark-card border border-white/[0.08] rounded-2xl p-6">
+                <label htmlFor="office-translation-file" className="block text-xs font-bold uppercase tracking-widest text-text-secondary mb-3">
+                  DOCX, XLSX oder PPTX
+                </label>
+                <input
+                  id="office-translation-file"
+                  type="file"
+                  accept=".docx,.xlsx,.pptx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                  onChange={(event) => setOfficeFile(event.target.files?.[0] || null)}
+                  className="block w-full text-sm text-text-secondary file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-text-primary hover:file:bg-white/15"
+                />
+                <p className="mt-3 text-xs text-text-secondary">
+                  Die App ersetzt nur Textinhalte. Layout, Zellformate, Folien, Bilder und eingebettete Medien bleiben im Office-Paket erhalten. PDF bleibt ein OCR-Workflow ohne Layoutgarantie.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-dark-card border border-white/[0.08] rounded-2xl p-5">
+                  <label htmlFor="office-target-language" className="block text-xs font-bold uppercase tracking-widest text-text-secondary mb-2">
+                    Zielsprache
+                  </label>
+                  <select
+                    id="office-target-language"
+                    value={targetLanguage}
+                    onChange={(event) => setTargetLanguage(event.target.value)}
+                    className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-text-primary outline-none focus:ring-1 focus:ring-accent-orange"
+                  >
+                    {LANGUAGES.map(lang => <option key={lang.code} value={lang.code}>{lang.label}</option>)}
+                  </select>
+                </div>
+                <div className="bg-dark-card border border-white/[0.08] rounded-2xl p-5">
+                  <label htmlFor="office-model" className="block text-xs font-bold uppercase tracking-widest text-text-secondary mb-2">
+                    KI-Modell
+                  </label>
+                  <select
+                    id="office-model"
+                    value={model}
+                    onChange={(event) => setModel(event.target.value)}
+                    className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-text-primary outline-none focus:ring-1 focus:ring-accent-orange"
+                  >
+                    <option value="mistral-small-latest">Kostengünstig / Schnell</option>
+                    <option value="mistral-medium-latest">Ausgewogen</option>
+                    <option value="mistral-large-latest">Qualität</option>
+                  </select>
+                </div>
+              </div>
+
+              {officeLoading && (
+                <ProcessStatusCard
+                  title="Office-Datei wird übersetzt"
+                  description="Textsegmente werden aus der Datei gelesen, übersetzt und in das ursprüngliche Office-Paket zurückgeschrieben."
+                  steps={[{ key: 'office-translation', label: 'Office-Texte übersetzen' }]}
+                  activeStep={0}
+                  done={false}
+                  startedAt={loadingStartedAt}
+                  etaSeconds={30}
+                  messages={TRANSLATION_MESSAGES}
+                />
+              )}
+
+              {officeResult && (
+                <div className="bg-accent-green/10 border border-accent-green/20 text-accent-green rounded-2xl p-4 text-sm">
+                  Datei erstellt: {officeResult.filename}
+                  {officeResult.warningCount > 0 ? ` (${officeResult.warningCount} mögliche Layout-Hinweise wegen längerer Übersetzungen)` : ''}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={officeLoading || !officeFile}
+                className="w-full gradient-accent text-white py-4 rounded-2xl text-lg font-bold shadow-lg shadow-accent-orange/20 disabled:opacity-30 transition-all"
+              >
+                {officeLoading ? 'Datei wird übersetzt...' : 'Office-Datei übersetzen'}
+              </button>
+            </form>
+          ) : (
           <div className="space-y-6">
             {/* Input Area */}
             <div className="space-y-4">
@@ -240,6 +398,7 @@ export default function Translate() {
               </button>
             </div>
           </div>
+          )}
         </div>
       ) : (
         <DocumentEditor 
