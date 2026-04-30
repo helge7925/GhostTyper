@@ -24,11 +24,11 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
     </svg>
   );
-  let iconColor = 'bg-accent-orange/10 text-accent-orange';
+  let iconColor = 'bg-accent/10 text-accent';
 
   if (isOCR) {
     typeLabel = 'Dokument';
-    iconColor = 'bg-accent-cyan/10 text-accent-cyan';
+    iconColor = 'bg-info/10 text-info';
     Icon = (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -36,7 +36,7 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
     );
   } else if (isTranslation) {
     typeLabel = 'Übersetzung';
-    iconColor = 'bg-accent-green/10 text-accent-green';
+    iconColor = 'bg-success/10 text-success';
     Icon = (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
@@ -45,13 +45,13 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
   }
 
   return (
-    <div className="group relative bg-dark-card border border-white/[0.06] rounded-xl p-4 hover:border-white/[0.12] transition-colors">
+    <div className="group relative bg-surface border border-subtle rounded-xl p-4 hover:border-emphasis transition-colors">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex items-center gap-4 flex-1 min-w-0">
           {onToggleFavorite && (
             <button 
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); }}
-              className={`shrink-0 transition-colors ${is_favorite ? 'text-accent-orange' : 'text-text-secondary/30 hover:text-accent-orange/50'}`}
+              className={`shrink-0 transition-colors ${is_favorite ? 'text-accent' : 'text-secondary/30 hover:text-accent/50'}`}
               title={is_favorite ? 'Von Favoriten entfernen' : 'Als Favorit markieren'}
               aria-label={is_favorite ? `${displayName} aus Favoriten entfernen` : `${displayName} als Favorit markieren`}
             >
@@ -68,12 +68,12 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-medium text-text-primary truncate group-hover:text-accent-orange transition-colors">{displayName}</h3>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-text-secondary uppercase tracking-widest font-bold shrink-0">
+                <h3 className="text-sm font-medium text-primary truncate group-hover:text-accent transition-colors">{displayName}</h3>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-hover-subtle text-secondary uppercase tracking-widest font-bold shrink-0">
                   {typeLabel}
                 </span>
               </div>
-              <p className="text-xs text-text-secondary mt-1">
+              <p className="text-xs text-secondary mt-1">
                 {new Date(date).toLocaleDateString('de-DE', {
                   day: '2-digit',
                   month: '2-digit',
@@ -82,7 +82,7 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
                   minute: '2-digit',
                 })}
                 {templateLabel && (
-                  <span className="ml-2 text-text-secondary/60 italic">&bull; {templateLabel}</span>
+                  <span className="ml-2 text-secondary/60 italic">&bull; {templateLabel}</span>
                 )}
               </p>
             </div>
@@ -96,7 +96,7 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
               onChange={(e) => onMove(e.target.value === '' ? null : parseInt(e.target.value))}
               onClick={(e) => e.stopPropagation()}
               aria-label={`${displayName} in Ordner verschieben`}
-              className="bg-white/5 border border-white/[0.06] text-[10px] text-text-secondary rounded px-2 py-1 outline-none hover:border-accent-orange/50 transition-colors cursor-pointer max-w-[120px] truncate"
+              className="bg-hover-subtle border border-subtle text-[10px] text-secondary rounded px-2 py-1 outline-none hover:border-accent/50 transition-colors cursor-pointer max-w-[120px] truncate"
             >
               <option value="">Kein Ordner</option>
               {folders.map(f => (
@@ -108,7 +108,7 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
           {onDelete && (
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(); }}
-              className="p-2 text-text-secondary hover:text-accent-red hover:bg-accent-red/10 rounded-lg transition-all"
+              className="p-2 text-secondary hover:text-danger hover:bg-danger/10 rounded-lg transition-all"
               title="Endgültig löschen"
               aria-label={`${displayName} endgültig löschen`}
             >

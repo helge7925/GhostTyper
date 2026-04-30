@@ -215,20 +215,20 @@ export default function Upload() {
       </Head>
 
       <div className="max-w-xl mx-auto">
-        <h1 className="text-2xl font-semibold text-text-primary mb-2">
+        <h1 className="text-2xl font-semibold text-primary mb-2">
           Audio hochladen
         </h1>
-        <p className="text-sm text-text-secondary mb-6">
+        <p className="text-sm text-secondary mb-6">
           Laden Sie eine Audiodatei hoch. Die Transkription startet automatisch.
         </p>
         {activePreset && (
-          <p className="text-xs text-accent-cyan bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 mb-6">
+          <p className="text-xs text-info bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 mb-6">
             Preset aktiv: {activePreset.label}
           </p>
         )}
 
         {result ? (
-          <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6 text-center">
+          <div className="bg-surface border border-subtle rounded-xl p-6 text-center">
             <div className="mb-5">
               <ProcessStatusCard
                 title={
@@ -278,7 +278,7 @@ export default function Upload() {
                 <button
                   onClick={() => triggerProcessingStart(result.id)}
                   disabled={startingProcess}
-                  className="bg-white/10 hover:bg-white/15 text-text-primary px-5 py-2 rounded-full text-sm font-medium border border-white/10 disabled:opacity-50"
+                  className="bg-hover-strong hover:bg-hover-strong text-primary px-5 py-2 rounded-full text-sm font-medium border border-subtle disabled:opacity-50"
                 >
                   {startingProcess ? 'Startet…' : 'Erneut starten'}
                 </button>
@@ -286,35 +286,35 @@ export default function Upload() {
             </div>
 
             {startError && (
-              <div className="mt-4 text-left bg-accent-red/10 border border-accent-red/30 text-accent-red rounded-xl px-4 py-3 text-xs">
+              <div className="mt-4 text-left bg-danger/10 border border-danger/30 text-danger rounded-xl px-4 py-3 text-xs">
                 {startError}
               </div>
             )}
 
-            <label className="mt-4 flex items-center justify-center gap-2 text-xs text-text-secondary">
+            <label className="mt-4 flex items-center justify-center gap-2 text-xs text-secondary">
               <input
                 type="checkbox"
                 checked={autoOpenWhenReady}
                 onChange={(e) => setAutoOpenWhenReady(e.target.checked)}
-                className="w-4 h-4 rounded border-white/20 bg-dark-input accent-accent-orange focus:ring-accent-orange"
+                className="w-4 h-4 rounded border-emphasis bg-surface-elevated accent-accent focus:ring-accent"
               />
               Detailseite automatisch öffnen, sobald das Ergebnis bereit ist
             </label>
 
             {result.auto_analyze && !result.diarize && (
-              <label className="mt-2 flex items-center justify-center gap-2 text-xs text-text-secondary">
+              <label className="mt-2 flex items-center justify-center gap-2 text-xs text-secondary">
                 <input
                   type="checkbox"
                   checked={autoOpenEditorWhenReady}
                   onChange={(e) => setAutoOpenEditorWhenReady(e.target.checked)}
-                  className="w-4 h-4 rounded border-white/20 bg-dark-input accent-accent-orange focus:ring-accent-orange"
+                  className="w-4 h-4 rounded border-emphasis bg-surface-elevated accent-accent focus:ring-accent"
                 />
                 Editor nach Zusammenfassung automatisch öffnen
               </label>
             )}
           </div>
         ) : (
-          <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6">
+          <div className="bg-surface border border-subtle rounded-xl p-6">
             <AudioUploadForm onSuccess={handleSuccess} presetConfig={activePreset?.config || null} />
           </div>
         )}

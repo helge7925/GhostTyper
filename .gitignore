@@ -31,3 +31,5 @@ logs
 
 # Test coverage
 coverage
+# Claude Code (local dev tooling)
+.claude/

@@ -18,12 +18,12 @@ export default function Tabellen() {
       </Head>
 
       <div className="max-w-5xl mx-auto mb-6">
-        <div className="inline-flex rounded-2xl border border-white/[0.08] bg-dark-card p-1">
+        <div className="inline-flex rounded-2xl border border-subtle bg-surface p-1">
           <button
             type="button"
             onClick={() => setMode('template')}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
-              mode === 'template' ? 'bg-accent-orange text-white' : 'text-text-secondary hover:text-text-primary'
+              mode === 'template' ? 'bg-accent text-white' : 'text-secondary hover:text-primary'
             }`}
           >
             Vorlage befüllen
@@ -32,7 +32,7 @@ export default function Tabellen() {
             type="button"
             onClick={() => setMode('free')}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
-              mode === 'free' ? 'bg-accent-orange text-white' : 'text-text-secondary hover:text-text-primary'
+              mode === 'free' ? 'bg-accent text-white' : 'text-secondary hover:text-primary'
             }`}
           >
             Freie Datentabelle

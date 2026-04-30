@@ -8,6 +8,39 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unreleased] - Ziel: v1.3.0
 
 ### Added
+- **App-Shell Phase 2 (Cross-Device-UX-Refactor):**
+  - Globaler UI-State via `zustand` (`lib/store/ui-store.js`): `sidebarOpen`, `sidebarCollapsed` (persistiert), `commandPaletteOpen`.
+  - Zentrale Z-Order in `lib/constants/z-index.js`.
+  - shadcn-Komponenten erweitert: `components/ui/sheet.js` (Radix-Dialog mit Side-Varianten) und `components/ui/command.js` (cmdk-Wrapper).
+  - `components/CommandPalette.js` — globale ⌘K-Palette mit Navigation, Aktionen, Theme-Toggle und Logout.
+  - `components/TopBar.js` — sticky Top-Bar mit Hamburger/Collapse-Toggle, zentriertem Such-/Befehls-Trigger (md+), Theme-Toggle und Profil-Dropdown (Profil/Einstellungen/Admin/Logout).
+  - `components/BottomNav.js` — 5-Routen-Bottom-Nav für Mobile mit iOS-`safe-area-inset-bottom`.
+  - Adaptive `Sidebar`: persistent kollapsible Rail (`xl:flex`, 256/64px mit Tooltips im Collapsed-Modus) + Sheet-Drawer (`xl:hidden`).
+  - Globale ⌘K / Ctrl+K / `/` Keyboard-Shortcuts in `pages/_app.js` (überspringt input/textarea/contentEditable).
+
+### Changed
+- **Layout** komponiert die neue Shell (TopBar + Sidebar + BottomNav) und reagiert auf `sidebarCollapsed` mit `xl:pl-16/64`.
+- **Z-Index aufgeräumt**: shadcn Dialog/AlertDialog 50 → 70, Tooltip 50 → 90, DropdownMenu 50 → 80, Sheet-Overlay 40 → 45; Full-Screen-Editoren (DocumentEditor/TableEditor/Settings-Overlays) 100/110 → 60 — Modale liegen jetzt korrekt über Editoren.
+- `Layout.js` rendert auch ohne Session eine schlanke TopBar (Logo + Theme-Toggle).
+
+### Removed
+- Touch-Swipe-Edge-Open-Handler aus alter Sidebar (Hamburger reicht; bei Bedarf später als `useEdgeSwipe`-Hook zurück).
+
+- **Design-System Phase 1 (Cross-Device-UX-Refactor):**
+  - Semantische Token-Schicht über CSS-Variablen mit Light- und Dark-Mode (`styles/globals.css`).
+  - `lib/theme-context.js` mit `ThemeProvider`, `useTheme()`, `localStorage`-Persistenz und `prefers-color-scheme`-Fallback; FOUC-freier Inline-Init in `pages/_document.js`.
+  - `components/ThemeToggle.js` in der Sidebar; `<meta theme-color>` in `Layout.js` jetzt theme-abhängig.
+  - shadcn/ui-Komponenten in `components/ui/`: Button (cva), Dialog, AlertDialog, Tooltip, DropdownMenu, Separator, Sonner-Toaster (theme-aware).
+  - Radix Primitives (`@radix-ui/react-{dialog,alert-dialog,tooltip,dropdown-menu,separator,slot}`), `clsx`, `tailwind-merge`, `class-variance-authority`, `tailwindcss-animate`, `sonner`, `lucide-react`.
+  - `lib/utils.js` mit `cn()` Helper.
+  - Migrations-Skripte: `scripts/migrate-tokens.mjs` (353 hartkodierte `white/[X]`-/`black/X`-Klassen) und `scripts/cleanup-tokens.mjs` (987 Legacy-Tokens) mit `--apply`/`--verbose`/Dry-Run.
+
+### Changed
+- **Tailwind-Config rein semantisch** — Compat-Aliase (`dark.*`, `text.*`, `accent.orange/cyan/green/yellow/red`) entfernt; Tokens jetzt: `canvas`, `surface`, `surface-elevated`, `primary`, `secondary`, `muted`, `accent.{DEFAULT,strong}`, `success`, `warning`, `danger`, `info`, `subtle`, `emphasis`, `hover-subtle/hover/hover-strong`, `overlay`.
+- `components/ConfirmDialog.js` auf Radix `AlertDialog` migriert (Focus-Trap, ESC, Backdrop-Click jetzt out-of-the-box; öffentliches Interface unverändert).
+- `components/AudioRecorder.js` Canvas liest Farben aus CSS-Variablen — reagiert live auf Theme-Switch.
+- Inline-SVGs in `Layout`, `Sidebar`, `ThemeToggle` durch lucide-Icons ersetzt; aktive Nav-Links bekommen `aria-current="page"`.
+
 - **Produktivitätsfunktionen (Punkte 1-3)**:
   - Auto-Glossar für Kontextbegriffe aus Historie (`GET /api/glossary/suggestions`).
   - Intelligente Modellauswahl mit Kosten-/Token-Vorschau (`POST /api/model-assistant`).

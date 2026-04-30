@@ -177,8 +177,8 @@ export default function KnowledgePrepWorkspace({
   return (
     <div className="max-w-5xl mx-auto animate-fade-in pb-20 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary">{heading}</h1>
-        <p className="text-sm text-text-secondary mt-1">
+        <h1 className="text-2xl font-bold text-primary">{heading}</h1>
+        <p className="text-sm text-secondary mt-1">
           {modeMeta.label}: {modeMeta.description}
         </p>
       </div>
@@ -192,18 +192,18 @@ export default function KnowledgePrepWorkspace({
               onClick={() => setMode(option.value)}
               className={`text-left rounded-2xl border p-4 transition-colors ${
                 effectiveMode === option.value
-                  ? 'border-accent-cyan/40 bg-cyan-500/10'
-                  : 'border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.04]'
+                  ? 'border-info/40 bg-cyan-500/10'
+                  : 'border-subtle bg-hover-subtle hover:bg-hover-subtle'
               }`}
             >
-              <p className="text-sm font-semibold text-text-primary">{option.label}</p>
-              <p className="text-xs text-text-secondary mt-1">{option.description}</p>
+              <p className="text-sm font-semibold text-primary">{option.label}</p>
+              <p className="text-xs text-secondary mt-1">{option.description}</p>
             </button>
           ))}
         </div>
       )}
 
-      <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-2 inline-flex gap-2">
+      <div className="bg-surface border border-subtle rounded-2xl p-2 inline-flex gap-2">
         {availableSourceOptions.map((option) => (
           <button
             key={option.value}
@@ -211,8 +211,8 @@ export default function KnowledgePrepWorkspace({
             onClick={() => setSource(option.value)}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
               source === option.value
-                ? 'bg-accent-orange/20 text-accent-orange border border-accent-orange/30'
-                : 'text-text-secondary hover:text-text-primary'
+                ? 'bg-accent/20 text-accent border border-accent/30'
+                : 'text-secondary hover:text-primary'
             }`}
           >
             {option.label}
@@ -221,9 +221,9 @@ export default function KnowledgePrepWorkspace({
       </div>
 
       {source === 'audio' && (
-        <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6">
-          <h2 className="text-sm font-semibold text-text-primary mb-2">Aus Audio erzeugen</h2>
-          <p className="text-xs text-text-secondary mb-4">
+        <div className="bg-surface border border-subtle rounded-2xl p-6">
+          <h2 className="text-sm font-semibold text-primary mb-2">Aus Audio erzeugen</h2>
+          <p className="text-xs text-secondary mb-4">
             Lädt Audio hoch und startet direkt die Verarbeitung. Danach wird die Detailseite geöffnet.
           </p>
           <AudioUploadForm
@@ -240,28 +240,28 @@ export default function KnowledgePrepWorkspace({
             }}
           />
           {audioStarting && (
-            <p className="text-xs text-accent-cyan mt-3">Verarbeitung wird gestartet…</p>
+            <p className="text-xs text-info mt-3">Verarbeitung wird gestartet…</p>
           )}
         </div>
       )}
 
       {source === 'text' && (
-        <form onSubmit={handleTextSubmit} className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-text-primary">Aus Text erzeugen</h2>
+        <form onSubmit={handleTextSubmit} className="bg-surface border border-subtle rounded-2xl p-6 space-y-4">
+          <h2 className="text-sm font-semibold text-primary">Aus Text erzeugen</h2>
           <textarea
             value={textInput}
             onChange={(event) => setTextInput(event.target.value)}
             placeholder="Text einfügen..."
             rows={10}
-            className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-text-primary outline-none resize-y"
+            className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none resize-y"
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">KI-Modell</label>
+              <label className="block text-xs font-medium text-secondary mb-1.5">KI-Modell</label>
               <select
                 value={textModel}
                 onChange={(event) => setTextModel(event.target.value)}
-                className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-3 py-2 text-sm text-text-primary outline-none"
+                className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-sm text-primary outline-none"
               >
                 {MODEL_OPTIONS.map((entry) => (
                   <option key={entry.value} value={entry.value}>{entry.label}</option>
@@ -269,29 +269,29 @@ export default function KnowledgePrepWorkspace({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Zusätzlicher Kontext</label>
+              <label className="block text-xs font-medium text-secondary mb-1.5">Zusätzlicher Kontext</label>
               <input
                 value={textPrompt}
                 onChange={(event) => setTextPrompt(event.target.value)}
                 placeholder="Optional: Fokus, Perspektive, Constraints"
-                className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-3 py-2 text-sm text-text-primary outline-none"
+                className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-sm text-primary outline-none"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Fokus der Analyse</label>
+              <label className="block text-xs font-medium text-secondary mb-1.5">Fokus der Analyse</label>
               <textarea
                 value={textAnalysisFocus}
                 onChange={(event) => setTextAnalysisFocus(event.target.value)}
                 placeholder="Worauf soll sich das KI-Modell bei der Analyse konzentrieren?"
                 rows={2}
-                className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-3 py-2 text-sm text-text-primary outline-none resize-y"
+                className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-sm text-primary outline-none resize-y"
               />
             </div>
           </div>
           <button
             type="submit"
             disabled={textSubmitting}
-            className="gradient-accent text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-accent-orange/20 disabled:opacity-40"
+            className="gradient-accent text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-accent/20 disabled:opacity-40"
           >
             {textSubmitting ? 'Wird erzeugt…' : `${modeMeta.label} aus Text erzeugen`}
           </button>
@@ -299,8 +299,8 @@ export default function KnowledgePrepWorkspace({
       )}
 
       {source === 'document' && (
-        <form onSubmit={handleDocumentSubmit} className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-text-primary">Aus PDF/Bild erzeugen</h2>
+        <form onSubmit={handleDocumentSubmit} className="bg-surface border border-subtle rounded-2xl p-6 space-y-4">
+          <h2 className="text-sm font-semibold text-primary">Aus PDF/Bild erzeugen</h2>
           <div
             role="button"
             tabIndex={0}
@@ -311,7 +311,7 @@ export default function KnowledgePrepWorkspace({
                 documentInputRef.current?.click();
               }
             }}
-            className="border-2 border-dashed border-white/[0.12] hover:border-white/[0.2] rounded-2xl p-6 text-center cursor-pointer transition-colors"
+            className="border-2 border-dashed border-emphasis hover:border-emphasis rounded-2xl p-6 text-center cursor-pointer transition-colors"
           >
             <input
               ref={documentInputRef}
@@ -321,21 +321,21 @@ export default function KnowledgePrepWorkspace({
               className="hidden"
             />
             {documentFile ? (
-              <p className="text-sm text-text-primary">
+              <p className="text-sm text-primary">
                 {documentFile.name}{' '}
-                <span className="text-text-secondary">({(documentFile.size / 1024 / 1024).toFixed(1)} MB)</span>
+                <span className="text-secondary">({(documentFile.size / 1024 / 1024).toFixed(1)} MB)</span>
               </p>
             ) : (
-              <p className="text-sm text-text-secondary">PDF oder Bild auswählen</p>
+              <p className="text-sm text-secondary">PDF oder Bild auswählen</p>
             )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">KI-Modell</label>
+              <label className="block text-xs font-medium text-secondary mb-1.5">KI-Modell</label>
               <select
                 value={documentModel}
                 onChange={(event) => setDocumentModel(event.target.value)}
-                className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-3 py-2 text-sm text-text-primary outline-none"
+                className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-sm text-primary outline-none"
               >
                 {MODEL_OPTIONS.map((entry) => (
                   <option key={entry.value} value={entry.value}>{entry.label}</option>
@@ -343,39 +343,39 @@ export default function KnowledgePrepWorkspace({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Zusätzlicher Kontext</label>
+              <label className="block text-xs font-medium text-secondary mb-1.5">Zusätzlicher Kontext</label>
               <input
                 value={documentPrompt}
                 onChange={(event) => setDocumentPrompt(event.target.value)}
                 placeholder="Optional: Fokus, Perspektive, Constraints"
-                className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-3 py-2 text-sm text-text-primary outline-none"
+                className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-sm text-primary outline-none"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Fokus der Analyse</label>
+              <label className="block text-xs font-medium text-secondary mb-1.5">Fokus der Analyse</label>
               <textarea
                 value={documentAnalysisFocus}
                 onChange={(event) => setDocumentAnalysisFocus(event.target.value)}
                 placeholder="Worauf soll sich das KI-Modell bei der Analyse konzentrieren?"
                 rows={2}
-                className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-3 py-2 text-sm text-text-primary outline-none resize-y"
+                className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-sm text-primary outline-none resize-y"
               />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Bezug im Dokument</label>
+            <label className="block text-xs font-medium text-secondary mb-1.5">Bezug im Dokument</label>
             <textarea
               value={documentScope}
               onChange={(event) => setDocumentScope(event.target.value)}
               placeholder="z. B. Seiten 3-8, Kapitel 'Risiken', Abschnitt 'Maßnahmenplan'"
               rows={2}
-              className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-3 py-2 text-sm text-text-primary outline-none resize-y"
+              className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-sm text-primary outline-none resize-y"
             />
           </div>
           <button
             type="submit"
             disabled={documentSubmitting}
-            className="gradient-accent text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-accent-orange/20 disabled:opacity-40"
+            className="gradient-accent text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-accent/20 disabled:opacity-40"
           >
             {documentSubmitting ? 'Wird verarbeitet…' : `${modeMeta.label} aus PDF/Bild erzeugen`}
           </button>
@@ -383,7 +383,7 @@ export default function KnowledgePrepWorkspace({
       )}
 
       {error && (
-        <div className="bg-accent-red/10 border border-accent-red/25 text-accent-red rounded-2xl px-4 py-3 text-sm">
+        <div className="bg-danger/10 border border-danger/25 text-danger rounded-2xl px-4 py-3 text-sm">
           {error}
         </div>
       )}

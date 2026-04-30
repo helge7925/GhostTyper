@@ -97,10 +97,10 @@ export default function ProcessStatusCard({
   }, [done, etaSeconds, startTimestamp, now]);
 
   return (
-    <div className="bg-dark-card border border-white/[0.08] rounded-2xl p-5 shadow-xl animate-fade-in">
+    <div className="bg-surface border border-subtle rounded-2xl p-5 shadow-xl animate-fade-in">
       <div className="flex items-start gap-3 mb-4">
         <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-          done ? 'bg-accent-green/20 text-accent-green' : 'bg-accent-orange/20 text-accent-orange'
+          done ? 'bg-success/20 text-success' : 'bg-accent/20 text-accent'
         }`}>
           {done ? (
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,8 +111,8 @@ export default function ProcessStatusCard({
           )}
         </div>
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
-          {description && <p className="text-xs text-text-secondary mt-1">{description}</p>}
+          <h3 className="text-sm font-semibold text-primary">{title}</h3>
+          {description && <p className="text-xs text-secondary mt-1">{description}</p>}
         </div>
       </div>
 
@@ -124,10 +124,10 @@ export default function ProcessStatusCard({
             return (
               <div key={step.key || step.label || index} className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${
-                  isCompleted ? 'bg-accent-green' : isActive ? 'bg-accent-orange animate-pulse' : 'bg-white/20'
+                  isCompleted ? 'bg-success' : isActive ? 'bg-accent animate-pulse' : 'bg-hover-strong'
                 }`} />
                 <span className={`text-xs ${
-                  isCompleted || isActive ? 'text-text-primary' : 'text-text-secondary'
+                  isCompleted || isActive ? 'text-primary' : 'text-secondary'
                 }`}>
                   {step.label}
                 </span>
@@ -138,13 +138,13 @@ export default function ProcessStatusCard({
       )}
 
       {etaText && (
-        <p className="mt-3 text-sm text-accent-orange font-medium">
+        <p className="mt-3 text-sm text-accent font-medium">
           {etaText}
         </p>
       )}
 
       {currentMessage && (
-        <p className="mt-4 text-sm md:text-base text-text-secondary italic leading-relaxed">
+        <p className="mt-4 text-sm md:text-base text-secondary italic leading-relaxed">
           {currentMessage}
         </p>
       )}

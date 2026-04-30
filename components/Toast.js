@@ -7,9 +7,9 @@ export default function Toast({ message, type = 'info', duration = 5000, onClose
   }, [duration, onClose]);
 
   const styles = {
-    info: 'bg-accent-orange/20 border-accent-orange/40 text-accent-orange',
+    info: 'bg-accent/20 border-accent/40 text-accent',
     success: 'bg-green-500/20 border-green-500/40 text-green-400',
-    error: 'bg-accent-red/20 border-accent-red/40 text-accent-red',
+    error: 'bg-danger/20 border-danger/40 text-danger',
   };
 
   return (

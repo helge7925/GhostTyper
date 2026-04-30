@@ -103,7 +103,7 @@ function FieldTypeSelect({ value, onChange }) {
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="w-full bg-dark-input border border-white/[0.1] rounded-md px-2 py-1.5 text-xs text-text-primary outline-none focus:border-accent-orange"
+      className="w-full bg-surface-elevated border border-subtle rounded-md px-2 py-1.5 text-xs text-primary outline-none focus:border-accent"
     >
       {TABLE_FIELD_TYPES.map((option) => (
         <option key={option.value} value={option.value}>{option.label}</option>
@@ -319,18 +319,18 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
 
   return (
     <div className="space-y-6">
-      <section className="bg-dark-card border border-white/[0.08] rounded-2xl p-5 space-y-5">
+      <section className="bg-surface border border-subtle rounded-2xl p-5 space-y-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold text-text-primary">Schnellstart</p>
-            <p className="text-[11px] text-text-secondary mt-1">Vorlage wählen oder aus einer kurzen Beschreibung erzeugen.</p>
+            <p className="text-xs font-semibold text-primary">Schnellstart</p>
+            <p className="text-[11px] text-secondary mt-1">Vorlage wählen oder aus einer kurzen Beschreibung erzeugen.</p>
           </div>
-          <label className="inline-flex items-center gap-2 text-xs text-text-secondary">
+          <label className="inline-flex items-center gap-2 text-xs text-secondary">
             <input
               type="checkbox"
               checked={showAdvanced}
               onChange={(event) => setShowAdvanced(event.target.checked)}
-              className="accent-accent-orange"
+              className="accent-accent"
             />
             Keys anzeigen
           </label>
@@ -342,10 +342,10 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
               key={preset.id}
               type="button"
               onClick={() => applyPreset(preset.schema)}
-              className="text-left rounded-xl border border-white/[0.08] bg-white/[0.03] hover:border-accent-orange/40 hover:bg-accent-orange/10 px-4 py-3 transition-colors"
+              className="text-left rounded-xl border border-subtle bg-hover-subtle hover:border-accent/40 hover:bg-accent/10 px-4 py-3 transition-colors"
             >
-              <p className="text-sm font-semibold text-text-primary">{preset.label}</p>
-              <p className="text-[11px] text-text-secondary mt-1">{preset.description}</p>
+              <p className="text-sm font-semibold text-primary">{preset.label}</p>
+              <p className="text-[11px] text-secondary mt-1">{preset.description}</p>
             </button>
           ))}
         </div>
@@ -356,13 +356,13 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
             onChange={(event) => setDescriptionInput(event.target.value)}
             placeholder="z. B. Tabelle mit Datum, ausgefüllt von, drei Prüfpunkten als Zeilen und Spalten für Wert und Bemerkung"
             rows={2}
-            className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none focus:border-accent-orange resize-none"
+            className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:border-accent resize-none"
           />
           <button
             type="button"
             onClick={handleGenerateFromDescription}
             disabled={!descriptionInput.trim()}
-            className="px-4 py-2.5 rounded-xl bg-white/[0.06] text-text-primary hover:bg-white/[0.1] disabled:opacity-40 text-sm font-medium"
+            className="px-4 py-2.5 rounded-xl bg-hover text-primary hover:bg-hover-strong disabled:opacity-40 text-sm font-medium"
           >
             Vorschlag erzeugen
           </button>
@@ -372,34 +372,34 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
       <section className="grid grid-cols-1 lg:grid-cols-[1.2fr_1.8fr] gap-4">
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Name der Tabelle</label>
+            <label className="block text-xs font-medium text-secondary mb-1.5">Name der Tabelle</label>
             <input
               type="text"
               value={schema.tableName}
               onChange={(event) => updateSchema((prev) => ({ ...prev, tableName: event.target.value }))}
               placeholder="z. B. Tagesbericht"
-              className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none focus:border-accent-orange"
+              className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:border-accent"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Extraktionshinweis</label>
+            <label className="block text-xs font-medium text-secondary mb-1.5">Extraktionshinweis</label>
             <textarea
               value={schema.description}
               onChange={(event) => updateSchema((prev) => ({ ...prev, description: event.target.value }))}
               placeholder="Was soll aus dem Transkript in diese Tabelle eingetragen werden?"
               rows={4}
-              className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none focus:border-accent-orange resize-none"
+              className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:border-accent resize-none"
             />
           </div>
         </div>
 
-        <div className="bg-dark-card border border-white/[0.08] rounded-2xl p-4 space-y-3">
+        <div className="bg-surface border border-subtle rounded-2xl p-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold text-text-primary">Metadaten oberhalb der Tabelle</p>
+            <p className="text-xs font-semibold text-primary">Metadaten oberhalb der Tabelle</p>
             <button
               type="button"
               onClick={addMetadataField}
-              className="px-3 py-1.5 rounded-lg border border-dashed border-white/[0.2] text-xs text-text-secondary hover:text-text-primary hover:border-accent-orange/50"
+              className="px-3 py-1.5 rounded-lg border border-dashed border-emphasis text-xs text-secondary hover:text-primary hover:border-accent/50"
             >
               + Feld
             </button>
@@ -409,7 +409,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
               value={quickMetadataInput}
               onChange={(event) => setQuickMetadataInput(event.target.value)}
               placeholder="z. B. Datum, Ausgefüllt von, Projekt"
-              className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-accent-orange"
+              className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent"
             />
             <button
               type="button"
@@ -418,7 +418,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                 setQuickMetadataInput('');
               }}
               disabled={!quickMetadataInput.trim()}
-              className="px-4 py-2 rounded-lg bg-white/[0.06] text-text-primary hover:bg-white/[0.1] disabled:opacity-40 text-sm font-medium"
+              className="px-4 py-2 rounded-lg bg-hover text-primary hover:bg-hover-strong disabled:opacity-40 text-sm font-medium"
             >
               Übernehmen
             </button>
@@ -430,23 +430,23 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                 <input
                   value={field.label}
                   onChange={(event) => updateMetadataField(index, { label: event.target.value })}
-                  className="bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-accent-orange"
+                  className="bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent"
                   placeholder="Feldname"
                 />
                 <FieldTypeSelect value={field.type} onChange={(value) => updateMetadataField(index, { type: value })} />
-                <label className="inline-flex items-center gap-2 text-xs text-text-secondary">
+                <label className="inline-flex items-center gap-2 text-xs text-secondary">
                   <input
                     type="checkbox"
                     checked={field.required}
                     onChange={(event) => updateMetadataField(index, { required: event.target.checked })}
-                    className="accent-accent-orange"
+                    className="accent-accent"
                   />
                   Pflicht
                 </label>
                 <button
                   type="button"
                   onClick={() => removeMetadataField(index)}
-                  className="px-2 py-2 rounded-lg text-accent-red hover:bg-accent-red/10 text-xs"
+                  className="px-2 py-2 rounded-lg text-danger hover:bg-danger/10 text-xs"
                 >
                   Löschen
                 </button>
@@ -454,13 +454,13 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                   <input
                     value={field.key}
                     onChange={(event) => updateMetadataField(index, { key: sanitizeTableKey(event.target.value, `meta_${index + 1}`) })}
-                    className="md:col-span-4 bg-dark-input border border-white/[0.1] rounded-lg px-3 py-1.5 text-xs font-mono text-text-secondary outline-none focus:border-accent-orange"
+                    className="md:col-span-4 bg-surface-elevated border border-subtle rounded-lg px-3 py-1.5 text-xs font-mono text-secondary outline-none focus:border-accent"
                   />
                 )}
               </div>
             ))}
             {schema.metadata.length === 0 && (
-              <p className="text-xs text-text-secondary bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-3">
+              <p className="text-xs text-secondary bg-hover-subtle border border-subtle rounded-xl px-3 py-3">
                 Keine Metadatenfelder angelegt.
               </p>
             )}
@@ -468,25 +468,25 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
         </div>
       </section>
 
-      <section className="bg-dark-card border border-white/[0.08] rounded-2xl overflow-hidden">
-        <div className="border-b border-white/[0.08] p-4 space-y-3">
+      <section className="bg-surface border border-subtle rounded-2xl overflow-hidden">
+        <div className="border-b border-subtle p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold text-text-primary">Tabellenraster</p>
-              <p className="text-[11px] text-text-secondary mt-1">Spaltentitel oben, Zeilentitel links. Die Zellen werden später nur mit diktiertem Inhalt gefüllt.</p>
+              <p className="text-xs font-semibold text-primary">Tabellenraster</p>
+              <p className="text-[11px] text-secondary mt-1">Spaltentitel oben, Zeilentitel links. Die Zellen werden später nur mit diktiertem Inhalt gefüllt.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={addRowDefinition}
-                className="px-3 py-1.5 rounded-lg border border-dashed border-white/[0.2] text-xs text-text-secondary hover:text-text-primary hover:border-accent-orange/50"
+                className="px-3 py-1.5 rounded-lg border border-dashed border-emphasis text-xs text-secondary hover:text-primary hover:border-accent/50"
               >
                 + Zeile
               </button>
               <button
                 type="button"
                 onClick={addColumn}
-                className="px-3 py-1.5 rounded-lg border border-dashed border-white/[0.2] text-xs text-text-secondary hover:text-text-primary hover:border-accent-orange/50"
+                className="px-3 py-1.5 rounded-lg border border-dashed border-emphasis text-xs text-secondary hover:text-primary hover:border-accent/50"
               >
                 + Spalte
               </button>
@@ -499,7 +499,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                 value={quickRowInput}
                 onChange={(event) => setQuickRowInput(event.target.value)}
                 placeholder="Zeilen: Raum 1, Raum 2, Raum 3"
-                className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-accent-orange"
+                className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent"
               />
               <button
                 type="button"
@@ -508,7 +508,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                   setQuickRowInput('');
                 }}
                 disabled={!quickRowInput.trim()}
-                className="px-3 py-2 rounded-lg bg-white/[0.06] text-text-primary hover:bg-white/[0.1] disabled:opacity-40 text-xs font-medium"
+                className="px-3 py-2 rounded-lg bg-hover text-primary hover:bg-hover-strong disabled:opacity-40 text-xs font-medium"
               >
                 Zeilen setzen
               </button>
@@ -518,7 +518,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                 value={quickColumnInput}
                 onChange={(event) => setQuickColumnInput(event.target.value)}
                 placeholder="Spalten: Wert, Einheit, Bemerkung"
-                className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-accent-orange"
+                className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent"
               />
               <button
                 type="button"
@@ -527,7 +527,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                   setQuickColumnInput('');
                 }}
                 disabled={!quickColumnInput.trim()}
-                className="px-3 py-2 rounded-lg bg-white/[0.06] text-text-primary hover:bg-white/[0.1] disabled:opacity-40 text-xs font-medium"
+                className="px-3 py-2 rounded-lg bg-hover text-primary hover:bg-hover-strong disabled:opacity-40 text-xs font-medium"
               >
                 Spalten setzen
               </button>
@@ -538,17 +538,17 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
         <div className="overflow-auto">
           <table className="w-full min-w-[860px] text-sm">
             <thead>
-              <tr className="bg-white/[0.04]">
-                <th className="sticky left-0 z-10 bg-[#1b1b25] w-56 px-3 py-3 text-left text-[11px] uppercase tracking-wider text-text-secondary border-r border-white/[0.08]">
+              <tr className="bg-hover-subtle">
+                <th className="sticky left-0 z-10 bg-surface-elevated w-56 px-3 py-3 text-left text-[11px] uppercase tracking-wider text-secondary border-r border-subtle">
                   Zeilentitel
                 </th>
                 {schema.columns.map((column, index) => (
-                  <th key={`column-${index}`} className="min-w-[170px] px-2 py-2 border-r border-white/[0.05] align-top">
+                  <th key={`column-${index}`} className="min-w-[170px] px-2 py-2 border-r border-subtle align-top">
                     <div className="space-y-2">
                       <input
                         value={column.label}
                         onChange={(event) => updateColumn(index, { label: event.target.value })}
-                        className="w-full bg-dark-input border border-white/[0.1] rounded-md px-2 py-1.5 text-sm text-text-primary outline-none focus:border-accent-orange"
+                        className="w-full bg-surface-elevated border border-subtle rounded-md px-2 py-1.5 text-sm text-primary outline-none focus:border-accent"
                         placeholder={`Spalte ${index + 1}`}
                       />
                       <div className="grid grid-cols-[1fr_auto_auto] gap-1 items-center">
@@ -557,7 +557,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                           type="button"
                           onClick={() => moveColumn(index, 'left')}
                           disabled={index === 0}
-                          className="px-2 py-1 rounded text-text-secondary hover:text-text-primary disabled:opacity-25"
+                          className="px-2 py-1 rounded text-secondary hover:text-primary disabled:opacity-25"
                           title="Nach links"
                         >
                           ←
@@ -566,19 +566,19 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                           type="button"
                           onClick={() => moveColumn(index, 'right')}
                           disabled={index === schema.columns.length - 1}
-                          className="px-2 py-1 rounded text-text-secondary hover:text-text-primary disabled:opacity-25"
+                          className="px-2 py-1 rounded text-secondary hover:text-primary disabled:opacity-25"
                           title="Nach rechts"
                         >
                           →
                         </button>
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <label className="inline-flex items-center gap-1.5 text-[11px] text-text-secondary">
+                        <label className="inline-flex items-center gap-1.5 text-[11px] text-secondary">
                           <input
                             type="checkbox"
                             checked={column.required}
                             onChange={(event) => updateColumn(index, { required: event.target.checked })}
-                            className="accent-accent-orange"
+                            className="accent-accent"
                           />
                           Pflicht
                         </label>
@@ -586,7 +586,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                           type="button"
                           onClick={() => removeColumn(index)}
                           disabled={schema.columns.length <= 1}
-                          className="text-[11px] text-accent-red hover:text-red-300 disabled:opacity-30"
+                          className="text-[11px] text-danger hover:text-red-300 disabled:opacity-30"
                         >
                           Löschen
                         </button>
@@ -595,7 +595,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                         <input
                           value={column.key}
                           onChange={(event) => updateColumn(index, { key: sanitizeTableKey(event.target.value, `spalte_${index + 1}`) })}
-                          className="w-full bg-dark-input border border-white/[0.1] rounded-md px-2 py-1 text-[11px] font-mono text-text-secondary outline-none focus:border-accent-orange"
+                          className="w-full bg-surface-elevated border border-subtle rounded-md px-2 py-1 text-[11px] font-mono text-secondary outline-none focus:border-accent"
                         />
                       )}
                     </div>
@@ -607,21 +607,21 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
               {previewRows.map((row, rowIndex) => {
                 const isRealRow = rowIndex < schema.rows.length;
                 return (
-                  <tr key={`row-${row.key || rowIndex}`} className="border-t border-white/[0.05]">
-                    <th className="sticky left-0 z-10 bg-[#171720] w-56 px-2 py-2 border-r border-white/[0.08] align-top">
+                  <tr key={`row-${row.key || rowIndex}`} className="border-t border-subtle">
+                    <th className="sticky left-0 z-10 bg-surface-elevated w-56 px-2 py-2 border-r border-subtle align-top">
                       {isRealRow ? (
                         <div className="space-y-2">
                           <input
                             value={row.label}
                             onChange={(event) => updateRowDefinition(rowIndex, { label: event.target.value })}
-                            className="w-full bg-dark-input border border-white/[0.1] rounded-md px-2 py-1.5 text-sm text-text-primary outline-none focus:border-accent-orange"
+                            className="w-full bg-surface-elevated border border-subtle rounded-md px-2 py-1.5 text-sm text-primary outline-none focus:border-accent"
                           />
                           <div className="grid grid-cols-[auto_auto_1fr_auto] gap-1 items-center">
                             <button
                               type="button"
                               onClick={() => moveRowDefinition(rowIndex, 'up')}
                               disabled={rowIndex === 0}
-                              className="px-2 py-1 rounded text-text-secondary hover:text-text-primary disabled:opacity-25"
+                              className="px-2 py-1 rounded text-secondary hover:text-primary disabled:opacity-25"
                               title="Nach oben"
                             >
                               ↑
@@ -630,24 +630,24 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                               type="button"
                               onClick={() => moveRowDefinition(rowIndex, 'down')}
                               disabled={rowIndex === schema.rows.length - 1}
-                              className="px-2 py-1 rounded text-text-secondary hover:text-text-primary disabled:opacity-25"
+                              className="px-2 py-1 rounded text-secondary hover:text-primary disabled:opacity-25"
                               title="Nach unten"
                             >
                               ↓
                             </button>
-                            <label className="inline-flex items-center gap-1.5 text-[11px] text-text-secondary justify-self-start">
+                            <label className="inline-flex items-center gap-1.5 text-[11px] text-secondary justify-self-start">
                               <input
                                 type="checkbox"
                                 checked={row.required}
                                 onChange={(event) => updateRowDefinition(rowIndex, { required: event.target.checked })}
-                                className="accent-accent-orange"
+                                className="accent-accent"
                               />
                               Pflicht
                             </label>
                             <button
                               type="button"
                               onClick={() => removeRowDefinition(rowIndex)}
-                              className="text-[11px] text-accent-red hover:text-red-300"
+                              className="text-[11px] text-danger hover:text-red-300"
                             >
                               Löschen
                             </button>
@@ -656,22 +656,22 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                             value={row.hint || ''}
                             onChange={(event) => updateRowDefinition(rowIndex, { hint: event.target.value })}
                             placeholder="Hinweis für diese Zeile"
-                            className="w-full bg-dark-input border border-white/[0.1] rounded-md px-2 py-1 text-[11px] text-text-secondary outline-none focus:border-accent-orange"
+                            className="w-full bg-surface-elevated border border-subtle rounded-md px-2 py-1 text-[11px] text-secondary outline-none focus:border-accent"
                           />
                           {showAdvanced && (
                             <input
                               value={row.key}
                               onChange={(event) => updateRowDefinition(rowIndex, { key: sanitizeTableKey(event.target.value, `zeile_${rowIndex + 1}`) })}
-                              className="w-full bg-dark-input border border-white/[0.1] rounded-md px-2 py-1 text-[11px] font-mono text-text-secondary outline-none focus:border-accent-orange"
+                              className="w-full bg-surface-elevated border border-subtle rounded-md px-2 py-1 text-[11px] font-mono text-secondary outline-none focus:border-accent"
                             />
                           )}
                         </div>
                       ) : (
-                        <span className="text-xs text-text-secondary">{row.label}</span>
+                        <span className="text-xs text-secondary">{row.label}</span>
                       )}
                     </th>
                     {schema.columns.map((column) => (
-                      <td key={`${row.key}-${column.key}`} className="px-3 py-4 border-r border-white/[0.04] text-text-secondary/50">
+                      <td key={`${row.key}-${column.key}`} className="px-3 py-4 border-r border-subtle text-secondary/50">
                         {renderPlaceholder(column)}
                       </td>
                     ))}
@@ -684,9 +684,9 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
       </section>
 
       {!validation.isValid && (
-        <div className="bg-accent-red/10 border border-accent-red/30 rounded-xl p-4">
-          <p className="text-accent-red text-sm font-medium mb-2">Bitte korrigieren Sie die folgenden Punkte:</p>
-          <ul className="text-accent-red/80 text-xs space-y-1">
+        <div className="bg-danger/10 border border-danger/30 rounded-xl p-4">
+          <p className="text-danger text-sm font-medium mb-2">Bitte korrigieren Sie die folgenden Punkte:</p>
+          <ul className="text-danger/80 text-xs space-y-1">
             {validation.errors.map((entry, index) => (
               <li key={`${entry}-${index}`}>• {entry}</li>
             ))}

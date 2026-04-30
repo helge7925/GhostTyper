@@ -384,28 +384,28 @@ export default function DocumentEditor({
   }, [captureSelection]);
 
   return (
-    <div className={`fixed inset-0 z-[100] bg-dark-bg flex flex-col animate-fade-in print-root ${focusMode ? `focus-mode focus-theme-${focusPreset}` : ''}`}>
+    <div className={`fixed inset-0 z-[60] bg-canvas flex flex-col animate-fade-in print-root ${focusMode ? `focus-mode focus-theme-${focusPreset}` : ''}`}>
       {/* Top Navbar */}
       <nav className={`min-h-16 border-b flex flex-wrap md:flex-nowrap items-center justify-between gap-2 px-3 md:px-6 py-2 md:py-0 shrink-0 no-print ${
         focusMode
           ? focusPreset === 'paper'
-            ? 'bg-[#f3f2ee] border-black/10 backdrop-blur-md md:min-h-14 md:px-8'
-            : 'bg-[#0b0b10] border-white/10 backdrop-blur-md md:min-h-14 md:px-8'
-          : 'bg-dark-card border-white/[0.06]'
+            ? 'bg-[#f3f2ee] border-subtle backdrop-blur-md md:min-h-14 md:px-8'
+            : 'bg-canvas border-subtle backdrop-blur-md md:min-h-14 md:px-8'
+          : 'bg-surface border-subtle'
       }`}>
         {focusMode ? (
           <div className="w-full flex items-center justify-end gap-2 md:gap-3">
             <div className={`flex items-center rounded-lg p-0.5 border ${
               focusPreset === 'paper'
-                ? 'bg-black/5 border-black/10'
-                : 'bg-white/5 border-white/10'
+                ? 'bg-hover-subtle border-subtle'
+                : 'bg-hover-subtle border-subtle'
             }`}>
               <button
                 onClick={() => setFocusPreset('paper')}
                 className={`px-2.5 py-1 text-[10px] font-bold rounded-md border transition-colors ${
                   focusPreset === 'paper'
-                    ? 'bg-accent-orange text-white border-accent-orange shadow-sm'
-                    : 'bg-transparent text-white/75 border-transparent hover:text-white hover:bg-white/10'
+                    ? 'bg-accent text-white border-accent shadow-sm'
+                    : 'bg-transparent text-white/75 border-transparent hover:text-white hover:bg-hover-strong'
                 }`}
               >
                 Hell
@@ -414,8 +414,8 @@ export default function DocumentEditor({
                 onClick={() => setFocusPreset('ink')}
                 className={`px-2.5 py-1 text-[10px] font-bold rounded-md border transition-colors ${
                   focusPreset === 'ink'
-                    ? 'bg-accent-orange text-white border-accent-orange shadow-sm'
-                    : 'bg-transparent text-black/75 border-transparent hover:text-black hover:bg-black/5'
+                    ? 'bg-accent text-white border-accent shadow-sm'
+                    : 'bg-transparent text-primary border-transparent hover:text-black hover:bg-hover-subtle'
                 }`}
               >
                 Dunkel
@@ -425,8 +425,8 @@ export default function DocumentEditor({
               onClick={() => setFocusMode(false)}
               className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
                 focusPreset === 'paper'
-                  ? 'bg-black/10 text-black border border-black/20'
-                  : 'bg-accent-orange/20 text-accent-orange border border-accent-orange/30'
+                  ? 'bg-hover-subtle text-black border border-emphasis'
+                  : 'bg-accent/20 text-accent border border-accent/30'
               }`}
             >
               Fokus aus
@@ -435,21 +435,21 @@ export default function DocumentEditor({
         ) : (
           <>
             <div className="flex items-center gap-3 md:gap-4 min-w-0">
-              <button onClick={onCancel} className="p-2 rounded-full transition-all text-text-secondary hover:text-accent-orange bg-white/5">
+              <button onClick={onCancel} className="p-2 rounded-full transition-all text-secondary hover:text-accent bg-hover-subtle">
                 <span className="sr-only">Editor schließen</span>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               </button>
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-accent-orange uppercase tracking-widest leading-none">Editor</span>
-                <span className="text-sm font-medium text-text-primary truncate max-w-[200px]">{filename}</span>
+                <span className="text-[10px] font-bold text-accent uppercase tracking-widest leading-none">Editor</span>
+                <span className="text-sm font-medium text-primary truncate max-w-[200px]">{filename}</span>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
               <button onClick={handleSave} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
                 saveFeedback
-                  ? 'bg-accent-green/20 text-accent-green'
-                  : 'text-text-primary hover:bg-white/5'
+                  ? 'bg-success/20 text-success'
+                  : 'text-primary hover:bg-hover-subtle'
               }`}>
                 {saveFeedback ? 'Gespeichert!' : 'Speichern ⌘S'}
               </button>
@@ -464,20 +464,20 @@ export default function DocumentEditor({
 
               <button
                 onClick={handleExportDoc}
-                className="px-4 py-2 text-xs font-bold rounded-xl border transition-colors bg-white/5 hover:bg-white/10 border-white/10 text-text-primary"
+                className="px-4 py-2 text-xs font-bold rounded-xl border transition-colors bg-hover-subtle hover:bg-hover-strong border-subtle text-primary"
               >
                 DOCX exportieren
               </button>
 
-              <div className="flex items-center gap-2 bg-white/5 rounded-xl px-2 py-1 border border-white/5">
-                <select value={targetLang} onChange={e => setTargetLang(e.target.value)} className="bg-transparent text-[10px] text-text-primary outline-none cursor-pointer">
+              <div className="flex items-center gap-2 bg-hover-subtle rounded-xl px-2 py-1 border border-subtle">
+                <select value={targetLang} onChange={e => setTargetLang(e.target.value)} className="bg-transparent text-[10px] text-primary outline-none cursor-pointer">
                   {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
                 </select>
                 <button
                   onClick={handleTranslateAction}
                   disabled={isTranslating}
                   aria-label="Text im Editor übersetzen"
-                  className="text-[10px] font-bold text-accent-orange hover:text-white transition-colors uppercase tracking-wider px-2"
+                  className="text-[10px] font-bold text-accent hover:text-white transition-colors uppercase tracking-wider px-2"
                 >
                   {isTranslating ? '...' : 'Übersetzen'}
                 </button>
@@ -485,7 +485,7 @@ export default function DocumentEditor({
               <button
                 onClick={handleCopy}
                 className={`px-3 py-2 text-xs font-bold rounded-xl transition-all ${
-                  copyFeedback ? 'bg-accent-green/20 text-accent-green' : 'text-text-primary hover:bg-white/5 border border-transparent'
+                  copyFeedback ? 'bg-success/20 text-success' : 'text-primary hover:bg-hover-subtle border border-transparent'
                 }`}
               >
                 {copyFeedback ? 'Kopiert!' : 'Text kopieren'}
@@ -493,7 +493,7 @@ export default function DocumentEditor({
 
               <button
                 onClick={() => setFocusMode(true)}
-                className="inline-flex px-4 py-2 text-xs font-bold rounded-xl transition-all text-text-primary hover:bg-white/5"
+                className="inline-flex px-4 py-2 text-xs font-bold rounded-xl transition-all text-primary hover:bg-hover-subtle"
               >
                 Fokus
               </button>
@@ -507,31 +507,31 @@ export default function DocumentEditor({
           focusMode
             ? focusPreset === 'paper'
               ? 'bg-[#efeee9]'
-              : 'bg-[#09090d]'
-            : 'bg-[#0a0a0f]'
+              : 'bg-canvas'
+            : 'bg-canvas'
         }`}>
           {/* Formatting Bar - Fixed bottom on mobile, sticky top on desktop */}
           <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 md:sticky md:top-6 md:bottom-auto md:translate-x-0 mb-4 no-print ${focusMode ? 'hidden' : ''}`}>
-            <div className="bg-dark-card/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl p-1.5 shadow-2xl flex items-center gap-0.5 max-w-[95vw] overflow-x-auto no-scrollbar">
-              <button type="button" onClick={() => execCommand('bold')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl font-bold" aria-label="Fett">B</button>
-              <button type="button" onClick={() => execCommand('italic')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl italic" aria-label="Kursiv">I</button>
-              <button type="button" onClick={() => execCommand('underline')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl underline" aria-label="Unterstrichen">U</button>
-              <div className="w-px h-4 bg-white/10 mx-1.5" />
-              <button type="button" onClick={() => execCommand('formatBlock', 'h2')} className="p-2 text-text-secondary hover:text-accent-orange rounded-xl text-xs font-bold" aria-label="Überschrift Ebene 2">H2</button>
-              <button type="button" onClick={() => execCommand('formatBlock', 'h3')} className="p-2 text-text-secondary hover:text-accent-orange rounded-xl text-[10px] font-bold" aria-label="Überschrift Ebene 3">H3</button>
-              <button type="button" onClick={() => execCommand('formatBlock', 'p')} className="p-2 text-text-secondary hover:text-accent-orange rounded-xl text-[10px] font-bold" aria-label="Absatz">P</button>
-              <div className="w-px h-4 bg-white/10 mx-1.5" />
-              <button type="button" onClick={() => execCommand('insertUnorderedList')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl" aria-label="Aufzählungsliste">
+            <div className="bg-surface/90 backdrop-blur-2xl border border-subtle rounded-2xl p-1.5 shadow-2xl flex items-center gap-0.5 max-w-[95vw] overflow-x-auto no-scrollbar">
+              <button type="button" onClick={() => execCommand('bold')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl font-bold" aria-label="Fett">B</button>
+              <button type="button" onClick={() => execCommand('italic')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl italic" aria-label="Kursiv">I</button>
+              <button type="button" onClick={() => execCommand('underline')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl underline" aria-label="Unterstrichen">U</button>
+              <div className="w-px h-4 bg-hover-strong mx-1.5" />
+              <button type="button" onClick={() => execCommand('formatBlock', 'h2')} className="p-2 text-secondary hover:text-accent rounded-xl text-xs font-bold" aria-label="Überschrift Ebene 2">H2</button>
+              <button type="button" onClick={() => execCommand('formatBlock', 'h3')} className="p-2 text-secondary hover:text-accent rounded-xl text-[10px] font-bold" aria-label="Überschrift Ebene 3">H3</button>
+              <button type="button" onClick={() => execCommand('formatBlock', 'p')} className="p-2 text-secondary hover:text-accent rounded-xl text-[10px] font-bold" aria-label="Absatz">P</button>
+              <div className="w-px h-4 bg-hover-strong mx-1.5" />
+              <button type="button" onClick={() => execCommand('insertUnorderedList')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" aria-label="Aufzählungsliste">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
               </button>
-              <button type="button" onClick={() => execCommand('insertOrderedList')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl" aria-label="Nummerierte Liste">
+              <button type="button" onClick={() => execCommand('insertOrderedList')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" aria-label="Nummerierte Liste">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h10M7 16h10M4 8h.01M4 12h.01M4 16h.01" /></svg>
               </button>
-              <div className="w-px h-4 bg-white/10 mx-1.5" />
-              <button type="button" onClick={() => execCommand('indent')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl" title="Einrücken" aria-label="Einrücken">
+              <div className="w-px h-4 bg-hover-strong mx-1.5" />
+              <button type="button" onClick={() => execCommand('indent')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" title="Einrücken" aria-label="Einrücken">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16M13 9l3 3-3 3" /></svg>
               </button>
-              <button type="button" onClick={() => execCommand('outdent')} className="p-2.5 text-text-secondary hover:text-accent-orange hover:bg-white/5 rounded-xl" title="Ausrücken" aria-label="Ausrücken">
+              <button type="button" onClick={() => execCommand('outdent')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" title="Ausrücken" aria-label="Ausrücken">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16M11 9l-3 3 3 3" /></svg>
               </button>
             </div>
@@ -541,12 +541,12 @@ export default function DocumentEditor({
           <div className={`w-full ${focusMode ? 'max-w-[980px]' : 'max-w-[850px]'} px-4 md:px-8 ${focusMode ? 'pt-8 md:pt-12 pb-28' : 'pb-20'} print:p-0 print:w-full print:max-w-none`}>
             <div 
               id="editor-content-to-print"
-              className={`text-[#e8e8ed] min-h-[300px] md:min-h-[500px] focus:outline-none prose prose-invert max-w-none print:bg-white print:text-black print:p-[25mm] print:shadow-none print:rounded-none print:border-none print:block ${
+              className={`text-primary min-h-[300px] md:min-h-[500px] focus:outline-none prose prose-invert max-w-none print:bg-white print:text-black print:p-[25mm] print:shadow-none print:rounded-none print:border-none print:block ${
                 focusMode
                   ? focusPreset === 'paper'
                     ? 'bg-[#f8f7f4] border border-black/[0.08] py-14 px-8 md:px-24 rounded-2xl shadow-none'
-                    : 'bg-[#14141b] border border-white/[0.06] py-14 px-8 md:px-24 rounded-2xl shadow-none'
-                  : 'bg-[#16161f] border border-white/[0.04] py-10 px-6 md:px-20 rounded-3xl shadow-2xl'
+                    : 'bg-surface border border-subtle py-14 px-8 md:px-24 rounded-2xl shadow-none'
+                  : 'bg-surface border border-subtle py-10 px-6 md:px-20 rounded-3xl shadow-2xl'
               } ${isTranslating ? 'opacity-50 pointer-events-none' : ''}`}
               contentEditable 
               ref={editorRef} 
@@ -557,16 +557,16 @@ export default function DocumentEditor({
             />
 
             {sidebarContent && !focusMode && (
-              <section className="mt-4 no-print bg-dark-card border border-white/[0.06] rounded-2xl overflow-hidden">
+              <section className="mt-4 no-print bg-surface border border-subtle rounded-2xl overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setShowSourceContent((prev) => !prev)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-sm text-text-primary hover:bg-white/[0.03] transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm text-primary hover:bg-hover-subtle transition-colors"
                   aria-expanded={showSourceContent}
                 >
                   <span>{showSourceContent ? `${sourceLabel} ausblenden` : `${sourceLabel} anzeigen`}</span>
                   <svg
-                    className={`w-4 h-4 text-text-secondary transition-transform ${showSourceContent ? 'rotate-180' : ''}`}
+                    className={`w-4 h-4 text-secondary transition-transform ${showSourceContent ? 'rotate-180' : ''}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -575,7 +575,7 @@ export default function DocumentEditor({
                   </svg>
                 </button>
                 {showSourceContent && (
-                  <div className="border-t border-white/[0.06] px-4 py-4 text-xs text-text-secondary whitespace-pre-wrap leading-relaxed max-h-[320px] overflow-y-auto custom-scrollbar font-mono">
+                  <div className="border-t border-subtle px-4 py-4 text-xs text-secondary whitespace-pre-wrap leading-relaxed max-h-[320px] overflow-y-auto custom-scrollbar font-mono">
                     {sidebarContent}
                   </div>
                 )}
