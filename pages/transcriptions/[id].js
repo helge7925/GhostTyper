@@ -61,11 +61,11 @@ const EVENT_STAGE_LABELS = {
 };
 
 function eventDotClass(stage) {
-  if (stage === 'completed') return 'bg-accent-green';
-  if (stage === 'error') return 'bg-accent-red';
-  if (stage === 'analyzing') return 'bg-accent-orange';
-  if (stage === 'speaker_assignment') return 'bg-accent-cyan';
-  return 'bg-accent-yellow';
+  if (stage === 'completed') return 'bg-success';
+  if (stage === 'error') return 'bg-danger';
+  if (stage === 'analyzing') return 'bg-accent';
+  if (stage === 'speaker_assignment') return 'bg-info';
+  return 'bg-warning';
 }
 
 function isDownloadableOfficeDocument(mimeType) {
@@ -93,7 +93,7 @@ function SpeakerInput({ sid, value, onChange }) {
       onChange={e => setLocalValue(e.target.value)}
       onBlur={() => onChange(sid, localValue)}
       placeholder={sid}
-      className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-1.5 text-xs text-text-primary outline-none focus:ring-1 focus:ring-accent-orange"
+      className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-1.5 text-xs text-primary outline-none focus:ring-1 focus:ring-accent"
     />
   );
 }
@@ -438,7 +438,7 @@ export default function TranscriptionDetail() {
 
       {!showEditor ? (
         <div className="max-w-5xl mx-auto animate-fade-in pb-20">
-          <button onClick={() => router.push('/transcriptions')} className="text-text-secondary hover:text-text-primary text-xs flex items-center gap-1 mb-6">
+          <button onClick={() => router.push('/transcriptions')} className="text-secondary hover:text-primary text-xs flex items-center gap-1 mb-6">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></svg>
             Zurück zur Historie
           </button>
@@ -446,28 +446,28 @@ export default function TranscriptionDetail() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left: Info & Actions */}
             <div className="lg:col-span-1 space-y-6">
-              <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
+              <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
                 <StatusBadge status={transcription.status} />
-                <h1 className="text-lg font-semibold text-text-primary mt-3 truncate">{transcription.original_name}</h1>
-                <p className="text-[10px] text-text-secondary uppercase tracking-widest mt-1">
+                <h1 className="text-lg font-semibold text-primary mt-3 truncate">{transcription.original_name}</h1>
+                <p className="text-[10px] text-secondary uppercase tracking-widest mt-1">
                   {new Date(transcription.created_at).toLocaleDateString('de-DE')} &bull; {typeLabel}
                 </p>
 
                 {/* Context & Settings */}
-                <div className="mt-6 pt-6 border-t border-white/[0.06] space-y-4">
+                <div className="mt-6 pt-6 border-t border-subtle space-y-4">
                   <div>
-                    <label className="text-[10px] font-bold text-text-secondary uppercase opacity-50">Analyse-Modus</label>
-                    <p className="text-sm text-text-primary capitalize">{templateLabel || '-'}</p>
+                    <label className="text-[10px] font-bold text-secondary uppercase opacity-50">Analyse-Modus</label>
+                    <p className="text-sm text-primary capitalize">{templateLabel || '-'}</p>
                     {transcription.analysis_type === 'table' && (
-                      <p className="text-[10px] text-accent-orange mt-2">
+                      <p className="text-[10px] text-accent mt-2">
                         {transcription.template === 'data_table' ? 'Datentabellen-Extraktion' : 'Tabellen-Extraktion'}
                       </p>
                     )}
                   </div>
                   {transcription.custom_prompt && (
                     <div>
-                      <label className="text-[10px] font-bold text-text-secondary uppercase opacity-50">Anweisung</label>
-                      <p className="text-xs text-text-secondary italic">&quot;{transcription.custom_prompt}&quot;</p>
+                      <label className="text-[10px] font-bold text-secondary uppercase opacity-50">Anweisung</label>
+                      <p className="text-xs text-secondary italic">&quot;{transcription.custom_prompt}&quot;</p>
                     </div>
                   )}
                 </div>
@@ -477,7 +477,7 @@ export default function TranscriptionDetail() {
                     <button
                       onClick={handleStartProcessing}
                       disabled={startingProcessing}
-                      className="bg-white/5 hover:bg-white/10 text-text-primary py-2 rounded-xl text-sm font-bold border border-white/[0.06] transition-all disabled:opacity-50"
+                      className="bg-hover-subtle hover:bg-hover-strong text-primary py-2 rounded-xl text-sm font-bold border border-subtle transition-all disabled:opacity-50"
                     >
                       {startingProcessing ? 'Startet…' : 'Verarbeitung starten'}
                     </button>
@@ -487,23 +487,23 @@ export default function TranscriptionDetail() {
                       setShowEditor(true);
                     }}
                     disabled={isOfficeDocument || (!transcription.text && !transcription.analysis)}
-                    className="gradient-accent text-white py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent-orange/20 transition-all hover:scale-[1.02] active:scale-100 disabled:opacity-30"
+                    className="gradient-accent text-white py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 transition-all hover:scale-[1.02] active:scale-100 disabled:opacity-30"
                   >
                     {isTableAnalysis ? 'Tabelle im Editor öffnen' : 'Im Editor öffnen'}
                   </button>
                   {isOfficeDocument && (
                     <a
                       href={`/api/transcriptions/${transcription.id}/download`}
-                      className="bg-white/5 hover:bg-white/10 text-text-primary py-2 rounded-xl text-sm font-bold border border-white/[0.06] text-center transition-all"
+                      className="bg-hover-subtle hover:bg-hover-strong text-primary py-2 rounded-xl text-sm font-bold border border-subtle text-center transition-all"
                     >
                       Übersetzte Datei herunterladen
                     </a>
                   )}
-                  <div className="mt-3 pt-3 border-t border-accent-red/20">
-                    <p className="text-[10px] font-bold text-accent-red/70 uppercase tracking-widest mb-2">Danger Zone</p>
+                  <div className="mt-3 pt-3 border-t border-danger/20">
+                    <p className="text-[10px] font-bold text-danger/70 uppercase tracking-widest mb-2">Danger Zone</p>
                     <button
                       onClick={() => setConfirmDialogOpen(true)}
-                      className="w-full text-accent-red hover:text-red-300 bg-accent-red/10 border border-accent-red/30 py-2 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50"
+                      className="w-full text-danger hover:text-red-300 bg-danger/10 border border-danger/30 py-2 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50"
                       disabled={deleting}
                     >
                       {deleting ? `${typeLabel} wird gelöscht...` : `${typeLabel} löschen`}
@@ -511,7 +511,7 @@ export default function TranscriptionDetail() {
                   </div>
                 </div>
                 {processingStartError && (
-                  <div className="mt-3 bg-accent-red/10 border border-accent-red/25 text-accent-red rounded-xl p-3 text-xs">
+                  <div className="mt-3 bg-danger/10 border border-danger/25 text-danger rounded-xl p-3 text-xs">
                     {processingStartError}
                   </div>
                 )}
@@ -519,8 +519,8 @@ export default function TranscriptionDetail() {
 
               {/* Speaker Assignment */}
               {transcription.status === STATUS.TRANSCRIBED && speakerIds.length > 0 && !isOCR && (
-                <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
-                  <h3 className="text-xs font-bold text-text-primary uppercase mb-4">Sprecher</h3>
+                <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
+                  <h3 className="text-xs font-bold text-primary uppercase mb-4">Sprecher</h3>
                   <div className="space-y-3">
                     {speakerIds.map(sid => (
                       <SpeakerInput
@@ -532,7 +532,7 @@ export default function TranscriptionDetail() {
                     ))}
                   </div>
                   <div className="mt-4">
-                    <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1.5">
+                    <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5">
                       Fokus der Analyse
                     </label>
                     <textarea
@@ -540,10 +540,10 @@ export default function TranscriptionDetail() {
                       onChange={(event) => setAnalysisFocus(event.target.value)}
                       rows={2}
                       placeholder="Worauf soll sich das KI-Modell bei der Analyse konzentrieren?"
-                      className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary outline-none focus:ring-1 focus:ring-accent-orange resize-y"
+                      className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary outline-none focus:ring-1 focus:ring-accent resize-y"
                     />
                   </div>
-                  <button onClick={handleStartAnalysis} disabled={analyzing} className="w-full mt-4 bg-white/5 hover:bg-white/10 text-text-primary py-2 rounded-xl text-xs font-bold border border-white/[0.06] transition-all">
+                  <button onClick={handleStartAnalysis} disabled={analyzing} className="w-full mt-4 bg-hover-subtle hover:bg-hover-strong text-primary py-2 rounded-xl text-xs font-bold border border-subtle transition-all">
                     {analyzing ? 'Analyse läuft...' : 'Analyse starten'}
                   </button>
                 </div>
@@ -566,28 +566,28 @@ export default function TranscriptionDetail() {
               )}
 
               {transcription.status === STATUS.ERROR && (
-                <div className="bg-accent-red/10 border border-accent-red/25 text-accent-red rounded-2xl p-4 text-sm">
+                <div className="bg-danger/10 border border-danger/25 text-danger rounded-2xl p-4 text-sm">
                   {transcription.error || 'Verarbeitung fehlgeschlagen. Bitte erneut versuchen.'}
                 </div>
               )}
 
               {timelineEvents.length > 0 && (
-                <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-5 shadow-xl">
-                  <h2 className="text-xs font-bold text-text-primary uppercase tracking-widest opacity-60 mb-4">Verlauf</h2>
+                <div className="bg-surface border border-subtle rounded-2xl p-5 shadow-xl">
+                  <h2 className="text-xs font-bold text-primary uppercase tracking-widest opacity-60 mb-4">Verlauf</h2>
                   <div className="space-y-3">
                     {timelineEvents.map((event) => (
                       <div key={event.id} className="flex items-start gap-3">
                         <span className={`w-2 h-2 mt-1.5 rounded-full ${eventDotClass(event.stage)}`} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-text-primary font-medium">
+                            <span className="text-xs text-primary font-medium">
                               {EVENT_STAGE_LABELS[event.stage] || event.stage}
                             </span>
-                            <span className="text-[10px] text-text-secondary">
+                            <span className="text-[10px] text-secondary">
                               {new Date(event.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                             </span>
                           </div>
-                          <p className="text-xs text-text-secondary mt-0.5">{event.message}</p>
+                          <p className="text-xs text-secondary mt-0.5">{event.message}</p>
                         </div>
                       </div>
                     ))}
@@ -597,8 +597,8 @@ export default function TranscriptionDetail() {
 
               {/* Table Analysis */}
               {isTableAnalysis && transcription.analysis && (
-                <div className="bg-dark-card border border-accent-orange/20 rounded-2xl p-6 shadow-2xl shadow-accent-orange/5">
-                  <h2 className="text-xs font-bold text-accent-orange uppercase tracking-widest mb-4">
+                <div className="bg-surface border border-accent/20 rounded-2xl p-6 shadow-2xl shadow-accent/5">
+                  <h2 className="text-xs font-bold text-accent uppercase tracking-widest mb-4">
                     {transcription.template === 'data_table' ? 'Datentabelle' : 'Tabellen-Ergebnis'}
                   </h2>
                   <TableRenderer
@@ -612,17 +612,17 @@ export default function TranscriptionDetail() {
 
               {/* Text Analysis Preview */}
               {transcription.analysis && !isTableAnalysis && (
-                <div className="bg-dark-card border border-accent-orange/20 rounded-2xl p-6 shadow-2xl shadow-accent-orange/5">
-                  <h2 className="text-xs font-bold text-accent-orange uppercase tracking-widest mb-4">Ergebnis</h2>
+                <div className="bg-surface border border-accent/20 rounded-2xl p-6 shadow-2xl shadow-accent/5">
+                  <h2 className="text-xs font-bold text-accent uppercase tracking-widest mb-4">Ergebnis</h2>
                   <div className="space-y-4">
                     {transcription.analysis.zusammenfassung && (
-                      <p className="text-sm text-text-primary leading-relaxed italic border-l-2 border-accent-orange/30 pl-4">
+                      <p className="text-sm text-primary leading-relaxed italic border-l-2 border-accent/30 pl-4">
                         {transcription.analysis.zusammenfassung}
                       </p>
                     )}
                     <button
                       onClick={() => setShowEditor(true)}
-                      className="text-xs text-accent-orange hover:text-accent-cyan transition-colors font-bold flex items-center gap-1"
+                      className="text-xs text-accent hover:text-info transition-colors font-bold flex items-center gap-1"
                     >
                       Vollständige Analyse im Editor bearbeiten &rarr;
                     </button>
@@ -631,11 +631,11 @@ export default function TranscriptionDetail() {
               )}
 
               {/* Raw Text */}
-              <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
+              <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xs font-bold text-text-primary uppercase tracking-widest opacity-50">{rawTextLabel}</h2>
+                  <h2 className="text-xs font-bold text-primary uppercase tracking-widest opacity-50">{rawTextLabel}</h2>
                 </div>
-                <div className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap max-h-[400px] overflow-y-auto pr-2 custom-scrollbar font-mono opacity-80">
+                <div className="text-sm text-secondary leading-relaxed whitespace-pre-wrap max-h-[400px] overflow-y-auto pr-2 custom-scrollbar font-mono opacity-80">
                   {transcription.text || (
                     transcription.status === STATUS.ANALYZING
                       ? 'Transkription abgeschlossen. Auswertung läuft...'

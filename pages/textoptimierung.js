@@ -90,16 +90,16 @@ export default function Textoptimierung() {
 
       <div className="max-w-5xl mx-auto animate-fade-in pb-20">
         <div className="mb-8">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-text-secondary">Textwerkzeug</p>
-          <h1 className="text-2xl font-bold text-text-primary mt-1">Textoptimierung</h1>
-          <p className="text-sm text-text-secondary mt-2 max-w-2xl">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-secondary">Textwerkzeug</p>
+          <h1 className="text-2xl font-bold text-primary mt-1">Textoptimierung</h1>
+          <p className="text-sm text-secondary mt-2 max-w-2xl">
             Kopierte Texte, E-Mails oder Entwürfe sprachlich verbessern, kürzen oder formeller formulieren.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-dark-card border border-white/[0.08] rounded-2xl p-5">
-            <label htmlFor="text-optimization-input" className="block text-xs font-bold uppercase tracking-widest text-text-secondary mb-3">
+          <div className="bg-surface border border-subtle rounded-2xl p-5">
+            <label htmlFor="text-optimization-input" className="block text-xs font-bold uppercase tracking-widest text-secondary mb-3">
               Eingabetext
             </label>
             <textarea
@@ -108,13 +108,13 @@ export default function Textoptimierung() {
               onChange={(event) => setText(event.target.value)}
               rows={14}
               placeholder="Text hier einfügen..."
-              className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-text-primary outline-none focus:ring-1 focus:ring-accent-orange resize-y"
+              className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none focus:ring-1 focus:ring-accent resize-y"
             />
           </div>
 
-          <div className="bg-dark-card border border-white/[0.08] rounded-2xl p-5 space-y-5">
+          <div className="bg-surface border border-subtle rounded-2xl p-5 space-y-5">
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-text-secondary mb-3">Optimierung</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-secondary mb-3">Optimierung</p>
               <div className="flex flex-wrap gap-2">
                 {PRESETS.map((entry) => (
                   <button
@@ -123,8 +123,8 @@ export default function Textoptimierung() {
                     onClick={() => setPreset(entry.id)}
                     className={`px-3 py-2 rounded-xl text-xs border transition-colors ${
                       preset === entry.id
-                        ? 'bg-accent-orange text-white border-accent-orange'
-                        : 'bg-white/5 border-white/10 text-text-primary hover:border-accent-orange/40'
+                        ? 'bg-accent text-white border-accent'
+                        : 'bg-hover-subtle border-subtle text-primary hover:border-accent/40'
                     }`}
                   >
                     {entry.label}
@@ -135,7 +135,7 @@ export default function Textoptimierung() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="text-optimization-instruction" className="block text-xs font-bold uppercase tracking-widest text-text-secondary mb-2">
+                <label htmlFor="text-optimization-instruction" className="block text-xs font-bold uppercase tracking-widest text-secondary mb-2">
                   Zusätzliche Anweisung
                 </label>
                 <textarea
@@ -144,18 +144,18 @@ export default function Textoptimierung() {
                   onChange={(event) => setCustomInstruction(event.target.value)}
                   rows={3}
                   placeholder="Optional, z.B. Zielgruppe oder gewünschter Stil"
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-text-primary outline-none focus:ring-1 focus:ring-accent-orange resize-y"
+                  className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none focus:ring-1 focus:ring-accent resize-y"
                 />
               </div>
               <div>
-                <label htmlFor="text-optimization-model" className="block text-xs font-bold uppercase tracking-widest text-text-secondary mb-2">
+                <label htmlFor="text-optimization-model" className="block text-xs font-bold uppercase tracking-widest text-secondary mb-2">
                   KI-Modell
                 </label>
                 <select
                   id="text-optimization-model"
                   value={model}
                   onChange={(event) => setModel(event.target.value)}
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-text-primary outline-none focus:ring-1 focus:ring-accent-orange"
+                  className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none focus:ring-1 focus:ring-accent"
                 >
                   <option value="mistral-small-latest">Kostengünstig / Schnell</option>
                   <option value="mistral-medium-latest">Ausgewogen</option>
@@ -166,7 +166,7 @@ export default function Textoptimierung() {
           </div>
 
           {error && (
-            <div className="p-4 bg-accent-red/10 border border-accent-red/20 text-accent-red rounded-2xl text-sm">
+            <div className="p-4 bg-danger/10 border border-danger/20 text-danger rounded-2xl text-sm">
               {error}
             </div>
           )}
@@ -174,7 +174,7 @@ export default function Textoptimierung() {
           <button
             type="submit"
             disabled={loading || !text.trim()}
-            className="w-full gradient-accent text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-accent-orange/20 disabled:opacity-30"
+            className="w-full gradient-accent text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 disabled:opacity-30"
           >
             {loading ? 'Optimiert...' : 'Text optimieren'}
           </button>

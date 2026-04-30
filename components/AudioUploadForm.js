@@ -157,20 +157,20 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="border-b border-white/[0.1] -mx-6 px-6 mb-1">
+      <div className="border-b border-subtle -mx-6 px-6 mb-1">
         <div className="flex gap-6">
           <button
             type="button"
             onClick={() => setUploadMode('file')}
             className={`pb-3 text-sm font-medium transition-colors relative ${
               uploadMode === 'file'
-                ? 'text-accent-orange'
-                : 'text-text-secondary hover:text-text-primary'
+                ? 'text-accent'
+                : 'text-secondary hover:text-primary'
             }`}
           >
             Datei hochladen
             {uploadMode === 'file' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent-orange to-accent-cyan" />
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-info" />
             )}
           </button>
           <button
@@ -178,13 +178,13 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
             onClick={() => setUploadMode('record')}
             className={`pb-3 text-sm font-medium transition-colors relative ${
               uploadMode === 'record'
-                ? 'text-accent-orange'
-                : 'text-text-secondary hover:text-text-primary'
+                ? 'text-accent'
+                : 'text-secondary hover:text-primary'
             }`}
           >
             Aufnehmen
             {uploadMode === 'record' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent-orange to-accent-cyan" />
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-info" />
             )}
           </button>
         </div>
@@ -202,8 +202,8 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
           aria-label="Audio-Datei auswählen oder per Drag-and-drop hochladen"
           className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
             dragActive
-              ? 'border-accent-orange bg-accent-orange/10'
-              : 'border-white/[0.12] hover:border-white/[0.2]'
+              ? 'border-accent bg-accent/10'
+              : 'border-emphasis hover:border-emphasis'
           }`}
         >
           <input
@@ -214,21 +214,21 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
             className="hidden"
           />
           {file ? (
-            <p className="text-sm text-text-primary">
+            <p className="text-sm text-primary">
               <span className="font-medium">{file.name}</span>{' '}
-              <span className="text-text-secondary">
+              <span className="text-secondary">
                 ({(file.size / 1024 / 1024).toFixed(1)} MB)
               </span>
             </p>
           ) : (
             <div>
-              <svg className="mx-auto w-10 h-10 text-text-secondary mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="mx-auto w-10 h-10 text-secondary mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-              <p className="text-sm text-text-secondary">
-                Audio-Datei hierher ziehen oder <span className="text-accent-orange font-medium">durchsuchen</span>
+              <p className="text-sm text-secondary">
+                Audio-Datei hierher ziehen oder <span className="text-accent font-medium">durchsuchen</span>
               </p>
-              <p className="text-xs text-text-secondary/60 mt-1">MP3, WAV, OGG, FLAC, M4A, WebM (max. 50 MB)</p>
+              <p className="text-xs text-secondary/60 mt-1">MP3, WAV, OGG, FLAC, M4A, WebM (max. 50 MB)</p>
             </div>
           )}
         </div>
@@ -238,12 +238,12 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
 
       <div className="space-y-3 pt-2">
         <label className="flex items-center gap-3 cursor-pointer group">
-          <input type="checkbox" checked={diarize} onChange={(e) => setDiarize(e.target.checked)} className="w-4 h-4 accent-accent-orange bg-dark-input border-white/[0.2] rounded focus:ring-accent-orange" />
-          <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">Sprechererkennung aktivieren</span>
+          <input type="checkbox" checked={diarize} onChange={(e) => setDiarize(e.target.checked)} className="w-4 h-4 accent-accent bg-surface-elevated border-emphasis rounded focus:ring-accent" />
+          <span className="text-sm text-secondary group-hover:text-primary transition-colors">Sprechererkennung aktivieren</span>
         </label>
         <label className="flex items-center gap-3 cursor-pointer group">
-          <input type="checkbox" checked={autoAnalyze} onChange={(e) => setAutoAnalyze(e.target.checked)} className="w-4 h-4 accent-accent-orange bg-dark-input border-white/[0.2] rounded focus:ring-accent-orange" />
-          <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">Direkt analysieren</span>
+          <input type="checkbox" checked={autoAnalyze} onChange={(e) => setAutoAnalyze(e.target.checked)} className="w-4 h-4 accent-accent bg-surface-elevated border-emphasis rounded focus:ring-accent" />
+          <span className="text-sm text-secondary group-hover:text-primary transition-colors">Direkt analysieren</span>
         </label>
       </div>
 
@@ -251,12 +251,12 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
         <button
           type="button"
           onClick={() => setShowAdvancedOptions((prev) => !prev)}
-          className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.02] text-sm text-text-primary hover:bg-white/[0.04] transition-colors"
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-subtle bg-hover-subtle text-sm text-primary hover:bg-hover-subtle transition-colors"
           aria-expanded={showAdvancedOptions}
         >
           <span>Erweiterte Optionen</span>
           <svg
-            className={`w-4 h-4 text-text-secondary transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 text-secondary transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -267,53 +267,53 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
       </div>
 
       {showAdvancedOptions && (
-        <div className="space-y-4 bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
+        <div className="space-y-4 bg-hover-subtle border border-subtle rounded-xl p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {!lockTemplate ? (
               <div>
-                <label htmlFor="upload-template" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Analyse-Modus</label>
-                <select id="upload-template" value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
+                <label htmlFor="upload-template" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">Analyse-Modus</label>
+                <select id="upload-template" value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none">
                   <optgroup label="Standard"><option value="generic">Zusammenfassung</option><option value="meeting">Meeting-Protokoll</option><option value="aufmass">Aufmaß</option></optgroup>
                   {textTemplates.length > 0 && <optgroup label="Eigene Text-Vorlagen">{textTemplates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}</optgroup>}
                 </select>
               </div>
             ) : (
               <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Analyse-Modus</label>
-                <div className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary">
+                <label className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">Analyse-Modus</label>
+                <div className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary">
                   {templateLabel || template}
                 </div>
               </div>
             )}
             <div>
-              <label htmlFor="upload-model" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">KI-Modell</label>
-              <select id="upload-model" value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
+              <label htmlFor="upload-model" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">KI-Modell</label>
+              <select id="upload-model" value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none">
                 <option value="mistral-small-latest">Kostengünstig / Schnell</option>
                 <option value="mistral-medium-latest">Ausgewogen</option>
                 <option value="mistral-large-latest">Qualität</option>
               </select>
-              <p className="mt-1 text-[11px] text-text-secondary">Einfach wählen: Kostengünstig / Schnell, Ausgewogen oder Qualität.</p>
+              <p className="mt-1 text-[11px] text-secondary">Einfach wählen: Kostengünstig / Schnell, Ausgewogen oder Qualität.</p>
             </div>
           </div>
           <div>
-            <label htmlFor="upload-prompt" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Zusätzlicher Kontext</label>
-            <textarea id="upload-prompt" value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Teilnehmer, Projekte, Hinweise..." rows={2} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none resize-none" />
+            <label htmlFor="upload-prompt" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">Zusätzlicher Kontext</label>
+            <textarea id="upload-prompt" value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Teilnehmer, Projekte, Hinweise..." rows={2} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none resize-none" />
           </div>
           <div>
-            <label htmlFor="upload-analysis-focus" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-widest">Fokus der Analyse</label>
+            <label htmlFor="upload-analysis-focus" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">Fokus der Analyse</label>
             <textarea
               id="upload-analysis-focus"
               value={analysisFocus}
               onChange={(e) => setAnalysisFocus(e.target.value)}
               placeholder="Worauf soll sich die Analyse konzentrieren?"
               rows={2}
-              className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-orange outline-none resize-none"
+              className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none resize-none"
             />
           </div>
         </div>
       )}
 
-      {error && <div className="bg-accent-red/10 border border-accent-red/20 text-accent-red px-4 py-3 rounded-lg text-sm">{error}</div>}
+      {error && <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm">{error}</div>}
 
       {uploading && (
         <progress
@@ -323,7 +323,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
         />
       )}
 
-      <button type="submit" disabled={!file || uploading} className="w-full gradient-accent text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-accent-orange/20 disabled:opacity-30 transition-all hover:scale-[1.01]">
+      <button type="submit" disabled={!file || uploading} className="w-full gradient-accent text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 disabled:opacity-30 transition-all hover:scale-[1.01]">
         {uploading ? 'Wird hochgeladen...' : 'Vorgang starten'}
       </button>
     </form>

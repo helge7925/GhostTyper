@@ -595,11 +595,11 @@ export default function Settings() {
   const renderTemplateCategoryPanel = ({ activeCategoryId, onChange, templatesForCounts }) => {
     const uncategorizedCount = templatesForCounts.filter((template) => !template.category_id).length;
     return (
-      <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
+      <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest">Kategorien</h2>
-            <p className="text-xs text-text-secondary mt-1">Organisieren und filtern Sie Ihre Vorlagen.</p>
+            <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest">Kategorien</h2>
+            <p className="text-xs text-secondary mt-1">Organisieren und filtern Sie Ihre Vorlagen.</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -608,8 +608,8 @@ export default function Settings() {
             onClick={() => onChange('all')}
             className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
               activeCategoryId === 'all'
-                ? 'bg-accent-orange text-white border-accent-orange'
-                : 'bg-white/5 border-white/10 text-text-primary hover:border-accent-orange/40'
+                ? 'bg-accent text-white border-accent'
+                : 'bg-hover-subtle border-subtle text-primary hover:border-accent/40'
             }`}
           >
             Alle ({templatesForCounts.length})
@@ -619,8 +619,8 @@ export default function Settings() {
             onClick={() => onChange('uncategorized')}
             className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
               activeCategoryId === 'uncategorized'
-                ? 'bg-accent-orange text-white border-accent-orange'
-                : 'bg-white/5 border-white/10 text-text-primary hover:border-accent-orange/40'
+                ? 'bg-accent text-white border-accent'
+                : 'bg-hover-subtle border-subtle text-primary hover:border-accent/40'
             }`}
           >
             Ohne Kategorie ({uncategorizedCount})
@@ -628,7 +628,7 @@ export default function Settings() {
           {templateCategories.map((cat) => {
             const count = templatesForCounts.filter((template) => String(template.category_id || '') === String(cat.id)).length;
             return (
-              <div key={cat.id} className="group flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1.5">
+              <div key={cat.id} className="group flex items-center gap-2 bg-hover-subtle border border-subtle rounded-full px-3 py-1.5">
                 {editingCategoryId === cat.id ? (
                   <input
                     autoFocus
@@ -637,26 +637,26 @@ export default function Settings() {
                     onChange={e => setEditingCategoryName(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleUpdateCategory(cat.id, editingCategoryName)}
                     onBlur={() => setEditingCategoryId(null)}
-                    className="bg-transparent border-none text-xs text-text-primary outline-none w-24"
+                    className="bg-transparent border-none text-xs text-primary outline-none w-24"
                   />
                 ) : (
                   <button
                     type="button"
                     onClick={() => onChange(String(cat.id))}
                     className={`flex items-center gap-2 text-xs transition-colors ${
-                      String(activeCategoryId) === String(cat.id) ? 'text-accent-orange' : 'text-text-primary hover:text-accent-orange'
+                      String(activeCategoryId) === String(cat.id) ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
                   >
-                    <span className="w-2 h-2 rounded-full bg-accent-orange" />
+                    <span className="w-2 h-2 rounded-full bg-accent" />
                     <span>{cat.name}</span>
-                    <span className="text-text-secondary">({count})</span>
+                    <span className="text-secondary">({count})</span>
                   </button>
                 )}
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     type="button"
                     onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}
-                    className="text-text-secondary hover:text-white"
+                    className="text-secondary hover:text-white"
                     aria-label={`Kategorie ${cat.name} bearbeiten`}
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
@@ -664,7 +664,7 @@ export default function Settings() {
                   <button
                     type="button"
                     onClick={() => handleDeleteCategory(cat.id)}
-                    className="text-text-secondary hover:text-accent-red"
+                    className="text-secondary hover:text-danger"
                     aria-label={`Kategorie ${cat.name} löschen`}
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -679,9 +679,9 @@ export default function Settings() {
               value={newCategoryName}
               onChange={e => setNewCategoryName(e.target.value)}
               placeholder="Neue Kategorie..."
-              className="bg-dark-input border border-white/10 rounded-full px-3 py-1.5 text-xs text-text-primary outline-none w-32"
+              className="bg-surface-elevated border border-subtle rounded-full px-3 py-1.5 text-xs text-primary outline-none w-32"
             />
-            <button type="submit" disabled={!newCategoryName.trim()} className="text-accent-orange hover:text-accent-orange/80 disabled:opacity-30" aria-label="Kategorie erstellen">
+            <button type="submit" disabled={!newCategoryName.trim()} className="text-accent hover:text-accent/80 disabled:opacity-30" aria-label="Kategorie erstellen">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             </button>
           </form>
@@ -696,13 +696,13 @@ export default function Settings() {
 
       <div className={(activeEditor || tableTemplateEditor) ? 'hidden' : 'max-w-5xl mx-auto animate-fade-in pb-20'}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <h1 className="text-2xl font-bold text-text-primary">Einstellungen</h1>
-          {saved && <p className="text-accent-green text-xs animate-pulse bg-accent-green/10 px-3 py-1 rounded-full border border-accent-green/20">Einstellungen gespeichert!</p>}
+          <h1 className="text-2xl font-bold text-primary">Einstellungen</h1>
+          {saved && <p className="text-success text-xs animate-pulse bg-success/10 px-3 py-1 rounded-full border border-success/20">Einstellungen gespeichert!</p>}
         </div>
 
         {/* Tab Navigation */}
         <div
-          className="flex items-center gap-1 bg-white/5 p-1 rounded-2xl mb-8 overflow-x-auto no-scrollbar border border-white/[0.06]"
+          className="flex items-center gap-1 bg-hover-subtle p-1 rounded-2xl mb-8 overflow-x-auto no-scrollbar border border-subtle"
           role="tablist"
           aria-label="Einstellungen-Bereiche"
         >
@@ -717,8 +717,8 @@ export default function Settings() {
               tabIndex={activeTab === tab.id ? 0 : -1}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.id 
-                  ? 'bg-accent-orange text-white shadow-lg shadow-accent-orange/20' 
-                  : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                  ? 'bg-accent text-white shadow-lg shadow-accent/20' 
+                  : 'text-secondary hover:text-primary hover:bg-hover-subtle'
               }`}
             >
               {tab.icon}
@@ -736,12 +736,12 @@ export default function Settings() {
         >
           {activeTab === 'transcription' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
-              <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
-                <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest mb-6">Transkription</h2>
+              <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
+                <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">Transkription</h2>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">Standardsprache</label>
-                    <select value={language} onChange={e => setLanguage(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none">
+                    <label className="block text-xs font-medium text-secondary mb-1.5">Standardsprache</label>
+                    <select value={language} onChange={e => setLanguage(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none">
                       <option value="de">Deutsch</option>
                       <option value="en">Englisch</option>
                       <option value="fr">Französisch</option>
@@ -750,18 +750,18 @@ export default function Settings() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">Kontext-Wörter (Context Bias)</label>
-                    <textarea value={contextBias} onChange={e => setContextBias(e.target.value)} placeholder="Fachbegriffe, Namen, Abkürzungen..." rows={5} className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none resize-none" />
-                    <p className="mt-2 text-[10px] text-text-secondary italic">Hilft der KI, spezifische Begriffe korrekt zu transkribieren.</p>
+                    <label className="block text-xs font-medium text-secondary mb-1.5">Kontext-Wörter (Context Bias)</label>
+                    <textarea value={contextBias} onChange={e => setContextBias(e.target.value)} placeholder="Fachbegriffe, Namen, Abkürzungen..." rows={5} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none resize-none" />
+                    <p className="mt-2 text-[10px] text-secondary italic">Hilft der KI, spezifische Begriffe korrekt zu transkribieren.</p>
 
                     <div className="mt-4 space-y-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Aktive Begriffe</p>
+                        <p className="text-[10px] font-bold text-secondary uppercase tracking-wider">Aktive Begriffe</p>
                         <button
                           type="button"
                           onClick={handleLoadGlossarySuggestions}
                           disabled={glossaryLoading}
-                          className="text-[10px] text-accent-orange hover:text-accent-cyan disabled:opacity-40"
+                          className="text-[10px] text-accent hover:text-info disabled:opacity-40"
                         >
                           {glossaryLoading ? 'Lädt...' : 'Auto-Glossar laden'}
                         </button>
@@ -769,14 +769,14 @@ export default function Settings() {
 
                       <div className="flex flex-wrap gap-2">
                         {contextTerms.length === 0 && (
-                          <span className="text-[11px] text-text-secondary/70">Noch keine Begriffe gespeichert.</span>
+                          <span className="text-[11px] text-secondary/70">Noch keine Begriffe gespeichert.</span>
                         )}
                         {contextTerms.map((term) => (
                           <button
                             key={term}
                             type="button"
                             onClick={() => handleRemoveContextTerm(term)}
-                            className="px-2.5 py-1 rounded-full text-[11px] border border-white/10 bg-white/5 text-text-primary hover:border-accent-red/40 hover:text-accent-red transition-colors"
+                            className="px-2.5 py-1 rounded-full text-[11px] border border-subtle bg-hover-subtle text-primary hover:border-danger/40 hover:text-danger transition-colors"
                             title="Begriff entfernen"
                           >
                             {term}
@@ -786,7 +786,7 @@ export default function Settings() {
 
                       {glossarySuggestions.length > 0 && (
                         <div className="pt-2">
-                          <p className="text-[10px] text-text-secondary mb-2">
+                          <p className="text-[10px] text-secondary mb-2">
                             Vorschläge aus {glossarySourceDocuments} Dokumenten
                           </p>
                           <div className="flex flex-wrap gap-2">
@@ -795,7 +795,7 @@ export default function Settings() {
                                 key={entry.term}
                                 type="button"
                                 onClick={() => handleAddContextTerm(entry.term)}
-                                className="px-2.5 py-1 rounded-full text-[11px] border border-accent-orange/30 bg-accent-orange/10 text-accent-orange hover:bg-accent-orange/20 transition-colors"
+                                className="px-2.5 py-1 rounded-full text-[11px] border border-accent/30 bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
                                 title={`${entry.count} Treffer`}
                               >
                                 + {entry.term}
@@ -809,16 +809,16 @@ export default function Settings() {
                 </div>
               </div>
               <div className="space-y-6">
-                <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl opacity-60">
-                  <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-widest mb-4">Modell-Info</h3>
-                  <p className="text-xs text-text-secondary leading-relaxed">
+                <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl opacity-60">
+                  <h3 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-4">Modell-Info</h3>
+                  <p className="text-xs text-secondary leading-relaxed">
                     Für die Transkription wird standardmäßig <strong>Mistral Voxtral Mini</strong> verwendet.
                   </p>
                 </div>
                 <button
                   onClick={handleSaveSettings}
                   disabled={isSavingSettings}
-                  className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent-orange/20 transition-all hover:scale-[1.01] disabled:opacity-40"
+                  className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-[1.01] disabled:opacity-40"
                 >
                   {isSavingSettings ? 'Speichert...' : 'Speichern'}
                 </button>
@@ -836,11 +836,11 @@ export default function Settings() {
 
               {/* Text Templates Section */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
+                <div className="lg:col-span-2 bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
                   <div className="flex items-center justify-between mb-8">
                     <div>
-                      <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest">Text-Verarbeitung</h2>
-                      <p className="text-xs text-text-secondary mt-1">Standard- und eigene Textvorlagen</p>
+                      <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest">Text-Verarbeitung</h2>
+                      <p className="text-xs text-secondary mt-1">Standard- und eigene Textvorlagen</p>
                     </div>
                     <button
                       onClick={() => setActiveEditor({
@@ -859,23 +859,23 @@ export default function Settings() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Defaults */}
                     {activeTextCategoryId === 'all' && DEFAULT_TEXT_TEMPLATE_OPTIONS.map(({ key, label }) => (
-                      <div key={key} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 group hover:border-accent-orange/30 transition-all">
-                        <span className="text-sm font-medium text-text-primary capitalize">
+                      <div key={key} className="flex items-center justify-between p-4 bg-hover-subtle rounded-xl border border-subtle group hover:border-accent/30 transition-all">
+                        <span className="text-sm font-medium text-primary capitalize">
                           {label}
                         </span>
-                        <button onClick={() => openDefaultEditor(key)} className="text-[10px] font-bold text-accent-orange uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">Edit</button>
+                        <button onClick={() => openDefaultEditor(key)} className="text-[10px] font-bold text-accent uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">Edit</button>
                       </div>
                     ))}
                     {/* Custom Text Templates */}
                     {filteredTextTemplates.filter(t => !DEFAULT_TEXT_TEMPLATE_OPTIONS.some((entry) => entry.key === t.name)).map(t => (
-                      <div key={t.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 group hover:border-accent-orange/30 transition-all">
+                      <div key={t.id} className="flex items-center justify-between p-4 bg-hover-subtle rounded-xl border border-subtle group hover:border-accent/30 transition-all">
                         <div className="min-w-0 pr-4">
-                          <span className="text-sm font-medium text-text-primary truncate block">{t.name}</span>
-                          <span className="text-[10px] text-text-secondary">{getCategoryName(t.category_id)}</span>
+                          <span className="text-sm font-medium text-primary truncate block">{t.name}</span>
+                          <span className="text-[10px] text-secondary">{getCategoryName(t.category_id)}</span>
                         </div>
                         <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => setActiveEditor({...t, isDefault: false})} className="text-[10px] font-bold text-accent-orange uppercase">Edit</button>
-                          <button onClick={() => handleDelete(t.id)} className="text-[10px] font-bold text-text-secondary uppercase hover:text-accent-red">Löschen</button>
+                          <button onClick={() => setActiveEditor({...t, isDefault: false})} className="text-[10px] font-bold text-accent uppercase">Edit</button>
+                          <button onClick={() => handleDelete(t.id)} className="text-[10px] font-bold text-secondary uppercase hover:text-danger">Löschen</button>
                         </div>
                       </div>
                     ))}
@@ -883,21 +883,21 @@ export default function Settings() {
                 </div>
 
                 <div className="space-y-6">
-                  <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
-                    <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest mb-6">Standard-Modell</h2>
-                    <select value={preferredModel} onChange={e => setPreferredModel(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none focus:ring-1 focus:ring-accent-orange">
+                  <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
+                    <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">Standard-Modell</h2>
+                    <select value={preferredModel} onChange={e => setPreferredModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent">
                       <option value="mistral-small-latest">Kostengünstig / Schnell</option>
                       <option value="mistral-medium-latest">Ausgewogen</option>
                       <option value="mistral-large-latest">Qualität</option>
                     </select>
-                    <p className="mt-3 text-[10px] text-text-secondary leading-relaxed italic">
+                    <p className="mt-3 text-[10px] text-secondary leading-relaxed italic">
                       Dieses Modell wird standardmäßig für KI-Analyse und Textaufgaben verwendet.
                     </p>
                   </div>
                   <button
                     onClick={handleSaveSettings}
                     disabled={isSavingSettings}
-                    className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent-orange/20 transition-all hover:scale-[1.01] disabled:opacity-40"
+                    className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-[1.01] disabled:opacity-40"
                   >
                     {isSavingSettings ? 'Speichert...' : 'Speichern'}
                   </button>
@@ -916,11 +916,11 @@ export default function Settings() {
               })}
 
               {/* Table Templates Section */}
-              <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
+              <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
                 <div className="flex items-center justify-between mb-8">
                   <div>
-                    <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest">Tabellen-Templates</h2>
-                    <p className="text-xs text-text-secondary mt-1">
+                    <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest">Tabellen-Templates</h2>
+                    <p className="text-xs text-secondary mt-1">
                       Extrahieren Sie strukturierte Daten als Tabelle (z.B. Rechnungen, Listen)
                     </p>
                   </div>
@@ -933,27 +933,27 @@ export default function Settings() {
                 </div>
 
                 {filteredTableTemplates.length === 0 ? (
-                  <div className="text-center py-8 bg-white/5 rounded-xl border border-dashed border-white/10">
-                    <p className="text-text-secondary text-sm">
+                  <div className="text-center py-8 bg-hover-subtle rounded-xl border border-dashed border-subtle">
+                    <p className="text-secondary text-sm">
                       Keine Tabellen-Vorlagen in dieser Kategorie.
                     </p>
-                    <p className="text-text-secondary/60 text-xs mt-1">
+                    <p className="text-secondary/60 text-xs mt-1">
                       Legen Sie eine Vorlage an oder wählen Sie eine andere Kategorie.
                     </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {filteredTableTemplates.map(t => (
-                      <div key={t.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 group hover:border-accent-orange/30 transition-all">
+                      <div key={t.id} className="flex items-center justify-between p-4 bg-hover-subtle rounded-xl border border-subtle group hover:border-accent/30 transition-all">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-accent-orange/20 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-accent-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
                             </svg>
                           </div>
                           <div>
-                            <span className="text-sm font-medium text-text-primary block">{t.name}</span>
-                            <span className="text-[10px] text-text-secondary">
+                            <span className="text-sm font-medium text-primary block">{t.name}</span>
+                            <span className="text-[10px] text-secondary">
                               {getCategoryName(t.category_id)} •{' '}
                               {t.table_schema?.columns?.length || 0} Spalten
                               {t.table_schema?.rows?.length > 0 && ` • ${t.table_schema.rows.length} Zeilen`}
@@ -962,8 +962,8 @@ export default function Settings() {
                           </div>
                         </div>
                         <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => openTableTemplateEditor(t)} className="text-[10px] font-bold text-accent-orange uppercase">Edit</button>
-                          <button onClick={() => handleDelete(t.id)} className="text-[10px] font-bold text-text-secondary uppercase hover:text-accent-red">Löschen</button>
+                          <button onClick={() => openTableTemplateEditor(t)} className="text-[10px] font-bold text-accent uppercase">Edit</button>
+                          <button onClick={() => handleDelete(t.id)} className="text-[10px] font-bold text-secondary uppercase hover:text-danger">Löschen</button>
                         </div>
                       </div>
                     ))}
@@ -975,26 +975,26 @@ export default function Settings() {
 
           {activeTab === 'ocr-translate' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
-              <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
-                <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest mb-6">OCR (Texterkennung)</h2>
+              <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
+                <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">OCR (Texterkennung)</h2>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">OCR-Modell</label>
-                    <select value={ocrModel} onChange={e => setOcrModel(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none">
+                    <label className="block text-xs font-medium text-secondary mb-1.5">OCR-Modell</label>
+                    <select value={ocrModel} onChange={e => setOcrModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none">
                       <option value="mistral-ocr-latest">Mistral OCR</option>
                     </select>
                   </div>
-                  <p className="text-xs text-text-secondary leading-relaxed italic opacity-70">
+                  <p className="text-xs text-secondary leading-relaxed italic opacity-70">
                     Mistral OCR ist spezialisiert auf die präzise Textextraktion aus PDF-Dokumenten und Bildern.
                   </p>
                 </div>
               </div>
-              <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
-                <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest mb-6">Übersetzung</h2>
+              <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
+                <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">Übersetzung</h2>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">Standard-Zielsprache</label>
-                    <select value={defaultTranslateLanguage} onChange={e => setDefaultTranslateLanguage(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none">
+                    <label className="block text-xs font-medium text-secondary mb-1.5">Standard-Zielsprache</label>
+                    <select value={defaultTranslateLanguage} onChange={e => setDefaultTranslateLanguage(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none">
                       <option value="de">Deutsch</option>
                       <option value="en">Englisch</option>
                       <option value="fr">Französisch</option>
@@ -1005,7 +1005,7 @@ export default function Settings() {
                   <button
                     onClick={handleSaveSettings}
                     disabled={isSavingSettings}
-                    className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent-orange/20 transition-all hover:scale-[1.01] disabled:opacity-40"
+                    className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-[1.01] disabled:opacity-40"
                   >
                     {isSavingSettings ? 'Speichert...' : 'Speichern'}
                   </button>
@@ -1017,38 +1017,38 @@ export default function Settings() {
           {activeTab === 'account' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
               <div className="space-y-6">
-                <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
-                  <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest mb-6">API-Konfiguration</h2>
+                <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
+                  <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">API-Konfiguration</h2>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-xs font-medium text-text-secondary mb-1.5">Mistral API-Key</label>
-                      <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={apiKeyConfigured ? '••••••••••••••••' : 'Key eingeben'} className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none focus:ring-1 focus:ring-accent-orange" />
+                      <label className="block text-xs font-medium text-secondary mb-1.5">Mistral API-Key</label>
+                      <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={apiKeyConfigured ? '••••••••••••••••' : 'Key eingeben'} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent" />
                       <div className="mt-2 flex items-center justify-between gap-3">
-                        <span className={`text-[11px] ${apiKeyConfigured ? 'text-accent-green' : 'text-text-secondary'}`}>
+                        <span className={`text-[11px] ${apiKeyConfigured ? 'text-success' : 'text-secondary'}`}>
                           {apiKeyConfigured ? 'API-Key hinterlegt' : 'Kein API-Key hinterlegt'}
                         </span>
                         <button
                           type="button"
                           onClick={handleClearMistralApiKey}
                           disabled={isClearingMistralKey || isSavingSettings || !apiKeyConfigured}
-                          className="text-[11px] text-accent-red hover:text-red-300 disabled:opacity-40"
+                          className="text-[11px] text-danger hover:text-red-300 disabled:opacity-40"
                         >
                           {isClearingMistralKey ? 'Entferne...' : 'Key entfernen'}
                         </button>
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-text-secondary mb-1.5">Monatliches Kostenlimit (€)</label>
-                      <input type="number" value={costLimit} onChange={e => setCostLimit(e.target.value)} placeholder="Kein Limit" className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none" />
+                      <label className="block text-xs font-medium text-secondary mb-1.5">Monatliches Kostenlimit (€)</label>
+                      <input type="number" value={costLimit} onChange={e => setCostLimit(e.target.value)} placeholder="Kein Limit" className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-text-secondary mb-1.5">Mitglieder-Budgetlimit / Monat (€)</label>
+                      <label className="block text-xs font-medium text-secondary mb-1.5">Mitglieder-Budgetlimit / Monat (€)</label>
                       <input
                         type="number"
                         value={memberMonthlyBudgetLimit}
                         onChange={e => setMemberMonthlyBudgetLimit(e.target.value)}
                         placeholder="Optional, überschreibt bei Bedarf das Konto-Limit"
-                        className="w-full bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none"
+                        className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none"
                       />
                     </div>
                   </div>
@@ -1056,7 +1056,7 @@ export default function Settings() {
                 <button
                   onClick={handleSaveSettings}
                   disabled={isSavingSettings || isClearingMistralKey}
-                  className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent-orange/20 transition-all hover:scale-[1.01] disabled:opacity-40"
+                  className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-[1.01] disabled:opacity-40"
                 >
                   {isSavingSettings ? 'Speichert...' : 'Speichern'}
                 </button>
@@ -1064,24 +1064,24 @@ export default function Settings() {
 
               <div className="space-y-6">
                 {usage && (
-                  <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                    <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest mb-6">Verbrauch aktuell</h2>
+                  <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                    <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">Verbrauch aktuell</h2>
                     <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                        <p className="text-xs text-text-secondary uppercase font-bold tracking-wider mb-1">Kosten</p>
-                        <p className="text-2xl font-bold text-accent-orange">{usage.totalCost?.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</p>
+                      <div className="bg-hover-subtle rounded-xl p-4 border border-subtle">
+                        <p className="text-xs text-secondary uppercase font-bold tracking-wider mb-1">Kosten</p>
+                        <p className="text-2xl font-bold text-accent">{usage.totalCost?.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</p>
                       </div>
-                      <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                        <p className="text-xs text-text-secondary uppercase font-bold tracking-wider mb-1">Anfragen</p>
-                        <p className="text-2xl font-bold text-text-primary">{usage.totalRequests}</p>
+                      <div className="bg-hover-subtle rounded-xl p-4 border border-subtle">
+                        <p className="text-xs text-secondary uppercase font-bold tracking-wider mb-1">Anfragen</p>
+                        <p className="text-2xl font-bold text-primary">{usage.totalRequests}</p>
                       </div>
                     </div>
-                    <div className="space-y-2 border-t border-white/5 pt-4">
-                      <h3 className="text-xs font-bold text-text-secondary uppercase mb-2 opacity-70">Preisliste (pro 1M Tokens)</h3>
+                    <div className="space-y-2 border-t border-subtle pt-4">
+                      <h3 className="text-xs font-bold text-secondary uppercase mb-2 opacity-70">Preisliste (pro 1M Tokens)</h3>
                       {PRICE_LIST.map(p => (
                         <div key={p.model} className="flex items-center justify-between text-xs">
-                          <span className="text-text-primary">{p.model}</span>
-                          <span className="text-text-secondary">In: {p.input} | Out: {p.output}</span>
+                          <span className="text-primary">{p.model}</span>
+                          <span className="text-secondary">In: {p.input} | Out: {p.output}</span>
                         </div>
                       ))}
                     </div>
@@ -1089,25 +1089,25 @@ export default function Settings() {
                 )}
 
                 {canReadAudit && (
-                <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-6 shadow-xl">
+                <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-widest">Audit-Log</h2>
+                    <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest">Audit-Log</h2>
                     <button
                       onClick={handleReloadAudit}
                       disabled={auditLoading}
-                      className="text-[11px] text-accent-orange hover:text-accent-cyan disabled:opacity-40"
+                      className="text-[11px] text-accent hover:text-info disabled:opacity-40"
                     >
                       {auditLoading ? 'Lädt...' : 'Neu laden'}
                     </button>
                   </div>
                   <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
                     {auditEvents.length === 0 && (
-                      <p className="text-xs text-text-secondary">Noch keine kritischen Aktionen protokolliert.</p>
+                      <p className="text-xs text-secondary">Noch keine kritischen Aktionen protokolliert.</p>
                     )}
                     {auditEvents.map((entry) => (
-                      <div key={entry.id} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
-                        <p className="text-xs text-text-primary">{entry.action}</p>
-                        <p className="text-[10px] text-text-secondary mt-1">
+                      <div key={entry.id} className="rounded-lg border border-subtle bg-hover-subtle px-3 py-2">
+                        <p className="text-xs text-primary">{entry.action}</p>
+                        <p className="text-[10px] text-secondary mt-1">
                           {new Date(entry.created_at).toLocaleString('de-DE')} {entry.target_type ? `• ${entry.target_type}` : ''}
                         </p>
                       </div>
@@ -1123,25 +1123,25 @@ export default function Settings() {
 
       {/* Text Template Editor Overlay */}
       {activeEditor && (
-        <div className="fixed inset-0 z-[110] bg-dark-bg flex flex-col animate-fade-in">
-          <header className="min-h-16 border-b border-white/[0.06] bg-dark-card flex flex-wrap items-center justify-between gap-3 px-6 py-3">
+        <div className="fixed inset-0 z-[60] bg-canvas flex flex-col animate-fade-in">
+          <header className="min-h-16 border-b border-subtle bg-surface flex flex-wrap items-center justify-between gap-3 px-6 py-3">
             <div className="flex items-center gap-4 min-w-0 flex-1">
-              <button onClick={() => setActiveEditor(null)} className="p-2 text-text-secondary hover:text-text-primary transition-colors" aria-label="Vorlagen-Editor schließen"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
+              <button onClick={() => setActiveEditor(null)} className="p-2 text-secondary hover:text-primary transition-colors" aria-label="Vorlagen-Editor schließen"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
               <input 
                 type="text" 
                 value={activeEditor.name} 
                 onChange={e => setActiveEditor({...activeEditor, name: e.target.value})} 
                 disabled={activeEditor.isDefault && DEFAULT_TEXT_TEMPLATE_OPTIONS.some((entry) => entry.key === activeEditor.id)} 
-                className="bg-transparent border-none text-lg font-semibold text-text-primary outline-none focus:ring-0 w-full max-w-md min-w-0"
+                className="bg-transparent border-none text-lg font-semibold text-primary outline-none focus:ring-0 w-full max-w-md min-w-0"
                 placeholder="Name der Vorlage..."
               />
             </div>
             <div className="flex items-center justify-end gap-3 flex-wrap">
-              {activeEditor.isDefault && DEFAULT_TEXT_TEMPLATE_OPTIONS.some((entry) => entry.key === activeEditor.id) && <span className="text-[10px] bg-accent-orange/20 text-accent-orange px-2 py-1 rounded-full uppercase">Standard-Vorlage</span>}
+              {activeEditor.isDefault && DEFAULT_TEXT_TEMPLATE_OPTIONS.some((entry) => entry.key === activeEditor.id) && <span className="text-[10px] bg-accent/20 text-accent px-2 py-1 rounded-full uppercase">Standard-Vorlage</span>}
               <select
                 value={activeEditor.category_id || ''}
                 onChange={e => setActiveEditor({ ...activeEditor, category_id: e.target.value })}
-                className="bg-dark-input border border-white/[0.1] rounded-xl px-3 py-2 text-xs text-text-primary outline-none"
+                className="bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none"
                 aria-label="Kategorie der Text-Vorlage"
               >
                 <option value="">Ohne Kategorie</option>
@@ -1149,18 +1149,18 @@ export default function Settings() {
                   <option key={category.id} value={category.id}>{category.name}</option>
                 ))}
               </select>
-              <button onClick={handleSaveTemplate} disabled={templateLoading} className="gradient-accent text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent-orange/20">
+              <button onClick={handleSaveTemplate} disabled={templateLoading} className="gradient-accent text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent/20">
                 {templateLoading ? 'Speichert...' : 'Vorlage speichern'}
               </button>
             </div>
           </header>
-          <main className="flex-1 p-6 md:p-12 overflow-y-auto bg-black/20">
+          <main className="flex-1 p-6 md:p-12 overflow-y-auto bg-hover-subtle">
             <div className="max-w-4xl mx-auto h-full flex flex-col">
               {/* KI Generator Section */}
-              <div className="mb-8 bg-dark-card border border-accent-orange/20 rounded-2xl p-6 shadow-2xl shadow-accent-orange/5">
+              <div className="mb-8 bg-surface border border-accent/20 rounded-2xl p-6 shadow-2xl shadow-accent/5">
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-2 h-2 bg-accent-orange rounded-full animate-pulse" />
-                  <h3 className="text-[10px] font-bold text-accent-orange uppercase tracking-[0.2em]">Vorlagen-Generator</h3>
+                  <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />
+                  <h3 className="text-[10px] font-bold text-accent uppercase tracking-[0.2em]">Vorlagen-Generator</h3>
                 </div>
                 <div className="flex gap-3 items-start">
                   <textarea 
@@ -1168,7 +1168,7 @@ export default function Settings() {
                     onChange={e => setGeneratorGoal(e.target.value)}
                     placeholder="Beschreiben Sie hier detailliert, was die Vorlage leisten soll (z.B. 'Ein Protokoll für ein IT-Team-Meeting, das technische Details und Architektur-Entscheidungen hervorhebt')..." 
                     rows={3}
-                    className="flex-1 bg-dark-input border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none focus:ring-1 focus:ring-accent-orange resize-none"
+                    className="flex-1 bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent resize-none"
                   />
                   <button 
                     onClick={handleGenerateAI}
@@ -1177,25 +1177,25 @@ export default function Settings() {
                   >
                     {isGenerating ? (
                       <>
-                        <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                        <div className="w-3 h-3 border-2 border-emphasis border-t-white rounded-full animate-spin" />
                         Generiere...
                       </>
                     ) : 'Erstellen'}
                   </button>
                 </div>
-                <p className="mt-3 text-[10px] text-text-secondary opacity-60">
+                <p className="mt-3 text-[10px] text-secondary opacity-60">
                   Aus Ihrer Beschreibung wird eine System-Anweisung mit JSON-Struktur erstellt.
                 </p>
               </div>
 
-              <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-4">System-Anweisungen (Prompt)</label>
+              <label className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-4">System-Anweisungen (Prompt)</label>
               <textarea 
                 value={activeEditor.prompt_text} 
                 onChange={e => setActiveEditor({...activeEditor, prompt_text: e.target.value})}
                 placeholder="Geben Sie hier die Anweisungen für das Sprachmodell ein..."
-                className="flex-1 bg-dark-card border border-white/5 rounded-2xl p-8 text-sm text-text-primary outline-none focus:border-accent-orange/30 shadow-2xl resize-none font-mono leading-relaxed"
+                className="flex-1 bg-surface border border-subtle rounded-2xl p-8 text-sm text-primary outline-none focus:border-accent/30 shadow-2xl resize-none font-mono leading-relaxed"
               />
-              <p className="mt-4 text-[10px] text-text-secondary italic">
+              <p className="mt-4 text-[10px] text-secondary italic">
                 Tipp: Beschreiben Sie exakt, wie das Ergebnis strukturiert sein soll (z.B. als JSON oder Fließtext).
               </p>
             </div>
@@ -1205,10 +1205,10 @@ export default function Settings() {
 
       {/* Table Template Editor Overlay */}
       {tableTemplateEditor && (
-        <div className="fixed inset-0 z-[110] bg-dark-bg flex flex-col animate-fade-in">
-          <header className="min-h-16 border-b border-white/[0.06] bg-dark-card flex flex-wrap items-center justify-between gap-3 px-6 py-3">
+        <div className="fixed inset-0 z-[60] bg-canvas flex flex-col animate-fade-in">
+          <header className="min-h-16 border-b border-subtle bg-surface flex flex-wrap items-center justify-between gap-3 px-6 py-3">
             <div className="flex items-center gap-4 min-w-0 flex-1">
-              <button onClick={() => { setTableTemplateEditor(null); setTableSchema(null); }} className="p-2 text-text-secondary hover:text-text-primary transition-colors" aria-label="Tabellen-Vorlagen-Editor schließen">
+              <button onClick={() => { setTableTemplateEditor(null); setTableSchema(null); }} className="p-2 text-secondary hover:text-primary transition-colors" aria-label="Tabellen-Vorlagen-Editor schließen">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
@@ -1217,16 +1217,16 @@ export default function Settings() {
                 type="text" 
                 value={tableTemplateEditor.name} 
                 onChange={e => handleTableTemplateNameChange(e.target.value)}
-                className="bg-transparent border-none text-lg font-semibold text-text-primary outline-none focus:ring-0 w-full max-w-md min-w-0"
+                className="bg-transparent border-none text-lg font-semibold text-primary outline-none focus:ring-0 w-full max-w-md min-w-0"
                 placeholder="Name der Tabellen-Vorlage..."
               />
             </div>
             <div className="flex items-center justify-end gap-3 flex-wrap">
-              <span className="text-[10px] bg-accent-orange/20 text-accent-orange px-2 py-1 rounded-full uppercase">Tabellen-Vorlage</span>
+              <span className="text-[10px] bg-accent/20 text-accent px-2 py-1 rounded-full uppercase">Tabellen-Vorlage</span>
               <select
                 value={tableTemplateEditor.category_id || ''}
                 onChange={e => setTableTemplateEditor({ ...tableTemplateEditor, category_id: e.target.value })}
-                className="bg-dark-input border border-white/[0.1] rounded-xl px-3 py-2 text-xs text-text-primary outline-none"
+                className="bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none"
                 aria-label="Kategorie der Tabellen-Vorlage"
               >
                 <option value="">Ohne Kategorie</option>
@@ -1238,13 +1238,13 @@ export default function Settings() {
                 type="button"
                 onClick={handleSaveTableTemplate} 
                 disabled={templateLoading} 
-                className="gradient-accent text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent-orange/20"
+                className="gradient-accent text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent/20"
               >
                 {templateLoading ? 'Speichert...' : 'Vorlage speichern'}
               </button>
             </div>
           </header>
-          <main className="flex-1 p-6 md:p-12 overflow-y-auto bg-black/20">
+          <main className="flex-1 p-6 md:p-12 overflow-y-auto bg-hover-subtle">
             <div className="max-w-4xl mx-auto">
               <TableSchemaBuilder 
                 schema={tableSchema}

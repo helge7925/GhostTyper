@@ -26,9 +26,9 @@ export default class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div className="min-h-[70vh] flex items-center justify-center px-4">
-          <div className="max-w-md w-full bg-dark-card border border-white/[0.06] rounded-2xl p-8 text-center">
-            <h1 className="text-lg font-semibold text-text-primary mb-3">Unerwarteter Fehler</h1>
-            <p className="text-sm text-text-secondary mb-6">
+          <div className="max-w-md w-full bg-surface border border-subtle rounded-2xl p-8 text-center">
+            <h1 className="text-lg font-semibold text-primary mb-3">Unerwarteter Fehler</h1>
+            <p className="text-sm text-secondary mb-6">
               Die Ansicht konnte nicht geladen werden. Bitte Seite neu laden.
             </p>
             <button

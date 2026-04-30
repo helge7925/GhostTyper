@@ -52,11 +52,11 @@ export default function Login() {
               height={48}
               className="h-12 w-auto mx-auto mb-2"
             />
-            <p className="text-sm text-text-secondary">
+            <p className="text-sm text-secondary">
               Ihre Gedanken, entschlüsselt und auf den Punkt gebracht.
             </p>
           </div>
-          <div className="bg-dark-card border border-white/[0.06] rounded-2xl p-8 shadow-2xl">
+          <div className="bg-surface border border-subtle rounded-2xl p-8 shadow-2xl">
             {providers?.oidc && (
               <button
                 type="button"
@@ -70,7 +70,7 @@ export default function Login() {
             {providers?.credentials && (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1.5">
+                <label htmlFor="email" className="block text-sm font-medium text-secondary mb-1.5">
                   Email
                 </label>
                 <input
@@ -80,13 +80,13 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoFocus
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none transition-shadow"
+                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-shadow"
                   placeholder="name@beispiel.de"
                 />
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-text-secondary mb-1.5">
+                <label htmlFor="password" className="block text-sm font-medium text-secondary mb-1.5">
                   Passwort
                 </label>
                 <input
@@ -95,12 +95,12 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none transition-shadow"
+                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-shadow"
                 />
               </div>
 
               {error && (
-                <p className="text-sm text-accent-red">{error}</p>
+                <p className="text-sm text-danger">{error}</p>
               )}
 
               <button
@@ -114,12 +114,12 @@ export default function Login() {
             )}
 
             {providers && !providers.credentials && !providers.oidc && (
-              <p className="text-sm text-text-secondary text-center">
+              <p className="text-sm text-secondary text-center">
                 Es ist kein Anmeldeverfahren konfiguriert. Bitte wenden Sie sich an den Administrator.
               </p>
             )}
 
-            <p className="text-sm text-text-secondary text-center mt-6">
+            <p className="text-sm text-secondary text-center mt-6">
               Kein Konto? Wenden Sie sich an den Administrator.
             </p>
           </div>

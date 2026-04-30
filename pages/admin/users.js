@@ -230,7 +230,7 @@ export default function AdminUsers() {
       </Head>
 
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-text-primary">User-Verwaltung</h1>
+        <h1 className="text-2xl font-semibold text-primary">User-Verwaltung</h1>
         {!showForm && (
           <button
             onClick={startCreate}
@@ -242,33 +242,33 @@ export default function AdminUsers() {
       </div>
 
       {success && (
-        <div className="bg-accent-green/10 border border-accent-green/20 text-accent-green px-4 py-3 rounded-lg text-sm mb-4">
+        <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-lg text-sm mb-4">
           {success}
         </div>
       )}
 
       {error && !showForm && (
-        <p className="text-sm text-accent-red mb-4">{error}</p>
+        <p className="text-sm text-danger mb-4">{error}</p>
       )}
 
-      <form onSubmit={handleSaveRetention} className="bg-dark-card border border-white/[0.06] rounded-xl p-6 mb-6">
-        <h2 className="text-base font-medium text-text-primary">Datenaufbewahrung</h2>
-        <p className="text-xs text-text-secondary mt-1">
+      <form onSubmit={handleSaveRetention} className="bg-surface border border-subtle rounded-xl p-6 mb-6">
+        <h2 className="text-base font-medium text-primary">Datenaufbewahrung</h2>
+        <p className="text-xs text-secondary mt-1">
           Standardmäßig ist keine automatische Löschung aktiv. Der Cleanup läuft nur, wenn `npm run retention:apply` geplant ausgeführt wird.
         </p>
         <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end">
-          <label className="flex items-center gap-3 text-sm text-text-primary">
+          <label className="flex items-center gap-3 text-sm text-primary">
             <input
               type="checkbox"
               checked={retentionEnabled}
               onChange={(event) => setRetentionEnabled(event.target.checked)}
-              className="w-4 h-4 accent-accent-orange"
+              className="w-4 h-4 accent-accent"
             />
             Automatische Aufbewahrungsfrist aktivieren
           </label>
           <div className="flex items-end gap-3">
             <div>
-              <label htmlFor="retention-days" className="block text-xs text-text-secondary mb-1">Tage</label>
+              <label htmlFor="retention-days" className="block text-xs text-secondary mb-1">Tage</label>
               <input
                 id="retention-days"
                 type="number"
@@ -277,10 +277,10 @@ export default function AdminUsers() {
                 value={retentionDays}
                 onChange={(event) => setRetentionDays(event.target.value)}
                 disabled={!retentionEnabled}
-                className="w-32 bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary outline-none disabled:opacity-50"
+                className="w-32 bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary outline-none disabled:opacity-50"
               />
             </div>
-            <button type="submit" className="bg-white/5 hover:bg-white/10 text-text-primary border border-white/[0.08] px-4 py-2 rounded-lg text-sm">
+            <button type="submit" className="bg-hover-subtle hover:bg-hover-strong text-primary border border-subtle px-4 py-2 rounded-lg text-sm">
               Speichern
             </button>
           </div>
@@ -288,39 +288,39 @@ export default function AdminUsers() {
       </form>
 
       {showForm && (
-        <div className="bg-dark-card border border-white/[0.06] rounded-xl p-6 mb-6">
-          <h2 className="text-base font-medium text-text-primary mb-4">
+        <div className="bg-surface border border-subtle rounded-xl p-6 mb-6">
+          <h2 className="text-base font-medium text-primary mb-4">
             {editingUser ? `User bearbeiten: ${editingUser.email}` : 'Neuen User erstellen'}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="admin-user-name" className="block text-sm font-medium text-text-secondary mb-1.5">Name</label>
+                <label htmlFor="admin-user-name" className="block text-sm font-medium text-secondary mb-1.5">Name</label>
                 <input
                   id="admin-user-name"
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="Max Mustermann"
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
+                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                 />
               </div>
 
               <div>
-                <label htmlFor="admin-user-email" className="block text-sm font-medium text-text-secondary mb-1.5">Email *</label>
+                <label htmlFor="admin-user-email" className="block text-sm font-medium text-secondary mb-1.5">Email *</label>
                 <input
                   id="admin-user-email"
                   type="email"
                   value={formEmail}
                   onChange={(e) => setFormEmail(e.target.value)}
                   required
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
+                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                 />
               </div>
 
               <div>
-                <label htmlFor="admin-user-password" className="block text-sm font-medium text-text-secondary mb-1.5">
+                <label htmlFor="admin-user-password" className="block text-sm font-medium text-secondary mb-1.5">
                   Passwort {editingUser ? '(leer = unverändert)' : '*'}
                 </label>
                 <input
@@ -330,17 +330,17 @@ export default function AdminUsers() {
                   onChange={(e) => setFormPassword(e.target.value)}
                   required={!editingUser}
                   placeholder={editingUser ? 'Neues Passwort eingeben' : 'Mindestens 8 Zeichen'}
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
+                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                 />
               </div>
 
               <div>
-                <label htmlFor="admin-user-role" className="block text-sm font-medium text-text-secondary mb-1.5">Rolle</label>
+                <label htmlFor="admin-user-role" className="block text-sm font-medium text-secondary mb-1.5">Rolle</label>
                 <select
                   id="admin-user-role"
                   value={formRole}
                   onChange={(e) => setFormRole(e.target.value)}
-                  className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
+                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                 >
                   <option value="user">User</option>
                   <option value="auditor">Auditor</option>
@@ -350,9 +350,9 @@ export default function AdminUsers() {
             </div>
 
             {editingUser && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/[0.06] pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-subtle pt-4">
                 <div>
-                  <label htmlFor="admin-user-api-key" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  <label htmlFor="admin-user-api-key" className="block text-sm font-medium text-secondary mb-1.5">
                     Mistral API-Key {editingUser.api_key_configured && '(konfiguriert)'}
                   </label>
                   <input
@@ -361,12 +361,12 @@ export default function AdminUsers() {
                     value={formApiKey}
                     onChange={(e) => setFormApiKey(e.target.value)}
                     placeholder={editingUser.api_key_configured ? 'Neuen Key eingeben zum Ändern' : 'API-Key eingeben'}
-                    className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
+                    className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="admin-user-cost-limit" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  <label htmlFor="admin-user-cost-limit" className="block text-sm font-medium text-secondary mb-1.5">
                     Monatliches Kostenlimit (€)
                   </label>
                   <input
@@ -377,14 +377,14 @@ export default function AdminUsers() {
                     value={formCostLimit}
                     onChange={(e) => setFormCostLimit(e.target.value)}
                     placeholder="Unbegrenzt"
-                    className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-orange focus:border-accent-orange outline-none"
+                    className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                   />
                 </div>
               </div>
             )}
 
             {error && showForm && (
-              <p className="text-sm text-accent-red">{error}</p>
+              <p className="text-sm text-danger">{error}</p>
             )}
 
             <div className="flex gap-3">
@@ -397,7 +397,7 @@ export default function AdminUsers() {
               <button
                 type="button"
                 onClick={resetForm}
-                className="border border-white/[0.12] text-text-secondary px-6 py-2.5 rounded-full text-sm font-medium hover:bg-white/[0.06] transition-colors"
+                className="border border-emphasis text-secondary px-6 py-2.5 rounded-full text-sm font-medium hover:bg-hover transition-colors"
               >
                 Abbrechen
               </button>
@@ -409,47 +409,47 @@ export default function AdminUsers() {
       {/* User list */}
       <div className="space-y-3">
         {users.map((user) => (
-          <div key={user.id} className="bg-dark-card border border-white/[0.06] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div key={user.id} className="bg-surface border border-subtle rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-medium text-text-primary truncate">
+                <span className="text-sm font-medium text-primary truncate">
                   {user.name || user.email}
                 </span>
                 {user.role === 'admin' && (
-                  <span className="text-xs bg-accent-orange/20 text-accent-orange px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full">
                     Admin
                   </span>
                 )}
                 {user.role === 'auditor' && (
-                  <span className="text-xs bg-accent-cyan/20 text-accent-cyan px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-info/20 text-info px-2 py-0.5 rounded-full">
                     Auditor
                   </span>
                 )}
                 {user.api_key_configured && (
-                  <span className="text-xs bg-accent-green/20 text-accent-green px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-success/20 text-success px-2 py-0.5 rounded-full">
                     Mistral API
                   </span>
                 )}
                 {user.cost_limit !== null && user.cost_limit !== undefined && (
-                  <span className="text-xs bg-accent-yellow/20 text-accent-yellow px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-warning/20 text-warning px-2 py-0.5 rounded-full">
                     Limit: {user.cost_limit} €
                   </span>
                 )}
               </div>
-              <p className="text-xs text-text-secondary mt-0.5">{user.email}</p>
+              <p className="text-xs text-secondary mt-0.5">{user.email}</p>
             </div>
 
             <div className="w-full sm:w-auto flex items-center gap-2 sm:justify-end">
               <button
                 onClick={() => startEdit(user)}
-                className="text-xs text-text-secondary hover:text-text-primary hover:bg-white/[0.06] px-3 py-1.5 rounded-full transition-colors"
+                className="text-xs text-secondary hover:text-primary hover:bg-hover px-3 py-1.5 rounded-full transition-colors"
               >
                 Bearbeiten
               </button>
               {user.id !== session.user.id && (
                 <button
                   onClick={() => handleDelete(user)}
-                  className="text-xs text-accent-red/70 hover:text-accent-red hover:bg-accent-red/10 px-3 py-1.5 rounded-full transition-colors"
+                  className="text-xs text-danger/70 hover:text-danger hover:bg-danger/10 px-3 py-1.5 rounded-full transition-colors"
                 >
                   Löschen
                 </button>
@@ -460,8 +460,8 @@ export default function AdminUsers() {
       </div>
 
       {users.length === 0 && !loading && (
-        <div className="bg-dark-card border border-white/[0.06] rounded-xl p-12 text-center">
-          <p className="text-text-secondary text-sm">Keine User vorhanden.</p>
+        <div className="bg-surface border border-subtle rounded-xl p-12 text-center">
+          <p className="text-secondary text-sm">Keine User vorhanden.</p>
         </div>
       )}
       {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}

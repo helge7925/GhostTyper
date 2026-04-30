@@ -128,13 +128,19 @@ export default function AudioRecorder({ onRecordingComplete }) {
         const width = displayWidth;
         const height = displayHeight;
 
+        // Read theme-aware colors from CSS variables (auto-updates on theme switch).
+        const rootStyles = getComputedStyle(document.documentElement);
+        const bgFill = rootStyles.getPropertyValue('--hover-subtle').trim() || 'rgba(255, 255, 255, 0.02)';
+        const midlineStroke = rootStyles.getPropertyValue('--border-emphasis').trim() || 'rgba(255, 255, 255, 0.12)';
+        const accentRgb = rootStyles.getPropertyValue('--accent').trim() || '255 89 23';
+
         // Background
         ctx.clearRect(0, 0, width, height);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
+        ctx.fillStyle = bgFill;
         ctx.fillRect(0, 0, width, height);
 
         // Midline
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+        ctx.strokeStyle = midlineStroke;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(0, height / 2);
@@ -142,7 +148,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
         ctx.stroke();
 
         // Waveform
-        ctx.strokeStyle = '#ff5917';
+        ctx.strokeStyle = `rgb(${accentRgb})`;
         ctx.lineWidth = 2;
         ctx.beginPath();
 
@@ -406,8 +412,8 @@ export default function AudioRecorder({ onRecordingComplete }) {
   if (audioBlob) {
     return (
       <div className="space-y-4">
-        <div className="bg-dark-input border border-white/[0.1] rounded-lg p-4">
-          <p className="text-sm text-text-secondary mb-3">
+        <div className="bg-surface-elevated border border-subtle rounded-lg p-4">
+          <p className="text-sm text-secondary mb-3">
             Aufnahme ({formatDuration(duration)})
           </p>
           <audio
@@ -425,7 +431,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
           <button
             type="button"
             onClick={handleDiscard}
-            className="flex-1 border border-white/[0.12] text-text-secondary py-2 rounded-full text-sm font-medium hover:bg-white/[0.06] transition-colors"
+            className="flex-1 border border-emphasis text-secondary py-2 rounded-full text-sm font-medium hover:bg-hover transition-colors"
           >
             Verwerfen
           </button>
@@ -444,7 +450,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="bg-accent-red/10 border border-accent-red/20 text-accent-red px-4 py-3 rounded-lg text-sm text-center">
+        <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm text-center">
           {error}
         </div>
       )}
@@ -456,10 +462,10 @@ export default function AudioRecorder({ onRecordingComplete }) {
               ref={canvasRef} 
               width={300} 
               height={80} 
-              className="mb-6 w-full max-w-[300px] h-[80px] bg-white/[0.02] border border-white/[0.05] rounded-xl"
+              className="mb-6 w-full max-w-[300px] h-[80px] bg-hover-subtle border border-subtle rounded-xl"
             />
             <div className="w-full max-w-[300px] mb-4">
-              <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-text-secondary mb-1">
+              <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-secondary mb-1">
                 <span>Mikrofonpegel</span>
                 <span>{inputLevel}%</span>
               </div>
@@ -468,7 +474,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
                 value={Math.max(inputLevel, 2)}
                 max={100}
               />
-              <p className="text-[10px] mt-1 text-text-secondary">
+              <p className="text-[10px] mt-1 text-secondary">
                 {visualizerUnavailable
                   ? 'Pegelanzeige aktuell nicht verfügbar. Aufnahme läuft trotzdem.'
                   : hasSignal
@@ -476,24 +482,24 @@ export default function AudioRecorder({ onRecordingComplete }) {
                     : 'Lauscht... sprechen Sie einfach normal.'}
               </p>
               {calibratedThreshold !== null && (
-                <p className="text-[10px] text-text-secondary/80 mt-0.5">
+                <p className="text-[10px] text-secondary/80 mt-0.5">
                   Mikro-Check aktiv. Sprache wird jetzt sensibler erkannt.
                 </p>
               )}
             </div>
-            <div className={`w-16 h-16 rounded-full mb-4 flex items-center justify-center ${isPaused ? 'bg-yellow-500/20' : 'bg-accent-red/20 animate-pulse'}`}>
-              <div className={`w-6 h-6 rounded-full ${isPaused ? 'bg-yellow-500' : 'bg-accent-red'}`} />
+            <div className={`w-16 h-16 rounded-full mb-4 flex items-center justify-center ${isPaused ? 'bg-yellow-500/20' : 'bg-danger/20 animate-pulse'}`}>
+              <div className={`w-6 h-6 rounded-full ${isPaused ? 'bg-yellow-500' : 'bg-danger'}`} />
             </div>
           </div>
         ) : (
-          <div className="w-20 h-20 rounded-full bg-accent-orange/20 mb-4 flex items-center justify-center">
-            <svg className="w-10 h-10 text-accent-orange" fill="currentColor" viewBox="0 0 20 20">
+          <div className="w-20 h-20 rounded-full bg-accent/20 mb-4 flex items-center justify-center">
+            <svg className="w-10 h-10 text-accent" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
             </svg>
           </div>
         )}
 
-        <p className="text-2xl font-mono text-text-primary mb-6">
+        <p className="text-2xl font-mono text-primary mb-6">
           {formatDuration(duration)}
         </p>
 
@@ -502,7 +508,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
             <button
               type="button"
               onClick={startRecording}
-              className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors shadow-lg shadow-accent-orange/20 hover:scale-105 transform active:scale-95"
+              className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors shadow-lg shadow-accent/20 hover:scale-105 transform active:scale-95"
             >
               Aufnahme starten
             </button>
@@ -512,7 +518,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
                 <button
                   type="button"
                   onClick={resumeRecording}
-                  className="border border-white/[0.12] text-text-secondary px-6 py-2.5 rounded-full text-sm font-medium hover:bg-white/[0.06] transition-colors"
+                  className="border border-emphasis text-secondary px-6 py-2.5 rounded-full text-sm font-medium hover:bg-hover transition-colors"
                 >
                   Fortsetzen
                 </button>
@@ -520,7 +526,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
                 <button
                   type="button"
                   onClick={pauseRecording}
-                  className="border border-white/[0.12] text-text-secondary px-6 py-2.5 rounded-full text-sm font-medium hover:bg-white/[0.06] transition-colors"
+                  className="border border-emphasis text-secondary px-6 py-2.5 rounded-full text-sm font-medium hover:bg-hover transition-colors"
                 >
                   Pause
                 </button>
@@ -529,7 +535,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
                 type="button"
                 onClick={calibrateInputLevel}
                 disabled={isPaused || isCalibrating || visualizerUnavailable}
-                className="border border-white/[0.12] text-text-secondary px-4 py-2.5 rounded-full text-sm font-medium hover:bg-white/[0.06] transition-colors disabled:opacity-40"
+                className="border border-emphasis text-secondary px-4 py-2.5 rounded-full text-sm font-medium hover:bg-hover transition-colors disabled:opacity-40"
                 title="Mikrofon kurz prüfen und auf die Umgebung einstellen"
               >
                 {isCalibrating ? 'Lausche kurz...' : 'Mikro-Check'}
@@ -537,7 +543,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
               <button
                 type="button"
                 onClick={stopRecording}
-                className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors shadow-lg hover:shadow-accent-orange/20 hover:scale-105 transform active:scale-95"
+                className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors shadow-lg hover:shadow-accent/20 hover:scale-105 transform active:scale-95"
               >
                 Stopp
               </button>

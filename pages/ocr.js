@@ -229,10 +229,10 @@ export default function OCR() {
         <div className="max-w-5xl mx-auto animate-fade-in pb-20">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-text-primary">OCR</h1>
-              <p className="text-sm text-text-secondary mt-1">Dokumente lesen und optional zusammenfassen</p>
+              <h1 className="text-2xl font-bold text-primary">OCR</h1>
+              <p className="text-sm text-secondary mt-1">Dokumente lesen und optional zusammenfassen</p>
               {activePreset && (
-                <p className="text-xs text-accent-cyan bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 mt-3 inline-flex">
+                <p className="text-xs text-info bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 mt-3 inline-flex">
                   Preset aktiv: {activePreset.label}
                 </p>
               )}
@@ -242,8 +242,8 @@ export default function OCR() {
           <div className="max-w-xl mx-auto space-y-6">
             <div 
               className={`border-2 border-dashed rounded-3xl p-12 text-center transition-all ${
-                dragActive ? 'border-accent-orange bg-accent-orange/10 scale-[1.02]' : 'border-white/[0.08] hover:border-white/[0.15] bg-white/[0.02]'
-              } ${file ? 'border-accent-green/30 bg-accent-green/5' : ''}`}
+                dragActive ? 'border-accent bg-accent/10 scale-[1.02]' : 'border-subtle hover:border-emphasis bg-hover-subtle'
+              } ${file ? 'border-success/30 bg-success/5' : ''}`}
               role="button"
               tabIndex={0}
               aria-label="Dokument auswählen oder per Drag-and-drop hochladen"
@@ -258,9 +258,9 @@ export default function OCR() {
               
               {file ? (
                 <div className="space-y-4">
-                  <div className="w-16 h-16 bg-accent-green/20 rounded-2xl flex items-center justify-center mx-auto text-accent-green font-bold text-xl">{file.name.split('.').pop().toUpperCase()}</div>
-                  <p className="text-text-primary font-medium">{file.name}</p>
-                  <button onClick={() => setFile(null)} className="text-xs text-text-secondary hover:text-accent-red underline">Anderes Dokument</button>
+                  <div className="w-16 h-16 bg-success/20 rounded-2xl flex items-center justify-center mx-auto text-success font-bold text-xl">{file.name.split('.').pop().toUpperCase()}</div>
+                  <p className="text-primary font-medium">{file.name}</p>
+                  <button onClick={() => setFile(null)} className="text-xs text-secondary hover:text-danger underline">Anderes Dokument</button>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -268,31 +268,31 @@ export default function OCR() {
                     <button 
                       type="button"
                       onClick={() => fileInputRef.current.click()} 
-                      className="flex flex-col items-center gap-2 bg-white/[0.05] hover:bg-white/[0.1] text-text-primary px-6 py-4 rounded-2xl border border-white/5 transition-all group w-32"
+                      className="flex flex-col items-center gap-2 bg-hover hover:bg-hover-strong text-primary px-6 py-4 rounded-2xl border border-subtle transition-all group w-32"
                       title="Dokument hochladen"
                     >
-                      <svg className="w-8 h-8 text-accent-orange group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      <svg className="w-8 h-8 text-accent group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                       <span className="text-[10px] font-bold uppercase tracking-widest">Dokument</span>
                     </button>
                     <button 
                       type="button"
                       onClick={() => cameraInputRef.current.click()} 
-                      className="flex flex-col items-center gap-2 bg-white/[0.05] hover:bg-white/[0.1] text-text-primary px-6 py-4 rounded-2xl border border-white/5 transition-all group w-32"
+                      className="flex flex-col items-center gap-2 bg-hover hover:bg-hover-strong text-primary px-6 py-4 rounded-2xl border border-subtle transition-all group w-32"
                       title="Foto machen"
                     >
-                      <svg className="w-8 h-8 text-accent-orange group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      <svg className="w-8 h-8 text-accent group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                       <span className="text-[10px] font-bold uppercase tracking-widest">Kamera</span>
                     </button>
                   </div>
-                  <p className="text-text-primary font-medium">Dokument hochladen oder fotografieren</p>
+                  <p className="text-primary font-medium">Dokument hochladen oder fotografieren</p>
                 </div>
               )}
             </div>
 
             <div className="flex flex-col items-center gap-6">
               <label className="flex items-center gap-3 cursor-pointer group">
-                <input type="checkbox" checked={analyze} onChange={(e) => setAnalyze(e.target.checked)} className="w-5 h-5 rounded border-white/10 bg-white/5 accent-accent-orange focus:ring-accent-orange" />
-                <span className="text-sm text-text-secondary group-hover:text-text-primary">Direkt analysieren</span>
+                <input type="checkbox" checked={analyze} onChange={(e) => setAnalyze(e.target.checked)} className="w-5 h-5 rounded border-subtle bg-hover-subtle accent-accent focus:ring-accent" />
+                <span className="text-sm text-secondary group-hover:text-primary">Direkt analysieren</span>
               </label>
 
               {analyze && (
@@ -300,12 +300,12 @@ export default function OCR() {
                   <button
                     type="button"
                     onClick={() => setShowAdvancedOptions((prev) => !prev)}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.02] text-sm text-text-primary hover:bg-white/[0.04] transition-colors"
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-subtle bg-hover-subtle text-sm text-primary hover:bg-hover-subtle transition-colors"
                     aria-expanded={showAdvancedOptions}
                   >
                     <span>Erweiterte Analyseoptionen</span>
                     <svg
-                      className={`w-4 h-4 text-text-secondary transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`}
+                      className={`w-4 h-4 text-secondary transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -315,29 +315,29 @@ export default function OCR() {
                   </button>
 
                   {showAdvancedOptions && (
-                    <div className="space-y-4 bg-white/[0.02] p-4 rounded-xl border border-white/[0.06]">
+                    <div className="space-y-4 bg-hover-subtle p-4 rounded-xl border border-subtle">
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1.5 ml-1">Modus</label>
-                          <select value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
+                          <label className="block text-[10px] font-bold text-secondary uppercase mb-1.5 ml-1">Modus</label>
+                          <select value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none">
                             <option value="generic">Zusammenfassung</option><option value="meeting">Meeting</option><option value="aufmass">Aufmaß</option>
                             {templates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1.5 ml-1">Modell</label>
-                          <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-orange outline-none">
+                          <label className="block text-[10px] font-bold text-secondary uppercase mb-1.5 ml-1">Modell</label>
+                          <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none">
                             <option value="mistral-small-latest">Kostengünstig / Schnell</option><option value="mistral-medium-latest">Ausgewogen</option><option value="mistral-large-latest">Qualität</option>
                           </select>
                         </div>
                       </div>
-                      <textarea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Zusätzliche Anweisungen..." rows={2} className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-orange outline-none" />
+                      <textarea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Zusätzliche Anweisungen..." rows={2} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none" />
                       <textarea
                         value={analysisFocus}
                         onChange={(e) => setAnalysisFocus(e.target.value)}
                         placeholder="Fokus der Analyse: Worauf soll sich das Modell konzentrieren?"
                         rows={2}
-                        className="w-full bg-dark-input border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-orange outline-none"
+                        className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none"
                       />
                     </div>
                   )}
@@ -345,10 +345,10 @@ export default function OCR() {
               )}
             </div>
 
-            <button onClick={handleSubmit} disabled={loading || !file} className="w-full gradient-accent text-white py-4 rounded-2xl text-lg font-semibold shadow-lg shadow-accent-orange/20 hover:shadow-accent-orange/30 disabled:opacity-30 flex flex-col items-center justify-center gap-1">
+            <button onClick={handleSubmit} disabled={loading || !file} className="w-full gradient-accent text-white py-4 rounded-2xl text-lg font-semibold shadow-lg shadow-accent/20 hover:shadow-accent/30 disabled:opacity-30 flex flex-col items-center justify-center gap-1">
               {loading ? (
                 <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-emphasis border-t-white rounded-full animate-spin" />
                   <span>{loadingStep === 'analysis' ? 'Schritt 2/2: Zusammenfassung wird erstellt...' : 'Schritt 1/2: Text wird gelesen...'}</span>
                 </div>
               ) : 'Vorgang starten'}
@@ -388,7 +388,7 @@ export default function OCR() {
         />
       )}
 
-      {error && <div className="mt-8 p-4 bg-accent-red/10 border border-accent-red/20 text-accent-red rounded-2xl text-sm text-center animate-fade-in">{error}</div>}
+      {error && <div className="mt-8 p-4 bg-danger/10 border border-danger/20 text-danger rounded-2xl text-sm text-center animate-fade-in">{error}</div>}
       {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
     </>
   );

@@ -14,7 +14,7 @@ function isMissingValue(value) {
 
 function formatValue(value, type) {
   if (isMissingValue(value)) {
-    return <span className="text-text-secondary/30">-</span>;
+    return <span className="text-secondary/30">-</span>;
   }
 
   if (type === 'currency') {
@@ -55,7 +55,7 @@ function CellEditor({ type, value, onChange }) {
       type={inputType}
       value={value ?? ''}
       onChange={(event) => onChange(normalizeInputValue(event.target.value, type))}
-      className="w-full min-w-[120px] bg-dark-input border border-accent-orange/50 rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent-orange"
+      className="w-full min-w-[120px] bg-surface-elevated border border-accent/50 rounded px-2 py-1.5 text-sm text-primary focus:outline-none focus:border-accent"
       step={type === 'currency' ? '0.01' : type === 'number' ? '1' : undefined}
     />
   );
@@ -193,19 +193,19 @@ export default function TableRenderer({
   }
 
   return (
-    <div className="bg-dark-card rounded-2xl overflow-hidden border border-white/[0.06]">
+    <div className="bg-surface rounded-2xl overflow-hidden border border-subtle">
       {showToolbar && (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-white/[0.06]">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-subtle">
           <div className="flex flex-wrap items-center gap-3">
-            <h3 className="text-lg font-semibold text-text-primary">{normalizedSchema.tableName || 'Datentabelle'}</h3>
-            <span className="text-sm text-text-secondary">{rows.length} Zeilen</span>
+            <h3 className="text-lg font-semibold text-primary">{normalizedSchema.tableName || 'Datentabelle'}</h3>
+            <span className="text-sm text-secondary">{rows.length} Zeilen</span>
             {missingMetadataFields.length > 0 && (
-              <span className="text-[11px] px-2 py-1 rounded-full border border-accent-red/40 text-accent-red bg-accent-red/10">
+              <span className="text-[11px] px-2 py-1 rounded-full border border-danger/40 text-danger bg-danger/10">
                 Metadaten unvollständig
               </span>
             )}
             {missingFieldsByRow.size > 0 && (
-              <span className="text-[11px] px-2 py-1 rounded-full border border-accent-red/40 text-accent-red bg-accent-red/10">
+              <span className="text-[11px] px-2 py-1 rounded-full border border-danger/40 text-danger bg-danger/10">
                 {missingFieldsByRow.size} Zeilen unvollständig
               </span>
             )}
@@ -218,8 +218,8 @@ export default function TableRenderer({
                 onClick={() => setEditMode((prev) => !prev)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   editMode
-                    ? 'bg-accent-orange text-white'
-                    : 'bg-white/5 text-text-secondary hover:text-text-primary'
+                    ? 'bg-accent text-white'
+                    : 'bg-hover-subtle text-secondary hover:text-primary'
                 }`}
               >
                 {editMode ? 'Fertig' : 'Bearbeiten'}
@@ -230,17 +230,17 @@ export default function TableRenderer({
               <button
                 type="button"
                 onClick={addRow}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-green/20 text-accent-green hover:bg-accent-green/30 transition-all"
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-success/20 text-success hover:bg-success/30 transition-all"
               >
                 + Zeile
               </button>
             )}
 
-            <div className="w-px h-4 bg-white/10 mx-1" />
+            <div className="w-px h-4 bg-hover-strong mx-1" />
             <button
               type="button"
               onClick={() => handleExport('excel')}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-green/20 text-accent-green hover:bg-accent-green/30 transition-all"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-success/20 text-success hover:bg-success/30 transition-all"
               title="Excel exportieren"
             >
               Excel
@@ -248,7 +248,7 @@ export default function TableRenderer({
             <button
               type="button"
               onClick={() => handleExport('csv')}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-text-secondary hover:text-text-primary transition-all"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-hover-subtle text-secondary hover:text-primary transition-all"
               title="CSV exportieren"
             >
               CSV
@@ -258,8 +258,8 @@ export default function TableRenderer({
               onClick={() => handleExport('copy')}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 copyFeedback
-                  ? 'bg-accent-green/20 text-accent-green'
-                  : 'bg-white/5 text-text-secondary hover:text-text-primary'
+                  ? 'bg-success/20 text-success'
+                  : 'bg-hover-subtle text-secondary hover:text-primary'
               }`}
               title="Als HTML-Tabelle kopieren"
             >
@@ -270,13 +270,13 @@ export default function TableRenderer({
       )}
 
       {normalizedSchema.metadata.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 border-b border-white/[0.06] bg-white/[0.02]">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 border-b border-subtle bg-hover-subtle">
           {normalizedSchema.metadata.map((field) => {
             const missing = field.required && isMissingValue(metadata[field.key]);
             return (
               <label key={field.key} className="block">
-                <span className="block text-[11px] uppercase tracking-wider text-text-secondary mb-1">
-                  {field.label}{field.required && <span className="text-accent-red ml-1">*</span>}
+                <span className="block text-[11px] uppercase tracking-wider text-secondary mb-1">
+                  {field.label}{field.required && <span className="text-danger ml-1">*</span>}
                 </span>
                 {editable && isEditing && field.editable !== false ? (
                   <CellEditor
@@ -285,7 +285,7 @@ export default function TableRenderer({
                     onChange={(value) => updateMetadata(field.key, value)}
                   />
                 ) : (
-                  <div className={`min-h-[34px] rounded-lg border px-3 py-2 text-sm text-text-primary ${missing ? 'border-accent-red/50 bg-accent-red/5' : 'border-white/[0.08] bg-white/[0.03]'}`}>
+                  <div className={`min-h-[34px] rounded-lg border px-3 py-2 text-sm text-primary ${missing ? 'border-danger/50 bg-danger/5' : 'border-subtle bg-hover-subtle'}`}>
                     {formatValue(metadata[field.key], field.type)}
                   </div>
                 )}
@@ -297,40 +297,40 @@ export default function TableRenderer({
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px]">
-          <thead className="bg-white/5">
+          <thead className="bg-hover-subtle">
             <tr>
               {editable && isEditing && !includeRowTitle && <th className="w-10 px-2 py-2" />}
               {includeRowTitle && (
-                <th className="sticky left-0 z-10 bg-[#20202a] px-3 py-2 text-left text-xs font-bold text-text-secondary uppercase tracking-wider whitespace-nowrap border-r border-white/[0.08]">
+                <th className="sticky left-0 z-10 bg-surface-elevated px-3 py-2 text-left text-xs font-bold text-secondary uppercase tracking-wider whitespace-nowrap border-r border-subtle">
                   Zeile
                 </th>
               )}
               {normalizedSchema.columns.map((column) => (
                 <th
                   key={column.key}
-                  className={`px-3 py-2 text-left text-xs font-bold text-text-secondary uppercase tracking-wider whitespace-nowrap ${
+                  className={`px-3 py-2 text-left text-xs font-bold text-secondary uppercase tracking-wider whitespace-nowrap ${
                     column.type === 'currency' || column.type === 'number' ? 'text-right' : ''
                   }`}
                 >
                   {column.label}
-                  {column.required && <span className="text-accent-red ml-1">*</span>}
+                  {column.required && <span className="text-danger ml-1">*</span>}
                 </th>
               ))}
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-white/[0.04]">
+          <tbody className="divide-y divide-subtle">
             {rows.map((row, rowIndex) => (
               <tr
                 key={`${row.row_key || 'row'}-${rowIndex}`}
-                className={`hover:bg-white/[0.02] ${missingFieldsByRow.has(rowIndex) ? 'bg-accent-red/5' : ''}`}
+                className={`hover:bg-hover-subtle ${missingFieldsByRow.has(rowIndex) ? 'bg-danger/5' : ''}`}
               >
                 {editable && isEditing && !includeRowTitle && (
                   <td className="px-2 py-2">
                     <button
                       type="button"
                       onClick={() => removeRow(rowIndex)}
-                      className="p-1 text-accent-red/50 hover:text-accent-red transition-colors"
+                      className="p-1 text-danger/50 hover:text-danger transition-colors"
                       aria-label={`Zeile ${rowIndex + 1} entfernen`}
                     >
                       ×
@@ -338,7 +338,7 @@ export default function TableRenderer({
                   </td>
                 )}
                 {includeRowTitle && (
-                  <th className="sticky left-0 z-10 bg-[#171720] px-3 py-2 text-left text-sm text-text-primary font-semibold border-r border-white/[0.08]">
+                  <th className="sticky left-0 z-10 bg-surface-elevated px-3 py-2 text-left text-sm text-primary font-semibold border-r border-subtle">
                     {getTableRowLabel(normalizedSchema, row, rowIndex)}
                   </th>
                 )}
@@ -350,7 +350,7 @@ export default function TableRenderer({
                       key={column.key}
                       className={`px-3 py-2 text-sm ${
                         column.type === 'currency' || column.type === 'number' ? 'text-right' : 'text-left'
-                      } text-text-primary ${missing ? 'ring-1 ring-inset ring-accent-red/40 rounded-sm' : ''}`}
+                      } text-primary ${missing ? 'ring-1 ring-inset ring-danger/40 rounded-sm' : ''}`}
                     >
                       {isEditable ? (
                         <CellEditor
@@ -371,7 +371,7 @@ export default function TableRenderer({
               <tr>
                 <td
                   colSpan={normalizedSchema.columns.length + (includeRowTitle ? 1 : 0) + (editable && isEditing && !includeRowTitle ? 1 : 0)}
-                  className="px-4 py-8 text-center text-text-secondary"
+                  className="px-4 py-8 text-center text-secondary"
                 >
                   Keine Daten vorhanden
                 </td>
@@ -382,7 +382,7 @@ export default function TableRenderer({
       </div>
 
       {(missingMetadataFields.length > 0 || missingFieldsByRow.size > 0) && (
-        <div className="px-4 py-3 bg-white/[0.02] border-t border-white/[0.06] text-[10px] text-accent-red/90">
+        <div className="px-4 py-3 bg-hover-subtle border-t border-subtle text-[10px] text-danger/90">
           {missingMetadataFields.length > 0 && (
             <p>Fehlende Metadaten: {missingMetadataFields.join(', ')}</p>
           )}

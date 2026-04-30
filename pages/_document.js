@@ -1,4 +1,5 @@
 import Document, { Head, Html, Main, NextScript } from 'next/document';
+import { THEME_INIT_SCRIPT } from '../lib/theme-context';
 
 function readNonce(req) {
   const nonceHeader = req?.headers?.['x-nonce'];
@@ -24,6 +25,10 @@ class AppDocument extends Document {
       <Html lang="de">
         <Head nonce={nonce} />
         <body>
+          <script
+            nonce={nonce}
+            dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
+          />
           <Main />
           <NextScript nonce={nonce} />
         </body>
