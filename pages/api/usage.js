@@ -1,24 +1,22 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from './auth/[...nextauth]';
 import { query } from '../../lib/db';
 import { enforceRateLimit, logApiError } from '../../lib/api-utils';
 import { calculateBudgetTrafficLight, resolveEffectiveBudgetLimit } from '../../lib/budget-guardrails';
+import { withOrgScope } from '../../lib/api/with-org-scope';
 
 /**
- * GET /api/usage — Returns the current user's usage for this month.
+ * GET /api/usage — Returns the current organisation's usage for this month.
  */
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const userId = req.userId;
+  const orgId = req.org.id;
+
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'usage',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 60,
     windowMs: 60_000,
   });
@@ -33,9 +31,9 @@ export default async function handler(req, res) {
          COALESCE(SUM(estimated_cost), 0)::numeric AS total_cost,
          COUNT(*)::int AS total_requests
        FROM usage_log
-       WHERE user_id = $1
+       WHERE organization_id = $1
          AND created_at >= date_trunc('month', CURRENT_TIMESTAMP)`,
-      [session.user.id]
+      [orgId]
     );
 
     // Breakdown by operation
@@ -47,25 +45,25 @@ export default async function handler(req, res) {
          COALESCE(SUM(estimated_cost), 0)::numeric AS cost,
          COUNT(*)::int AS requests
        FROM usage_log
-       WHERE user_id = $1
+       WHERE organization_id = $1
          AND created_at >= date_trunc('month', CURRENT_TIMESTAMP)
        GROUP BY operation
        ORDER BY cost DESC`,
-      [session.user.id]
+      [orgId]
     );
 
-    // Cost limit
+    // Cost limit (still user-scoped: personal cost cap)
     let settings;
     try {
       settings = await query(
         'SELECT cost_limit, member_monthly_budget_limit FROM settings WHERE user_id = $1',
-        [session.user.id]
+        [userId]
       );
     } catch (settingsError) {
       if (settingsError?.code !== '42703') throw settingsError;
       settings = await query(
         'SELECT cost_limit, NULL::numeric AS member_monthly_budget_limit FROM settings WHERE user_id = $1',
-        [session.user.id]
+        [userId]
       );
     }
 
@@ -106,3 +104,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: 'Fehler beim Laden der Nutzungsdaten' });
   }
 }
+
+export default withOrgScope(handler);

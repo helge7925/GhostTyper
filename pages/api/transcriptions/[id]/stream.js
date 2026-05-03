@@ -1,5 +1,3 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../auth/[...nextauth]';
 import { query } from '../../../../lib/db';
 import { addTranscriptionEvent, listTranscriptionEvents } from '../../../../lib/transcription-events';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
@@ -10,18 +8,21 @@ import {
   STALE_TRANSCRIPTION_ERROR_MESSAGE,
   STALE_TRANSCRIPTION_EVENT_MESSAGE,
 } from '../../../../lib/transcription-stale';
+import { withOrgScope } from '../../../../lib/api/with-org-scope';
 
 const POLL_INTERVAL_MS = 1500;
 const HEARTBEAT_MS = 15000;
 
-async function loadTranscriptionSnapshot(transcriptionId, userId) {
+async function loadTranscriptionSnapshot(transcriptionId, orgId, userId) {
   const result = await query(
     `SELECT id, original_name, filename, status, template, diarize, auto_analyze, custom_prompt,
             mime_type, model, text, segments, speakers, analysis, error, folder_id, is_favorite,
-            document_html, created_at, updated_at
+            document_html, created_at, updated_at, user_id,
+            source, meeting_platform, native_meeting_id, external_meeting_id, bot_status,
+            meeting_started_at, meeting_ended_at
      FROM transcriptions
-     WHERE id = $1 AND user_id = $2`,
-    [transcriptionId, userId]
+     WHERE id = $1 AND organization_id = $2`,
+    [transcriptionId, orgId]
   );
 
   if (result.rows.length === 0) {
@@ -29,23 +30,25 @@ async function loadTranscriptionSnapshot(transcriptionId, userId) {
   }
 
   const transcription = result.rows[0];
+  const ownerId = transcription.user_id || userId;
   const updatedAt = new Date(transcription.updated_at).getTime();
   if (isStaleTranscription(transcription.status, updatedAt)) {
-    const recovered = await recoverStaleTranscriptionById(transcriptionId, userId);
+    const recovered = await recoverStaleTranscriptionById(transcriptionId, ownerId);
     if (recovered) {
       transcription.status = 'error';
       transcription.error = STALE_TRANSCRIPTION_ERROR_MESSAGE;
       transcription.updated_at = new Date().toISOString();
       await addTranscriptionEvent({
         transcriptionId,
-        userId,
+        userId: ownerId,
+        organizationId: orgId,
         stage: 'error',
         message: STALE_TRANSCRIPTION_EVENT_MESSAGE,
       });
     }
   }
 
-  const events = await listTranscriptionEvents(transcriptionId, userId);
+  const events = await listTranscriptionEvents(transcriptionId, ownerId);
   transcription.events = events;
   return transcription;
 }
@@ -70,18 +73,17 @@ function writeSseEvent(res, eventName, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const userId = req.userId;
+  const orgId = req.org.id;
+
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'transcription-stream',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 30,
     windowMs: 60_000,
   }, 'Zu viele Live-Verbindungen. Bitte später erneut versuchen.');
@@ -129,7 +131,7 @@ export default async function handler(req, res) {
     pollInFlight = true;
 
     try {
-      const snapshot = await loadTranscriptionSnapshot(transId, session.user.id);
+      const snapshot = await loadTranscriptionSnapshot(transId, orgId, userId);
       if (!snapshot) {
         writeSseEvent(res, 'missing', { message: 'Transkription nicht gefunden' });
         cleanup();
@@ -168,3 +170,5 @@ export default async function handler(req, res) {
 
   await pushSnapshot();
 }
+
+export default withOrgScope({ permission: 'transcription.read' }, handler);

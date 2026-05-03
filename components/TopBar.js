@@ -21,7 +21,10 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import ThemeToggle from './ThemeToggle';
+import LocaleSwitcher from './LocaleSwitcher';
+import WorkspaceSwitcher from './WorkspaceSwitcher';
 import { useUIStore } from '../lib/store/ui-store';
+import { useTranslations } from '../lib/i18n';
 
 function isMacLike() {
   if (typeof navigator === 'undefined') return false;
@@ -29,6 +32,7 @@ function isMacLike() {
 }
 
 function ProfileMenu({ session }) {
+  const t = useTranslations('nav');
   const initials = session.user.email?.substring(0, 2)?.toUpperCase() || '??';
   return (
     <DropdownMenu>
@@ -36,7 +40,7 @@ function ProfileMenu({ session }) {
         <button
           type="button"
           className="inline-flex items-center gap-2 rounded-xl p-1 hover:bg-hover-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          aria-label="Benutzermenü"
+          aria-label={useTranslations('topbar')('userMenu')}
         >
           {session.user.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -56,7 +60,7 @@ function ProfileMenu({ session }) {
         <DropdownMenuLabel>
           <div className="flex flex-col gap-0.5">
             <span className="text-sm font-medium text-primary normal-case tracking-normal">
-              {session.user.name || 'Benutzer'}
+              {session.user.name || t('profile')}
             </span>
             <span className="text-[11px] text-secondary normal-case tracking-normal">
               {session.user.email}
@@ -67,20 +71,20 @@ function ProfileMenu({ session }) {
         <DropdownMenuItem asChild>
           <Link href="/profile">
             <User aria-hidden="true" className="w-4 h-4" />
-            Profil
+            {t('profile')}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/settings">
             <Settings aria-hidden="true" className="w-4 h-4" />
-            Einstellungen
+            {t('settings')}
           </Link>
         </DropdownMenuItem>
         {session.user.role === 'admin' && (
           <DropdownMenuItem asChild>
             <Link href="/admin/users">
               <ShieldCheck aria-hidden="true" className="w-4 h-4" />
-              Admin
+              {t('admin')}
             </Link>
           </DropdownMenuItem>
         )}
@@ -93,7 +97,7 @@ function ProfileMenu({ session }) {
           className="text-danger data-[highlighted]:bg-danger/10 data-[highlighted]:text-danger"
         >
           <LogOut aria-hidden="true" className="w-4 h-4" />
-          Abmelden
+          {t('logout')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -105,12 +109,13 @@ export default function TopBar() {
   const { data: session } = useSession();
   const { openSidebar, toggleSidebarCollapsed, sidebarCollapsed, openCommandPalette } = useUIStore();
   const [shortcutKey, setShortcutKey] = useState('Ctrl');
+  const tBar = useTranslations('topbar');
 
   useEffect(() => {
     setShortcutKey(isMacLike() ? '⌘' : 'Ctrl');
   }, []);
 
-  // Unauthenticated: minimal bar with logo + theme toggle.
+  // Unauthenticated: minimal bar with logo + locale + theme toggle.
   if (!session) {
     return (
       <header
@@ -122,7 +127,10 @@ export default function TopBar() {
           <img src="/logo.png" alt="" width={26} height={26} className="w-6 h-6" />
           <span className="font-bold text-primary tracking-tight truncate">GhostTyper</span>
         </Link>
-        <ThemeToggle compact />
+        <div className="flex items-center gap-1">
+          <LocaleSwitcher />
+          <ThemeToggle compact />
+        </div>
       </header>
     );
   }
@@ -137,7 +145,7 @@ export default function TopBar() {
         type="button"
         onClick={openSidebar}
         className="xl:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg text-secondary hover:text-primary hover:bg-hover-subtle transition-colors"
-        aria-label="Navigation öffnen"
+        aria-label={tBar('openSidebar')}
       >
         <Menu className="w-5 h-5" aria-hidden="true" />
       </button>
@@ -146,7 +154,7 @@ export default function TopBar() {
         type="button"
         onClick={toggleSidebarCollapsed}
         className="hidden xl:inline-flex items-center justify-center w-10 h-10 rounded-lg text-secondary hover:text-primary hover:bg-hover-subtle transition-colors"
-        aria-label={sidebarCollapsed ? 'Seitenleiste ausklappen' : 'Seitenleiste einklappen'}
+        aria-label={sidebarCollapsed ? tBar('expandSidebar') : tBar('collapseSidebar')}
       >
         {sidebarCollapsed ? (
           <ChevronsRight className="w-5 h-5" aria-hidden="true" />
@@ -155,22 +163,27 @@ export default function TopBar() {
         )}
       </button>
 
-      {/* Logo (mobile/tablet only — desktop has it in the persistent sidebar) */}
-      <Link href="/" className="xl:hidden flex items-center gap-2 min-w-0">
+      {/* Logo (mobile only — tablet has WorkspaceSwitcher there, desktop has logo in the persistent sidebar) */}
+      <Link href="/" className="md:hidden flex items-center gap-2 min-w-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="" width={26} height={26} className="w-6 h-6" />
         <span className="font-bold text-primary tracking-tight truncate">GhostTyper</span>
       </Link>
+
+      {/* Workspace switcher (md+) */}
+      <div className="hidden md:block">
+        <WorkspaceSwitcher />
+      </div>
 
       {/* Center: Command palette trigger (tablet+ only — mobile gets icon-only) */}
       <button
         type="button"
         onClick={openCommandPalette}
         className="hidden md:inline-flex flex-1 items-center gap-2 max-w-md mx-auto h-9 rounded-xl border border-subtle bg-surface px-3 text-sm text-secondary hover:text-primary hover:bg-hover-subtle transition-colors"
-        aria-label="Suche und Befehlspalette öffnen"
+        aria-label={tBar('openSearch')}
       >
         <Search className="w-4 h-4" aria-hidden="true" />
-        <span className="flex-1 text-left">Suche oder Befehl…</span>
+        <span className="flex-1 text-left">{tBar('searchPlaceholder')}</span>
         <kbd className="text-[10px] font-semibold tracking-wider text-secondary border border-subtle rounded px-1.5 py-0.5">
           {shortcutKey} K
         </kbd>
@@ -178,18 +191,18 @@ export default function TopBar() {
 
       <div className="flex-1 md:hidden" />
 
-      {/* Right: Mobile search icon, theme toggle, profile menu */}
+      {/* Right: Mobile search icon, locale, theme toggle, profile menu */}
       <button
         type="button"
         onClick={openCommandPalette}
         className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg text-secondary hover:text-primary hover:bg-hover-subtle transition-colors"
-        aria-label="Suche öffnen"
+        aria-label={tBar('openSearch')}
       >
         <Search className="w-5 h-5" aria-hidden="true" />
       </button>
 
+      <LocaleSwitcher />
       <ThemeToggle compact />
-
       <ProfileMenu session={session} />
     </header>
   );

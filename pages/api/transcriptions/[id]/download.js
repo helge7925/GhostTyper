@@ -1,10 +1,9 @@
 import { readFile } from 'fs/promises';
 import path from 'path';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../auth/[...nextauth]';
 import { query } from '../../../../lib/db';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { logAuditEvent } from '../../../../lib/audit-log';
+import { withOrgScope } from '../../../../lib/api/with-org-scope';
 
 const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
 
@@ -21,19 +20,17 @@ function safeDownloadName(filename) {
     .slice(0, 120) || 'download';
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const userId = req.userId;
+  const orgId = req.org.id;
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'transcription-download',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 60,
     windowMs: 60_000,
   });
@@ -44,8 +41,8 @@ export default async function handler(req, res) {
     const result = await query(
       `SELECT id, file_path, original_name, mime_type
        FROM transcriptions
-       WHERE id = $1 AND user_id = $2`,
-      [id, session.user.id]
+       WHERE id = $1 AND organization_id = $2`,
+      [id, orgId]
     );
     const row = result.rows[0];
     if (!row || !row.file_path) {
@@ -57,7 +54,8 @@ export default async function handler(req, res) {
 
     const buffer = await readFile(row.file_path);
     await logAuditEvent({
-      userId: session.user.id,
+      userId,
+      organizationId: orgId,
       action: 'download.file',
       targetType: 'transcription',
       targetId: String(row.id),
@@ -79,3 +77,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: 'Download fehlgeschlagen' });
   }
 }
+
+export default withOrgScope({ permission: 'transcription.read' }, handler);

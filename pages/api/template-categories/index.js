@@ -1,18 +1,15 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
 import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
+import { withOrgScope } from '../../../lib/api/with-org-scope';
+import { hasPermission } from '../../../lib/permissions';
 
-export default async function handler(req, res) {
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+async function handler(req, res) {
+  const userId = req.userId;
+  const orgId = req.org.id;
 
-  const userId = session.user.id;
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'template-categories',
-    identifier: `user:${userId}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 120,
     windowMs: 60_000,
   });
@@ -22,11 +19,11 @@ export default async function handler(req, res) {
     case 'GET': {
       try {
         const result = await query(
-          `SELECT id, user_id, name, color, position, created_at, updated_at
+          `SELECT id, user_id, organization_id, name, color, position, created_at, updated_at
            FROM template_categories
-           WHERE user_id = $1
+           WHERE organization_id = $1
            ORDER BY position ASC, name ASC`,
-          [userId]
+          [orgId]
         );
         return res.status(200).json(result.rows);
       } catch (error) {
@@ -36,6 +33,9 @@ export default async function handler(req, res) {
     }
 
     case 'POST': {
+      if (!hasPermission(req.role, 'template.write')) {
+        return res.status(403).json({ code: 'FORBIDDEN', message: 'Keine Berechtigung zum Anlegen von Kategorien.' });
+      }
       const { name, color = '#f97316' } = req.body;
 
       if (!name || typeof name !== 'string' || !name.trim()) {
@@ -49,16 +49,16 @@ export default async function handler(req, res) {
 
       try {
         const maxPosResult = await query(
-          'SELECT COALESCE(MAX(position), -1) as max_pos FROM template_categories WHERE user_id = $1',
-          [userId]
+          'SELECT COALESCE(MAX(position), -1) as max_pos FROM template_categories WHERE organization_id = $1',
+          [orgId]
         );
         const nextPosition = (maxPosResult.rows[0].max_pos || -1) + 1;
 
         const result = await query(
-          `INSERT INTO template_categories (user_id, name, color, position)
-           VALUES ($1, $2, $3, $4)
+          `INSERT INTO template_categories (user_id, organization_id, name, color, position)
+           VALUES ($1, $2, $3, $4, $5)
            RETURNING *`,
-          [userId, normalizedName, color, nextPosition]
+          [userId, orgId, normalizedName, color, nextPosition]
         );
         return res.status(201).json(result.rows[0]);
       } catch (error) {
@@ -71,3 +71,5 @@ export default async function handler(req, res) {
       return res.status(405).json({ message: 'Method not allowed' });
   }
 }
+
+export default withOrgScope({ permission: 'template.read' }, handler);

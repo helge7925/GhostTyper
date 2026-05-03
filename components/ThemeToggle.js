@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '../lib/theme-context';
+import { useTranslations } from '../lib/i18n';
 
 export default function ThemeToggle({ className = '', compact = false }) {
   const { resolvedTheme, toggleTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const t = useTranslations('theme');
 
   useEffect(() => setMounted(true), []);
 
   const isDark = mounted && resolvedTheme === 'dark';
-  const label = isDark ? 'Helles Design aktivieren' : 'Dunkles Design aktivieren';
+  const label = isDark ? t('toggleToLight') : t('toggleToDark');
 
   const baseClasses = compact
     ? 'inline-flex items-center justify-center w-9 h-9 rounded-lg text-secondary hover:text-primary hover:bg-hover transition-colors'
@@ -28,7 +30,7 @@ export default function ThemeToggle({ className = '', compact = false }) {
       ) : (
         <span className="w-5 h-5" aria-hidden="true" />
       )}
-      {!compact && <span>{isDark ? 'Helles Design' : 'Dunkles Design'}</span>}
+      {!compact && <span>{isDark ? t('lightLabel') : t('darkLabel')}</span>}
     </button>
   );
 }

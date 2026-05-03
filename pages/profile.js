@@ -3,11 +3,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useTranslations } from '../lib/i18n';
 
 export default function Profile() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
   const fileInputRef = useRef(null);
+  const t = useTranslations('profile');
+  const tCommon = useTranslations('common');
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -111,11 +114,11 @@ export default function Profile() {
   return (
     <>
       <Head>
-        <title>Profil - GhostTyper</title>
+        <title>{`${t('title')} – GhostTyper`}</title>
       </Head>
 
       <div className="max-w-2xl mx-auto animate-fade-in">
-        <h1 className="text-2xl font-bold text-primary mb-8">Benutzerprofil</h1>
+        <h1 className="text-2xl font-bold text-primary mb-8">{t('title')}</h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Avatar Section */}
@@ -163,7 +166,7 @@ export default function Profile() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-secondary mb-1.5">Name</label>
+                <label className="block text-xs font-medium text-secondary mb-1.5">{t('name')}</label>
                 <input
                   type="text"
                   value={formData.name}
@@ -173,7 +176,7 @@ export default function Profile() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-secondary mb-1.5">E-Mail Adresse</label>
+                <label className="block text-xs font-medium text-secondary mb-1.5">{t('email')}</label>
                 <input
                   type="email"
                   value={formData.email}
@@ -190,7 +193,7 @@ export default function Profile() {
             <h2 className="text-sm font-semibold text-secondary uppercase tracking-wider mb-2">Passwort ändern</h2>
             
             <div>
-              <label className="block text-xs font-medium text-secondary mb-1.5">Aktuelles Passwort</label>
+              <label className="block text-xs font-medium text-secondary mb-1.5">{t('currentPassword')}</label>
               <input
                 type="password"
                 value={formData.currentPassword}
@@ -202,7 +205,7 @@ export default function Profile() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-subtle pt-4">
               <div>
-                <label className="block text-xs font-medium text-secondary mb-1.5">Neues Passwort</label>
+                <label className="block text-xs font-medium text-secondary mb-1.5">{t('newPassword')}</label>
                 <input
                   type="password"
                   value={formData.password}
@@ -212,7 +215,7 @@ export default function Profile() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-secondary mb-1.5">Bestätigen</label>
+                <label className="block text-xs font-medium text-secondary mb-1.5">{t('confirmPassword')}</label>
                 <input
                   type="password"
                   value={formData.confirmPassword}
@@ -242,7 +245,7 @@ export default function Profile() {
               disabled={saving}
               className="gradient-accent text-white px-10 py-3.5 rounded-full text-sm font-semibold shadow-lg shadow-accent/20 hover:shadow-accent/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:-translate-y-0.5 active:translate-y-0"
             >
-              {saving ? 'Wird gespeichert...' : 'Änderungen speichern'}
+              {saving ? tCommon('saving') : tCommon('save')}
             </button>
           </div>
         </form>

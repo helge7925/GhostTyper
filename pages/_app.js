@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { SessionProvider } from 'next-auth/react';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import '../styles/globals.css';
@@ -8,6 +9,16 @@ import CommandPalette from '../components/CommandPalette';
 import { ThemeProvider } from '../lib/theme-context';
 import { Toaster } from '../components/ui/sonner';
 import { useUIStore } from '../lib/store/ui-store';
+import { I18nProvider, readLocaleFromCookie, DEFAULT_LOCALE } from '../lib/i18n';
+
+/**
+ * Routes that opt out of the standard app shell (TopBar/Sidebar/BottomNav).
+ * Editor pages take the entire viewport and supply their own slim header.
+ */
+const NO_LAYOUT_ROUTES = new Set([
+  '/transcriptions/[id]/edit',
+  '/transcriptions/[id]/table',
+]);
 
 function isEditableTarget(target) {
   if (!target || target.nodeType !== 1) return false;
@@ -41,21 +52,45 @@ function GlobalShortcuts() {
   return null;
 }
 
-export default function App({ Component, pageProps: { session, ...pageProps } }) {
+function AppBody({ Component, pageProps }) {
+  const router = useRouter();
+  const useLayout = !NO_LAYOUT_ROUTES.has(router.route);
+
+  if (!useLayout) {
+    return <Component {...pageProps} />;
+  }
+  return (
+    <Layout>
+      <Component {...pageProps} />
+    </Layout>
+  );
+}
+
+function App({ Component, pageProps: { session, initialLocale, ...pageProps } }) {
   return (
     <SessionProvider session={session}>
-      <ThemeProvider>
-        <TooltipProvider delayDuration={250}>
-          <ErrorBoundary>
-            <Layout>
-              <Component {...pageProps} />
-            </Layout>
-          </ErrorBoundary>
-          <GlobalShortcuts />
-          <CommandPalette />
-          <Toaster />
-        </TooltipProvider>
-      </ThemeProvider>
+      <I18nProvider initialLocale={initialLocale || DEFAULT_LOCALE}>
+        <ThemeProvider>
+          <TooltipProvider delayDuration={250}>
+            <ErrorBoundary>
+              <AppBody Component={Component} pageProps={pageProps} />
+            </ErrorBoundary>
+            <GlobalShortcuts />
+            <CommandPalette />
+            <Toaster />
+          </TooltipProvider>
+        </ThemeProvider>
+      </I18nProvider>
     </SessionProvider>
   );
 }
+
+App.getInitialProps = async (appCtx) => {
+  // Read the locale cookie server-side so the first paint matches the
+  // user's choice (no client-side flash to default → user locale).
+  const cookieHeader = appCtx?.ctx?.req?.headers?.cookie || '';
+  const initialLocale = readLocaleFromCookie(cookieHeader) || DEFAULT_LOCALE;
+  return { pageProps: { initialLocale } };
+};
+
+export default App;

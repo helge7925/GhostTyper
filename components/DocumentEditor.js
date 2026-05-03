@@ -3,6 +3,19 @@ import { exportToDoc } from '../lib/export-utils';
 import DOMPurify from 'dompurify';
 import { buildPdfPrintStyles } from '../lib/pdf-print-style';
 import Toast from './Toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
+import { MoreHorizontal } from 'lucide-react';
+import { useTranslations } from '../lib/i18n';
 
 const LANGUAGES = [
   { code: 'German', label: 'Deutsch' },
@@ -33,6 +46,11 @@ export default function DocumentEditor({
   const [focusPreset, setFocusPreset] = useState('paper');
   const [showSourceContent, setShowSourceContent] = useState(false);
   const [toast, setToast] = useState(null);
+  const [dirty, setDirty] = useState(false);
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [extrasOpen, setExtrasOpen] = useState(false);
+  const t = useTranslations('components.documentEditor');
+  const tErrors = useTranslations('errors');
   const editorRef = useRef(null);
   const selectionRef = useRef(null);
 
@@ -43,7 +61,19 @@ export default function DocumentEditor({
 
   useEffect(() => {
     setHtml(initialHtml);
+    setDirty(false);
   }, [initialHtml]);
+
+  // Browser-level guard for hard reloads / tab close.
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const handler = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
 
   useEffect(() => {
     if (!editorRef.current) return;
@@ -85,7 +115,7 @@ export default function DocumentEditor({
 
   const execCommand = useCallback((command, value = null) => {
     if (typeof document.execCommand !== 'function') {
-      setToast({ message: 'Diese Browserfunktion wird nicht mehr unterstützt.', type: 'error' });
+      setToast({ message: t('browserUnsupported'), type: 'error' });
       return;
     }
     if (editorRef.current) {
@@ -94,7 +124,7 @@ export default function DocumentEditor({
     restoreSelection();
     document.execCommand(command, false, value);
     captureSelection();
-  }, [captureSelection, restoreSelection]);
+  }, [captureSelection, restoreSelection, t]);
 
   const handleCopy = async () => {
     const currentText = editorRef.current?.innerText || "";
@@ -111,12 +141,21 @@ export default function DocumentEditor({
     const currentHtml = sanitizeEditorHtml(editorRef.current?.innerHTML || html);
     try {
       await onSave(currentHtml);
+      setDirty(false);
       setSaveFeedback(true);
       setTimeout(() => setSaveFeedback(false), 2000);
     } catch (err) {
       console.error('Failed to save!', err);
     }
   }, [html, onSave, sanitizeEditorHtml]);
+
+  const requestCancel = useCallback(() => {
+    if (dirty) {
+      setConfirmCancelOpen(true);
+      return;
+    }
+    onCancel?.();
+  }, [dirty, onCancel]);
 
   useEffect(() => {
     const handleShortcut = (event) => {
@@ -338,7 +377,7 @@ export default function DocumentEditor({
       if (!res.ok) throw new Error(data.message);
       setHtml(sanitizeEditorHtml(data.translatedText));
     } catch (err) {
-      setToast({ message: 'Fehler bei der Übersetzung: ' + err.message, type: 'error' });
+      setToast({ message: `${tErrors('connection')}: ${err.message}`, type: 'error' });
     } finally {
       setIsTranslating(false);
     }
@@ -347,6 +386,7 @@ export default function DocumentEditor({
   const handleEditorInput = useCallback((event) => {
     const rawHtml = event.currentTarget.innerHTML || '';
     setHtml(rawHtml);
+    setDirty(true);
     captureSelection();
   }, [captureSelection]);
 
@@ -408,7 +448,7 @@ export default function DocumentEditor({
                     : 'bg-transparent text-white/75 border-transparent hover:text-white hover:bg-hover-strong'
                 }`}
               >
-                Hell
+                {t('focusPaperLabel')}
               </button>
               <button
                 onClick={() => setFocusPreset('ink')}
@@ -418,7 +458,7 @@ export default function DocumentEditor({
                     : 'bg-transparent text-primary border-transparent hover:text-black hover:bg-hover-subtle'
                 }`}
               >
-                Dunkel
+                {t('focusInkLabel')}
               </button>
             </div>
             <button
@@ -429,18 +469,18 @@ export default function DocumentEditor({
                   : 'bg-accent/20 text-accent border border-accent/30'
               }`}
             >
-              Fokus aus
+              {t('focusOff')}
             </button>
           </div>
         ) : (
           <>
             <div className="flex items-center gap-3 md:gap-4 min-w-0">
-              <button onClick={onCancel} className="p-2 rounded-full transition-all text-secondary hover:text-accent bg-hover-subtle">
-                <span className="sr-only">Editor schließen</span>
+              <button onClick={requestCancel} className="p-2 rounded-full transition-all text-secondary hover:text-accent bg-hover-subtle">
+                <span className="sr-only">{t('closeEditor')}</span>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               </button>
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-accent uppercase tracking-widest leading-none">Editor</span>
+                <span className="text-[10px] font-bold text-accent uppercase tracking-widest leading-none">{t('editor')}</span>
                 <span className="text-sm font-medium text-primary truncate max-w-[200px]">{filename}</span>
               </div>
             </div>
@@ -451,7 +491,7 @@ export default function DocumentEditor({
                   ? 'bg-success/20 text-success'
                   : 'text-primary hover:bg-hover-subtle'
               }`}>
-                {saveFeedback ? 'Gespeichert!' : 'Speichern ⌘S'}
+                {saveFeedback ? t('saved') : t('save')}
               </button>
 
               <button
@@ -459,14 +499,14 @@ export default function DocumentEditor({
                 disabled={isExportingPdf}
                 className="gradient-accent text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg active:scale-95 disabled:opacity-50"
               >
-                {isExportingPdf ? 'PDF wird erstellt…' : 'PDF exportieren'}
+                {isExportingPdf ? t('exportPdfBusy') : t('exportPdf')}
               </button>
 
               <button
                 onClick={handleExportDoc}
                 className="px-4 py-2 text-xs font-bold rounded-xl border transition-colors bg-hover-subtle hover:bg-hover-strong border-subtle text-primary"
               >
-                DOCX exportieren
+                {t('exportDocx')}
               </button>
 
               <div className="flex items-center gap-2 bg-hover-subtle rounded-xl px-2 py-1 border border-subtle">
@@ -476,10 +516,10 @@ export default function DocumentEditor({
                 <button
                   onClick={handleTranslateAction}
                   disabled={isTranslating}
-                  aria-label="Text im Editor übersetzen"
+                  aria-label={t('translateTo')}
                   className="text-[10px] font-bold text-accent hover:text-white transition-colors uppercase tracking-wider px-2"
                 >
-                  {isTranslating ? '...' : 'Übersetzen'}
+                  {isTranslating ? t('translating') : t('translateTo')}
                 </button>
               </div>
               <button
@@ -488,14 +528,14 @@ export default function DocumentEditor({
                   copyFeedback ? 'bg-success/20 text-success' : 'text-primary hover:bg-hover-subtle border border-transparent'
                 }`}
               >
-                {copyFeedback ? 'Kopiert!' : 'Text kopieren'}
+                {copyFeedback ? t('copied') : t('copy')}
               </button>
 
               <button
                 onClick={() => setFocusMode(true)}
                 className="inline-flex px-4 py-2 text-xs font-bold rounded-xl transition-all text-primary hover:bg-hover-subtle"
               >
-                Fokus
+                {t('focus')}
               </button>
             </div>
           </>
@@ -510,28 +550,88 @@ export default function DocumentEditor({
               : 'bg-canvas'
             : 'bg-canvas'
         }`}>
-          {/* Formatting Bar - Fixed bottom on mobile, sticky top on desktop */}
-          <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 md:sticky md:top-6 md:bottom-auto md:translate-x-0 mb-4 no-print ${focusMode ? 'hidden' : ''}`}>
+          {/*
+            Formatting toolbar — adaptive:
+              < md: compact pill at bottom (B / I / U / Mehr) — secondary
+                    actions live in a bottom sheet that opens on "Mehr".
+              md+:  full sticky-top toolbar with every action visible.
+          */}
+          {/* Mobile compact pill (< md) */}
+          <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 md:hidden no-print ${focusMode ? 'hidden' : ''}`}>
+            <div
+              className="bg-surface/90 backdrop-blur-2xl border border-subtle rounded-2xl p-1.5 shadow-2xl flex items-center gap-1"
+              style={{ paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}
+            >
+              <button type="button" onClick={() => execCommand('bold')} className="p-3 min-w-[44px] min-h-[44px] text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl font-bold" aria-label={t('toolbarBold')}>B</button>
+              <button type="button" onClick={() => execCommand('italic')} className="p-3 min-w-[44px] min-h-[44px] text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl italic" aria-label={t('toolbarItalic')}>I</button>
+              <button type="button" onClick={() => execCommand('underline')} className="p-3 min-w-[44px] min-h-[44px] text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl underline" aria-label={t('toolbarUnderline')}>U</button>
+              <div className="w-px h-5 bg-hover-strong mx-1" />
+              <button
+                type="button"
+                onClick={() => setExtrasOpen(true)}
+                className="p-3 min-w-[44px] min-h-[44px] text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl flex items-center justify-center"
+                aria-label={t('moreActions')}
+              >
+                <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile bottom-sheet for the secondary format actions */}
+          <Sheet open={extrasOpen} onOpenChange={setExtrasOpen}>
+            <SheetContent side="bottom" className="md:hidden h-auto pb-6 rounded-t-2xl">
+              <SheetHeader>
+                <SheetTitle>{t('formatSheetTitle')}</SheetTitle>
+              </SheetHeader>
+              <div className="px-5 pb-2 grid grid-cols-3 gap-2">
+                {[
+                  { onClick: () => execCommand('formatBlock', 'h2'), label: t('toolbarH2'), short: 'H2' },
+                  { onClick: () => execCommand('formatBlock', 'h3'), label: t('toolbarH3'), short: 'H3' },
+                  { onClick: () => execCommand('formatBlock', 'p'), label: t('toolbarP'), short: 'P' },
+                  { onClick: () => execCommand('insertUnorderedList'), label: t('toolbarUL'), short: '•' },
+                  { onClick: () => execCommand('insertOrderedList'), label: t('toolbarOL'), short: '1.' },
+                  { onClick: () => execCommand('indent'), label: t('toolbarIndent'), short: '→' },
+                  { onClick: () => execCommand('outdent'), label: t('toolbarOutdent'), short: '←' },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => {
+                      item.onClick();
+                      setExtrasOpen(false);
+                    }}
+                    className="flex flex-col items-center gap-1 px-3 py-3 rounded-xl bg-hover-subtle hover:bg-hover-strong text-primary text-xs"
+                  >
+                    <span className="text-base font-semibold">{item.short}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          {/* Desktop / tablet full toolbar (md+) */}
+          <div className={`hidden md:block sticky top-6 mb-4 no-print ${focusMode ? 'md:hidden' : ''}`}>
             <div className="bg-surface/90 backdrop-blur-2xl border border-subtle rounded-2xl p-1.5 shadow-2xl flex items-center gap-0.5 max-w-[95vw] overflow-x-auto no-scrollbar">
-              <button type="button" onClick={() => execCommand('bold')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl font-bold" aria-label="Fett">B</button>
-              <button type="button" onClick={() => execCommand('italic')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl italic" aria-label="Kursiv">I</button>
-              <button type="button" onClick={() => execCommand('underline')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl underline" aria-label="Unterstrichen">U</button>
+              <button type="button" onClick={() => execCommand('bold')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl font-bold" aria-label={t('toolbarBold')}>B</button>
+              <button type="button" onClick={() => execCommand('italic')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl italic" aria-label={t('toolbarItalic')}>I</button>
+              <button type="button" onClick={() => execCommand('underline')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl underline" aria-label={t('toolbarUnderline')}>U</button>
               <div className="w-px h-4 bg-hover-strong mx-1.5" />
-              <button type="button" onClick={() => execCommand('formatBlock', 'h2')} className="p-2 text-secondary hover:text-accent rounded-xl text-xs font-bold" aria-label="Überschrift Ebene 2">H2</button>
-              <button type="button" onClick={() => execCommand('formatBlock', 'h3')} className="p-2 text-secondary hover:text-accent rounded-xl text-[10px] font-bold" aria-label="Überschrift Ebene 3">H3</button>
-              <button type="button" onClick={() => execCommand('formatBlock', 'p')} className="p-2 text-secondary hover:text-accent rounded-xl text-[10px] font-bold" aria-label="Absatz">P</button>
+              <button type="button" onClick={() => execCommand('formatBlock', 'h2')} className="p-2 text-secondary hover:text-accent rounded-xl text-xs font-bold" aria-label={t('toolbarH2')}>H2</button>
+              <button type="button" onClick={() => execCommand('formatBlock', 'h3')} className="p-2 text-secondary hover:text-accent rounded-xl text-[10px] font-bold" aria-label={t('toolbarH3')}>H3</button>
+              <button type="button" onClick={() => execCommand('formatBlock', 'p')} className="p-2 text-secondary hover:text-accent rounded-xl text-[10px] font-bold" aria-label={t('toolbarP')}>P</button>
               <div className="w-px h-4 bg-hover-strong mx-1.5" />
-              <button type="button" onClick={() => execCommand('insertUnorderedList')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" aria-label="Aufzählungsliste">
+              <button type="button" onClick={() => execCommand('insertUnorderedList')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" aria-label={t('toolbarUL')}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
               </button>
-              <button type="button" onClick={() => execCommand('insertOrderedList')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" aria-label="Nummerierte Liste">
+              <button type="button" onClick={() => execCommand('insertOrderedList')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" aria-label={t('toolbarOL')}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h10M7 16h10M4 8h.01M4 12h.01M4 16h.01" /></svg>
               </button>
               <div className="w-px h-4 bg-hover-strong mx-1.5" />
-              <button type="button" onClick={() => execCommand('indent')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" title="Einrücken" aria-label="Einrücken">
+              <button type="button" onClick={() => execCommand('indent')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" title={t('toolbarIndent')} aria-label={t('toolbarIndent')}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16M13 9l3 3-3 3" /></svg>
               </button>
-              <button type="button" onClick={() => execCommand('outdent')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" title="Ausrücken" aria-label="Ausrücken">
+              <button type="button" onClick={() => execCommand('outdent')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" title={t('toolbarOutdent')} aria-label={t('toolbarOutdent')}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16M11 9l-3 3 3 3" /></svg>
               </button>
             </div>
@@ -747,6 +847,28 @@ export default function DocumentEditor({
         }
       `}</style>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      <AlertDialog open={confirmCancelOpen} onOpenChange={setConfirmCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('discardTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('discardMessage')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('discardKeep')}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={(event) => {
+                event.preventDefault();
+                setConfirmCancelOpen(false);
+                onCancel?.();
+              }}
+            >
+              {t('discardConfirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

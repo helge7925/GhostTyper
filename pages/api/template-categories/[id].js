@@ -1,15 +1,11 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
 import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
+import { withOrgScope } from '../../../lib/api/with-org-scope';
+import { hasPermission } from '../../../lib/permissions';
 
-export default async function handler(req, res) {
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
-
-  const userId = session.user.id;
+async function handler(req, res) {
+  const userId = req.userId;
+  const orgId = req.org.id;
   const { id } = req.query;
   const categoryId = parseInt(id, 10);
 
@@ -19,15 +15,15 @@ export default async function handler(req, res) {
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'template-category',
-    identifier: `user:${userId}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 120,
     windowMs: 60_000,
   });
   if (!allowed) return;
 
   const ownerCheck = await query(
-    'SELECT id FROM template_categories WHERE id = $1 AND user_id = $2',
-    [categoryId, userId]
+    'SELECT id FROM template_categories WHERE id = $1 AND organization_id = $2',
+    [categoryId, orgId]
   );
   if (ownerCheck.rows.length === 0) {
     return res.status(404).json({ message: 'Kategorie nicht gefunden' });
@@ -35,6 +31,9 @@ export default async function handler(req, res) {
 
   switch (req.method) {
     case 'PUT': {
+      if (!hasPermission(req.role, 'template.write')) {
+        return res.status(403).json({ code: 'FORBIDDEN', message: 'Keine Berechtigung zum Bearbeiten von Kategorien.' });
+      }
       const { name, color, position } = req.body;
 
       try {
@@ -69,11 +68,11 @@ export default async function handler(req, res) {
         }
 
         updates.push(`updated_at = NOW()`);
-        values.push(categoryId, userId);
+        values.push(categoryId, orgId);
 
         const result = await query(
           `UPDATE template_categories SET ${updates.join(', ')}
-           WHERE id = $${paramIndex++} AND user_id = $${paramIndex}
+           WHERE id = $${paramIndex++} AND organization_id = $${paramIndex}
            RETURNING *`,
           values
         );
@@ -85,8 +84,11 @@ export default async function handler(req, res) {
     }
 
     case 'DELETE': {
+      if (!hasPermission(req.role, 'template.delete')) {
+        return res.status(403).json({ code: 'FORBIDDEN', message: 'Keine Berechtigung zum Löschen von Kategorien.' });
+      }
       try {
-        await query('DELETE FROM template_categories WHERE id = $1 AND user_id = $2', [categoryId, userId]);
+        await query('DELETE FROM template_categories WHERE id = $1 AND organization_id = $2', [categoryId, orgId]);
         return res.status(200).json({ success: true });
       } catch (error) {
         logApiError('Error deleting template category', error);
@@ -98,3 +100,5 @@ export default async function handler(req, res) {
       return res.status(405).json({ message: 'Method not allowed' });
   }
 }
+
+export default withOrgScope({ permission: 'template.read' }, handler);

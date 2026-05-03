@@ -2,10 +2,12 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import TabellenTranskription from './tabellen-transkription';
 import Datentabelle from './datentabelle';
+import { useTranslations } from '../lib/i18n';
 
 export default function Tabellen() {
   const router = useRouter();
   const mode = router.query.mode === 'free' ? 'free' : 'template';
+  const t = useTranslations('tablesPage');
 
   function setMode(nextMode) {
     router.push(`/tabellen?mode=${nextMode}`, undefined, { shallow: true });
@@ -14,7 +16,7 @@ export default function Tabellen() {
   return (
     <>
       <Head>
-        <title>Tabellen - GhostTyper</title>
+        <title>{`${t('title')} – GhostTyper`}</title>
       </Head>
 
       <div className="max-w-5xl mx-auto mb-6">
@@ -26,7 +28,7 @@ export default function Tabellen() {
               mode === 'template' ? 'bg-accent text-white' : 'text-secondary hover:text-primary'
             }`}
           >
-            Vorlage befüllen
+            {t('fromTemplate')}
           </button>
           <button
             type="button"
@@ -35,7 +37,7 @@ export default function Tabellen() {
               mode === 'free' ? 'bg-accent text-white' : 'text-secondary hover:text-primary'
             }`}
           >
-            Freie Datentabelle
+            {t('freeTable')}
           </button>
         </div>
       </div>

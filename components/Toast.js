@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
+import { useTranslations } from '../lib/i18n';
 
 export default function Toast({ message, type = 'info', duration = 5000, onClose }) {
+  const tCommon = useTranslations('common');
   useEffect(() => {
     const timer = setTimeout(onClose, duration);
     return () => clearTimeout(timer);
@@ -22,7 +24,7 @@ export default function Toast({ message, type = 'info', duration = 5000, onClose
         <span className="text-sm font-medium flex-1">{message}</span>
         <button
           type="button"
-          aria-label="Hinweis schließen"
+          aria-label={tCommon('close')}
           onClick={onClose}
           className="text-current opacity-60 hover:opacity-100 flex-shrink-0"
         >

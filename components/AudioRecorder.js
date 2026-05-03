@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslations } from '../lib/i18n';
 
 export default function AudioRecorder({ onRecordingComplete }) {
+  const t = useTranslations('components.audioRecorder');
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
@@ -314,7 +316,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
 
     } catch (err) {
       console.error('Start recording error:', err);
-      setError('Fehler beim Zugriff auf das Mikrofon: ' + err.message);
+      setError(t('permissionDenied', { error: err.message }));
       cleanup();
     }
   }
@@ -433,14 +435,14 @@ export default function AudioRecorder({ onRecordingComplete }) {
             onClick={handleDiscard}
             className="flex-1 border border-emphasis text-secondary py-2 rounded-full text-sm font-medium hover:bg-hover transition-colors"
           >
-            Verwerfen
+            {t('rerecord')}
           </button>
           <button
             type="button"
             onClick={handleUseRecording}
             className="flex-1 gradient-accent text-white py-2 rounded-full text-sm font-medium transition-colors"
           >
-            Verwenden
+            {t('uploadRecording')}
           </button>
         </div>
       </div>
@@ -466,7 +468,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
             />
             <div className="w-full max-w-[300px] mb-4">
               <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-secondary mb-1">
-                <span>Mikrofonpegel</span>
+                <span>{t('level')}</span>
                 <span>{inputLevel}%</span>
               </div>
               <progress
@@ -476,14 +478,14 @@ export default function AudioRecorder({ onRecordingComplete }) {
               />
               <p className="text-[10px] mt-1 text-secondary">
                 {visualizerUnavailable
-                  ? 'Pegelanzeige aktuell nicht verfügbar. Aufnahme läuft trotzdem.'
+                  ? t('noMicVisualizer')
                   : hasSignal
-                    ? 'Signal erkannt'
-                    : 'Lauscht... sprechen Sie einfach normal.'}
+                    ? t('signalOk')
+                    : t('calibrationActive')}
               </p>
               {calibratedThreshold !== null && (
                 <p className="text-[10px] text-secondary/80 mt-0.5">
-                  Mikro-Check aktiv. Sprache wird jetzt sensibler erkannt.
+                  {t('calibrationDone')}
                 </p>
               )}
             </div>
@@ -510,7 +512,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
               onClick={startRecording}
               className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors shadow-lg shadow-accent/20 hover:scale-105 transform active:scale-95"
             >
-              Aufnahme starten
+              {t('start')}
             </button>
           ) : (
             <>
@@ -520,7 +522,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
                   onClick={resumeRecording}
                   className="border border-emphasis text-secondary px-6 py-2.5 rounded-full text-sm font-medium hover:bg-hover transition-colors"
                 >
-                  Fortsetzen
+                  {t('resume')}
                 </button>
               ) : (
                 <button
@@ -528,7 +530,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
                   onClick={pauseRecording}
                   className="border border-emphasis text-secondary px-6 py-2.5 rounded-full text-sm font-medium hover:bg-hover transition-colors"
                 >
-                  Pause
+                  {t('pause')}
                 </button>
               )}
               <button
@@ -536,16 +538,16 @@ export default function AudioRecorder({ onRecordingComplete }) {
                 onClick={calibrateInputLevel}
                 disabled={isPaused || isCalibrating || visualizerUnavailable}
                 className="border border-emphasis text-secondary px-4 py-2.5 rounded-full text-sm font-medium hover:bg-hover transition-colors disabled:opacity-40"
-                title="Mikrofon kurz prüfen und auf die Umgebung einstellen"
+                title={t('calibrationHint')}
               >
-                {isCalibrating ? 'Lausche kurz...' : 'Mikro-Check'}
+                {isCalibrating ? t('calibrationActive') : t('calibrationStart')}
               </button>
               <button
                 type="button"
                 onClick={stopRecording}
                 className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors shadow-lg hover:shadow-accent/20 hover:scale-105 transform active:scale-95"
               >
-                Stopp
+                {t('stop')}
               </button>
             </>
           )}

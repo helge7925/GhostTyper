@@ -6,6 +6,7 @@ import DocumentEditor from '../components/DocumentEditor';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { mdToHtml } from '../lib/export-utils';
 import { saveDocument } from '../lib/api';
+import { useTranslations } from '../lib/i18n';
 
 const PRESETS = [
   { id: 'spelling_grammar', label: 'Rechtschreibung & Grammatik' },
@@ -19,6 +20,7 @@ const PRESETS = [
 export default function Textoptimierung() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const t = useTranslations('textOptPage');
   const [text, setText] = useState('');
   const [preset, setPreset] = useState('spelling_grammar');
   const [customInstruction, setCustomInstruction] = useState('');
@@ -85,36 +87,34 @@ export default function Textoptimierung() {
   return (
     <>
       <Head>
-        <title>Textoptimierung - GhostTyper</title>
+        <title>{`${t('title')} – GhostTyper`}</title>
       </Head>
 
       <div className="max-w-5xl mx-auto animate-fade-in pb-20">
         <div className="mb-8">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-secondary">Textwerkzeug</p>
-          <h1 className="text-2xl font-bold text-primary mt-1">Textoptimierung</h1>
-          <p className="text-sm text-secondary mt-2 max-w-2xl">
-            Kopierte Texte, E-Mails oder Entwürfe sprachlich verbessern, kürzen oder formeller formulieren.
-          </p>
+          <p className="text-[10px] uppercase tracking-[0.22em] text-secondary">{t('title')}</p>
+          <h1 className="text-2xl font-bold text-primary mt-1">{t('title')}</h1>
+          <p className="text-sm text-secondary mt-2 max-w-2xl">{t('subtitle')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="bg-surface border border-subtle rounded-2xl p-5">
             <label htmlFor="text-optimization-input" className="block text-xs font-bold uppercase tracking-widest text-secondary mb-3">
-              Eingabetext
+              {t('input')}
             </label>
             <textarea
               id="text-optimization-input"
               value={text}
               onChange={(event) => setText(event.target.value)}
-              rows={14}
-              placeholder="Text hier einfügen..."
+              rows={6}
+              placeholder={t('input')}
               className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none focus:ring-1 focus:ring-accent resize-y"
             />
           </div>
 
           <div className="bg-surface border border-subtle rounded-2xl p-5 space-y-5">
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-secondary mb-3">Optimierung</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-secondary mb-3">{t('preset')}</p>
               <div className="flex flex-wrap gap-2">
                 {PRESETS.map((entry) => (
                   <button
@@ -127,7 +127,7 @@ export default function Textoptimierung() {
                         : 'bg-hover-subtle border-subtle text-primary hover:border-accent/40'
                     }`}
                   >
-                    {entry.label}
+                    {t(`presets.${entry.id}`)}
                   </button>
                 ))}
               </div>
@@ -136,14 +136,14 @@ export default function Textoptimierung() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="text-optimization-instruction" className="block text-xs font-bold uppercase tracking-widest text-secondary mb-2">
-                  Zusätzliche Anweisung
+                  {t('customInstruction')}
                 </label>
                 <textarea
                   id="text-optimization-instruction"
                   value={customInstruction}
                   onChange={(event) => setCustomInstruction(event.target.value)}
                   rows={3}
-                  placeholder="Optional, z.B. Zielgruppe oder gewünschter Stil"
+                  placeholder={t('customInstructionHint')}
                   className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none focus:ring-1 focus:ring-accent resize-y"
                 />
               </div>
@@ -176,7 +176,7 @@ export default function Textoptimierung() {
             disabled={loading || !text.trim()}
             className="w-full gradient-accent text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 disabled:opacity-30"
           >
-            {loading ? 'Optimiert...' : 'Text optimieren'}
+            {loading ? t('submitting') : t('submit')}
           </button>
         </form>
       </div>

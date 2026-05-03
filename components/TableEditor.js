@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import TableRenderer from './TableRenderer';
 import Toast from './Toast';
+import ConfirmDialog from './ConfirmDialog';
+import { useTranslations } from '../lib/i18n';
 import {
   normalizeTableMetadata,
   normalizeTableSchema,
@@ -14,8 +16,12 @@ export default function TableEditor({
   onCancel,
   filename,
   sidebarContent,
-  sourceLabel = 'Transkript',
+  sourceLabel,
 }) {
+  const t = useTranslations('tableEditor');
+  const tCommon = useTranslations('common');
+  const resolvedSourceLabel = sourceLabel || t('sourceTranscript');
+  const DISCARD_MESSAGE = t('discardMessage');
   const normalizedSchema = useMemo(() => normalizeTableSchema(schema), [schema]);
   const [tableData, setTableData] = useState(() => ({
     metadata: normalizeTableMetadata(initialData?.metadata || {}, normalizedSchema),
@@ -27,6 +33,8 @@ export default function TableEditor({
   const [saveFeedback, setSaveFeedback] = useState(false);
   const [showSourceContent, setShowSourceContent] = useState(false);
   const [toast, setToast] = useState(null);
+  const [dirty, setDirty] = useState(false);
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
 
   useEffect(() => {
     setTableData({
@@ -35,21 +43,53 @@ export default function TableEditor({
       missing_fields_by_row: initialData?.missing_fields_by_row || [],
       missing_metadata_fields: initialData?.missing_metadata_fields || [],
     });
+    setDirty(false);
   }, [initialData, normalizedSchema]);
+
+  // Warn the browser-native way before reload / tab-close while dirty.
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const handler = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
+  const handleTableChange = useCallback((next) => {
+    setTableData(next);
+    setDirty(true);
+  }, []);
 
   const handleSave = useCallback(async () => {
     if (saving) return;
     setSaving(true);
     try {
       await onSave(tableData);
+      setDirty(false);
       setSaveFeedback(true);
       setTimeout(() => setSaveFeedback(false), 2000);
     } catch (error) {
-      setToast({ message: error?.message || 'Tabelle konnte nicht gespeichert werden.', type: 'error' });
+      setToast({ message: error?.message || t('saveFailed'), type: 'error' });
     } finally {
       setSaving(false);
     }
-  }, [onSave, saving, tableData]);
+  }, [onSave, saving, tableData, t]);
+
+  const handleCancelClick = useCallback(() => {
+    if (dirty) {
+      setConfirmDiscardOpen(true);
+    } else {
+      onCancel?.();
+    }
+  }, [dirty, onCancel]);
+
+  const handleConfirmDiscard = useCallback(() => {
+    setConfirmDiscardOpen(false);
+    setDirty(false);
+    onCancel?.();
+  }, [onCancel]);
 
   useEffect(() => {
     const handleShortcut = (event) => {
@@ -67,12 +107,12 @@ export default function TableEditor({
     <div className="fixed inset-0 z-[60] bg-canvas flex flex-col animate-fade-in">
       <nav className="min-h-16 border-b border-subtle bg-surface flex flex-wrap md:flex-nowrap items-center justify-between gap-2 px-3 md:px-6 py-2 shrink-0">
         <div className="flex items-center gap-3 md:gap-4 min-w-0">
-          <button onClick={onCancel} className="p-2 rounded-full transition-all text-secondary hover:text-accent bg-hover-subtle">
-            <span className="sr-only">Tabellen-Editor schließen</span>
+          <button onClick={handleCancelClick} className="p-2 rounded-full transition-all text-secondary hover:text-accent bg-hover-subtle">
+            <span className="sr-only">{t('closeEditor')}</span>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </button>
           <div className="flex flex-col min-w-0">
-            <span className="text-[10px] font-bold text-accent uppercase tracking-widest leading-none">Tabellen-Editor</span>
+            <span className="text-[10px] font-bold text-accent uppercase tracking-widest leading-none">{t('eyebrow')}</span>
             <span className="text-sm font-medium text-primary truncate max-w-[260px]">{filename}</span>
           </div>
         </div>
@@ -87,7 +127,7 @@ export default function TableEditor({
                 : 'gradient-accent text-white shadow-lg shadow-accent/20'
             }`}
           >
-            {saving ? 'Speichert...' : saveFeedback ? 'Gespeichert!' : 'Speichern ⌘S'}
+            {saving ? t('saving') : saveFeedback ? t('saved') : t('saveShortcut')}
           </button>
         </div>
       </nav>
@@ -100,7 +140,7 @@ export default function TableEditor({
             filename={filename}
             editable
             alwaysEditing
-            onChange={setTableData}
+            onChange={handleTableChange}
           />
 
           {sidebarContent && (
@@ -111,7 +151,7 @@ export default function TableEditor({
                 className="w-full flex items-center justify-between px-4 py-3 text-sm text-primary hover:bg-hover-subtle transition-colors"
                 aria-expanded={showSourceContent}
               >
-                <span>{showSourceContent ? `${sourceLabel} ausblenden` : `${sourceLabel} anzeigen`}</span>
+                <span>{showSourceContent ? t('hideSource', { label: resolvedSourceLabel }) : t('showSource', { label: resolvedSourceLabel })}</span>
                 <svg
                   className={`w-4 h-4 text-secondary transition-transform ${showSourceContent ? 'rotate-180' : ''}`}
                   fill="none"
@@ -131,6 +171,17 @@ export default function TableEditor({
         </div>
       </main>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      <ConfirmDialog
+        open={confirmDiscardOpen}
+        title={t('discardTitle')}
+        message={DISCARD_MESSAGE}
+        confirmLabel={tCommon('discard')}
+        cancelLabel={t('keepEditing')}
+        danger
+        onConfirm={handleConfirmDiscard}
+        onCancel={() => setConfirmDiscardOpen(false)}
+      />
     </div>
   );
 }

@@ -1,24 +1,31 @@
 import Link from 'next/link';
 import StatusBadge from './StatusBadge';
+import { useFormatter, useLocale, useTranslations } from '../lib/i18n';
+
+const TEMPLATE_LABELS = {
+  generic: { de: 'Zusammenfassung', en: 'Summary' },
+  meeting: { de: 'Meeting', en: 'Meeting' },
+  aufmass: { de: 'Aufmaß', en: 'Measurements' },
+  data_table: { de: 'Datentabelle', en: 'Data table' },
+};
 
 export default function TranscriptionCard({ transcription, folders = [], onMove, onToggleFavorite, onDelete }) {
   const { id, original_name, filename, status, template, mime_type, folder_id, is_favorite, created_at, createdAt } = transcription;
   const displayName = original_name || filename;
   const date = created_at || createdAt;
+  const tNav = useTranslations('nav');
+  const tList = useTranslations('transcriptions');
+  const tDetail = useTranslations('transcriptionDetail');
+  const { locale } = useLocale();
+  const { dateTime } = useFormatter();
 
   const isOCR = mime_type?.startsWith('image/') || mime_type === 'application/pdf';
   const isTranslation = template === 'translation';
-  const templateLabel = template === 'generic'
-    ? 'Zusammenfassung'
-    : template === 'meeting'
-      ? 'Meeting'
-        : template === 'aufmass'
-        ? 'Aufmaß'
-        : template === 'data_table'
-          ? 'Datentabelle'
-          : template;
+  const templateLabel = TEMPLATE_LABELS[template]
+    ? TEMPLATE_LABELS[template][locale] || TEMPLATE_LABELS[template].de
+    : template;
 
-  let typeLabel = 'Transkription';
+  let typeLabel = tNav('transcription');
   let Icon = (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
@@ -27,7 +34,7 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
   let iconColor = 'bg-accent/10 text-accent';
 
   if (isOCR) {
-    typeLabel = 'Dokument';
+    typeLabel = tNav('ocr');
     iconColor = 'bg-info/10 text-info';
     Icon = (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -35,7 +42,7 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
       </svg>
     );
   } else if (isTranslation) {
-    typeLabel = 'Übersetzung';
+    typeLabel = tNav('translation');
     iconColor = 'bg-success/10 text-success';
     Icon = (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -52,8 +59,8 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
             <button 
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); }}
               className={`shrink-0 transition-colors ${is_favorite ? 'text-accent' : 'text-secondary/30 hover:text-accent/50'}`}
-              title={is_favorite ? 'Von Favoriten entfernen' : 'Als Favorit markieren'}
-              aria-label={is_favorite ? `${displayName} aus Favoriten entfernen` : `${displayName} als Favorit markieren`}
+              title={is_favorite ? tDetail('unfavorite') : tDetail('favorite')}
+              aria-label={is_favorite ? `${displayName} — ${tDetail('unfavorite')}` : `${displayName} — ${tDetail('favorite')}`}
             >
               <svg className="w-5 h-5" fill={is_favorite ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -74,13 +81,7 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
                 </span>
               </div>
               <p className="text-xs text-secondary mt-1">
-                {new Date(date).toLocaleDateString('de-DE', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {dateTime.format(new Date(date))}
                 {templateLabel && (
                   <span className="ml-2 text-secondary/60 italic">&bull; {templateLabel}</span>
                 )}
@@ -95,10 +96,10 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
               value={folder_id || ''}
               onChange={(e) => onMove(e.target.value === '' ? null : parseInt(e.target.value))}
               onClick={(e) => e.stopPropagation()}
-              aria-label={`${displayName} in Ordner verschieben`}
+              aria-label={`${displayName} — ${tDetail('moveToFolder')}`}
               className="bg-hover-subtle border border-subtle text-[10px] text-secondary rounded px-2 py-1 outline-none hover:border-accent/50 transition-colors cursor-pointer max-w-[120px] truncate"
             >
-              <option value="">Kein Ordner</option>
+              <option value="">{tList('noFolder')}</option>
               {folders.map(f => (
                 <option key={f.id} value={f.id}>{f.name}</option>
               ))}
@@ -109,8 +110,8 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(); }}
               className="p-2 text-secondary hover:text-danger hover:bg-danger/10 rounded-lg transition-all"
-              title="Endgültig löschen"
-              aria-label={`${displayName} endgültig löschen`}
+              title={tDetail('delete')}
+              aria-label={`${displayName} — ${tDetail('delete')}`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
