@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useState, useEffect, useCallback } from 'react';
@@ -6,10 +7,12 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import Toast from '../../components/Toast';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useUiFeedback } from '../../lib/use-ui-feedback';
+import { useTranslations } from '../../lib/i18n';
 
 export default function AdminUsers() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const t = useTranslations('admin');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -119,10 +122,6 @@ export default function AdminUsers() {
           role: formRole,
         };
         if (formPassword) body.password = formPassword;
-        if (formApiKey) body.mistralApiKey = formApiKey;
-        if (formCostLimit !== '' && formCostLimit !== editingUser.cost_limit) {
-          body.costLimit = formCostLimit === '' ? null : parseFloat(formCostLimit);
-        }
 
         const res = await fetch(`/api/admin/users/${editingUser.id}`, {
           method: 'PUT',
@@ -226,19 +225,27 @@ export default function AdminUsers() {
   return (
     <>
       <Head>
-        <title>User-Verwaltung - GhostTyper</title>
+        <title>{`${t('users')} – GhostTyper`}</title>
       </Head>
 
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-primary">User-Verwaltung</h1>
-        {!showForm && (
-          <button
-            onClick={startCreate}
-            className="gradient-accent text-white px-5 py-2 rounded-full text-sm font-medium transition-colors"
+      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+        <h1 className="text-2xl font-semibold text-primary">{t('users')}</h1>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/workspaces"
+            className="text-xs text-secondary hover:text-primary transition-colors"
           >
-            Neuer User
-          </button>
-        )}
+            Workspaces verwalten →
+          </Link>
+          {!showForm && (
+            <button
+              onClick={startCreate}
+              className="gradient-accent text-white px-5 py-2 rounded-full text-sm font-medium transition-colors"
+            >
+              Neuer User
+            </button>
+          )}
+        </div>
       </div>
 
       {success && (
@@ -350,36 +357,14 @@ export default function AdminUsers() {
             </div>
 
             {editingUser && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-subtle pt-4">
-                <div>
-                  <label htmlFor="admin-user-api-key" className="block text-sm font-medium text-secondary mb-1.5">
-                    Mistral API-Key {editingUser.api_key_configured && '(konfiguriert)'}
-                  </label>
-                  <input
-                    id="admin-user-api-key"
-                    type="password"
-                    value={formApiKey}
-                    onChange={(e) => setFormApiKey(e.target.value)}
-                    placeholder={editingUser.api_key_configured ? 'Neuen Key eingeben zum Ändern' : 'API-Key eingeben'}
-                    className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent focus:border-accent outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="admin-user-cost-limit" className="block text-sm font-medium text-secondary mb-1.5">
-                    Monatliches Kostenlimit (€)
-                  </label>
-                  <input
-                    id="admin-user-cost-limit"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formCostLimit}
-                    onChange={(e) => setFormCostLimit(e.target.value)}
-                    placeholder="Unbegrenzt"
-                    className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent focus:border-accent outline-none"
-                  />
-                </div>
+              <div className="border-t border-subtle pt-4 bg-hover-subtle/50 rounded-xl px-4 py-3">
+                <p className="text-xs text-secondary leading-relaxed">
+                  💡 <strong className="text-primary">Mistral-API-Key</strong> und <strong className="text-primary">Kostenlimits</strong> werden jetzt
+                  pro Workspace verwaltet. Wechsle zu{' '}
+                  <Link href="/settings/organization/members" className="text-accent hover:underline">Workspace verwalten → Mitglieder</Link>{' '}
+                  oder{' '}
+                  <Link href="/settings/organization/integrations" className="text-accent hover:underline">API-Keys & Integrationen</Link>.
+                </p>
               </div>
             )}
 
@@ -423,16 +408,6 @@ export default function AdminUsers() {
                 {user.role === 'auditor' && (
                   <span className="text-xs bg-info/20 text-info px-2 py-0.5 rounded-full">
                     Auditor
-                  </span>
-                )}
-                {user.api_key_configured && (
-                  <span className="text-xs bg-success/20 text-success px-2 py-0.5 rounded-full">
-                    Mistral API
-                  </span>
-                )}
-                {user.cost_limit !== null && user.cost_limit !== undefined && (
-                  <span className="text-xs bg-warning/20 text-warning px-2 py-0.5 rounded-full">
-                    Limit: {user.cost_limit} €
                   </span>
                 )}
               </div>

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession, signOut } from 'next-auth/react';
 import {
+  Building2,
   History,
   Languages,
   LogOut,
@@ -9,22 +10,31 @@ import {
   PencilLine,
   ScanText,
   Settings as SettingsIcon,
-  ShieldCheck,
   Table as TableIcon,
+  Video,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle } from './ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { cn } from '../lib/utils';
 import { useUIStore } from '../lib/store/ui-store';
+import { useTranslations } from '../lib/i18n';
+import { useVexaIntegrationEnabled } from '../lib/use-vexa-integration';
+import { usePermission } from '../lib/use-permission';
 
 const NAV_LINKS = [
-  { href: '/upload', label: 'Transkription', Icon: Mic },
-  { href: '/tabellen', label: 'Tabellen', Icon: TableIcon },
-  { href: '/translate', label: 'Übersetzung', Icon: Languages },
-  { href: '/ocr', label: 'OCR', Icon: ScanText },
-  { href: '/textoptimierung', label: 'Textoptimierung', Icon: PencilLine },
-  { href: '/transcriptions', label: 'Historie', Icon: History },
+  { href: '/upload', labelKey: 'transcription', Icon: Mic },
+  { href: '/tabellen', labelKey: 'tables', Icon: TableIcon },
+  { href: '/translate', labelKey: 'translation', Icon: Languages },
+  { href: '/ocr', labelKey: 'ocr', Icon: ScanText },
+  { href: '/textoptimierung', labelKey: 'textOptimization', Icon: PencilLine },
+  { href: '/transcriptions', labelKey: 'history', Icon: History },
 ];
+
+const REMOTE_MEETING_LINK = {
+  href: '/transcriptions?meeting=1',
+  labelKey: 'remoteMeeting',
+  Icon: Video,
+};
 
 /**
  * Single nav row, optionally tooltip-wrapped when the sidebar is collapsed.
@@ -97,9 +107,12 @@ function FooterButton({ label, Icon, onClick, danger = false, collapsed }) {
 function SidebarBody({ collapsed = false, onNavigate }) {
   const router = useRouter();
   const { data: session } = useSession();
+  const tNav = useTranslations('nav');
+  const canStartMeeting = usePermission('meeting.start');
+  const canManageWorkspace = usePermission('org.settings');
+  const { enabled: vexaEnabled } = useVexaIntegrationEnabled();
+  const showRemoteMeeting = canStartMeeting && vexaEnabled;
   if (!session) return null;
-
-  const isAdmin = session.user.role === 'admin';
 
   return (
     <div className="flex h-full flex-col">
@@ -112,7 +125,7 @@ function SidebarBody({ collapsed = false, onNavigate }) {
             'flex items-center gap-3 rounded-lg p-2 hover:bg-hover-subtle transition-colors',
             collapsed && 'justify-center',
           )}
-          aria-label="Zur Startseite"
+          aria-label="GhostTyper"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="" width={28} height={28} className="w-7 h-7 shrink-0" />
@@ -123,16 +136,31 @@ function SidebarBody({ collapsed = false, onNavigate }) {
       </div>
 
       {/* Navigation */}
-      <nav className={cn('flex-1 space-y-1 overflow-y-auto scrollbar-hide', collapsed ? 'px-2 py-2' : 'px-3 py-2')}>
+      <nav
+        className={cn('flex-1 space-y-1 overflow-y-auto scrollbar-hide', collapsed ? 'px-2 py-2' : 'px-3 py-2')}
+        aria-label={tNav('ariaCurrent')}
+      >
         {NAV_LINKS.map((link) => (
           <NavRow
             key={link.href}
-            {...link}
+            href={link.href}
+            label={tNav(link.labelKey)}
+            Icon={link.Icon}
             isActive={router.pathname === link.href || router.pathname.startsWith(link.href + '/')}
             collapsed={collapsed}
             onNavigate={onNavigate}
           />
         ))}
+        {showRemoteMeeting && (
+          <NavRow
+            href={REMOTE_MEETING_LINK.href}
+            label={tNav(REMOTE_MEETING_LINK.labelKey)}
+            Icon={REMOTE_MEETING_LINK.Icon}
+            isActive={router.asPath === REMOTE_MEETING_LINK.href}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        )}
       </nav>
 
       {/* Footer: settings, admin, profile, logout */}
@@ -144,23 +172,27 @@ function SidebarBody({ collapsed = false, onNavigate }) {
       >
         <NavRow
           href="/settings"
-          label="Einstellungen"
+          label={tNav('settings')}
           Icon={SettingsIcon}
           isActive={router.pathname === '/settings'}
           collapsed={collapsed}
           onNavigate={onNavigate}
         />
 
-        {isAdmin && (
+        {canManageWorkspace && (
           <NavRow
-            href="/admin/users"
-            label="Admin"
-            Icon={ShieldCheck}
-            isActive={router.pathname.startsWith('/admin')}
+            href="/settings/organization"
+            label={tNav('workspaceAdmin')}
+            Icon={Building2}
+            isActive={router.pathname.startsWith('/settings/organization')}
             collapsed={collapsed}
             onNavigate={onNavigate}
           />
         )}
+
+        {/* Global system admin is now reachable from the workspace switcher
+            (workspace creation) and via the Workspace-Admin pages — no need
+            for a dedicated sidebar slot anymore. */}
 
         {/* Profile compact card (only when expanded) */}
         {!collapsed && (
@@ -183,7 +215,7 @@ function SidebarBody({ collapsed = false, onNavigate }) {
             )}
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-medium text-primary truncate group-hover:text-accent transition-colors">
-                {session.user.name || 'Benutzer'}
+                {session.user.name || tNav('profile')}
               </span>
               <span className="text-[10px] text-secondary truncate">{session.user.email}</span>
             </div>
@@ -191,7 +223,7 @@ function SidebarBody({ collapsed = false, onNavigate }) {
         )}
 
         <FooterButton
-          label="Abmelden"
+          label={tNav('logout')}
           Icon={LogOut}
           onClick={() => signOut({ callbackUrl: '/login' })}
           danger
@@ -211,6 +243,7 @@ function SidebarBody({ collapsed = false, onNavigate }) {
 export default function Sidebar() {
   const { data: session } = useSession();
   const { sidebarOpen, setSidebarOpen, sidebarCollapsed, closeSidebar } = useUIStore();
+  const tNav = useTranslations('nav');
 
   if (!session) return null;
 
@@ -229,7 +262,7 @@ export default function Sidebar() {
       {/* Sheet drawer (< xl) */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-72 p-0 xl:hidden">
-          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <SheetTitle className="sr-only">{tNav('ariaCurrent')}</SheetTitle>
           <SidebarBody collapsed={false} onNavigate={closeSidebar} />
         </SheetContent>
       </Sheet>
