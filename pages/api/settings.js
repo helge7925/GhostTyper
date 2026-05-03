@@ -1,6 +1,5 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from './auth/[...nextauth]';
 import pool from '../../lib/db';
+import { withOrgScope } from '../../lib/api/with-org-scope';
 import {
   getSettingsRow,
   hasStoredApiKey,
@@ -63,15 +62,13 @@ function addUpdate(updates, values, column, value) {
   values.push(value);
 }
 
-export default async function handler(req, res) {
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+async function handler(req, res) {
+  const userId = req.userId;
+  const orgId = req.org.id;
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'api-settings',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 120,
     windowMs: 60_000,
   });
@@ -80,7 +77,7 @@ export default async function handler(req, res) {
   try {
     switch (req.method) {
       case 'GET': {
-        const settings = await getSettingsRow(session.user.id);
+        const settings = await getSettingsRow(userId);
 
         if (!settings) {
           return res.status(200).json({
@@ -93,6 +90,7 @@ export default async function handler(req, res) {
             ocrModel: 'mistral-ocr-latest',
             costLimit: null,
             memberMonthlyBudgetLimit: null,
+            remoteMeetingEnabled: true,
           });
         }
 
@@ -106,6 +104,7 @@ export default async function handler(req, res) {
           ocrModel: settings.ocr_model || 'mistral-ocr-latest',
           costLimit: settings.cost_limit,
           memberMonthlyBudgetLimit: settings.member_monthly_budget_limit,
+          remoteMeetingEnabled: settings.remote_meeting_enabled !== false,
         });
       }
 
@@ -122,6 +121,7 @@ export default async function handler(req, res) {
           memberMonthlyBudgetLimit,
           defaultTranslateLanguage,
           ocrModel,
+          remoteMeetingEnabled,
         } = body;
 
         if (preferredModel !== undefined && resolveChatModel(preferredModel) === null) {
@@ -142,6 +142,7 @@ export default async function handler(req, res) {
         const shouldUpdateMemberMonthlyBudgetLimit = hasOwnValue(body, 'memberMonthlyBudgetLimit');
         const shouldUpdateDefaultTranslateLanguage = hasOwnValue(body, 'defaultTranslateLanguage');
         const shouldUpdateOcrModel = hasOwnValue(body, 'ocrModel');
+        const shouldUpdateRemoteMeetingEnabled = hasOwnValue(body, 'remoteMeetingEnabled');
 
         const normalizedCostLimit = normalizeCostLimit(costLimit);
         if (shouldUpdateCostLimit && costLimit !== null && costLimit !== '' && normalizedCostLimit === null) {
@@ -179,7 +180,7 @@ export default async function handler(req, res) {
             `INSERT INTO settings (user_id, updated_at)
              VALUES ($1, NOW())
              ON CONFLICT (user_id) DO NOTHING`,
-            [session.user.id]
+            [userId]
           );
 
           const updates = [];
@@ -217,9 +218,12 @@ export default async function handler(req, res) {
           if (shouldUpdateOcrModel) {
             addUpdate(updates, values, 'ocr_model', ocrModel || null);
           }
+          if (shouldUpdateRemoteMeetingEnabled) {
+            addUpdate(updates, values, 'remote_meeting_enabled', remoteMeetingEnabled !== false);
+          }
 
           if (updates.length > 0) {
-            values.push(session.user.id);
+            values.push(userId);
             await client.query(
               `UPDATE settings
                SET ${updates.join(', ')}, updated_at = NOW()
@@ -241,10 +245,10 @@ export default async function handler(req, res) {
         }
 
         await logAuditEvent({
-          userId: session.user.id,
+          userId: userId,
           action: 'settings.updated',
           targetType: 'settings',
-          targetId: String(session.user.id),
+          targetId: String(userId),
           metadata: auditFlags,
         });
 
@@ -262,3 +266,5 @@ export default async function handler(req, res) {
     return serverError(res, 'Fehler beim Verarbeiten der Einstellungen');
   }
 }
+
+export default withOrgScope(handler);

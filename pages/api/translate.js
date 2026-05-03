@@ -1,6 +1,5 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from './auth/[...nextauth]';
 import { translateText } from '../../lib/ai-service';
+import { withOrgScope } from '../../lib/api/with-org-scope';
 import {
   CostLimitCheckUnavailableError,
   CostLimitExceededError,
@@ -11,24 +10,22 @@ import {
   withUserCostLock,
 } from '../../lib/usage';
 import { resolveChatModel } from '../../lib/model-policy';
-import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service';
+import { getSettingsRow, resolveMistralApiKey } from '../../lib/settings-service';
 import { MAX_TRANSLATE_INPUT_LENGTH } from '../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { logAuditEvent } from '../../lib/audit-log';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const userId = req.userId;
+  const orgId = req.org.id;
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'translate',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 60,
     windowMs: 60_000,
   });
@@ -44,8 +41,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const settingsRow = await getSettingsRow(session.user.id);
-    const apiKey = resolveStoredApiKey(settingsRow) || process.env.MISTRAL_API_KEY;
+    const settingsRow = await getSettingsRow(userId);
+    const apiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
     const preferredModel = resolveChatModel(requestModel || settingsRow?.preferred_model || 'mistral-large-latest');
 
     if (!apiKey) {
@@ -55,8 +52,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Ungültiges KI-Modell' });
     }
 
-    const translatedText = await withUserCostLock(session.user.id, async () => {
-      const costCheck = await checkCostLimit(session.user.id);
+    const translatedText = await withUserCostLock(userId, async () => {
+      const costCheck = await checkCostLimit(userId, orgId);
       if (!costCheck.allowed) {
         throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
       }
@@ -65,7 +62,7 @@ export default async function handler(req, res) {
         outputMultiplier: 1.1,
         outputBufferTokens: 90,
       });
-      await enforceProjectedBudgetGuardrail(session.user.id, estimatedCost);
+      await enforceProjectedBudgetGuardrail(userId, estimatedCost, orgId);
 
       const { translatedText: value, usage, model } = await translateText(
         text,
@@ -75,12 +72,13 @@ export default async function handler(req, res) {
         preferredModel
       );
 
-      await logUsage(session.user.id, model, 'translation', usage);
+      await logUsage(userId, model, 'translation', usage, orgId);
       return value;
     });
 
     await logAuditEvent({
-      userId: session.user.id,
+      userId,
+      organizationId: orgId,
       action: 'translation.completed',
       targetType: 'translation',
       metadata: {
@@ -103,3 +101,5 @@ export default async function handler(req, res) {
     return serverError(res, 'Fehler bei der Übersetzung');
   }
 }
+
+export default withOrgScope(handler);
