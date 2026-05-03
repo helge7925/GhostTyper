@@ -2,6 +2,27 @@ PolyForm Noncommercial License 1.0.0
 
 <https://polyformproject.org/licenses/noncommercial/1.0.0>
 
+---
+
+## At a glance
+
+This is a plain-language summary for orientation only. The binding terms
+are the legal text further below.
+
+| Permitted without prior consent       | Requires a separate commercial license      |
+| ------------------------------------- | ------------------------------------------- |
+| Private use (personal, hobby)         | Commercial use, including internal use in a |
+| Research and teaching at universities | for-profit organisation                     |
+| Non-profit organisations              | Operating a commercial SaaS based on it     |
+| Public-sector / government use        | Paid consulting built on it                 |
+| Modification and redistribution under | Selling modified versions                   |
+| the same terms                        |                                             |
+
+For commercial-license inquiries, open a discussion on the project's
+issue tracker or contact the copyright holder directly.
+
+---
+
 ## Acceptance
 
 In order to get any license under these terms, you must agree to them as

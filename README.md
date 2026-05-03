@@ -3,11 +3,14 @@
   <h1>GhostTyper</h1>
   <p><strong>Self-hosted transcription, OCR and AI analysis platform.</strong></p>
   <p>
-    <a href="#schnellstart">Quickstart</a> ·
-    <a href="#funktionen">Features</a> ·
-    <a href="#architektur">Architektur</a> ·
-    <a href="docs/README.md">Dokumentation</a> ·
+    <a href="#quickstart">Quickstart</a> ·
+    <a href="#features">Features</a> ·
+    <a href="#architecture">Architecture</a> ·
+    <a href="docs/README.md">Documentation</a> ·
     <a href="CHANGELOG.md">Changelog</a>
+  </p>
+  <p>
+    <strong>English</strong> · <a href="README.de.md">Deutsch</a>
   </p>
 
   <p>
@@ -24,65 +27,75 @@
   <img src="docs/screenshots/01-login.png" alt="GhostTyper login screen" width="100%" />
 </p>
 
-GhostTyper bündelt Audio-Transkription, OCR, KI-Zusammenfassungen, strukturierte Datenextraktion und Live-Meeting-Aufzeichnung in einer self-hosted Anwendung. Mehrere Workspaces, rollenbasierte Berechtigungen, verschlüsselte API-Keys und ein vollständiger Audit-Trail sind Teil der Basis.
+GhostTyper bundles audio transcription, OCR, AI summaries, structured data
+extraction and live meeting capture into a single self-hosted application.
+Multiple workspaces, role-based permissions, encrypted API keys and a full
+audit trail are part of the baseline.
 
 ---
 
-## Funktionen
+## Features
 
-- **Audio-Transkription** mit Sprechertrennung; Direktaufnahme oder Datei-Upload.
-- **Remote-Meeting-Bot** für Google Meet und Microsoft Teams via [Vexa Lite](https://github.com/Vexa-ai/vexa) — Live-Transkript fließt in den gleichen Editor.
-- **OCR** für PDFs und Bilder.
-- **KI-Analyse**: Zusammenfassungen, freie Prompts, Vorlagen, Übersetzungen.
-- **Datentabellen**: Strukturierte Extraktion aus Audio, Text oder Dokumenten; Excel-Export.
-- **Multi-Workspace**: Org-skopierte Daten, Rollen `owner`/`admin`/`member`/`viewer`/`auditor`, Audit-Log.
-- **Kosten-Tracking**: Monatliche Aufschlüsselung pro Provider, Operation und Mitglied.
-- **Provider-Management**: Mistral, Fireworks Whisper, Vexa zentral pro Workspace verwaltbar; Keys AES-256-GCM verschlüsselt.
+- **Audio transcription** with speaker diarisation; direct browser recording
+  or file upload.
+- **Remote-meeting bot** for Google Meet and Microsoft Teams via
+  [Vexa Lite](https://github.com/Vexa-ai/vexa) — live transcript flows
+  into the same editor.
+- **OCR** for PDFs and images.
+- **AI analysis**: summaries, free-form prompts, templates, translation.
+- **Data tables**: structured extraction from audio, text or documents;
+  Excel export.
+- **Multi-workspace**: org-scoped data, roles `owner`/`admin`/`member`/
+  `viewer`/`auditor`, audit log.
+- **Cost tracking**: monthly breakdown per provider, operation and member.
+- **Provider management**: Mistral, Fireworks Whisper, Vexa managed
+  centrally per workspace; keys encrypted with AES-256-GCM.
 
-## Tech-Stack
+## Tech Stack
 
-| Schicht | Technologie |
-| --- | --- |
-| Frontend | Next.js 13 (Pages Router), React 18, Tailwind, Radix, Zustand |
-| Backend | Next.js API Routes, NextAuth, PostgreSQL 16 (`pg`) |
-| AI | Mistral (Chat / OCR / Voxtral), Fireworks Whisper-v3, Vexa Lite |
-| Infra | Docker Compose, Traefik (optional), AES-256-GCM (`lib/secrets.js`) |
-| CI | GitHub Actions: CodeQL, Security-Gates, Smoke |
+| Layer    | Technology                                                       |
+| -------- | ---------------------------------------------------------------- |
+| Frontend | Next.js 13 (Pages Router), React 18, Tailwind, Radix, Zustand    |
+| Backend  | Next.js API Routes, NextAuth, PostgreSQL 16 (`pg`)               |
+| AI       | Mistral (Chat / OCR / Voxtral), Fireworks Whisper-v3, Vexa Lite  |
+| Infra    | Docker Compose, Traefik (optional), AES-256-GCM (`lib/secrets.js`) |
+| CI       | GitHub Actions: CodeQL, security gates, smoke tests              |
 
-## Architektur
+## Architecture
 
 ```
 ┌─────────────────────────┐    ┌──────────────────────────┐
-│ GhostTyper Webapp       │    │ Postgres 16              │
-│ Next.js 13 + Worker     │◄──►│ Workspaces · Audit · Logs│
+│ GhostTyper webapp       │    │ Postgres 16              │
+│ Next.js 13 + worker     │◄──►│ workspaces · audit · logs│
 └──┬──────────────┬───────┘    └──────────────────────────┘
    │              │
-   │ REST/SSE     │ Webhook + Bridge
+   │ REST/SSE     │ webhook + bridge
    ▼              ▼
 ┌────────┐   ┌──────────────────┐    ┌────────────────────┐
 │ Mistral│   │ Vexa Lite        │───►│ Fireworks Whisper  │
-│ API    │   │ (Bot-Container)  │    │ (über fireworks-   │
-└────────┘   └──────────────────┘    │  bridge Translator)│
+│ API    │   │ (bot container)  │    │ (via fireworks-    │
+└────────┘   └──────────────────┘    │  bridge translator)│
                                      └────────────────────┘
 ```
 
-Datenfluss-Details: [`docs/architecture.md`](docs/architecture.md). Vexa-Integration: [`docs/vexa-integration.md`](docs/vexa-integration.md).
+Detailed flow: [`docs/architecture.md`](docs/architecture.md). Vexa
+integration: [`docs/vexa-integration.md`](docs/vexa-integration.md).
 
-## Schnellstart
+## Quickstart
 
-Voraussetzungen: Docker + Docker Compose v2, ein Mistral-API-Key.
+Prerequisites: Docker + Docker Compose v2, a Mistral API key.
 
 ```bash
 git clone https://github.com/helge7925/transkription_webapp.git
 cd transkription_webapp
 cp .env.example .env
-# Secrets in .env mit `openssl rand -hex 32` erzeugen,
-# DB_USER / DB_PASSWORD / DB_NAME / DOMAIN setzen.
+# Generate secrets in .env with `openssl rand -hex 32`,
+# set DB_USER / DB_PASSWORD / DB_NAME / DOMAIN.
 
 docker compose -f config/docker-compose.prod.yml --env-file .env up -d --build
 ```
 
-Schema initialisieren (einmalig):
+Initialise the schema (one time):
 
 ```bash
 docker compose -f config/docker-compose.prod.yml --env-file .env \
@@ -92,18 +105,19 @@ docker compose -f config/docker-compose.prod.yml --env-file .env \
   http://127.0.0.1:3000/api/db-init
 ```
 
-Admin anlegen:
+Seed an admin:
 
 ```bash
 npm run seed-admin
 ```
 
-App ist dann unter `http://localhost:3000` erreichbar (oder hinter Traefik
-auf `https://${DOMAIN}`).
+The app is then reachable at `http://localhost:3000` (or behind Traefik
+on `https://${DOMAIN}`).
 
-### Mit Remote-Meeting-Bot
+### With remote-meeting bot
 
-Vexa Lite + Fireworks-Bridge sind als optionales Compose-Profile vorbereitet:
+Vexa Lite + the Fireworks bridge are wired up as an optional Compose
+profile:
 
 ```bash
 COMPOSE_PROFILES=vexa
@@ -113,52 +127,58 @@ VEXA_ADMIN_API_TOKEN=$(openssl rand -hex 32)
 BRIDGE_SHARED_SECRET=$(openssl rand -hex 32)
 ```
 
-Dann hochfahren mit `--profile vexa`. Operator-Guide: [`docs/vexa-integration.md`](docs/vexa-integration.md).
+Then bring it up with `--profile vexa`. Operator guide:
+[`docs/vexa-integration.md`](docs/vexa-integration.md).
 
-## Konfiguration
+## Configuration
 
-Pro Workspace verwaltet der Admin in **Settings → Workspace verwalten**:
+Per workspace, an admin manages everything under
+**Settings → Workspace verwalten**:
 
-- API-Keys & Integrationen (Mistral, Fireworks Whisper, Vexa)
-- Mitglieder & Rollen (inkl. per-Member-Kostenlimits)
-- Aufbewahrungsfristen
-- Nutzung & Kosten-Dashboard
-- Audit-Log
+- API keys & integrations (Mistral, Fireworks Whisper, Vexa)
+- Members & roles (incl. per-member spend caps)
+- Retention windows
+- Usage & cost dashboard
+- Audit log
 
-Detaillierte ENV-Referenz: [`.env.example`](.env.example).
+Full ENV reference: [`.env.example`](.env.example).
 
-## Tests & Qualität
+## Tests & quality
 
-| Befehl | Zweck |
-| --- | --- |
-| `npm test` | 60 Unit-Tests (Tabellenlogik, Vexa-Mapping, Webhooks, …) |
-| `npm run lint` | ESLint mit Next.js-Regelsatz |
-| `npm run smoke` | Docker/API-Smoke-Test |
-| `npm run smoke:full` | Smoke + Tests + Lint + Build + PDF-Renderer |
-| `npm run retention:apply` | Aufbewahrungs-Policy anwenden |
+| Command                  | Purpose                                              |
+| ------------------------ | ---------------------------------------------------- |
+| `npm test`               | 60 unit tests (table logic, Vexa mapper, webhooks…)  |
+| `npm run lint`           | ESLint with the Next.js rule set                     |
+| `npm run smoke`          | Docker / API smoke test                              |
+| `npm run smoke:full`     | Smoke + tests + lint + build + PDF renderer         |
+| `npm run retention:apply`| Apply the retention policy                           |
 
-CI-Pipelines: CodeQL (Security), Security-Gates (Secrets-Scan), Smoke
-(`/api/health` + Build). Siehe [`.github/workflows`](.github/workflows).
+CI pipelines: CodeQL (security), security gates (secrets scan), smoke
+(`/api/health` + build). See [`.github/workflows`](.github/workflows).
 
-## Dokumentation
+## Documentation
 
-- [`docs/README.md`](docs/README.md) — Übersicht aller Dokumente
-- [`docs/architecture.md`](docs/architecture.md) — Datenfluss + Komponenten
-- [`docs/vexa-integration.md`](docs/vexa-integration.md) — Operator-Guide für Remote-Meeting
-- [`docs/api-specification.md`](docs/api-specification.md) — REST-API-Referenz
-- [`docs/vps-deployment-guide.md`](docs/vps-deployment-guide.md) — Produktiv-Deployment
-- [`docs/cybersecurity-audit-2026-02-21.md`](docs/cybersecurity-audit-2026-02-21.md) — Letzter Sicherheits-Audit
+- [`docs/README.md`](docs/README.md) — index of all documents
+- [`docs/architecture.md`](docs/architecture.md) — data flow + components
+- [`docs/vexa-integration.md`](docs/vexa-integration.md) — operator guide
+  for remote-meeting capture
+- [`docs/api-specification.md`](docs/api-specification.md) — REST API reference
+- [`docs/vps-deployment-guide.md`](docs/vps-deployment-guide.md) — production
+  deployment
+- [`docs/cybersecurity-audit-2026-02-21.md`](docs/cybersecurity-audit-2026-02-21.md)
+  — most recent security audit
 
-## Beitragen
+## Contributing
 
-Issues und Pull-Requests sind willkommen — siehe [`SECURITY.md`](SECURITY.md)
-für sicherheitsrelevante Meldungen und die Templates unter `.github/`.
+Issues and pull requests are welcome — see [`SECURITY.md`](SECURITY.md)
+for security disclosures and the templates under
+[`.github/`](.github/) for structured submissions.
 
-## Lizenz
+## License
 
-[PolyForm Noncommercial License 1.0.0](LICENSE). Erlaubt private,
-akademische, gemeinnützige und Hobby-Nutzung sowie Modifikation und
-Weitergabe, solange keine kommerzielle Verwendung vorliegt. Für
-kommerzielle Nutzung — auch intern in einem gewinnorientierten
-Unternehmen — ist eine separate Lizenz erforderlich; bitte über den
-Issue-Tracker oder direkt beim Copyright-Inhaber anfragen.
+[PolyForm Noncommercial License 1.0.0](LICENSE). Permits private,
+academic, non-profit and hobby use, plus modification and redistribution,
+as long as the use is non-commercial. Commercial use — including
+internal use in a for-profit organisation — requires a separate license;
+please open a discussion in the issue tracker or contact the copyright
+holder directly.
