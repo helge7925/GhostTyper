@@ -8,18 +8,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
+import { useTranslations } from '../lib/i18n';
 
 export default function ConfirmDialog({
   open,
-  title = 'Bitte bestätigen',
-  message = 'Möchten Sie fortfahren?',
-  confirmLabel = 'Bestätigen',
-  cancelLabel = 'Abbrechen',
+  title,
+  message,
+  confirmLabel,
+  cancelLabel,
   danger = false,
   busy = false,
   onConfirm,
   onCancel,
 }) {
+  const t = useTranslations('confirmDialog');
+  const resolvedTitle = title ?? t('title');
+  const resolvedMessage = message ?? t('message');
+  const resolvedConfirm = confirmLabel ?? t('confirmLabel');
+  const resolvedCancel = cancelLabel ?? t('cancelLabel');
+
   const handleOpenChange = (next) => {
     if (!next && !busy) onCancel?.();
   };
@@ -28,12 +35,12 @@ export default function ConfirmDialog({
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{message}</AlertDialogDescription>
+          <AlertDialogTitle>{resolvedTitle}</AlertDialogTitle>
+          <AlertDialogDescription>{resolvedMessage}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy} onClick={onCancel}>
-            {cancelLabel}
+            {resolvedCancel}
           </AlertDialogCancel>
           <AlertDialogAction
             disabled={busy}
@@ -44,7 +51,7 @@ export default function ConfirmDialog({
               onConfirm?.();
             }}
           >
-            {confirmLabel}
+            {resolvedConfirm}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
