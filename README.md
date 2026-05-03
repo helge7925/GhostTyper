@@ -16,7 +16,7 @@
     <img alt="Node" src="https://img.shields.io/badge/Node-18%2B-success" />
     <img alt="Postgres" src="https://img.shields.io/badge/Postgres-16-blue" />
     <img alt="Tests" src="https://img.shields.io/badge/tests-60%20passing-success" />
-    <img alt="License" src="https://img.shields.io/badge/license-Proprietary-lightgrey" />
+    <img alt="License" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue" />
   </p>
 </div>
 
@@ -156,4 +156,9 @@ für sicherheitsrelevante Meldungen und die Templates unter `.github/`.
 
 ## Lizenz
 
-Proprietär. Siehe [`LICENSE`](LICENSE). Lizenzanfragen über das Issue-Tracker-System.
+[PolyForm Noncommercial License 1.0.0](LICENSE). Erlaubt private,
+akademische, gemeinnützige und Hobby-Nutzung sowie Modifikation und
+Weitergabe, solange keine kommerzielle Verwendung vorliegt. Für
+kommerzielle Nutzung — auch intern in einem gewinnorientierten
+Unternehmen — ist eine separate Lizenz erforderlich; bitte über den
+Issue-Tracker oder direkt beim Copyright-Inhaber anfragen.

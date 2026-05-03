@@ -4,6 +4,7 @@
   "description": "Self-hosted platform for audio transcription, OCR, AI analysis and remote-meeting capture.",
   "author": "Helge Roos",
   "license": "SEE LICENSE IN LICENSE",
+  "_licenseNote": "PolyForm Noncommercial 1.0.0 — has no SPDX identifier; see LICENSE for full text.",
   "homepage": "https://github.com/helge7925/transkription_webapp#readme",
   "repository": {
     "type": "git",
