@@ -5,7 +5,12 @@ Alle relevanten Änderungen an diesem Projekt werden in dieser Datei dokumentier
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
-## [Unreleased] - Ziel: v1.3.0
+## [0.3.0] – 2026-05-03
+
+Erstes öffentliches Release auf GitHub. Project switched from internal
+1.x numbering to 0.x to reflect public-beta status.
+
+
 
 ### Added
 - **Remote-Meeting-Transkription (Vexa Lite + Cortecs Whisper):** Bot tritt Google Meet, Microsoft Teams oder Zoom bei und liefert das Transkript in den bestehenden Workflow (Editor, Auto-Analyse, Export).

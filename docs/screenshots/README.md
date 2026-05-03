@@ -6,12 +6,13 @@ theme, German UI.
 | File | Page | Notes |
 | --- | --- | --- |
 | `01-login.png` | `/login` | Public, no auth required. |
-| `02-transcriptions.png` | `/transcriptions` | Logged in. Shows the history grid with at least 3 entries (audio + remote-meeting). |
-| `03-editor.png` | `/transcriptions/[id]` | A finalised transcription with summary block and analysis. |
-| `04-table-extract.png` | `/tabellen` or `/transcriptions/[id]/table` | Filled data table (e.g. invoice, list). |
-| `05-workspace-admin.png` | `/settings/organization/integrations` | API keys + cost caps panel. |
-| `06-usage.png` | `/settings/organization/usage` | Per-operation and per-member cost breakdown. |
-| `07-remote-meeting.png` | Remote meeting start dialog | Captured with the modal open. |
+| `02-dashboard.png` | `/` (logged in) | **Hero shot used in the README.** Welcome dashboard with sidebar + quick-action grid. |
+| `03-transcriptions.png` | `/transcriptions` | History grid with at least 3 entries (audio + remote-meeting). |
+| `04-editor.png` | `/transcriptions/[id]` | A finalised transcription with summary block and analysis. |
+| `05-table-extract.png` | `/tabellen` or `/transcriptions/[id]/table` | Filled data table (e.g. invoice, list). |
+| `06-workspace-admin.png` | `/settings/organization/integrations` | API keys + cost caps panel. |
+| `07-remote-meeting.png` | Remote-meeting start dialog | Modal open, sample meeting URL in the field. |
+| `08-usage.png` | `/settings/organization/usage` | Per-operation and per-member cost breakdown. |
 
 ## How to capture
 

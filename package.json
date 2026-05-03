@@ -1,6 +1,6 @@
 {
   "name": "ghosttyper",
-  "version": "1.2.0",
+  "version": "0.3.0",
   "description": "Self-hosted platform for audio transcription, OCR, AI analysis and remote-meeting capture.",
   "author": "Helge Roos",
   "license": "SEE LICENSE IN LICENSE",

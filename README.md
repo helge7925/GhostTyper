@@ -14,7 +14,7 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-1.2.0-orange" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-orange" />
     <img alt="Stack" src="https://img.shields.io/badge/Next.js-13-black" />
     <img alt="Node" src="https://img.shields.io/badge/Node-18%2B-success" />
     <img alt="Postgres" src="https://img.shields.io/badge/Postgres-16-blue" />
@@ -24,13 +24,20 @@
 </div>
 
 <p align="center">
-  <img src="docs/screenshots/01-login.png" alt="GhostTyper login screen" width="100%" />
+  <img src="docs/screenshots/02-dashboard.png" alt="GhostTyper dashboard after login" width="100%" />
 </p>
 
 GhostTyper bundles audio transcription, OCR, AI summaries, structured data
 extraction and live meeting capture into a single self-hosted application.
 Multiple workspaces, role-based permissions, encrypted API keys and a full
 audit trail are part of the baseline.
+
+<details>
+<summary>More screenshots</summary>
+
+<p align="center"><img src="docs/screenshots/01-login.png" alt="Login screen" width="49%" /> <img src="docs/screenshots/07-remote-meeting.png" alt="Remote-meeting modal" width="49%" /></p>
+
+</details>
 
 ---
 
