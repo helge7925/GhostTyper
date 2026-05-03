@@ -88,6 +88,19 @@ audit trail are part of the baseline.
 Detailed flow: [`docs/architecture.md`](docs/architecture.md). Vexa
 integration: [`docs/vexa-integration.md`](docs/vexa-integration.md).
 
+## System Requirements
+
+| Profile               | RAM   | CPU      | Disk    | Notes                                |
+| --------------------- | ----- | -------- | ------- | ------------------------------------ |
+| Minimum (without Vexa) | 2 GB  | 1 vCPU   | 10 GB   | webapp + Postgres only               |
+| With `vexa` profile   | 4 GB  | 2 vCPU   | 20 GB   | adds vexa-lite (2 GB) + bridge (256 MB) |
+| 5–10 active users     | 8 GB  | 4 vCPU   | 40 GB SSD | comfortable for daily team usage   |
+
+Whisper inference happens at Fireworks AI, so **no GPU is required on
+the host**. Browser bots inside Vexa add roughly 1 GB transient RAM per
+concurrent live meeting. The `vexa-lite` image is `linux/amd64`-only —
+on Apple Silicon it runs under emulation and is noticeably slower.
+
 ## Quickstart
 
 Prerequisites: Docker + Docker Compose v2, a Mistral API key.

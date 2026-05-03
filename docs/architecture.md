@@ -110,6 +110,27 @@ bridge and Postgres remain internal.
 Migrations live in `lib/db-init.js` and are applied via the protected
 `POST /api/db-init` endpoint at deploy time.
 
+## Resource footprint
+
+Whisper inference is delegated to Fireworks AI, so the host does not
+need a GPU. A reasonable sizing matrix:
+
+| Profile               | RAM   | CPU    | Disk      | Notes                                |
+| --------------------- | ----- | ------ | --------- | ------------------------------------ |
+| Minimum (without Vexa) | 2 GB  | 1 vCPU | 10 GB     | webapp + Postgres                    |
+| With `vexa` profile   | 4 GB  | 2 vCPU | 20 GB     | + vexa-lite (2 GB) + bridge (256 MB) |
+| 5–10 active users     | 8 GB  | 4 vCPU | 40 GB SSD | comfortable for daily team usage     |
+
+Per concurrent live meeting, the Vexa container spawns a Chromium
+process that adds roughly 1 GB of transient RAM until the bot leaves
+the meeting. The `vexa-lite` image is published for `linux/amd64` only;
+running it on Apple Silicon falls back to emulation and is noticeably
+slower than native AMD64 hosts.
+
+The webapp container itself has no hard memory limit configured (Next.js
+is fairly steady around 300–500 MB); Postgres should be tuned per the
+official `postgresql.conf` guidance once the workload is known.
+
 ## Observability
 
 - Structured JSON logs (set `LOG_FORMAT=json`).

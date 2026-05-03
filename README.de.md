@@ -91,6 +91,20 @@ Audit-Trail sind Teil der Basis.
 Datenfluss-Details: [`docs/architecture.md`](docs/architecture.md).
 Vexa-Integration: [`docs/vexa-integration.md`](docs/vexa-integration.md).
 
+## Systemanforderungen
+
+| Profil                  | RAM   | CPU      | Disk    | Hinweis                              |
+| ----------------------- | ----- | -------- | ------- | ------------------------------------ |
+| Minimum (ohne Vexa)     | 2 GB  | 1 vCPU   | 10 GB   | nur Webapp + Postgres                |
+| Mit `vexa`-Profil       | 4 GB  | 2 vCPU   | 20 GB   | + vexa-lite (2 GB) + bridge (256 MB) |
+| 5–10 aktive Nutzer      | 8 GB  | 4 vCPU   | 40 GB SSD | komfortabel für tägliche Team-Nutzung |
+
+Whisper-Inferenz läuft bei Fireworks AI, **GPU auf dem Host ist nicht
+nötig**. Browser-Bots innerhalb von Vexa belegen pro paralleles
+Live-Meeting kurzzeitig zusätzlich ~1 GB RAM. Das `vexa-lite`-Image ist
+`linux/amd64`-only — auf Apple Silicon läuft es per Emulation und ist
+spürbar langsamer.
+
 ## Schnellstart
 
 Voraussetzungen: Docker + Docker Compose v2, ein Mistral-API-Key.
