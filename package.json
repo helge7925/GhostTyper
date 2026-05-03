@@ -1,7 +1,28 @@
 {
   "name": "ghosttyper",
   "version": "1.2.0",
-  "description": "GhostTyper - Audio-Transkription und KI-Analyse",
+  "description": "Self-hosted platform for audio transcription, OCR, AI analysis and remote-meeting capture.",
+  "author": "Helge Roos",
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://github.com/helge7925/transkription_webapp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/helge7925/transkription_webapp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/helge7925/transkription_webapp/issues"
+  },
+  "keywords": [
+    "transcription",
+    "whisper",
+    "mistral",
+    "ocr",
+    "remote-meeting",
+    "vexa",
+    "next.js",
+    "self-hosted",
+    "docker"
+  ],
   "main": "index.js",
   "scripts": {
     "dev": "next dev",
@@ -38,6 +59,7 @@
     "marked": "^17.0.1",
     "next": "^13.4.0",
     "next-auth": "^4.24.14",
+    "nodemailer": "^7.0.13",
     "pg": "^8.11.0",
     "protobufjs": "^7.5.6",
     "react": "^18.2.0",
