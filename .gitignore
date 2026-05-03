@@ -6,6 +6,9 @@ node_modules
 .env.bak
 .env*.local
 
+# Test artifacts
+test-results/
+
 # Next.js
 .next
 out
