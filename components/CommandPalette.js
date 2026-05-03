@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import { useSession, signOut } from 'next-auth/react';
 import {
+  Building2,
   History,
   Languages,
   LogOut,
@@ -27,14 +28,18 @@ import {
 } from './ui/command';
 import { useUIStore } from '../lib/store/ui-store';
 import { useTheme } from '../lib/theme-context';
+import { usePermission } from '../lib/use-permission';
+import { useTranslations } from '../lib/i18n';
 
+// Routes + locale-independent search keywords (so users can type `audio` or
+// `tabelle` regardless of UI locale).
 const NAV_ITEMS = [
-  { href: '/upload', label: 'Transkription', Icon: Mic, keywords: 'audio diktat record' },
-  { href: '/tabellen', label: 'Tabellen', Icon: Table, keywords: 'tabelle excel csv' },
-  { href: '/translate', label: 'Übersetzung', Icon: Languages, keywords: 'translate sprache' },
-  { href: '/ocr', label: 'OCR', Icon: ScanText, keywords: 'bild scan dokument text' },
-  { href: '/textoptimierung', label: 'Textoptimierung', Icon: PencilLine, keywords: 'text edit redaktion' },
-  { href: '/transcriptions', label: 'Historie', Icon: History, keywords: 'archiv liste verlauf' },
+  { href: '/upload', labelKey: 'transcription', Icon: Mic, keywords: 'audio diktat record record audio dictation' },
+  { href: '/tabellen', labelKey: 'tables', Icon: Table, keywords: 'tabelle table excel csv spreadsheet' },
+  { href: '/translate', labelKey: 'translation', Icon: Languages, keywords: 'translate sprache language uebersetzen' },
+  { href: '/ocr', labelKey: 'ocr', Icon: ScanText, keywords: 'bild scan dokument text image scanner' },
+  { href: '/textoptimierung', labelKey: 'textOptimization', Icon: PencilLine, keywords: 'text edit redaktion refine optimize' },
+  { href: '/transcriptions', labelKey: 'history', Icon: History, keywords: 'archiv liste verlauf history archive list' },
 ];
 
 export default function CommandPalette() {
@@ -42,6 +47,10 @@ export default function CommandPalette() {
   const { data: session } = useSession();
   const { commandPaletteOpen, closeCommandPalette, setCommandPaletteOpen } = useUIStore();
   const { resolvedTheme, toggleTheme } = useTheme();
+  const canReadAudit = usePermission('audit.read');
+  const t = useTranslations('command');
+  const tNav = useTranslations('nav');
+  const tTheme = useTranslations('theme');
 
   const run = (fn) => {
     closeCommandPalette();
@@ -51,55 +60,73 @@ export default function CommandPalette() {
 
   return (
     <CommandDialog open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen}>
-      <CommandInput placeholder="Befehl, Seite oder Aktion suchen…" />
+      <CommandInput placeholder={t('placeholder')} />
       <CommandList>
-        <CommandEmpty>Keine Treffer.</CommandEmpty>
+        <CommandEmpty>{t('noResults')}</CommandEmpty>
 
-        <CommandGroup heading="Navigation">
-          {NAV_ITEMS.map(({ href, label, Icon, keywords }) => (
+        <CommandGroup heading={t('groups.navigation')}>
+          {NAV_ITEMS.map(({ href, labelKey, Icon, keywords }) => (
             <CommandItem
               key={href}
-              value={`${label} ${keywords}`}
+              value={`${tNav(labelKey)} ${keywords}`}
               onSelect={() => run(() => router.push(href))}
             >
               <Icon aria-hidden="true" />
-              {label}
+              {tNav(labelKey)}
             </CommandItem>
           ))}
           <CommandItem
-            value="Einstellungen settings konfiguration"
+            value={`${tNav('settings')} settings konfiguration configuration`}
             onSelect={() => run(() => router.push('/settings'))}
           >
             <Settings aria-hidden="true" />
-            Einstellungen
+            {tNav('settings')}
           </CommandItem>
           <CommandItem
-            value="Profil account user"
+            value={`${tNav('profile')} profil account user`}
             onSelect={() => run(() => router.push('/profile'))}
           >
             <User aria-hidden="true" />
-            Profil
+            {tNav('profile')}
           </CommandItem>
+          {session && (
+            <CommandItem
+              value="workspace organisation organization team"
+              onSelect={() => run(() => router.push('/settings/organization'))}
+            >
+              <Building2 aria-hidden="true" />
+              {t('items.manageWorkspace')}
+            </CommandItem>
+          )}
+          {canReadAudit && (
+            <CommandItem
+              value="audit log sicherheit aktivität security activity"
+              onSelect={() => run(() => router.push('/audit'))}
+            >
+              <ShieldCheck aria-hidden="true" />
+              {t('items.auditLog')}
+            </CommandItem>
+          )}
           {session?.user?.role === 'admin' && (
             <CommandItem
-              value="Admin Benutzerverwaltung"
+              value={`${tNav('admin')} benutzerverwaltung user management`}
               onSelect={() => run(() => router.push('/admin/users'))}
             >
               <ShieldCheck aria-hidden="true" />
-              Admin
+              {tNav('admin')}
             </CommandItem>
           )}
         </CommandGroup>
 
         <CommandSeparator />
 
-        <CommandGroup heading="Aktionen">
+        <CommandGroup heading={t('groups.actions')}>
           <CommandItem
-            value="neue transkription new upload"
+            value="neue transkription new transcription upload"
             onSelect={() => run(() => router.push('/upload'))}
           >
             <Plus aria-hidden="true" />
-            Neue Transkription
+            {t('items.newTranscription')}
             <CommandShortcut>N</CommandShortcut>
           </CommandItem>
           <CommandItem
@@ -107,15 +134,15 @@ export default function CommandPalette() {
             onSelect={() => run(() => toggleTheme())}
           >
             {resolvedTheme === 'dark' ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
-            {resolvedTheme === 'dark' ? 'Helles Design' : 'Dunkles Design'}
+            {resolvedTheme === 'dark' ? tTheme('lightLabel') : tTheme('darkLabel')}
           </CommandItem>
           {session && (
             <CommandItem
-              value="abmelden logout"
+              value="abmelden logout sign out"
               onSelect={() => run(() => signOut({ callbackUrl: '/login' }))}
             >
               <LogOut aria-hidden="true" />
-              Abmelden
+              {tNav('logout')}
             </CommandItem>
           )}
         </CommandGroup>

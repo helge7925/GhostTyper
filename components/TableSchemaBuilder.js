@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { validateTableSchema } from '../lib/table-calculations';
 import { generateSchemaFromDescription } from '../lib/table-template-generator';
+import { useTranslations } from '../lib/i18n';
 import {
   TABLE_FIELD_TYPES,
   createDefaultTableSchema,
@@ -13,8 +14,6 @@ import {
 const QUICKSTART_PRESETS = [
   {
     id: 'invoice',
-    label: 'Rechnung',
-    description: 'Positionen mit Datum und Person',
     schema: {
       tableName: 'Rechnungspositionen',
       description: 'Extrahiert diktierte Rechnungs- oder Bestellpositionen.',
@@ -35,8 +34,6 @@ const QUICKSTART_PRESETS = [
   },
   {
     id: 'fixed',
-    label: 'Festes Formular',
-    description: 'Zeilentitel und Spalten vorgeben',
     schema: {
       tableName: 'Erfassungsbogen',
       description: 'Füllt feste Zeilen und Spalten mit diktierten Werten.',
@@ -58,8 +55,6 @@ const QUICKSTART_PRESETS = [
   },
   {
     id: 'actions',
-    label: 'Aktionsliste',
-    description: 'Aufgaben aus Protokollen',
     schema: {
       tableName: 'Aktionsliste',
       description: 'Extrahiert Aufgaben, Verantwortliche und Termine aus Transkripten.',
@@ -113,6 +108,7 @@ function FieldTypeSelect({ value, onChange }) {
 }
 
 export default function TableSchemaBuilder({ schema: initialSchema, onChange }) {
+  const t = useTranslations('tableSchemaBuilder');
   const [schema, setSchema] = useState(() => normalizeTableSchema(initialSchema || createDefaultTableSchema()));
   const [quickColumnInput, setQuickColumnInput] = useState('');
   const [quickRowInput, setQuickRowInput] = useState('');
@@ -311,10 +307,10 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
   }
 
   function renderPlaceholder(column) {
-    if (column.type === 'currency') return '0,00 €';
-    if (column.type === 'number') return '0';
-    if (column.type === 'date') return 'TT.MM.JJJJ';
-    return 'Inhalt';
+    if (column.type === 'currency') return t('placeholders.currency');
+    if (column.type === 'number') return t('placeholders.number');
+    if (column.type === 'date') return t('placeholders.date');
+    return t('placeholders.text');
   }
 
   return (
@@ -322,8 +318,8 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
       <section className="bg-surface border border-subtle rounded-2xl p-5 space-y-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold text-primary">Schnellstart</p>
-            <p className="text-[11px] text-secondary mt-1">Vorlage wählen oder aus einer kurzen Beschreibung erzeugen.</p>
+            <p className="text-xs font-semibold text-primary">{t('quickstart')}</p>
+            <p className="text-[11px] text-secondary mt-1">{t('quickstartHint')}</p>
           </div>
           <label className="inline-flex items-center gap-2 text-xs text-secondary">
             <input
@@ -332,7 +328,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
               onChange={(event) => setShowAdvanced(event.target.checked)}
               className="accent-accent"
             />
-            Keys anzeigen
+            {t('showKeys')}
           </label>
         </div>
 
@@ -344,8 +340,8 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
               onClick={() => applyPreset(preset.schema)}
               className="text-left rounded-xl border border-subtle bg-hover-subtle hover:border-accent/40 hover:bg-accent/10 px-4 py-3 transition-colors"
             >
-              <p className="text-sm font-semibold text-primary">{preset.label}</p>
-              <p className="text-[11px] text-secondary mt-1">{preset.description}</p>
+              <p className="text-sm font-semibold text-primary">{t(`presets.${preset.id}.label`)}</p>
+              <p className="text-[11px] text-secondary mt-1">{t(`presets.${preset.id}.description`)}</p>
             </button>
           ))}
         </div>
@@ -354,7 +350,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
           <textarea
             value={descriptionInput}
             onChange={(event) => setDescriptionInput(event.target.value)}
-            placeholder="z. B. Tabelle mit Datum, ausgefüllt von, drei Prüfpunkten als Zeilen und Spalten für Wert und Bemerkung"
+            placeholder={t('describePlaceholder')}
             rows={2}
             className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:border-accent resize-none"
           />
@@ -364,7 +360,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
             disabled={!descriptionInput.trim()}
             className="px-4 py-2.5 rounded-xl bg-hover text-primary hover:bg-hover-strong disabled:opacity-40 text-sm font-medium"
           >
-            Vorschlag erzeugen
+            {t('generateSuggestion')}
           </button>
         </div>
       </section>
@@ -372,21 +368,21 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
       <section className="grid grid-cols-1 lg:grid-cols-[1.2fr_1.8fr] gap-4">
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-secondary mb-1.5">Name der Tabelle</label>
+            <label className="block text-xs font-medium text-secondary mb-1.5">{t('tableNameLabel')}</label>
             <input
               type="text"
               value={schema.tableName}
               onChange={(event) => updateSchema((prev) => ({ ...prev, tableName: event.target.value }))}
-              placeholder="z. B. Tagesbericht"
+              placeholder={t('tableNamePlaceholder')}
               className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:border-accent"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-secondary mb-1.5">Extraktionshinweis</label>
+            <label className="block text-xs font-medium text-secondary mb-1.5">{t('extractionHint')}</label>
             <textarea
               value={schema.description}
               onChange={(event) => updateSchema((prev) => ({ ...prev, description: event.target.value }))}
-              placeholder="Was soll aus dem Transkript in diese Tabelle eingetragen werden?"
+              placeholder={t('extractionHintPlaceholder')}
               rows={4}
               className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:border-accent resize-none"
             />
@@ -395,20 +391,20 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
 
         <div className="bg-surface border border-subtle rounded-2xl p-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold text-primary">Metadaten oberhalb der Tabelle</p>
+            <p className="text-xs font-semibold text-primary">{t('metadataHeading')}</p>
             <button
               type="button"
               onClick={addMetadataField}
               className="px-3 py-1.5 rounded-lg border border-dashed border-emphasis text-xs text-secondary hover:text-primary hover:border-accent/50"
             >
-              + Feld
+              {t('addField')}
             </button>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_auto] gap-2">
             <input
               value={quickMetadataInput}
               onChange={(event) => setQuickMetadataInput(event.target.value)}
-              placeholder="z. B. Datum, Ausgefüllt von, Projekt"
+              placeholder={t('metadataPlaceholder')}
               className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent"
             />
             <button
@@ -420,7 +416,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
               disabled={!quickMetadataInput.trim()}
               className="px-4 py-2 rounded-lg bg-hover text-primary hover:bg-hover-strong disabled:opacity-40 text-sm font-medium"
             >
-              Übernehmen
+              {t('apply')}
             </button>
           </div>
 
@@ -431,7 +427,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                   value={field.label}
                   onChange={(event) => updateMetadataField(index, { label: event.target.value })}
                   className="bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent"
-                  placeholder="Feldname"
+                  placeholder={t('fieldName')}
                 />
                 <FieldTypeSelect value={field.type} onChange={(value) => updateMetadataField(index, { type: value })} />
                 <label className="inline-flex items-center gap-2 text-xs text-secondary">
@@ -441,14 +437,14 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                     onChange={(event) => updateMetadataField(index, { required: event.target.checked })}
                     className="accent-accent"
                   />
-                  Pflicht
+                  {t('required')}
                 </label>
                 <button
                   type="button"
                   onClick={() => removeMetadataField(index)}
                   className="px-2 py-2 rounded-lg text-danger hover:bg-danger/10 text-xs"
                 >
-                  Löschen
+                  {t('delete')}
                 </button>
                 {showAdvanced && (
                   <input
@@ -461,7 +457,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
             ))}
             {schema.metadata.length === 0 && (
               <p className="text-xs text-secondary bg-hover-subtle border border-subtle rounded-xl px-3 py-3">
-                Keine Metadatenfelder angelegt.
+                {t('noMetadata')}
               </p>
             )}
           </div>
@@ -472,8 +468,8 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
         <div className="border-b border-subtle p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold text-primary">Tabellenraster</p>
-              <p className="text-[11px] text-secondary mt-1">Spaltentitel oben, Zeilentitel links. Die Zellen werden später nur mit diktiertem Inhalt gefüllt.</p>
+              <p className="text-xs font-semibold text-primary">{t('gridHeading')}</p>
+              <p className="text-[11px] text-secondary mt-1">{t('gridHint')}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -481,14 +477,14 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                 onClick={addRowDefinition}
                 className="px-3 py-1.5 rounded-lg border border-dashed border-emphasis text-xs text-secondary hover:text-primary hover:border-accent/50"
               >
-                + Zeile
+                {t('addRow')}
               </button>
               <button
                 type="button"
                 onClick={addColumn}
                 className="px-3 py-1.5 rounded-lg border border-dashed border-emphasis text-xs text-secondary hover:text-primary hover:border-accent/50"
               >
-                + Spalte
+                {t('addColumn')}
               </button>
             </div>
           </div>
@@ -498,7 +494,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
               <input
                 value={quickRowInput}
                 onChange={(event) => setQuickRowInput(event.target.value)}
-                placeholder="Zeilen: Raum 1, Raum 2, Raum 3"
+                placeholder={t('rowsPlaceholder')}
                 className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent"
               />
               <button
@@ -510,14 +506,14 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                 disabled={!quickRowInput.trim()}
                 className="px-3 py-2 rounded-lg bg-hover text-primary hover:bg-hover-strong disabled:opacity-40 text-xs font-medium"
               >
-                Zeilen setzen
+                {t('applyRows')}
               </button>
             </div>
             <div className="grid grid-cols-[1fr_auto] gap-2">
               <input
                 value={quickColumnInput}
                 onChange={(event) => setQuickColumnInput(event.target.value)}
-                placeholder="Spalten: Wert, Einheit, Bemerkung"
+                placeholder={t('columnsPlaceholder')}
                 className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent"
               />
               <button
@@ -529,7 +525,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                 disabled={!quickColumnInput.trim()}
                 className="px-3 py-2 rounded-lg bg-hover text-primary hover:bg-hover-strong disabled:opacity-40 text-xs font-medium"
               >
-                Spalten setzen
+                {t('applyColumns')}
               </button>
             </div>
           </div>
@@ -540,7 +536,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
             <thead>
               <tr className="bg-hover-subtle">
                 <th className="sticky left-0 z-10 bg-surface-elevated w-56 px-3 py-3 text-left text-[11px] uppercase tracking-wider text-secondary border-r border-subtle">
-                  Zeilentitel
+                  {t('rowTitleHeader')}
                 </th>
                 {schema.columns.map((column, index) => (
                   <th key={`column-${index}`} className="min-w-[170px] px-2 py-2 border-r border-subtle align-top">
@@ -549,7 +545,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                         value={column.label}
                         onChange={(event) => updateColumn(index, { label: event.target.value })}
                         className="w-full bg-surface-elevated border border-subtle rounded-md px-2 py-1.5 text-sm text-primary outline-none focus:border-accent"
-                        placeholder={`Spalte ${index + 1}`}
+                        placeholder={t('columnPlaceholder', { n: index + 1 })}
                       />
                       <div className="grid grid-cols-[1fr_auto_auto] gap-1 items-center">
                         <FieldTypeSelect value={column.type} onChange={(value) => updateColumn(index, { type: value })} />
@@ -558,7 +554,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                           onClick={() => moveColumn(index, 'left')}
                           disabled={index === 0}
                           className="px-2 py-1 rounded text-secondary hover:text-primary disabled:opacity-25"
-                          title="Nach links"
+                          title={t('moveLeft')}
                         >
                           ←
                         </button>
@@ -567,7 +563,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                           onClick={() => moveColumn(index, 'right')}
                           disabled={index === schema.columns.length - 1}
                           className="px-2 py-1 rounded text-secondary hover:text-primary disabled:opacity-25"
-                          title="Nach rechts"
+                          title={t('moveRight')}
                         >
                           →
                         </button>
@@ -580,7 +576,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                             onChange={(event) => updateColumn(index, { required: event.target.checked })}
                             className="accent-accent"
                           />
-                          Pflicht
+                          {t('required')}
                         </label>
                         <button
                           type="button"
@@ -588,7 +584,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                           disabled={schema.columns.length <= 1}
                           className="text-[11px] text-danger hover:text-red-300 disabled:opacity-30"
                         >
-                          Löschen
+                          {t('delete')}
                         </button>
                       </div>
                       {showAdvanced && (
@@ -622,7 +618,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                               onClick={() => moveRowDefinition(rowIndex, 'up')}
                               disabled={rowIndex === 0}
                               className="px-2 py-1 rounded text-secondary hover:text-primary disabled:opacity-25"
-                              title="Nach oben"
+                              title={t('moveUp')}
                             >
                               ↑
                             </button>
@@ -631,7 +627,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                               onClick={() => moveRowDefinition(rowIndex, 'down')}
                               disabled={rowIndex === schema.rows.length - 1}
                               className="px-2 py-1 rounded text-secondary hover:text-primary disabled:opacity-25"
-                              title="Nach unten"
+                              title={t('moveDown')}
                             >
                               ↓
                             </button>
@@ -642,20 +638,20 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
                                 onChange={(event) => updateRowDefinition(rowIndex, { required: event.target.checked })}
                                 className="accent-accent"
                               />
-                              Pflicht
+                              {t('required')}
                             </label>
                             <button
                               type="button"
                               onClick={() => removeRowDefinition(rowIndex)}
                               className="text-[11px] text-danger hover:text-red-300"
                             >
-                              Löschen
+                              {t('delete')}
                             </button>
                           </div>
                           <input
                             value={row.hint || ''}
                             onChange={(event) => updateRowDefinition(rowIndex, { hint: event.target.value })}
-                            placeholder="Hinweis für diese Zeile"
+                            placeholder={t('rowHintPlaceholder')}
                             className="w-full bg-surface-elevated border border-subtle rounded-md px-2 py-1 text-[11px] text-secondary outline-none focus:border-accent"
                           />
                           {showAdvanced && (
@@ -685,7 +681,7 @@ export default function TableSchemaBuilder({ schema: initialSchema, onChange }) 
 
       {!validation.isValid && (
         <div className="bg-danger/10 border border-danger/30 rounded-xl p-4">
-          <p className="text-danger text-sm font-medium mb-2">Bitte korrigieren Sie die folgenden Punkte:</p>
+          <p className="text-danger text-sm font-medium mb-2">{t('validationHeading')}</p>
           <ul className="text-danger/80 text-xs space-y-1">
             {validation.errors.map((entry, index) => (
               <li key={`${entry}-${index}`}>• {entry}</li>

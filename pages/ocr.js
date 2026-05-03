@@ -10,6 +10,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import { analysisToHtml } from '../lib/export-utils';
 import { useUiFeedback } from '../lib/use-ui-feedback';
+import { useMessageList, useTranslations } from '../lib/i18n';
 
 const OCR_LOADING_MESSAGES = [
   'Wir lesen Pixel für Pixel, damit kein Wort verloren geht.',
@@ -65,6 +66,8 @@ const OCR_PRESETS = {
 export default function OCR() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const t = useTranslations('ocrPage');
+  const ocrMessages = useMessageList('loadingMessages.ocr');
   
   const [file, setFile] = useState(null);
   const [markdown, setMarkdown] = useState('');
@@ -223,13 +226,13 @@ export default function OCR() {
 
   return (
     <>
-      <Head><title>OCR - GhostTyper</title></Head>
+      <Head><title>{`${t('title')} – GhostTyper`}</title></Head>
 
       {!showEditor ? (
         <div className="max-w-5xl mx-auto animate-fade-in pb-20">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-primary">OCR</h1>
+              <h1 className="text-2xl font-bold text-primary">{t('title')}</h1>
               <p className="text-sm text-secondary mt-1">Dokumente lesen und optional zusammenfassen</p>
               {activePreset && (
                 <p className="text-xs text-info bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 mt-3 inline-flex">
@@ -292,7 +295,7 @@ export default function OCR() {
             <div className="flex flex-col items-center gap-6">
               <label className="flex items-center gap-3 cursor-pointer group">
                 <input type="checkbox" checked={analyze} onChange={(e) => setAnalyze(e.target.checked)} className="w-5 h-5 rounded border-subtle bg-hover-subtle accent-accent focus:ring-accent" />
-                <span className="text-sm text-secondary group-hover:text-primary">Direkt analysieren</span>
+                <span className="text-sm text-secondary group-hover:text-primary">{t('withAnalysis')}</span>
               </label>
 
               {analyze && (
@@ -372,7 +375,7 @@ export default function OCR() {
                 done={false}
                 startedAt={stepStartedAt}
                 etaSeconds={loadingStep === 'analysis' ? 22 : 16}
-                messages={loadingStep === 'analysis' ? OCR_ANALYSIS_MESSAGES : OCR_LOADING_MESSAGES}
+                messages={ocrMessages}
               />
             )}
           </div>

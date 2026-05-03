@@ -1,28 +1,25 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from './auth/[...nextauth]';
 import { getSettingsRow } from '../../lib/settings-service';
 import { checkCostLimit, CostLimitCheckUnavailableError } from '../../lib/usage';
 import { recommendModelPlan } from '../../lib/model-assistant';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
+import { withOrgScope } from '../../lib/api/with-org-scope';
 
 const ALLOWED_TASK_TYPES = new Set([
   'translation',
   'transcription-analysis',
 ]);
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const userId = req.userId;
+  const orgId = req.org.id;
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'model-assistant',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 120,
     windowMs: 60_000,
   });
@@ -41,8 +38,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Ungültiger Task-Typ' });
     }
 
-    const settings = await getSettingsRow(session.user.id);
-    const cost = await checkCostLimit(session.user.id);
+    const settings = await getSettingsRow(userId);
+    const cost = await checkCostLimit(userId, orgId);
 
     const recommendation = recommendModelPlan({
       taskType,
@@ -64,3 +61,5 @@ export default async function handler(req, res) {
     return serverError(res, 'Modellempfehlung fehlgeschlagen');
   }
 }
+
+export default withOrgScope(handler);

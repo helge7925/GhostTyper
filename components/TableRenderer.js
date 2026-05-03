@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { exportTableToCSV, exportTableToExcel, exportTableToHTML } from '../lib/table-export';
+import { useTranslations } from '../lib/i18n';
 import {
   createEmptyTableRow,
   getTableRowLabel,
@@ -71,6 +72,7 @@ export default function TableRenderer({
   alwaysEditing = false,
   showToolbar = true,
 }) {
+  const t = useTranslations('table');
   const normalizedSchema = useMemo(() => normalizeTableSchema(schema), [schema]);
   const [editMode, setEditMode] = useState(startInEditMode || alwaysEditing);
   const [rows, setRows] = useState(() => orderRowsBySchema(initialData?.rows || [], normalizedSchema));
@@ -197,16 +199,16 @@ export default function TableRenderer({
       {showToolbar && (
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-subtle">
           <div className="flex flex-wrap items-center gap-3">
-            <h3 className="text-lg font-semibold text-primary">{normalizedSchema.tableName || 'Datentabelle'}</h3>
-            <span className="text-sm text-secondary">{rows.length} Zeilen</span>
+            <h3 className="text-lg font-semibold text-primary">{normalizedSchema.tableName || t('defaultTableName')}</h3>
+            <span className="text-sm text-secondary">{rows.length} {t('rows')}</span>
             {missingMetadataFields.length > 0 && (
               <span className="text-[11px] px-2 py-1 rounded-full border border-danger/40 text-danger bg-danger/10">
-                Metadaten unvollständig
+                {t('missingMetadata')}
               </span>
             )}
             {missingFieldsByRow.size > 0 && (
               <span className="text-[11px] px-2 py-1 rounded-full border border-danger/40 text-danger bg-danger/10">
-                {missingFieldsByRow.size} Zeilen unvollständig
+                {t('incompleteRows', { count: missingFieldsByRow.size })}
               </span>
             )}
           </div>
@@ -222,7 +224,7 @@ export default function TableRenderer({
                     : 'bg-hover-subtle text-secondary hover:text-primary'
                 }`}
               >
-                {editMode ? 'Fertig' : 'Bearbeiten'}
+                {editMode ? t('save') : t('edit')}
               </button>
             )}
 
@@ -232,7 +234,7 @@ export default function TableRenderer({
                 onClick={addRow}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium bg-success/20 text-success hover:bg-success/30 transition-all"
               >
-                + Zeile
+                + {t('addRow')}
               </button>
             )}
 
@@ -241,7 +243,7 @@ export default function TableRenderer({
               type="button"
               onClick={() => handleExport('excel')}
               className="px-3 py-1.5 rounded-lg text-xs font-medium bg-success/20 text-success hover:bg-success/30 transition-all"
-              title="Excel exportieren"
+              title={t('exportExcel')}
             >
               Excel
             </button>
@@ -249,7 +251,7 @@ export default function TableRenderer({
               type="button"
               onClick={() => handleExport('csv')}
               className="px-3 py-1.5 rounded-lg text-xs font-medium bg-hover-subtle text-secondary hover:text-primary transition-all"
-              title="CSV exportieren"
+              title={t('exportCsv')}
             >
               CSV
             </button>
@@ -261,9 +263,9 @@ export default function TableRenderer({
                   ? 'bg-success/20 text-success'
                   : 'bg-hover-subtle text-secondary hover:text-primary'
               }`}
-              title="Als HTML-Tabelle kopieren"
+              title={t('copyHtml')}
             >
-              {copyFeedback ? 'Kopiert!' : 'Kopieren'}
+              {copyFeedback ? t('copied') : t('copyHtml')}
             </button>
           </div>
         </div>
@@ -302,7 +304,7 @@ export default function TableRenderer({
               {editable && isEditing && !includeRowTitle && <th className="w-10 px-2 py-2" />}
               {includeRowTitle && (
                 <th className="sticky left-0 z-10 bg-surface-elevated px-3 py-2 text-left text-xs font-bold text-secondary uppercase tracking-wider whitespace-nowrap border-r border-subtle">
-                  Zeile
+                  {t('rowLabel')}
                 </th>
               )}
               {normalizedSchema.columns.map((column) => (
@@ -331,7 +333,7 @@ export default function TableRenderer({
                       type="button"
                       onClick={() => removeRow(rowIndex)}
                       className="p-1 text-danger/50 hover:text-danger transition-colors"
-                      aria-label={`Zeile ${rowIndex + 1} entfernen`}
+                      aria-label={t('removeRow', { n: rowIndex + 1 })}
                     >
                       ×
                     </button>
@@ -373,7 +375,7 @@ export default function TableRenderer({
                   colSpan={normalizedSchema.columns.length + (includeRowTitle ? 1 : 0) + (editable && isEditing && !includeRowTitle ? 1 : 0)}
                   className="px-4 py-8 text-center text-secondary"
                 >
-                  Keine Daten vorhanden
+                  {t('noData')}
                 </td>
               </tr>
             )}
@@ -384,14 +386,14 @@ export default function TableRenderer({
       {(missingMetadataFields.length > 0 || missingFieldsByRow.size > 0) && (
         <div className="px-4 py-3 bg-hover-subtle border-t border-subtle text-[10px] text-danger/90">
           {missingMetadataFields.length > 0 && (
-            <p>Fehlende Metadaten: {missingMetadataFields.join(', ')}</p>
+            <p>{t('missingMetadataLabel')}: {missingMetadataFields.join(', ')}</p>
           )}
           {missingFieldsByRow.size > 0 && (
             <p>
-              Fehlende Pflichtfelder:{' '}
+              {t('missingRequiredLabel')}:{' '}
               {Array.from(missingFieldsByRow.entries())
                 .slice(0, 4)
-                .map(([rowIndex, fields]) => `Zeile ${rowIndex + 1} (${fields.join(', ')})`)
+                .map(([rowIndex, fields]) => t('rowFieldsList', { n: rowIndex + 1, fields: fields.join(', ') }))
                 .join(' | ')}
               {missingFieldsByRow.size > 4 ? ' ...' : ''}
             </p>

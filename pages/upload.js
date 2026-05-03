@@ -6,6 +6,7 @@ import AudioUploadForm from '../components/AudioUploadForm';
 import ProcessStatusCard from '../components/ProcessStatusCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { STATUS } from '../lib/constants';
+import { useMessageList, useTranslations } from '../lib/i18n';
 
 const TRANSCRIPTION_LOADING_MESSAGES = [
   'Wir horchen konzentriert rein und fangen jedes Wort ein.',
@@ -65,6 +66,9 @@ const UPLOAD_PRESETS = {
 export default function Upload() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const tUpload = useTranslations('upload');
+  const transcriptionMessages = useMessageList('loadingMessages.transcription');
+  const analysisMessages = useMessageList('loadingMessages.transcription');
   const [result, setResult] = useState(null);
   const [liveStatus, setLiveStatus] = useState(null);
   const [statusStartedAt, setStatusStartedAt] = useState(null);
@@ -211,15 +215,15 @@ export default function Upload() {
   return (
     <>
       <Head>
-        <title>Hochladen - GhostTyper</title>
+        <title>{`${tUpload('title')} – GhostTyper`}</title>
       </Head>
 
       <div className="max-w-xl mx-auto">
         <h1 className="text-2xl font-semibold text-primary mb-2">
-          Audio hochladen
+          {tUpload('title')}
         </h1>
         <p className="text-sm text-secondary mb-6">
-          Laden Sie eine Audiodatei hoch. Die Transkription startet automatisch.
+          {tUpload('subtitle')}
         </p>
         {activePreset && (
           <p className="text-xs text-info bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 mb-6">
@@ -259,11 +263,7 @@ export default function Upload() {
                 done={liveStatus === STATUS.COMPLETED || liveStatus === STATUS.TRANSCRIBED}
                 startedAt={statusStartedAt}
                 etaSeconds={liveStatus === STATUS.ANALYZING ? 22 : 45}
-                messages={
-                  liveStatus === STATUS.ANALYZING
-                    ? ANALYSIS_LOADING_MESSAGES
-                    : TRANSCRIPTION_LOADING_MESSAGES
-                }
+                messages={liveStatus === STATUS.ANALYZING ? analysisMessages : transcriptionMessages}
               />
             </div>
 

@@ -1,19 +1,17 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { recoverStaleTranscriptionsForUser } from '../../../lib/transcription-stale';
 import { ensureTranscriptionWorkerRunning } from '../../../lib/transcription-worker';
 import { parseTranscriptionsListParams } from '../../../lib/transcriptions-list';
+import { withOrgScope } from '../../../lib/api/with-org-scope';
 
-export default async function handler(req, res) {
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+async function handler(req, res) {
+  const userId = req.userId;
+  const orgId = req.org.id;
+
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'transcriptions-list',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 120,
     windowMs: 60_000,
   });
@@ -23,15 +21,15 @@ export default async function handler(req, res) {
     case 'GET': {
       try {
         ensureTranscriptionWorkerRunning();
-        await recoverStaleTranscriptionsForUser(session.user.id);
+        await recoverStaleTranscriptionsForUser(userId);
 
         const { search, scope, limit, offset } = parseTranscriptionsListParams(req.query || {});
         const useFullSearch = scope === 'full' && search.length >= 3;
 
         let sql = `SELECT id, original_name, status, template, mime_type, folder_id, is_favorite, created_at, updated_at
                    FROM transcriptions
-                   WHERE user_id = $1`;
-        const params = [session.user.id];
+                   WHERE organization_id = $1`;
+        const params = [orgId];
 
         if (search) {
           const searchPattern = `%${search}%`;
@@ -63,3 +61,5 @@ export default async function handler(req, res) {
       return res.status(405).json({ message: 'Method not allowed' });
   }
 }
+
+export default withOrgScope({ permission: 'transcription.read' }, handler);

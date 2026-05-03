@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE, normalizeDefaultTemplate } from '../lib/constants';
 import { uploadAudio, getTemplates, getSettings } from '../lib/api';
 import AudioRecorder from './AudioRecorder';
+import { useTranslations } from '../lib/i18n';
 
 const BUILTIN_TEMPLATE_VALUES = new Set(['generic', 'meeting', 'aufmass', 'data_table']);
 const ALLOWED_CHAT_MODELS = new Set(['mistral-small-latest', 'mistral-medium-latest', 'mistral-large-latest']);
@@ -17,6 +18,9 @@ function resolvePresetTemplate(templateValue, templates) {
 }
 
 export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTemplate = false, templateLabel = '' }) {
+  const t = useTranslations('upload');
+  const tForm = useTranslations('components.uploadForm');
+  const tCommon = useTranslations('common');
   const [file, setFile] = useState(null);
   const [template, setTemplate] = useState('generic');
   const [model, setModel] = useState('mistral-large-latest');
@@ -168,7 +172,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
                 : 'text-secondary hover:text-primary'
             }`}
           >
-            Datei hochladen
+            {tForm('tabUpload')}
             {uploadMode === 'file' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-info" />
             )}
@@ -182,7 +186,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
                 : 'text-secondary hover:text-primary'
             }`}
           >
-            Aufnehmen
+            {tForm('tabRecord')}
             {uploadMode === 'record' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-info" />
             )}
@@ -199,7 +203,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
           onKeyDown={handleFileZoneKeyDown}
           role="button"
           tabIndex={0}
-          aria-label="Audio-Datei auswählen oder per Drag-and-drop hochladen"
+          aria-label={tForm('dragOrClick')}
           className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
             dragActive
               ? 'border-accent bg-accent/10'
@@ -225,10 +229,8 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
               <svg className="mx-auto w-10 h-10 text-secondary mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-              <p className="text-sm text-secondary">
-                Audio-Datei hierher ziehen oder <span className="text-accent font-medium">durchsuchen</span>
-              </p>
-              <p className="text-xs text-secondary/60 mt-1">MP3, WAV, OGG, FLAC, M4A, WebM (max. 50 MB)</p>
+              <p className="text-sm text-secondary">{tForm('dragOrClick')}</p>
+              <p className="text-xs text-secondary/60 mt-1">{t('fileFormats')}</p>
             </div>
           )}
         </div>
@@ -239,11 +241,11 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
       <div className="space-y-3 pt-2">
         <label className="flex items-center gap-3 cursor-pointer group">
           <input type="checkbox" checked={diarize} onChange={(e) => setDiarize(e.target.checked)} className="w-4 h-4 accent-accent bg-surface-elevated border-emphasis rounded focus:ring-accent" />
-          <span className="text-sm text-secondary group-hover:text-primary transition-colors">Sprechererkennung aktivieren</span>
+          <span className="text-sm text-secondary group-hover:text-primary transition-colors">{t('diarize')}</span>
         </label>
         <label className="flex items-center gap-3 cursor-pointer group">
           <input type="checkbox" checked={autoAnalyze} onChange={(e) => setAutoAnalyze(e.target.checked)} className="w-4 h-4 accent-accent bg-surface-elevated border-emphasis rounded focus:ring-accent" />
-          <span className="text-sm text-secondary group-hover:text-primary transition-colors">Direkt analysieren</span>
+          <span className="text-sm text-secondary group-hover:text-primary transition-colors">{t('autoAnalyze')}</span>
         </label>
       </div>
 
@@ -296,16 +298,16 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
             </div>
           </div>
           <div>
-            <label htmlFor="upload-prompt" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">Zusätzlicher Kontext</label>
-            <textarea id="upload-prompt" value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Teilnehmer, Projekte, Hinweise..." rows={2} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none resize-none" />
+            <label htmlFor="upload-prompt" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">{t('additionalContext')}</label>
+            <textarea id="upload-prompt" value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder={t('additionalContextHint')} rows={2} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none resize-none" />
           </div>
           <div>
-            <label htmlFor="upload-analysis-focus" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">Fokus der Analyse</label>
+            <label htmlFor="upload-analysis-focus" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">{t('analysisFocus')}</label>
             <textarea
               id="upload-analysis-focus"
               value={analysisFocus}
               onChange={(e) => setAnalysisFocus(e.target.value)}
-              placeholder="Worauf soll sich die Analyse konzentrieren?"
+              placeholder={t('analysisFocus')}
               rows={2}
               className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none resize-none"
             />
@@ -324,7 +326,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
       )}
 
       <button type="submit" disabled={!file || uploading} className="w-full gradient-accent text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 disabled:opacity-30 transition-all hover:scale-[1.01]">
-        {uploading ? 'Wird hochgeladen...' : 'Vorgang starten'}
+        {uploading ? t('submitting') : t('submit')}
       </button>
     </form>
   );

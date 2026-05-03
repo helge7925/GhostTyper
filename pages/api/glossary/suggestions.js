@@ -1,23 +1,20 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
 import { getSettingsRow } from '../../../lib/settings-service';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { buildGlossarySuggestions, parseContextBiasTerms } from '../../../lib/glossary';
+import { withOrgScope } from '../../../lib/api/with-org-scope';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const userId = req.userId;
+  const orgId = req.org.id;
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'glossary-suggestions',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 60,
     windowMs: 60_000,
   });
@@ -26,18 +23,18 @@ export default async function handler(req, res) {
   try {
     const limit = Math.max(5, Math.min(100, Number.parseInt(req.query.limit, 10) || 30));
 
-    const settings = await getSettingsRow(session.user.id);
+    const settings = await getSettingsRow(userId);
     const existingTerms = parseContextBiasTerms(settings?.context_bias || '');
 
     const result = await query(
       `SELECT text, custom_prompt, original_name
        FROM transcriptions
-       WHERE user_id = $1
+       WHERE organization_id = $1
          AND text IS NOT NULL
          AND LENGTH(text) > 0
        ORDER BY created_at DESC
        LIMIT 150`,
-      [session.user.id]
+      [orgId]
     );
 
     const texts = result.rows.flatMap((row) => {
@@ -70,3 +67,5 @@ export default async function handler(req, res) {
     return serverError(res, 'Auto-Glossar konnte nicht geladen werden');
   }
 }
+
+export default withOrgScope({ permission: 'transcription.read' }, handler);

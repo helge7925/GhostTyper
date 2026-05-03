@@ -2,8 +2,6 @@ import formidable from 'formidable';
 import { copyFile, unlink, mkdir } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from './auth/[...nextauth]';
 import { query } from '../../lib/db';
 import { ACCEPTED_AUDIO_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE, normalizeAnalysisTemplate } from '../../lib/constants';
 import { resolveChatModel } from '../../lib/model-policy';
@@ -12,6 +10,7 @@ import { addTranscriptionEvent } from '../../lib/transcription-events';
 import { scanFileForViruses } from '../../lib/virus-scan';
 import { logAuditEvent } from '../../lib/audit-log';
 import { detectAudioMimeType, extensionFromDetectedMime } from '../../lib/file-signature';
+import { withOrgScope } from '../../lib/api/with-org-scope';
 
 export const config = {
   api: {
@@ -44,19 +43,17 @@ function parseForm(req) {
   });
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const userId = req.userId;
+  const orgId = req.org.id;
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'upload-audio',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 30,
     windowMs: 60_000,
   }, 'Zu viele Uploads. Bitte später erneut versuchen.');
@@ -90,7 +87,8 @@ export default async function handler(req, res) {
       await safeUnlink(tempUploadPath);
       tempUploadPath = '';
       await logAuditEvent({
-        userId: session.user.id,
+        userId,
+        organizationId: orgId,
         action: 'upload.virus_detected',
         targetType: 'upload',
         targetId: file.originalFilename || null,
@@ -150,20 +148,22 @@ export default async function handler(req, res) {
     const autoAnalyze = (fields.autoAnalyze?.[0] || fields.autoAnalyze) !== 'false';
 
     const result = await query(
-      `INSERT INTO transcriptions (user_id, filename, original_name, file_path, file_size, mime_type, template, model, diarize, custom_prompt, auto_analyze, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending')
+      `INSERT INTO transcriptions (user_id, organization_id, filename, original_name, file_path, file_size, mime_type, template, model, diarize, custom_prompt, auto_analyze, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending')
        RETURNING id, filename, original_name, status, template, model, diarize, auto_analyze, created_at`,
-      [session.user.id, filename, file.originalFilename, filePath, file.size, detectedMimeType, template, model, diarize, combinedPrompt || null, autoAnalyze]
+      [userId, orgId, filename, file.originalFilename, filePath, file.size, detectedMimeType, template, model, diarize, combinedPrompt || null, autoAnalyze]
     );
 
     await addTranscriptionEvent({
       transcriptionId: result.rows[0].id,
-      userId: session.user.id,
+      userId,
+      organizationId: orgId,
       stage: 'queued',
       message: 'Upload abgeschlossen. Wartet auf Start der Verarbeitung.',
     });
     await logAuditEvent({
-      userId: session.user.id,
+      userId,
+      organizationId: orgId,
       action: 'upload.created',
       targetType: 'transcription',
       targetId: String(result.rows[0].id),
@@ -192,3 +192,5 @@ export default async function handler(req, res) {
     return serverError(res, 'Upload fehlgeschlagen');
   }
 }
+
+export default withOrgScope({ permission: 'transcription.write' }, handler);

@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -6,13 +7,12 @@ import StatusBadge from '../../components/StatusBadge';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Toast from '../../components/Toast';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import DocumentEditor from '../../components/DocumentEditor';
-import TableEditor from '../../components/TableEditor';
 import TableRenderer from '../../components/TableRenderer';
 import ProcessStatusCard from '../../components/ProcessStatusCard';
+import MeetingControlBar from '../../components/MeetingControlBar';
 import { getTranscription, deleteTranscription, updateSpeakers, startAnalysis } from '../../lib/api';
 import { STATUS } from '../../lib/constants';
-import { analysisToHtml } from '../../lib/export-utils';
+import { useMessageList, useTranslations } from '../../lib/i18n';
 
 const TRANSCRIPTION_LOADING_MESSAGES = [
   'Wir lauschen tief konzentriert und schreiben fleißig mit.',
@@ -102,6 +102,9 @@ export default function TranscriptionDetail() {
   const router = useRouter();
   const { id } = router.query;
   const { data: session, status: authStatus } = useSession();
+  const t = useTranslations('transcriptionDetailPage');
+  const tCommon = useTranslations('common');
+  const transcriptionMessages = useMessageList('loadingMessages.transcription');
   const [transcription, setTranscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
@@ -115,10 +118,6 @@ export default function TranscriptionDetail() {
   const statusRef = useRef(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
-  // Editor state
-  const [showEditor, setShowEditor] = useState(false);
-  const [editorHtml, setEditorHtml] = useState('');
-
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
       router.push('/login');
@@ -130,22 +129,21 @@ export default function TranscriptionDetail() {
       .then((data) => {
         setTranscription(data);
         if (data.speakers) setSpeakerNames(data.speakers);
-        if (data.document_html) setEditorHtml(data.document_html);
       })
       .catch(() => setTranscription(null))
       .finally(() => setLoading(false));
   }, [id, authStatus, router]);
 
   useEffect(() => {
-    if (!router.isReady || showEditor || !transcription) return;
+    if (!router.isReady || !transcription) return;
 
     const shouldAutoOpenEditor = router.query.autoEditor === '1';
     const canOpenEditor = transcription.status === STATUS.COMPLETED && Boolean(transcription.analysis);
     if (!shouldAutoOpenEditor || !canOpenEditor) return;
 
-    setShowEditor(true);
-    router.replace(`/transcriptions/${id}`, undefined, { shallow: true });
-  }, [router, id, showEditor, transcription]);
+    const isTable = transcription.analysis_type === 'table' && transcription.table_schema;
+    router.replace(`/transcriptions/${id}/${isTable ? 'table' : 'edit'}`);
+  }, [router, id, transcription]);
 
   useEffect(() => {
     statusRef.current = transcription?.status || null;
@@ -175,7 +173,6 @@ export default function TranscriptionDetail() {
 
       statusRef.current = updated.status;
       setTranscription(updated);
-      if (updated.document_html) setEditorHtml(updated.document_html);
     };
 
     const startFallbackPolling = () => {
@@ -263,46 +260,6 @@ export default function TranscriptionDetail() {
     }
   }, [id]);
 
-  const handleSaveDocument = useCallback(async (html) => {
-    setEditorHtml(html);
-    try {
-      await fetch(`/api/transcriptions/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentHtml: html }),
-      });
-      setToast({ message: 'Dokument gespeichert.', type: 'success' });
-    } catch {
-      setToast({ message: 'Fehler beim Speichern.', type: 'error' });
-    }
-  }, [id]);
-
-  const handleSaveTableData = useCallback(async (tableData) => {
-    const response = await fetch(`/api/transcriptions/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tableData }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload?.message || 'Tabelle konnte nicht gespeichert werden.');
-    }
-    setTranscription((prev) => prev ? {
-      ...prev,
-      analysis: {
-        metadata: tableData.metadata || {},
-        rows: tableData.rows || [],
-      },
-      analysis_meta: {
-        ...(prev.analysis_meta || {}),
-        missing_fields_by_row: tableData.missing_fields_by_row || [],
-        missing_metadata_fields: tableData.missing_metadata_fields || [],
-      },
-      updated_at: new Date().toISOString(),
-    } : prev);
-    setToast({ message: 'Tabelle gespeichert.', type: 'success' });
-  }, [id]);
-
   const handleSpeakerChange = useCallback((sid, name) => {
     setSpeakerNames(prev => ({ ...prev, [sid]: name }));
   }, []);
@@ -320,22 +277,23 @@ export default function TranscriptionDetail() {
     }
   }, [id, router]);
 
-  const transcriptionHtml = useMemo(() => {
-    if (!transcription) return '';
-    return editorHtml || analysisToHtml(transcription);
-  }, [transcription, editorHtml]);
+  // Check if this is a table analysis
+  const isTableAnalysis = useMemo(() => {
+    return transcription?.analysis_type === 'table' && transcription?.table_schema;
+  }, [transcription]);
 
-  const tableEditorData = useMemo(() => {
+  const editorHref = useMemo(() => {
+    if (!transcription || !id) return null;
+    const sub = isTableAnalysis ? 'table' : 'edit';
+    return `/transcriptions/${id}/${sub}`;
+  }, [id, transcription, isTableAnalysis]);
+
+  const tablePreviewData = useMemo(() => {
     if (!transcription) return { metadata: {}, rows: [] };
     return {
       ...(transcription.analysis || {}),
       ...(transcription.analysis_meta || {}),
     };
-  }, [transcription]);
-
-  // Check if this is a table analysis
-  const isTableAnalysis = useMemo(() => {
-    return transcription?.analysis_type === 'table' && transcription?.table_schema;
   }, [transcription]);
 
   const processState = useMemo(() => {
@@ -398,7 +356,11 @@ export default function TranscriptionDetail() {
 
   const processMessages = useMemo(() => {
     if (!transcription) return [];
-
+    // All states share the same translated transcription pool — the
+    // ProcessStatusCard's own status label already disambiguates the
+    // user-facing distinction.
+    return transcriptionMessages;
+    // eslint-disable-next-line no-unreachable
     if (transcription.status === STATUS.ANALYZING) {
       return ANALYSIS_LOADING_MESSAGES;
     }
@@ -412,7 +374,7 @@ export default function TranscriptionDetail() {
     }
 
     return [];
-  }, [transcription]);
+  }, [transcription, transcriptionMessages]);
 
   if (authStatus === 'loading' || loading) return <LoadingSpinner />;
   if (!transcription) return <LoadingSpinner />;
@@ -436,7 +398,7 @@ export default function TranscriptionDetail() {
     <>
       <Head><title>{transcription.original_name} - GhostTyper</title></Head>
 
-      {!showEditor ? (
+      {(
         <div className="max-w-5xl mx-auto animate-fade-in pb-20">
           <button onClick={() => router.push('/transcriptions')} className="text-secondary hover:text-primary text-xs flex items-center gap-1 mb-6">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -482,15 +444,23 @@ export default function TranscriptionDetail() {
                       {startingProcessing ? 'Startet…' : 'Verarbeitung starten'}
                     </button>
                   )}
-                  <button
-                    onClick={() => {
-                      setShowEditor(true);
-                    }}
-                    disabled={isOfficeDocument || (!transcription.text && !transcription.analysis)}
-                    className="gradient-accent text-white py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 transition-all hover:scale-[1.02] active:scale-100 disabled:opacity-30"
-                  >
-                    {isTableAnalysis ? 'Tabelle im Editor öffnen' : 'Im Editor öffnen'}
-                  </button>
+                  {(() => {
+                    const canOpen = !isOfficeDocument && (transcription.text || transcription.analysis);
+                    const className = 'gradient-accent text-white py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 transition-all hover:scale-[1.02] active:scale-100 text-center';
+                    const label = isTableAnalysis ? 'Tabelle im Editor öffnen' : 'Im Editor öffnen';
+                    if (!canOpen || !editorHref) {
+                      return (
+                        <button disabled className={`${className} opacity-30 cursor-not-allowed`}>
+                          {label}
+                        </button>
+                      );
+                    }
+                    return (
+                      <Link href={editorHref} className={className}>
+                        {label}
+                      </Link>
+                    );
+                  })()}
                   {isOfficeDocument && (
                     <a
                       href={`/api/transcriptions/${transcription.id}/download`}
@@ -520,7 +490,7 @@ export default function TranscriptionDetail() {
               {/* Speaker Assignment */}
               {transcription.status === STATUS.TRANSCRIBED && speakerIds.length > 0 && !isOCR && (
                 <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
-                  <h3 className="text-xs font-bold text-primary uppercase mb-4">Sprecher</h3>
+                  <h3 className="text-xs font-bold text-primary uppercase mb-4">{t('speakerHeading')}</h3>
                   <div className="space-y-3">
                     {speakerIds.map(sid => (
                       <SpeakerInput
@@ -552,6 +522,15 @@ export default function TranscriptionDetail() {
 
             {/* Right: Preview Area */}
             <div className="lg:col-span-2 space-y-6">
+              {transcription.source === 'vexa' && [STATUS.PENDING, STATUS.PROCESSING].includes(transcription.status) && (
+                <MeetingControlBar
+                  transcriptionId={transcription.id}
+                  currentLanguage={transcription.language || 'de'}
+                  botStatus={transcription.bot_status}
+                  onChanged={() => getTranscription(transcription.id).then(setTranscription).catch(() => {})}
+                />
+              )}
+
               {processState && [STATUS.PENDING, STATUS.QUEUED, STATUS.PROCESSING, STATUS.ANALYZING].includes(transcription.status) && (
                 <ProcessStatusCard
                   title={processState.title}
@@ -602,7 +581,7 @@ export default function TranscriptionDetail() {
                     {transcription.template === 'data_table' ? 'Datentabelle' : 'Tabellen-Ergebnis'}
                   </h2>
                   <TableRenderer
-                    initialData={tableEditorData}
+                    initialData={tablePreviewData}
                     schema={transcription.table_schema}
                     filename={transcription.original_name.replace(/\.[^/.]+$/, '')}
                     editable={false}
@@ -620,12 +599,14 @@ export default function TranscriptionDetail() {
                         {transcription.analysis.zusammenfassung}
                       </p>
                     )}
-                    <button
-                      onClick={() => setShowEditor(true)}
-                      className="text-xs text-accent hover:text-info transition-colors font-bold flex items-center gap-1"
-                    >
-                      Vollständige Analyse im Editor bearbeiten &rarr;
-                    </button>
+                    {editorHref && (
+                      <Link
+                        href={editorHref}
+                        className="text-xs text-accent hover:text-info transition-colors font-bold flex items-center gap-1"
+                      >
+                        Vollständige Analyse im Editor bearbeiten &rarr;
+                      </Link>
+                    )}
                   </div>
                 </div>
               )}
@@ -646,27 +627,6 @@ export default function TranscriptionDetail() {
             </div>
           </div>
         </div>
-      ) : (
-        isTableAnalysis ? (
-          <TableEditor
-            initialData={tableEditorData}
-            schema={transcription.table_schema}
-            filename={transcription.original_name}
-            sidebarContent={transcription.text}
-            sourceLabel={rawTextLabel}
-            onSave={handleSaveTableData}
-            onCancel={() => setShowEditor(false)}
-          />
-        ) : (
-          <DocumentEditor
-            initialHtml={transcriptionHtml}
-            filename={transcription.original_name}
-            sidebarContent={transcription.text}
-            sourceLabel={rawTextLabel}
-            onSave={handleSaveDocument}
-            onCancel={() => setShowEditor(false)}
-          />
-        )
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

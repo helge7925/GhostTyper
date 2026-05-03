@@ -5,12 +5,14 @@ import TopBar from './TopBar';
 import BottomNav from './BottomNav';
 import { useTheme } from '../lib/theme-context';
 import { useUIStore } from '../lib/store/ui-store';
+import { useTranslations } from '../lib/i18n';
 import { cn } from './../lib/utils';
 
 export default function Layout({ children }) {
   const { data: session } = useSession();
   const { resolvedTheme } = useTheme();
   const { sidebarCollapsed } = useUIStore();
+  const tFooter = useTranslations('layout');
 
   return (
     <>
@@ -51,10 +53,10 @@ export default function Layout({ children }) {
 
               <footer className="py-8 text-center space-y-1 md:pb-8">
                 <p className="text-[10px] text-secondary/60 uppercase tracking-[0.2em]">
-                  Your thoughts, decoded and distilled.
+                  {tFooter('footerTagline')}
                 </p>
                 <p className="text-[10px] text-secondary/40 uppercase tracking-widest">
-                  Ghost Typer 2026 &bull; Developed by Helge Roos
+                  {tFooter('footerCredit')}
                 </p>
               </footer>
             </div>
@@ -69,10 +71,10 @@ export default function Layout({ children }) {
             </main>
             <footer className="py-12 text-center space-y-2">
               <p className="text-xs text-secondary/60 uppercase tracking-[0.2em]">
-                Your thoughts, decoded and distilled.
+                {tFooter('footerTagline')}
               </p>
               <p className="text-xs text-secondary/40 uppercase tracking-widest">
-                Ghost Typer 2026 &bull; Developed by Helge Roos
+                {tFooter('footerCredit')}
               </p>
             </footer>
           </div>

@@ -1,7 +1,5 @@
 import path from 'path';
 import { unlink } from 'fs/promises';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { addTranscriptionEvent, listTranscriptionEvents } from '../../../lib/transcription-events';
@@ -13,6 +11,8 @@ import {
   STALE_TRANSCRIPTION_ERROR_MESSAGE,
   STALE_TRANSCRIPTION_EVENT_MESSAGE,
 } from '../../../lib/transcription-stale';
+import { withOrgScope } from '../../../lib/api/with-org-scope';
+import { hasPermission } from '../../../lib/permissions';
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
@@ -22,7 +22,7 @@ function isSafeUploadPath(filePath) {
   return resolved.startsWith(path.resolve(UPLOADS_DIR) + path.sep);
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const { id } = req.query;
   const transId = parseInt(id, 10);
 
@@ -30,14 +30,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: 'Ungültige ID' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const userId = req.userId;
+  const orgId = req.org.id;
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'transcriptions-item',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 120,
     windowMs: 60_000,
   });
@@ -51,10 +49,12 @@ export default async function handler(req, res) {
           `SELECT id, original_name, filename, status, template, diarize, auto_analyze, custom_prompt,
                   mime_type, model,
                   text, segments, speakers, analysis, analysis_type, analysis_meta, table_schema, document_html,
-                  error, folder_id, is_favorite, created_at, updated_at
+                  error, folder_id, is_favorite, created_at, updated_at,
+                  source, meeting_platform, native_meeting_id, external_meeting_id, bot_status,
+                  meeting_started_at, meeting_ended_at
            FROM transcriptions
-           WHERE id = $1 AND user_id = $2`,
-          [transId, session.user.id]
+           WHERE id = $1 AND organization_id = $2`,
+          [transId, orgId]
         );
 
         if (result.rows.length === 0) {
@@ -64,20 +64,21 @@ export default async function handler(req, res) {
         const transcription = result.rows[0];
         const updatedAt = new Date(transcription.updated_at).getTime();
         if (isStaleTranscription(transcription.status, updatedAt)) {
-          const recovered = await recoverStaleTranscriptionById(transId, session.user.id);
+          const recovered = await recoverStaleTranscriptionById(transId, userId);
           if (recovered) {
             transcription.status = 'error';
             transcription.error = STALE_TRANSCRIPTION_ERROR_MESSAGE;
             await addTranscriptionEvent({
               transcriptionId: transId,
-              userId: session.user.id,
+              userId,
+              organizationId: orgId,
               stage: 'error',
               message: STALE_TRANSCRIPTION_EVENT_MESSAGE,
             });
           }
         }
 
-        transcription.events = await listTranscriptionEvents(transId, session.user.id);
+        transcription.events = await listTranscriptionEvents(transId, userId);
         return res.status(200).json(transcription);
       } catch (error) {
         logApiError('Transcription GET error', error);
@@ -86,12 +87,15 @@ export default async function handler(req, res) {
     }
 
     case 'PATCH': {
+      if (!hasPermission(req.role, 'transcription.write')) {
+        return res.status(403).json({ code: 'FORBIDDEN', message: 'Keine Berechtigung zum Bearbeiten.' });
+      }
       const { speakers, text, documentHtml, tableData, folderId, isFavorite } = req.body;
 
       try {
         const existing = await query(
-          'SELECT id, table_schema FROM transcriptions WHERE id = $1 AND user_id = $2',
-          [transId, session.user.id]
+          'SELECT id, table_schema FROM transcriptions WHERE id = $1 AND organization_id = $2',
+          [transId, orgId]
         );
 
         if (existing.rows.length === 0) {
@@ -176,8 +180,8 @@ export default async function handler(req, res) {
             values.push(null);
           } else {
             const folder = await query(
-              'SELECT id FROM folders WHERE id = $1 AND user_id = $2',
-              [folderId, session.user.id]
+              'SELECT id FROM folders WHERE id = $1 AND organization_id = $2',
+              [folderId, orgId]
             );
             if (folder.rows.length === 0) {
               return res.status(400).json({ message: 'Ungültiger Ordner' });
@@ -197,10 +201,10 @@ export default async function handler(req, res) {
         }
 
         updates.push('updated_at = NOW()');
-        values.push(transId, session.user.id);
+        values.push(transId, orgId);
 
         await query(
-          `UPDATE transcriptions SET ${updates.join(', ')} WHERE id = $${paramIndex++} AND user_id = $${paramIndex}`,
+          `UPDATE transcriptions SET ${updates.join(', ')} WHERE id = $${paramIndex++} AND organization_id = $${paramIndex}`,
           values
         );
 
@@ -212,10 +216,13 @@ export default async function handler(req, res) {
     }
 
     case 'DELETE': {
+      if (!hasPermission(req.role, 'transcription.delete')) {
+        return res.status(403).json({ code: 'FORBIDDEN', message: 'Keine Berechtigung zum Löschen.' });
+      }
       try {
         const existing = await query(
-          'SELECT file_path FROM transcriptions WHERE id = $1 AND user_id = $2',
-          [transId, session.user.id]
+          'SELECT file_path FROM transcriptions WHERE id = $1 AND organization_id = $2',
+          [transId, orgId]
         );
 
         if (existing.rows.length === 0) {
@@ -227,7 +234,7 @@ export default async function handler(req, res) {
           await unlink(filePath).catch(() => {});
         }
 
-        await query('DELETE FROM transcriptions WHERE id = $1 AND user_id = $2', [transId, session.user.id]);
+        await query('DELETE FROM transcriptions WHERE id = $1 AND organization_id = $2', [transId, orgId]);
         return res.status(200).json({ message: 'Erfolgreich gelöscht' });
       } catch (error) {
         logApiError('Transcription DELETE error', error);
@@ -239,3 +246,5 @@ export default async function handler(req, res) {
       return res.status(405).json({ message: 'Method not allowed' });
   }
 }
+
+export default withOrgScope({ permission: 'transcription.read' }, handler);

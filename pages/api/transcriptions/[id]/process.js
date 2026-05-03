@@ -1,23 +1,20 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../auth/[...nextauth]';
 import { query } from '../../../../lib/db';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { addTranscriptionEvent } from '../../../../lib/transcription-events';
 import { ensureTranscriptionWorkerRunning, queueTranscriptionJob } from '../../../../lib/transcription-worker';
+import { withOrgScope } from '../../../../lib/api/with-org-scope';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const userId = req.userId;
+  const orgId = req.org.id;
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'transcription-process',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 30,
     windowMs: 60_000,
   });
@@ -37,29 +34,31 @@ export default async function handler(req, res) {
            error = NULL,
            updated_at = NOW()
        WHERE id = $1
-         AND user_id = $2
+         AND organization_id = $2
          AND status = 'pending'
-       RETURNING id`,
-      [transcriptionId, session.user.id]
+       RETURNING id, user_id`,
+      [transcriptionId, orgId]
     );
 
     if (queueResult.rowCount > 0) {
+      const ownerId = queueResult.rows[0].user_id || userId;
       await addTranscriptionEvent({
         transcriptionId,
-        userId: session.user.id,
+        userId: ownerId,
+        organizationId: orgId,
         stage: 'queued',
         message: 'Verarbeitung eingeplant.',
       });
       queueTranscriptionJob({
         transcriptionId,
-        userId: session.user.id,
+        userId: ownerId,
       });
       return res.status(202).json({ message: 'Transkription eingeplant', status: 'queued' });
     }
 
     const latestResult = await query(
-      'SELECT status FROM transcriptions WHERE id = $1 AND user_id = $2',
-      [transcriptionId, session.user.id]
+      'SELECT status, user_id FROM transcriptions WHERE id = $1 AND organization_id = $2',
+      [transcriptionId, orgId]
     );
 
     if (latestResult.rows.length === 0) {
@@ -67,10 +66,11 @@ export default async function handler(req, res) {
     }
 
     const latestStatus = latestResult.rows[0]?.status;
+    const ownerId = latestResult.rows[0]?.user_id || userId;
     if (latestStatus === 'queued') {
       queueTranscriptionJob({
         transcriptionId,
-        userId: session.user.id,
+        userId: ownerId,
       });
       return res.status(202).json({ message: 'Transkription bereits eingeplant.', status: 'queued' });
     }
@@ -89,3 +89,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: 'Verarbeitung konnte nicht gestartet werden.' });
   }
 }
+
+export default withOrgScope({ permission: 'transcription.write' }, handler);

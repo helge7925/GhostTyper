@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AudioUploadForm from '../components/AudioUploadForm';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { getTemplateCategories, getTemplates } from '../lib/api';
+import { useTranslations } from '../lib/i18n';
 
 function templateMatchesCategory(template, categoryId) {
   if (!categoryId || categoryId === 'all') return true;
@@ -16,6 +17,7 @@ function templateMatchesCategory(template, categoryId) {
 export default function TabellenTranskription() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const t = useTranslations('tablesPage');
   const [templates, setTemplates] = useState([]);
   const [templateCategories, setTemplateCategories] = useState([]);
   const [activeCategoryId, setActiveCategoryId] = useState('all');
@@ -103,13 +105,13 @@ export default function TabellenTranskription() {
   return (
     <>
       <Head>
-        <title>Tabellen-Transkription - GhostTyper</title>
+        <title>{`${t('fromTranscript')} – GhostTyper`}</title>
       </Head>
 
       <div className="max-w-5xl mx-auto animate-fade-in pb-20 space-y-6">
         <div>
           <p className="text-[10px] uppercase tracking-[0.22em] text-secondary">Feste Tabellen-Vorlage</p>
-          <h1 className="text-2xl font-bold text-primary mt-1">Tabellen-Transkription</h1>
+          <h1 className="text-2xl font-bold text-primary mt-1">{t('fromTranscript')}</h1>
           <p className="text-sm text-secondary mt-2 max-w-2xl">
             Audio wird transkribiert und anschließend in eine von Ihnen definierte Tabellen-Vorlage einsortiert.
           </p>

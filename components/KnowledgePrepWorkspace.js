@@ -3,34 +3,47 @@ import { useSession } from 'next-auth/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AudioUploadForm from './AudioUploadForm';
 import LoadingSpinner from './LoadingSpinner';
-
-const MODE_OPTIONS = [
-  {
-    value: 'data_table',
-    label: 'Freie Datentabelle',
-    description: 'Die KI erkennt die passende Tabellenstruktur selbst',
-  },
-];
-
-const SOURCE_OPTIONS = [
-  { value: 'audio', label: 'Audio' },
-  { value: 'text', label: 'Text' },
-  { value: 'document', label: 'PDF / Bild' },
-];
-
-const MODEL_OPTIONS = [
-  { value: 'mistral-small-latest', label: 'Kostengünstig / Schnell' },
-  { value: 'mistral-medium-latest', label: 'Ausgewogen' },
-  { value: 'mistral-large-latest', label: 'Qualität' },
-];
+import { useTranslations } from '../lib/i18n';
 
 export default function KnowledgePrepWorkspace({
   fixedMode = null,
-  heading = 'Datentabelle',
+  heading,
   showModeSelector = true,
 }) {
+  const t = useTranslations('knowledgePrep');
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  const MODE_OPTIONS = useMemo(
+    () => [
+      {
+        value: 'data_table',
+        label: t('modes.dataTable.label'),
+        description: t('modes.dataTable.description'),
+      },
+    ],
+    [t]
+  );
+
+  const SOURCE_OPTIONS = useMemo(
+    () => [
+      { value: 'audio', label: t('sources.audio') },
+      { value: 'text', label: t('sources.text') },
+      { value: 'document', label: t('sources.document') },
+    ],
+    [t]
+  );
+
+  const MODEL_OPTIONS = useMemo(
+    () => [
+      { value: 'mistral-small-latest', label: t('models.fast') },
+      { value: 'mistral-medium-latest', label: t('models.balanced') },
+      { value: 'mistral-large-latest', label: t('models.quality') },
+    ],
+    [t]
+  );
+
+  const resolvedHeading = heading || t('defaultHeading');
 
   const [mode, setMode] = useState(fixedMode || 'data_table');
   const effectiveMode = fixedMode || mode;
@@ -66,7 +79,7 @@ export default function KnowledgePrepWorkspace({
 
   const modeMeta = useMemo(
     () => MODE_OPTIONS.find((entry) => entry.value === effectiveMode) || MODE_OPTIONS[0],
-    [effectiveMode]
+    [effectiveMode, MODE_OPTIONS]
   );
 
   const availableSourceOptions = SOURCE_OPTIONS;
@@ -81,11 +94,11 @@ export default function KnowledgePrepWorkspace({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload?.message || 'Verarbeitung konnte nicht gestartet werden.');
+        throw new Error(payload?.message || t('audio.processStartFailed'));
       }
       router.push(`/transcriptions/${uploadResult.id}`);
     } catch (err) {
-      setError(err.message || 'Audio-Verarbeitung konnte nicht gestartet werden.');
+      setError(err.message || t('audio.audioProcessFailed'));
     } finally {
       setAudioStarting(false);
     }
@@ -95,7 +108,7 @@ export default function KnowledgePrepWorkspace({
     event.preventDefault();
     const trimmedText = textInput.trim();
     if (!trimmedText) {
-      setError('Bitte Text eingeben.');
+      setError(t('text.missingText'));
       return;
     }
 
@@ -115,11 +128,11 @@ export default function KnowledgePrepWorkspace({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload?.message || 'Text konnte nicht verarbeitet werden.');
+        throw new Error(payload?.message || t('text.processFailed'));
       }
       router.push(`/transcriptions/${payload.id}`);
     } catch (err) {
-      setError(err.message || 'Text konnte nicht verarbeitet werden.');
+      setError(err.message || t('text.processFailed'));
     } finally {
       setTextSubmitting(false);
     }
@@ -128,7 +141,7 @@ export default function KnowledgePrepWorkspace({
   async function handleDocumentSubmit(event) {
     event.preventDefault();
     if (!documentFile) {
-      setError('Bitte eine PDF- oder Bilddatei auswählen.');
+      setError(t('document.missingFile'));
       return;
     }
 
@@ -157,11 +170,11 @@ export default function KnowledgePrepWorkspace({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload?.message || 'Dokument konnte nicht verarbeitet werden.');
+        throw new Error(payload?.message || t('document.processFailed'));
       }
       router.push(`/transcriptions/${payload.transcriptionId}`);
     } catch (err) {
-      setError(err.message || 'Dokument konnte nicht verarbeitet werden.');
+      setError(err.message || t('document.processFailed'));
     } finally {
       setDocumentSubmitting(false);
     }
@@ -177,7 +190,7 @@ export default function KnowledgePrepWorkspace({
   return (
     <div className="max-w-5xl mx-auto animate-fade-in pb-20 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary">{heading}</h1>
+        <h1 className="text-2xl font-bold text-primary">{resolvedHeading}</h1>
         <p className="text-sm text-secondary mt-1">
           {modeMeta.label}: {modeMeta.description}
         </p>
@@ -222,9 +235,9 @@ export default function KnowledgePrepWorkspace({
 
       {source === 'audio' && (
         <div className="bg-surface border border-subtle rounded-2xl p-6">
-          <h2 className="text-sm font-semibold text-primary mb-2">Aus Audio erzeugen</h2>
+          <h2 className="text-sm font-semibold text-primary mb-2">{t('audio.heading')}</h2>
           <p className="text-xs text-secondary mb-4">
-            Lädt Audio hoch und startet direkt die Verarbeitung. Danach wird die Detailseite geöffnet.
+            {t('audio.subtext')}
           </p>
           <AudioUploadForm
             key={`audio-${effectiveMode}`}
@@ -240,24 +253,24 @@ export default function KnowledgePrepWorkspace({
             }}
           />
           {audioStarting && (
-            <p className="text-xs text-info mt-3">Verarbeitung wird gestartet…</p>
+            <p className="text-xs text-info mt-3">{t('audio.starting')}</p>
           )}
         </div>
       )}
 
       {source === 'text' && (
         <form onSubmit={handleTextSubmit} className="bg-surface border border-subtle rounded-2xl p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-primary">Aus Text erzeugen</h2>
+          <h2 className="text-sm font-semibold text-primary">{t('text.heading')}</h2>
           <textarea
             value={textInput}
             onChange={(event) => setTextInput(event.target.value)}
-            placeholder="Text einfügen..."
+            placeholder={t('text.placeholder')}
             rows={10}
             className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none resize-y"
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-secondary mb-1.5">KI-Modell</label>
+              <label className="block text-xs font-medium text-secondary mb-1.5">{t('text.model')}</label>
               <select
                 value={textModel}
                 onChange={(event) => setTextModel(event.target.value)}
@@ -269,20 +282,20 @@ export default function KnowledgePrepWorkspace({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-secondary mb-1.5">Zusätzlicher Kontext</label>
+              <label className="block text-xs font-medium text-secondary mb-1.5">{t('text.context')}</label>
               <input
                 value={textPrompt}
                 onChange={(event) => setTextPrompt(event.target.value)}
-                placeholder="Optional: Fokus, Perspektive, Constraints"
+                placeholder={t('text.contextPlaceholder')}
                 className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-sm text-primary outline-none"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-secondary mb-1.5">Fokus der Analyse</label>
+              <label className="block text-xs font-medium text-secondary mb-1.5">{t('text.focus')}</label>
               <textarea
                 value={textAnalysisFocus}
                 onChange={(event) => setTextAnalysisFocus(event.target.value)}
-                placeholder="Worauf soll sich das KI-Modell bei der Analyse konzentrieren?"
+                placeholder={t('text.focusPlaceholder')}
                 rows={2}
                 className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-sm text-primary outline-none resize-y"
               />
@@ -293,14 +306,14 @@ export default function KnowledgePrepWorkspace({
             disabled={textSubmitting}
             className="gradient-accent text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-accent/20 disabled:opacity-40"
           >
-            {textSubmitting ? 'Wird erzeugt…' : `${modeMeta.label} aus Text erzeugen`}
+            {textSubmitting ? t('text.submitting') : t('text.submit', { label: modeMeta.label })}
           </button>
         </form>
       )}
 
       {source === 'document' && (
         <form onSubmit={handleDocumentSubmit} className="bg-surface border border-subtle rounded-2xl p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-primary">Aus PDF/Bild erzeugen</h2>
+          <h2 className="text-sm font-semibold text-primary">{t('document.heading')}</h2>
           <div
             role="button"
             tabIndex={0}
@@ -326,12 +339,12 @@ export default function KnowledgePrepWorkspace({
                 <span className="text-secondary">({(documentFile.size / 1024 / 1024).toFixed(1)} MB)</span>
               </p>
             ) : (
-              <p className="text-sm text-secondary">PDF oder Bild auswählen</p>
+              <p className="text-sm text-secondary">{t('document.pickFile')}</p>
             )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-secondary mb-1.5">KI-Modell</label>
+              <label className="block text-xs font-medium text-secondary mb-1.5">{t('document.model')}</label>
               <select
                 value={documentModel}
                 onChange={(event) => setDocumentModel(event.target.value)}
@@ -343,31 +356,31 @@ export default function KnowledgePrepWorkspace({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-secondary mb-1.5">Zusätzlicher Kontext</label>
+              <label className="block text-xs font-medium text-secondary mb-1.5">{t('document.context')}</label>
               <input
                 value={documentPrompt}
                 onChange={(event) => setDocumentPrompt(event.target.value)}
-                placeholder="Optional: Fokus, Perspektive, Constraints"
+                placeholder={t('document.contextPlaceholder')}
                 className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-sm text-primary outline-none"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-secondary mb-1.5">Fokus der Analyse</label>
+              <label className="block text-xs font-medium text-secondary mb-1.5">{t('document.focus')}</label>
               <textarea
                 value={documentAnalysisFocus}
                 onChange={(event) => setDocumentAnalysisFocus(event.target.value)}
-                placeholder="Worauf soll sich das KI-Modell bei der Analyse konzentrieren?"
+                placeholder={t('document.focusPlaceholder')}
                 rows={2}
                 className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-sm text-primary outline-none resize-y"
               />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-secondary mb-1.5">Bezug im Dokument</label>
+            <label className="block text-xs font-medium text-secondary mb-1.5">{t('document.scope')}</label>
             <textarea
               value={documentScope}
               onChange={(event) => setDocumentScope(event.target.value)}
-              placeholder="z. B. Seiten 3-8, Kapitel 'Risiken', Abschnitt 'Maßnahmenplan'"
+              placeholder={t('document.scopePlaceholder')}
               rows={2}
               className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-sm text-primary outline-none resize-y"
             />
@@ -377,7 +390,7 @@ export default function KnowledgePrepWorkspace({
             disabled={documentSubmitting}
             className="gradient-accent text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-accent/20 disabled:opacity-40"
           >
-            {documentSubmitting ? 'Wird verarbeitet…' : `${modeMeta.label} aus PDF/Bild erzeugen`}
+            {documentSubmitting ? t('document.submitting') : t('document.submit', { label: modeMeta.label })}
           </button>
         </form>
       )}

@@ -1,5 +1,3 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
 import {
   MAX_DOCUMENT_HTML_LENGTH,
@@ -8,19 +6,19 @@ import {
 } from '../../../lib/constants';
 import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
 import { logAuditEvent } from '../../../lib/audit-log';
+import { withOrgScope } from '../../../lib/api/with-org-scope';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const userId = req.userId;
+  const orgId = req.org.id;
+
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'transcription-save-doc',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 30,
     windowMs: 60_000,
   });
@@ -51,13 +49,14 @@ export default async function handler(req, res) {
   try {
     const result = await query(
       `INSERT INTO transcriptions (
-        user_id, filename, original_name, file_path, file_size, 
+        user_id, organization_id, filename, original_name, file_path, file_size,
         mime_type, status, template, text, document_html
       )
-       VALUES ($1, $2, $3, $4, $5, $6, 'completed', $7, $8, $9)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', $8, $9, $10)
        RETURNING id`,
       [
-        session.user.id,
+        userId,
+        orgId,
         'doc_' + Date.now(),
         title.trim(),
         'INTERNAL_DOC', // Placeholder for file_path
@@ -65,12 +64,13 @@ export default async function handler(req, res) {
         'application/vnd.ghosttyper.doc',
         template || 'generic',
         typeof text === 'string' ? text : '',
-        documentHtml
+        documentHtml,
       ]
     );
 
     await logAuditEvent({
-      userId: session.user.id,
+      userId,
+      organizationId: orgId,
       action: 'document.saved',
       targetType: 'transcription',
       targetId: String(result.rows[0].id),
@@ -86,3 +86,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: 'Fehler beim Speichern des Dokuments' });
   }
 }
+
+export default withOrgScope({ permission: 'transcription.write' }, handler);

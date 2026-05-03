@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { History, Languages, Mic, ScanText, Table } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useTranslations } from '../lib/i18n';
 
 /**
  * Bottom navigation for handheld viewports (< md).
@@ -10,16 +11,18 @@ import { cn } from '../lib/utils';
  * Respects iOS safe-area-inset via the trailing pb hack.
  */
 const ITEMS = [
-  { href: '/upload', label: 'Aufnahme', Icon: Mic },
-  { href: '/tabellen', label: 'Tabellen', Icon: Table },
-  { href: '/translate', label: 'Übersetzen', Icon: Languages },
-  { href: '/ocr', label: 'OCR', Icon: ScanText },
-  { href: '/transcriptions', label: 'Historie', Icon: History },
+  { href: '/upload', labelKey: 'record', Icon: Mic },
+  { href: '/tabellen', labelKey: 'tables', Icon: Table },
+  { href: '/translate', labelKey: 'translate', Icon: Languages },
+  { href: '/ocr', labelKey: 'ocr', Icon: ScanText },
+  { href: '/transcriptions', labelKey: 'history', Icon: History },
 ];
 
 export default function BottomNav() {
   const router = useRouter();
   const { data: session } = useSession();
+  const t = useTranslations('bottomNav');
+  const tNav = useTranslations('nav');
 
   if (!session) return null;
 
@@ -27,10 +30,10 @@ export default function BottomNav() {
     <nav
       className="md:hidden fixed inset-x-0 bottom-0 z-30 border-t border-subtle bg-canvas/90 backdrop-blur-md"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      aria-label="Hauptnavigation"
+      aria-label={tNav('ariaCurrent')}
     >
       <ul className="flex items-stretch justify-around h-14">
-        {ITEMS.map(({ href, label, Icon }) => {
+        {ITEMS.map(({ href, labelKey, Icon }) => {
           const isActive = router.pathname === href || router.pathname.startsWith(href + '/');
           return (
             <li key={href} className="flex-1">
@@ -43,7 +46,7 @@ export default function BottomNav() {
                 )}
               >
                 <Icon className="w-5 h-5" aria-hidden="true" />
-                <span>{label}</span>
+                <span>{t(labelKey)}</span>
               </Link>
             </li>
           );
