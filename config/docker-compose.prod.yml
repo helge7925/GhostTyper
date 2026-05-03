@@ -9,6 +9,10 @@ services:
     networks:
       - web
       - internal
+    ports:
+      # Direkt-Zugriff (lokal/ohne Traefik). In Traefik-Setups optional, da
+      # die `web`-Network + Labels darunter ohnehin greifen.
+      - "${WEBAPP_HOST_PORT:-3000}:3000"
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
@@ -26,7 +30,13 @@ services:
       - NEXT_PUBLIC_API_URL=/api
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@transkription-db:5432/${DB_NAME}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=https://${DOMAIN}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-https://${DOMAIN}}
+      - APP_PUBLIC_URL=${APP_PUBLIC_URL:-http://transkription-webapp:3000}
+      # Operator default for the Fireworks Whisper key. The admin UI in
+      # /settings/organization/integrations can override this — the bridge
+      # picks up the override via /api/internal/whisper-config.
+      - FIREWORKS_API_KEY=${VEXA_TRANSCRIPTION_TOKEN:-}
+      - BRIDGE_SHARED_SECRET=${BRIDGE_SHARED_SECRET}
       - AUTH_CREDENTIALS_ENABLED=${AUTH_CREDENTIALS_ENABLED:-false}
       - OIDC_PROVIDER_NAME=${OIDC_PROVIDER_NAME:-Single Sign-On}
       - OIDC_ISSUER=${OIDC_ISSUER:-}
@@ -41,6 +51,8 @@ services:
       - RATE_LIMIT_TRUST_PROXY=${RATE_LIMIT_TRUST_PROXY:-true}
       - HTTP_CLIENT_TIMEOUT_MS=${HTTP_CLIENT_TIMEOUT_MS:-30000}
       - HEALTH_DETAILS_PUBLIC=${HEALTH_DETAILS_PUBLIC:-false}
+      - VEXA_BASE_URL=${VEXA_BASE_URL:-http://vexa-lite:8056}
+      - RECONCILE_API_SECRET=${RECONCILE_API_SECRET:-}
     depends_on:
       transkription-db:
         condition: service_healthy
@@ -68,6 +80,98 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Vexa Remote-Meeting integration (opt-in via `--profile vexa`).
+  #
+  # Two-tier opt-in:
+  #   1. Operator activates the compose profile (here)
+  #   2. Org-Admin enables `organization_integrations.vexa.enabled` in-app
+  #
+  # Without the profile, none of these services run — GhostTyper works fine
+  # without them. Without the in-app toggle, no bot is ever started even if
+  # the container is up. The button in the UI is hidden until both are true.
+  # ---------------------------------------------------------------------------
+  vexa-db-init:
+    image: postgres:16-alpine
+    profiles: ["vexa"]
+    networks: [internal]
+    restart: "no"
+    depends_on:
+      transkription-db:
+        condition: service_healthy
+    environment:
+      - PGPASSWORD=${DB_PASSWORD}
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        # Refresh collation on template1 in case the volume was bootstrapped
+        # against a different libc/glibc baseline (alpine vs debian, etc.).
+        psql -h transkription-db -U ${DB_USER} -d postgres \
+          -c "ALTER DATABASE template1 REFRESH COLLATION VERSION" || true
+        psql -h transkription-db -U ${DB_USER} -d postgres \
+          -tc "SELECT 1 FROM pg_database WHERE datname='vexa'" \
+          | grep -q 1 \
+          || psql -h transkription-db -U ${DB_USER} -d postgres \
+            -c "CREATE DATABASE vexa OWNER ${DB_USER}"
+
+  # Tiny proxy that rewrites Vexa's hardcoded model name (whisper-1 /
+  # large-v3-turbo) to the upstream provider's actual id (Fireworks expects
+  # `whisper-v3`). The real Whisper key flows through unchanged via Bearer.
+  fireworks-bridge:
+    build:
+      context: ../services/fireworks-bridge
+      dockerfile: Dockerfile
+    image: fireworks-bridge:prod
+    container_name: transkription-fireworks-bridge
+    restart: unless-stopped
+    profiles: ["vexa"]
+    networks: [internal]
+    mem_limit: 256m
+    environment:
+      - UPSTREAM_URL=${VEXA_TRANSCRIPTION_URL}
+      - MODEL_OVERRIDE=${VEXA_TRANSCRIPTION_MODEL:-whisper-v3}
+      - UPSTREAM_TIMEOUT_S=${VEXA_TRANSCRIPTION_TIMEOUT_S:-120}
+      # Webapp callback so the Fireworks key set in the admin UI takes
+      # effect at runtime (cached ~60s). Falls back to FIREWORKS_API_KEY.
+      - WEBAPP_URL=http://transkription-webapp:3000
+      - BRIDGE_SECRET=${BRIDGE_SHARED_SECRET}
+      - FIREWORKS_API_KEY=${VEXA_TRANSCRIPTION_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://0.0.0.0:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  vexa-lite:
+    image: vexaai/vexa-lite:0.10.0-260430-1701
+    container_name: transkription-vexa-lite
+    restart: unless-stopped
+    profiles: ["vexa"]
+    networks: [internal]
+    mem_limit: 2g
+    cpus: 2
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@transkription-db:5432/vexa
+      - DB_SSL_MODE=disable
+      - TRANSCRIPTION_SERVICE_URL=http://fireworks-bridge:8080/v1/audio/transcriptions
+      - TRANSCRIPTION_SERVICE_TOKEN=${VEXA_TRANSCRIPTION_TOKEN}
+      - ADMIN_API_TOKEN=${VEXA_ADMIN_API_TOKEN}
+    depends_on:
+      transkription-db:
+        condition: service_healthy
+      vexa-db-init:
+        condition: service_completed_successfully
+      fireworks-bridge:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://0.0.0.0:8056/docs >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
 volumes:
   transkription-uploads:

@@ -6,17 +6,66 @@ import TranscriptionCard from '../components/TranscriptionCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
+import MeetingStartForm from '../components/MeetingStartForm';
+import { Skeleton } from '../components/ui/skeleton';
+import { Video } from 'lucide-react';
 import { getTranscriptions, getFolders, createFolder, updateFolder, deleteFolder, updateTranscription, deleteTranscription } from '../lib/api';
+import { useTranslations } from '../lib/i18n';
 import { useUiFeedback } from '../lib/use-ui-feedback';
+import { usePermission } from '../lib/use-permission';
+import { useVexaIntegrationEnabled } from '../lib/use-vexa-integration';
+
+const PAGE_SIZE = 100;
+const SEARCH_LIMIT = 200;
+
+function ListSkeleton() {
+  return (
+    <div className="space-y-3" aria-hidden="true">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          key={i}
+          className="bg-surface border border-subtle rounded-xl p-4 flex items-center gap-3"
+        >
+          <Skeleton className="w-10 h-10 rounded-lg" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-2/3" />
+            <Skeleton className="h-2.5 w-1/3" />
+          </div>
+          <Skeleton className="h-6 w-16 rounded-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function Transcriptions() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const tNav = useTranslations('nav');
+  const tList = useTranslations('transcriptions');
+  const tSidebar = useTranslations('transcriptionsList');
+  const tMeeting = useTranslations('meeting.start');
+  const canStartMeeting = usePermission('meeting.start');
+  const { enabled: vexaEnabled } = useVexaIntegrationEnabled();
+  const showMeetingButton = canStartMeeting && vexaEnabled;
+  const [meetingDialogOpen, setMeetingDialogOpen] = useState(false);
+
+  // Sidebar deeplink: /transcriptions?meeting=1 opens the start dialog directly.
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (router.query.meeting && showMeetingButton) {
+      setMeetingDialogOpen(true);
+      const { meeting, ...rest } = router.query;
+      router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+    }
+  }, [router.isReady, router.query.meeting, showMeetingButton]); // eslint-disable-line react-hooks/exhaustive-deps
   const [transcriptions, setTranscriptions] = useState([]);
   const [folders, setFolders] = useState([]);
   const [activeFolderId, setActiveFolderId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [editingFolderId, setEditingFolderId] = useState(null);
@@ -40,17 +89,44 @@ export default function Transcriptions() {
     }
     if (status !== 'authenticated') return;
 
-    Promise.all([getTranscriptions('', { limit: 500 }), getFolders()])
+    Promise.all([
+      getTranscriptions('', { limit: PAGE_SIZE, offset: 0 }),
+      getFolders(),
+    ])
       .then(([transcripts, foldersData]) => {
         setTranscriptions(transcripts);
+        setHasMore(transcripts.length >= PAGE_SIZE);
         setFolders(foldersData);
       })
       .catch(() => {
         setTranscriptions([]);
+        setHasMore(false);
         setFolders([]);
       })
       .finally(() => setLoading(false));
   }, [status, router]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const next = await getTranscriptions('', {
+        limit: PAGE_SIZE,
+        offset: transcriptions.length,
+      });
+      setTranscriptions((prev) => {
+        const seen = new Set(prev.map((t) => t.id));
+        return [...prev, ...next.filter((t) => !seen.has(t.id))];
+      });
+      setHasMore(next.length >= PAGE_SIZE);
+    } catch {
+      // Network errors are surfaced via toast in other actions; here we
+      // simply stop trying to avoid an infinite spinner.
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMore, loadingMore, transcriptions.length]);
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -60,8 +136,11 @@ export default function Transcriptions() {
     const query = searchQuery.trim();
     if (query === '') {
       setSearching(true);
-      getTranscriptions('', { limit: 500 })
-        .then((results) => setTranscriptions(results))
+      getTranscriptions('', { limit: PAGE_SIZE, offset: 0 })
+        .then((results) => {
+          setTranscriptions(results);
+          setHasMore(results.length >= PAGE_SIZE);
+        })
         .catch(() => {})
         .finally(() => setSearching(false));
       return;
@@ -70,8 +149,13 @@ export default function Transcriptions() {
     searchTimeoutRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const results = await getTranscriptions(query, { scope: 'full', limit: 200, offset: 0 });
+        const results = await getTranscriptions(query, {
+          scope: 'full',
+          limit: SEARCH_LIMIT,
+          offset: 0,
+        });
         setTranscriptions(results);
+        setHasMore(false); // search returns top-N matches; no incremental loading
       } catch {
         // ignore
       } finally {
@@ -181,19 +265,19 @@ export default function Transcriptions() {
   return (
     <>
       <Head>
-        <title>Historie - GhostTyper</title>
+        <title>{`${tNav('history')} – GhostTyper`}</title>
       </Head>
 
       <div className="w-full flex flex-col md:flex-row gap-8 min-h-[60vh]">
         {/* Sidebar: Folders */}
         <aside className="w-full md:w-64 shrink-0">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em]">Ordner</h2>
-            <button 
-              onClick={() => setIsCreatingFolder(true)} 
+            <h2 className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em]">{tSidebar('folders')}</h2>
+            <button
+              onClick={() => setIsCreatingFolder(true)}
               className="p-1 hover:bg-hover-subtle rounded text-accent transition-colors"
-              title="Neuer Ordner"
-              aria-label="Neuen Ordner erstellen"
+              title={tSidebar('newFolder')}
+              aria-label={tSidebar('newFolderTooltip')}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             </button>
@@ -206,7 +290,7 @@ export default function Transcriptions() {
             >
               <span className="flex items-center gap-3 min-w-0">
                 <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-                <span className="truncate">Alle Dateien</span>
+                <span className="truncate">{tSidebar('allFiles')}</span>
               </span>
               <span className="text-[10px] opacity-70">{transcriptions.length}</span>
             </button>
@@ -219,7 +303,7 @@ export default function Transcriptions() {
                   value={newFolderName}
                   onChange={e => setNewFolderName(e.target.value)}
                   onBlur={() => !newFolderName && setIsCreatingFolder(false)}
-                  placeholder="Ordnername..."
+                  placeholder={tSidebar('folderNamePlaceholder')}
                   className="w-full bg-surface-elevated border border-accent/50 rounded-lg px-2 py-1 text-xs text-primary outline-none"
                 />
               </form>
@@ -256,14 +340,14 @@ export default function Transcriptions() {
                       <button 
                         onClick={() => { setEditingFolderId(folder.id); setEditFolderName(folder.name); }}
                         className="p-1 text-secondary hover:text-white"
-                        aria-label={`Ordner ${folder.name} umbenennen`}
+                        aria-label={tSidebar('renameFolderAria', { name: folder.name })}
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                       </button>
                       <button 
                         onClick={() => handleDeleteFolder(folder.id)}
                         className="p-1 text-secondary hover:text-danger"
-                        aria-label={`Ordner ${folder.name} löschen`}
+                        aria-label={tSidebar('deleteFolderAria', { name: folder.name })}
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
@@ -299,6 +383,16 @@ export default function Transcriptions() {
                   className="bg-surface-elevated border border-subtle rounded-xl pl-9 pr-4 py-2 text-xs text-primary outline-none focus:ring-1 focus:ring-accent w-full lg:w-64"
                 />
               </div>
+              {showMeetingButton && (
+                <button
+                  type="button"
+                  onClick={() => setMeetingDialogOpen(true)}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 transition-colors whitespace-nowrap"
+                >
+                  <Video className="w-4 h-4" />
+                  <span>{tMeeting('buttonLabel')}</span>
+                </button>
+              )}
               <div className="text-[10px] text-secondary uppercase tracking-widest font-bold whitespace-nowrap hidden xl:block">
                 {filteredTranscriptions.length} {filteredTranscriptions.length === 1 ? 'Eintrag' : 'Einträge'}
               </div>
@@ -306,7 +400,7 @@ export default function Transcriptions() {
           </div>
 
           {loading ? (
-            <LoadingSpinner />
+            <ListSkeleton />
           ) : filteredTranscriptions.length === 0 ? (
             <div className="bg-surface border border-subtle rounded-xl p-12 text-center">
               <div className="w-16 h-16 bg-hover rounded-full flex items-center justify-center mx-auto mb-4">
@@ -315,7 +409,7 @@ export default function Transcriptions() {
                 </svg>
               </div>
               <p className="text-primary font-medium mb-1">
-                {searchQuery ? 'Keine Ergebnisse für Ihre Suche' : 'Dieser Ordner ist leer'}
+                {searchQuery ? tSidebar('emptySearch') : tSidebar('emptyFolder')}
               </p>
               <p className="text-sm text-secondary">
                 {searchQuery ? 'Versuchen Sie es mit einem anderen Begriff.' : 'Laden Sie etwas hoch oder verschieben Sie Dateien hierher.'}
@@ -324,15 +418,28 @@ export default function Transcriptions() {
           ) : (
             <div className="space-y-3">
               {filteredTranscriptions.map((t) => (
-                <TranscriptionCard 
-                  key={t.id} 
-                  transcription={t} 
-                  folders={folders} 
+                <TranscriptionCard
+                  key={t.id}
+                  transcription={t}
+                  folders={folders}
                   onMove={(folderId) => handleMoveToFolder(t.id, folderId)}
                   onToggleFavorite={() => handleToggleFavorite(t.id, t.is_favorite)}
                   onDelete={() => handleDeleteTranscription(t.id)}
                 />
               ))}
+
+              {hasMore && !searchQuery && (
+                <div className="pt-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="px-5 py-2.5 rounded-xl text-sm font-semibold border border-subtle bg-surface text-primary hover:bg-hover-subtle disabled:opacity-60 transition-colors"
+                  >
+                    {loadingMore ? 'Lädt…' : 'Weitere laden'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -348,6 +455,12 @@ export default function Transcriptions() {
         onConfirm={acceptConfirm}
         onCancel={closeConfirm}
       />
+      {showMeetingButton && (
+        <MeetingStartForm
+          open={meetingDialogOpen}
+          onOpenChange={setMeetingDialogOpen}
+        />
+      )}
     </>
   );
 }

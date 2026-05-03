@@ -2,9 +2,13 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useCallback, useState, useEffect } from 'react';
+import { Mic, FileText, Table as TableIcon, Languages, KeyRound } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { usePermission } from '../lib/use-permission';
+import { invalidateVexaIntegrationCache } from '../lib/use-vexa-integration';
+import { cn } from '../lib/utils';
 import {
   getSettings,
   updateSettings,
@@ -26,6 +30,7 @@ import TableSchemaBuilder from '../components/TableSchemaBuilder';
 import { validateTableSchema, buildTableExtractionPrompt } from '../lib/table-calculations';
 import { createDefaultTableSchema, normalizeTableSchema } from '../lib/table-schema';
 import { useUiFeedback } from '../lib/use-ui-feedback';
+import { useTranslations } from '../lib/i18n';
 
 const PRICE_LIST = [
   { model: 'Mistral Large', input: '2,00 €', output: '6,00 €', note: 'Umfangreich' },
@@ -73,6 +78,9 @@ function templateMatchesCategory(template, categoryId) {
 export default function Settings() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const t = useTranslations('settings');
+  const tTabs = useTranslations('settings.tabs');
+  const tCommon = useTranslations('common');
   const [apiKey, setApiKey] = useState('');
   const [defaultTemplate, setDefaultTemplate] = useState('generic');
   const [language, setLanguage] = useState('de');
@@ -82,7 +90,10 @@ export default function Settings() {
   const [preferredModel, setPreferredModel] = useState('mistral-large-latest');
   const [defaultTranslateLanguage, setDefaultTranslateLanguage] = useState('en');
   const [ocrModel, setOcrModel] = useState('mistral-ocr-latest');
+  const [remoteMeetingEnabled, setRemoteMeetingEnabled] = useState(true);
+  const [vexaWorkspaceEnabled, setVexaWorkspaceEnabled] = useState(false);
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
+  const [mistralOrgManaged, setMistralOrgManaged] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isClearingMistralKey, setIsClearingMistralKey] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -169,6 +180,18 @@ export default function Settings() {
         ]);
 
         setApiKeyConfigured(settingsData.apiKeyConfigured);
+
+        // Detect whether the org admin has provisioned a central Mistral key.
+        // The user-level field below is then a no-op fallback and we hide it.
+        try {
+          const mistralRes = await fetch('/api/organizations/integrations/mistral', { credentials: 'same-origin' });
+          if (mistralRes.ok) {
+            const data = await mistralRes.json();
+            setMistralOrgManaged(!!data.enabled && !!data.config?.apiKeyConfigured);
+          }
+        } catch {
+          /* non-fatal */
+        }
         setDefaultTemplate(normalizeDefaultTemplate(settingsData.defaultTemplate));
         setLanguage(settingsData.language || 'de');
         setContextBias(settingsData.contextBias || '');
@@ -177,6 +200,20 @@ export default function Settings() {
         setPreferredModel(settingsData.preferredModel || 'mistral-large-latest');
         setDefaultTranslateLanguage(settingsData.defaultTranslateLanguage || 'en');
         setOcrModel(settingsData.ocrModel || 'mistral-ocr-latest');
+        setRemoteMeetingEnabled(settingsData.remoteMeetingEnabled !== false);
+
+        // Workspace-Vexa-Status getrennt laden, damit der Toggle nur dann
+        // angezeigt wird, wenn die Funktion vom Admin überhaupt freigegeben ist.
+        try {
+          const vexaRes = await fetch('/api/organizations/integrations/vexa', { credentials: 'same-origin' });
+          if (vexaRes.ok) {
+            const data = await vexaRes.json();
+            setVexaWorkspaceEnabled(!!data.enabled);
+          }
+        } catch {
+          /* non-fatal */
+        }
+
         setTemplates(templatesData);
         setTemplateCategories(categoriesData);
       } catch (err) {
@@ -216,11 +253,13 @@ export default function Settings() {
         preferredModel,
         defaultTranslateLanguage,
         ocrModel,
+        remoteMeetingEnabled,
       };
 
       if (apiKey !== '') payload.mistralApiKey = apiKey;
 
       await updateSettings(payload);
+      invalidateVexaIntegrationCache();
 
       setSaved(true);
       if (apiKey) {
@@ -577,11 +616,11 @@ export default function Settings() {
   if (status === 'loading' || loading) return <LoadingSpinner />;
 
   const TABS = [
-    { id: 'transcription', label: 'Transkription', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg> },
-    { id: 'text-templates', label: 'Text-Templates', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
-    { id: 'table-templates', label: 'Tabellen-Templates', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18M6 4v16M12 4v16M18 4v16" /></svg> },
-    { id: 'ocr-translate', label: 'OCR & Übersetzung', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg> },
-    { id: 'account', label: 'Konto & API', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg> },
+    { id: 'transcription', label: tTabs('transcription'), Icon: Mic },
+    { id: 'text-templates', label: tTabs('textTemplates'), Icon: FileText },
+    { id: 'table-templates', label: tTabs('tableTemplates'), Icon: TableIcon },
+    { id: 'ocr-translate', label: tTabs('ocrTranslate'), Icon: Languages },
+    { id: 'account', label: tTabs('account'), Icon: KeyRound },
   ];
 
   // Separate table templates from text templates
@@ -692,43 +731,97 @@ export default function Settings() {
 
   return (
     <>
-      <Head><title>Einstellungen - GhostTyper</title></Head>
+      <Head><title>{`${t('title')} – GhostTyper`}</title></Head>
 
-      <div className={(activeEditor || tableTemplateEditor) ? 'hidden' : 'max-w-5xl mx-auto animate-fade-in pb-20'}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <h1 className="text-2xl font-bold text-primary">Einstellungen</h1>
+      <div className={(activeEditor || tableTemplateEditor) ? 'hidden' : 'max-w-6xl mx-auto animate-fade-in pb-20'}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <h1 className="text-2xl font-bold text-primary">{t('title')}</h1>
           {saved && <p className="text-success text-xs animate-pulse bg-success/10 px-3 py-1 rounded-full border border-success/20">Einstellungen gespeichert!</p>}
         </div>
 
-        {/* Tab Navigation */}
-        <div
-          className="flex items-center gap-1 bg-hover-subtle p-1 rounded-2xl mb-8 overflow-x-auto no-scrollbar border border-subtle"
-          role="tablist"
-          aria-label="Einstellungen-Bereiche"
-        >
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              role="tab"
-              id={`settings-tab-${tab.id}`}
-              aria-selected={activeTab === tab.id}
-              aria-controls={`settings-panel-${tab.id}`}
-              tabIndex={activeTab === tab.id ? 0 : -1}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
-                activeTab === tab.id 
-                  ? 'bg-accent text-white shadow-lg shadow-accent/20' 
-                  : 'text-secondary hover:text-primary hover:bg-hover-subtle'
-              }`}
+        <div className="lg:grid lg:grid-cols-[240px_1fr] lg:gap-8">
+          {/* Mobile (<md): native select dropdown */}
+          <div className="md:hidden mb-6">
+            <label htmlFor="settings-section" className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5">
+              Bereich
+            </label>
+            <select
+              id="settings-section"
+              value={activeTab}
+              onChange={(event) => handleTabChange(event.target.value)}
+              className="w-full bg-surface border border-subtle rounded-xl px-3 py-2.5 text-sm text-primary outline-none focus:ring-2 focus:ring-accent"
             >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
-        </div>
+              {TABS.map((tab) => (
+                <option key={tab.id} value={tab.id}>{tab.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Tablet (md..lg): horizontal tab bar */}
+          <div
+            className="hidden md:flex lg:hidden items-center gap-1 bg-hover-subtle p-1 rounded-2xl mb-6 overflow-x-auto no-scrollbar border border-subtle"
+            role="tablist"
+            aria-label="Einstellungen-Bereiche"
+          >
+            {TABS.map((tab) => {
+              const Icon = tab.Icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                  role="tab"
+                  id={`settings-tab-${tab.id}`}
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`settings-panel-${tab.id}`}
+                  tabIndex={activeTab === tab.id ? 0 : -1}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                    activeTab === tab.id
+                      ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                      : 'text-secondary hover:text-primary hover:bg-hover-subtle',
+                  )}
+                >
+                  <Icon className="w-4 h-4" aria-hidden="true" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Desktop (lg+): vertical sidebar tabs left of content */}
+          <nav
+            className="hidden lg:flex flex-col gap-0.5 sticky top-20 self-start"
+            role="tablist"
+            aria-label="Einstellungen-Bereiche"
+          >
+            {TABS.map((tab) => {
+              const Icon = tab.Icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                  role="tab"
+                  id={`settings-tab-${tab.id}`}
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`settings-panel-${tab.id}`}
+                  tabIndex={activeTab === tab.id ? 0 : -1}
+                  className={cn(
+                    'flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors text-left',
+                    activeTab === tab.id
+                      ? 'bg-accent/10 text-accent'
+                      : 'text-secondary hover:text-primary hover:bg-hover-subtle',
+                  )}
+                  aria-current={activeTab === tab.id ? 'page' : undefined}
+                >
+                  <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
 
         <div
-          className="space-y-8"
+          className="space-y-8 lg:min-w-0"
           role="tabpanel"
           id={`settings-panel-${activeTab}`}
           aria-labelledby={`settings-tab-${activeTab}`}
@@ -894,6 +987,29 @@ export default function Settings() {
                       Dieses Modell wird standardmäßig für KI-Analyse und Textaufgaben verwendet.
                     </p>
                   </div>
+
+                  {vexaWorkspaceEnabled && (
+                    <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
+                      <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-3">Remote-Meeting</h2>
+                      <label className="flex items-start justify-between gap-4 cursor-pointer">
+                        <div>
+                          <p className="text-sm text-primary font-medium">Funktion für mich aktivieren</p>
+                          <p className="text-xs text-secondary mt-0.5 max-w-prose">
+                            Wenn aktiviert, erscheint &quot;Remote Meeting&quot; in deiner Sidebar und du kannst Bots zu Google-Meet- oder Teams-Calls schicken.
+                            Workspace-Admins steuern die Funktion zusätzlich global.
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={remoteMeetingEnabled}
+                          onChange={(e) => setRemoteMeetingEnabled(e.target.checked)}
+                        />
+                        <span className="w-10 h-6 shrink-0 rounded-full bg-subtle peer-checked:bg-accent transition-colors relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-4" />
+                      </label>
+                    </div>
+                  )}
+
                   <button
                     onClick={handleSaveSettings}
                     disabled={isSavingSettings}
@@ -1020,23 +1136,33 @@ export default function Settings() {
                 <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
                   <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">API-Konfiguration</h2>
                   <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium text-secondary mb-1.5">Mistral API-Key</label>
-                      <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={apiKeyConfigured ? '••••••••••••••••' : 'Key eingeben'} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent" />
-                      <div className="mt-2 flex items-center justify-between gap-3">
-                        <span className={`text-[11px] ${apiKeyConfigured ? 'text-success' : 'text-secondary'}`}>
-                          {apiKeyConfigured ? 'API-Key hinterlegt' : 'Kein API-Key hinterlegt'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={handleClearMistralApiKey}
-                          disabled={isClearingMistralKey || isSavingSettings || !apiKeyConfigured}
-                          className="text-[11px] text-danger hover:text-red-300 disabled:opacity-40"
-                        >
-                          {isClearingMistralKey ? 'Entferne...' : 'Key entfernen'}
-                        </button>
+                    {mistralOrgManaged ? (
+                      <div className="bg-success/10 border border-success/30 rounded-xl px-4 py-3 text-xs text-primary">
+                        <p className="font-medium mb-1">Mistral wird zentral verwaltet</p>
+                        <p className="text-secondary">
+                          Dein Workspace-Admin hat einen gemeinsamen Mistral-API-Key hinterlegt.
+                          Du musst hier nichts mehr eintragen — KI-Funktionen sind sofort nutzbar.
+                        </p>
                       </div>
-                    </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs font-medium text-secondary mb-1.5">Mistral API-Key</label>
+                        <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={apiKeyConfigured ? '••••••••••••••••' : 'Key eingeben'} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent" />
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <span className={`text-[11px] ${apiKeyConfigured ? 'text-success' : 'text-secondary'}`}>
+                            {apiKeyConfigured ? 'API-Key hinterlegt' : 'Kein API-Key hinterlegt'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleClearMistralApiKey}
+                            disabled={isClearingMistralKey || isSavingSettings || !apiKeyConfigured}
+                            className="text-[11px] text-danger hover:text-red-300 disabled:opacity-40"
+                          >
+                            {isClearingMistralKey ? 'Entferne...' : 'Key entfernen'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-medium text-secondary mb-1.5">Monatliches Kostenlimit (€)</label>
                       <input type="number" value={costLimit} onChange={e => setCostLimit(e.target.value)} placeholder="Kein Limit" className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none" />
@@ -1118,6 +1244,7 @@ export default function Settings() {
               </div>
             </div>
           )}
+        </div>
         </div>
       </div>
 
