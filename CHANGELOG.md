@@ -8,6 +8,54 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unreleased] - Ziel: v1.3.0
 
 ### Added
+- **Remote-Meeting-Transkription (Vexa Lite + Cortecs Whisper):** Bot tritt Google Meet, Microsoft Teams oder Zoom bei und liefert das Transkript in den bestehenden Workflow (Editor, Auto-Analyse, Export).
+  - **Zwei-Stufen-Opt-in**: (1) `docker compose --profile vexa up` aktiviert den Bundle-Container, (2) Org-Admin schaltet die Integration in den Settings frei. Vor beiden Schaltern ist der „Remote-Meeting"-Button unsichtbar; ohne Profil läuft kein Vexa-Container.
+  - **Compose-Bundle**: `config/docker-compose.prod.yml` enthält `vexa-lite` (gepinnt `vexaai/vexa-lite:0.10.4`, 2 GB RAM, Health-Check) + `vexa-db-init` (legt `vexa`-Datenbank in derselben Postgres-Instanz an). Browser-Bots laufen als Kindprozesse im Vexa-Container und enden mit dem Meeting — keine Docker-Socket-Mounts, keine Leichen.
+  - **ENV-Fallback**: `VEXA_BASE_URL` und `VEXA_ADMIN_API_TOKEN` aus dem Compose-Stack werden vom neuen `resolveVexaConfig()` als Operator-Default genutzt; Org-Settings überschreiben (für externe Vexa-Deployments).
+  - **Webhook-Auto-Registrierung**: beim ersten Bot-Start je User registriert GhostTyper die Webhook-URL automatisch via `setUserWebhook` an Vexa — kein manueller `curl`-Schritt mehr.
+  - **DB**: neue Spalten auf `transcriptions` (`source`, `meeting_platform`, `native_meeting_id`, `external_meeting_id`, `bot_status`, `meeting_started_at/ended_at`); neue Tabellen `organization_integrations` (verschlüsselte Provider-Config), `vexa_user_tokens` (per-User-API-Keys, AES-256-GCM), `vexa_webhook_events` (Idempotenz).
+  - **RBAC**: neue Permissions `meeting.start` (member+), `meeting.admin` (admin+).
+  - **Vexa-Client** (`lib/api/vexa.js`): `startBot/stopBot/updateBotConfig/getTranscript/ensureVexaUser/createVexaUserToken/setUserWebhook/adminHealthCheck` + `parseMeetingUrl` (Meet/Teams/Zoom) + `mapVexaTranscriptToGhostTyper`.
+  - **Live-Bridge** (`lib/vexa-bridge.js`): Polling-Daemon (2s) speist Vexa-Segmente in die existierende SSE-Pipeline — DocumentEditor unverändert.
+  - **API-Endpunkte**: `POST/DELETE /api/meetings`, `PUT /api/meetings/[id]/config`, `POST /api/webhooks/vexa` (HMAC, Idempotenz, ±5 min Replay-Schutz), `POST /api/admin/vexa/reconcile` (Cron-Backstop mit `RECONCILE_API_SECRET`), `GET/PUT /api/organizations/integrations/vexa` + `/test`.
+  - **UI**: „Remote-Meeting"-Button in der Transkriptionsliste, `MeetingStartForm` (URL-Erkennung, Sprache, **Pflicht-Consent-Checkbox**), `MeetingControlBar` in der Detail-Seite (Sprache wechseln, Bot stoppen), neuer Settings-Tab „Integrationen → Vexa Meeting-Bot" mit Verbindungstest.
+  - **Persistenz-Hook**: `meeting.completed`-Webhook → bestehende `transcriptions`-Row (`source='vexa'`) → `auto_analyze` triggert `runManualAnalysisJob` automatisch.
+  - **i18n**: deutsche und englische Strings für `meeting.start.*` und `settings.integrations.vexa.*`.
+  - **Tests**: 13 neue Tests (URL-Parser, Transcript-Adapter, Webhook-HMAC inkl. Replay/Tamper/Wrong-Secret).
+  - **Doku**: `docs/vexa-integration.md` (Operator-Guide mit Vexa-Lite-/Cortecs-Setup, Webhook-Registrierung, Reconcile-Cron, DSGVO-Hinweise, Troubleshooting).
+- **Workspace/Org-Layer Phase 4 (Multi-Tenancy, Cross-Device-UX-Refactor):**
+  - **DB-Schema** (additiv, `lib/db-init.js`): neue Tabellen `organizations`, `organization_members`, `organization_invites`, `organization_settings` + `organization_id BIGINT NULL` auf transcriptions, templates, template_categories, folders, usage_log, api_keys, audit_log, transcription_events; passende Indexe.
+  - **RBAC**: `lib/permissions.js` mit Rollen `viewer/auditor/member/admin/owner` und 18 Permissions, fail-closed `hasPermission()` + `assertPermission()`.
+  - **Middleware**: `lib/api/with-org-scope.js` als HOC für Next.js-API-Handler — resolved aktive Org, prüft Membership + Permission, setzt `req.userId`/`req.org`/`req.role`/`req.memberships`.
+  - **Hooks**: `lib/use-current-org.js` (Liste, aktive Org, `switchOrg()`), `lib/use-permission.js`.
+  - **NextAuth-Callbacks**: JWT enthält jetzt `currentOrganizationId` + `organizations[]`; `update({ currentOrganizationId })` triggert Server-Roundtrip + Re-Issue.
+  - **Backfill-Skript** `scripts/migrate-to-organizations.mjs` (`--dry-run` / `--apply` / `--enforce`): legt Personal-Org pro User an, weist alle bestehenden Records zu, optional NOT-NULL-Flip.
+  - **API-Endpoints (27)** auf Org-Scope umgestellt: transcriptions/* (incl. analyze/process/stream/download/save-doc), templates, template-categories, folders, upload, settings, usage, audit-log, glossary/suggestions, knowledge-prep/text, model-assistant, text-optimization, ocr, translate, translate/file, templates/generate.
+  - **Org-Management-APIs**: `pages/api/organizations/{index,members,invites,settings}.js` + `pages/api/auth/switch-org.js`.
+  - **UI**:
+    - `components/WorkspaceSwitcher.js` in der TopBar (DropdownMenu mit aktiver Org, Rollen, Plan, Switch-Action).
+    - `pages/settings/organization/index.js` (Stat-Tiles, Quick-Links).
+    - `pages/settings/organization/members.js` (Member-Liste mit Rollen-Inline-Edit, Invite-Form, offene Einladungen, Confirm-Dialog).
+    - `pages/audit.js` mit Severity-Badges, Filter (Action/Severity), CSV-Export.
+    - CommandPalette erweitert um "Workspace verwalten" und "Audit-Log" (nur bei Permission).
+  - **Audit-Log lib** (`lib/audit-log.js`): `organizationId`-Parameter, neue `listAuditEventsForOrg()` mit `since`/`until`/`action`/`severity`-Filtern.
+
+### Changed
+- Alle Hot-Path-API-Endpoints filtern jetzt mit `WHERE organization_id = $1` (Personal-Org enthält die bisherigen User-Daten — semantisch unverändert).
+- `INSERT INTO transcriptions` in upload/ocr/knowledge-prep-text/translate/file um `organization_id` ergänzt.
+
+- **Editor-Routen, Settings & Pagination Phase 3 (Cross-Device-UX-Refactor):**
+  - `pages/transcriptions/[id]/edit.js` und `pages/transcriptions/[id]/table.js` — eigene Routen für DocumentEditor/TableEditor mit Deep-Link, "in neuem Tab", Browser-Back. Editor-Routen rendern ohne App-Shell (`NO_LAYOUT_ROUTES`-Set in `pages/_app.js`).
+  - DocumentEditor: dirty-Tracking, `beforeunload`-Guard und shadcn `AlertDialog` beim Close-Button mit "Verwerfen / Weiter bearbeiten".
+  - Settings-Tabs adaptiv: native `<select>` (< md) / horizontale Tabs (md..lg) / **vertikale Sidebar-Tabs** in `grid-cols-[240px_1fr]` (≥ lg).
+  - Pagination der Transkriptions-Historie: initial 100 Items + "Weitere laden"-Button (statt 500 auf einen Schlag); Skeleton-Loading während Initial-Fetch.
+  - `components/ui/skeleton.js` — wiederverwendbare Skeleton-Komponente (respektiert reduced-motion).
+
+### Changed
+- `pages/transcriptions/[id].js` — `showEditor`-State entfernt; "Im Editor öffnen"-Buttons und Inline-Links sind jetzt `<Link href>` zu `/transcriptions/[id]/edit` bzw. `/table`. `?autoEditor=1` redirected automatisch zur richtigen Route.
+- Settings-Tab-Konstante nutzt `lucide-react` (Mic, FileText, Table, Languages, KeyRound) statt Inline-SVGs.
+- `/transcriptions/[id]`-Bundle halbiert (14.7 → 7.27 kB durch Code-Splitting der Editor-Module).
+
 - **App-Shell Phase 2 (Cross-Device-UX-Refactor):**
   - Globaler UI-State via `zustand` (`lib/store/ui-store.js`): `sidebarOpen`, `sidebarCollapsed` (persistiert), `commandPaletteOpen`.
   - Zentrale Z-Order in `lib/constants/z-index.js`.
