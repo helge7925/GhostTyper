@@ -2,9 +2,8 @@ import formidable from 'formidable';
 import { copyFile, unlink, mkdir } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from './auth/[...nextauth]';
 import { query } from '../../lib/db';
+import { withOrgScope } from '../../lib/api/with-org-scope';
 import { performOCR, analyzeTranscription } from '../../lib/ai-service';
 import {
   CostLimitCheckUnavailableError,
@@ -15,7 +14,7 @@ import {
 } from '../../lib/usage';
 import { ACCEPTED_OCR_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE, normalizeAnalysisTemplate } from '../../lib/constants';
 import { resolveChatModel } from '../../lib/model-policy';
-import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service';
+import { getSettingsRow, resolveMistralApiKey } from '../../lib/settings-service';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { addTranscriptionEvent } from '../../lib/transcription-events';
 import { resolveTemplate } from '../../lib/template-service';
@@ -56,19 +55,17 @@ function parseForm(req) {
   });
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const userId = req.userId;
+  const orgId = req.org.id;
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'upload-ocr',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 20,
     windowMs: 60_000,
   }, 'Zu viele OCR-Anfragen. Bitte später erneut versuchen.');
@@ -109,8 +106,8 @@ export default async function handler(req, res) {
     await safeUnlink(tempUploadPath);
     tempUploadPath = '';
 
-    const settingsRow = await getSettingsRow(session.user.id);
-    const apiKey = resolveStoredApiKey(settingsRow) || process.env.MISTRAL_API_KEY;
+    const settingsRow = await getSettingsRow(userId);
+    const apiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
     const preferredModel = resolveChatModel(settingsRow?.preferred_model || 'mistral-large-latest');
     const language = settingsRow?.language || 'de';
 
@@ -173,14 +170,14 @@ export default async function handler(req, res) {
     }
 
     let resolvedTemplateForAnalysis = null;
-    const { markdown, analysis, selectedModelForSave } = await withUserCostLock(session.user.id, async () => {
-      const costCheck = await checkCostLimit(session.user.id);
+    const { markdown, analysis, selectedModelForSave } = await withUserCostLock(userId, async () => {
+      const costCheck = await checkCostLimit(userId, orgId);
       if (!costCheck.allowed) {
         throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
       }
 
       const { markdown: markdownValue, usage: ocrUsage, model: ocrModel } = await performOCR(filePath, apiKey, detectedMimeType);
-      await logUsage(session.user.id, ocrModel, 'ocr', ocrUsage);
+      await logUsage(userId, ocrModel, 'ocr', ocrUsage, orgId);
 
       if (!shouldAnalyze || !markdownValue.trim()) {
         return {
@@ -190,7 +187,7 @@ export default async function handler(req, res) {
         };
       }
 
-      resolvedTemplateForAnalysis = await resolveTemplate(template, session.user.id);
+      resolvedTemplateForAnalysis = await resolveTemplate(template, userId);
       const analysisResult = await analyzeTranscription(
         markdownValue,
         resolvedTemplateForAnalysis,
@@ -199,7 +196,7 @@ export default async function handler(req, res) {
         selectedModelForAnalysis,
         language
       );
-      await logUsage(session.user.id, analysisResult.model, 'analysis', analysisResult.usage);
+      await logUsage(userId, analysisResult.model, 'analysis', analysisResult.usage, orgId);
 
       return {
         markdown: markdownValue,
@@ -235,11 +232,12 @@ export default async function handler(req, res) {
 
     // Save OCR result as a transcription record in the history
     const transcriptionResult = await query(
-      `INSERT INTO transcriptions (user_id, filename, original_name, file_path, file_size, mime_type, template, model, custom_prompt, status, text, analysis, analysis_type, analysis_meta, table_schema)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'completed', $10, $11, $12, $13, $14)
+      `INSERT INTO transcriptions (user_id, organization_id, filename, original_name, file_path, file_size, mime_type, template, model, custom_prompt, status, text, analysis, analysis_type, analysis_meta, table_schema)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11, $12, $13, $14, $15)
        RETURNING id`,
       [
-        session.user.id,
+        userId,
+        orgId,
         filename,
         file.originalFilename,
         filePath,
@@ -259,14 +257,16 @@ export default async function handler(req, res) {
     const transcriptionId = transcriptionResult.rows[0].id;
     await addTranscriptionEvent({
       transcriptionId,
-      userId: session.user.id,
+      userId,
+      organizationId: orgId,
       stage: 'completed',
       message: shouldAnalyze
         ? 'OCR und KI-Analyse abgeschlossen.'
         : 'OCR abgeschlossen.',
     });
     await logAuditEvent({
-      userId: session.user.id,
+      userId,
+      organizationId: orgId,
       action: shouldAnalyze ? 'ocr.analysis.completed' : 'ocr.completed',
       targetType: 'transcription',
       targetId: String(transcriptionId),
@@ -297,3 +297,5 @@ export default async function handler(req, res) {
     return serverError(res, 'OCR fehlgeschlagen');
   }
 }
+
+export default withOrgScope({ permission: 'transcription.write' }, handler);

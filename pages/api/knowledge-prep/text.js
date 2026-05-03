@@ -1,6 +1,5 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
+import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { analyzeTranscription } from '../../../lib/ai-service';
 import {
   CostLimitCheckUnavailableError,
@@ -10,7 +9,7 @@ import {
   withUserCostLock,
 } from '../../../lib/usage';
 import { resolveChatModel } from '../../../lib/model-policy';
-import { getSettingsRow, resolveStoredApiKey } from '../../../lib/settings-service';
+import { getSettingsRow, resolveMistralApiKey } from '../../../lib/settings-service';
 import { MAX_CUSTOM_PROMPT_LENGTH, MAX_DOCUMENT_TEXT_LENGTH } from '../../../lib/constants';
 import { resolveTemplate } from '../../../lib/template-service';
 import { addTranscriptionEvent } from '../../../lib/transcription-events';
@@ -19,19 +18,17 @@ import { normalizeDataTableAnalysis } from '../../../lib/data-table';
 
 const ALLOWED_TEMPLATES = new Set(['data_table']);
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const userId = req.userId;
+  const orgId = req.org.id;
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'knowledge-prep-text',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 30,
     windowMs: 60_000,
   });
@@ -60,8 +57,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: `Fokus der Analyse ist zu lang (max. ${MAX_CUSTOM_PROMPT_LENGTH} Zeichen).` });
     }
 
-    const settingsRow = await getSettingsRow(session.user.id);
-    const apiKey = resolveStoredApiKey(settingsRow) || process.env.MISTRAL_API_KEY;
+    const settingsRow = await getSettingsRow(userId);
+    const apiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
     const language = settingsRow?.language || 'de';
     const selectedModel = resolveChatModel(requestModel || settingsRow?.preferred_model || 'mistral-large-latest');
 
@@ -81,13 +78,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: `Kombinierter Analysekontext ist zu lang (max. ${MAX_CUSTOM_PROMPT_LENGTH} Zeichen).` });
     }
 
-    const { analysis, usedModel } = await withUserCostLock(session.user.id, async () => {
-      const costCheck = await checkCostLimit(session.user.id);
+    const { analysis, usedModel } = await withUserCostLock(userId, async () => {
+      const costCheck = await checkCostLimit(userId, orgId);
       if (!costCheck.allowed) {
         throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
       }
 
-      const resolvedTemplate = await resolveTemplate(template, session.user.id);
+      const resolvedTemplate = await resolveTemplate(template, userId);
       const analysisResult = await analyzeTranscription(
         text,
         resolvedTemplate,
@@ -96,7 +93,7 @@ export default async function handler(req, res) {
         selectedModel,
         language
       );
-      await logUsage(session.user.id, analysisResult.model, 'analysis', analysisResult.usage);
+      await logUsage(userId, analysisResult.model, 'analysis', analysisResult.usage, orgId);
 
       return {
         analysis: analysisResult.analysis,
@@ -120,11 +117,12 @@ export default async function handler(req, res) {
     }
 
     const result = await query(
-      `INSERT INTO transcriptions (user_id, filename, original_name, file_path, file_size, mime_type, status, template, model, custom_prompt, text, analysis, analysis_type, analysis_meta, table_schema, auto_analyze, diarize)
-       VALUES ($1, $2, $3, $4, $5, $6, 'completed', $7, $8, $9, $10, $11, $12, $13, $14, false, false)
+      `INSERT INTO transcriptions (user_id, organization_id, filename, original_name, file_path, file_size, mime_type, status, template, model, custom_prompt, text, analysis, analysis_type, analysis_meta, table_schema, auto_analyze, diarize)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', $8, $9, $10, $11, $12, $13, $14, $15, false, false)
        RETURNING id, original_name, status, template, created_at`,
       [
-        session.user.id,
+        userId,
+        orgId,
         null,
         `${titlePrefix} (Text)`,
         null,
@@ -144,7 +142,8 @@ export default async function handler(req, res) {
     const transcription = result.rows[0];
     await addTranscriptionEvent({
       transcriptionId: transcription.id,
-      userId: session.user.id,
+      userId,
+      organizationId: orgId,
       stage: 'completed',
       message: `${titlePrefix}-Analyse aus Text abgeschlossen.`,
     });
@@ -161,3 +160,5 @@ export default async function handler(req, res) {
     return serverError(res, 'Wissensaufbereitung fehlgeschlagen');
   }
 }
+
+export default withOrgScope({ permission: 'transcription.write' }, handler);

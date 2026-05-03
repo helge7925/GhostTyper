@@ -1,6 +1,5 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from './auth/[...nextauth]';
 import { optimizeText } from '../../lib/ai-service';
+import { withOrgScope } from '../../lib/api/with-org-scope';
 import {
   CostLimitCheckUnavailableError,
   CostLimitExceededError,
@@ -10,7 +9,7 @@ import {
   checkCostLimit,
   withUserCostLock,
 } from '../../lib/usage';
-import { getSettingsRow, resolveStoredApiKey } from '../../lib/settings-service';
+import { getSettingsRow, resolveMistralApiKey } from '../../lib/settings-service';
 import { resolveChatModel } from '../../lib/model-policy';
 import { MAX_TEXT_OPTIMIZATION_INPUT_LENGTH, MAX_CUSTOM_PROMPT_LENGTH } from '../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
@@ -25,19 +24,17 @@ const ALLOWED_PRESETS = new Set([
   'email_improve',
 ]);
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    return res.status(401).json({ message: 'Nicht authentifiziert' });
-  }
+  const userId = req.userId;
+  const orgId = req.org.id;
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'text-optimization',
-    identifier: `user:${session.user.id}`,
+    identifier: `org:${orgId}:user:${userId}`,
     limit: 60,
     windowMs: 60_000,
   });
@@ -64,8 +61,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const settingsRow = await getSettingsRow(session.user.id);
-    const apiKey = resolveStoredApiKey(settingsRow) || process.env.MISTRAL_API_KEY;
+    const settingsRow = await getSettingsRow(userId);
+    const apiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
     const preferredModel = resolveChatModel(requestModel || settingsRow?.preferred_model || 'mistral-large-latest');
 
     if (!apiKey) {
@@ -75,8 +72,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Ungültiges KI-Modell' });
     }
 
-    const optimizedText = await withUserCostLock(session.user.id, async () => {
-      const costCheck = await checkCostLimit(session.user.id);
+    const optimizedText = await withUserCostLock(userId, async () => {
+      const costCheck = await checkCostLimit(userId, orgId);
       if (!costCheck.allowed) {
         throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
       }
@@ -85,7 +82,7 @@ export default async function handler(req, res) {
         outputMultiplier: 0.9,
         outputBufferTokens: 120,
       });
-      await enforceProjectedBudgetGuardrail(session.user.id, estimatedCost);
+      await enforceProjectedBudgetGuardrail(userId, estimatedCost, orgId);
 
       const result = await optimizeText(
         text,
@@ -94,12 +91,13 @@ export default async function handler(req, res) {
         apiKey,
         preferredModel
       );
-      await logUsage(session.user.id, result.model, 'text_optimization', result.usage);
+      await logUsage(userId, result.model, 'text_optimization', result.usage, orgId);
       return result.optimizedText;
     });
 
     await logAuditEvent({
-      userId: session.user.id,
+      userId,
+      organizationId: orgId,
       action: 'text_optimization.completed',
       targetType: 'text_optimization',
       metadata: {
@@ -121,3 +119,5 @@ export default async function handler(req, res) {
     return serverError(res, 'Textoptimierung fehlgeschlagen');
   }
 }
+
+export default withOrgScope(handler);
