@@ -85,13 +85,41 @@ if (process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID && process.env.OIDC_CL
   );
 }
 
+async function loadOrgMemberships(userId) {
+  if (!userId) return [];
+  try {
+    const result = await query(
+      `SELECT o.id, o.name, o.slug, o.plan, o.is_personal, m.role
+         FROM organization_members m
+         JOIN organizations o ON o.id = m.organization_id
+        WHERE m.user_id = $1
+        ORDER BY o.is_personal DESC, m.joined_at ASC`,
+      [userId],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      plan: row.plan,
+      isPersonal: !!row.is_personal,
+      role: row.role,
+    }));
+  } catch (error) {
+    // Phase 4a may not yet be backfilled in some environments — fall back to
+    // an empty list rather than blocking auth.
+    if (error?.code === '42P01' || error?.code === '42703') return [];
+    throw error;
+  }
+}
+
 export const authOptions = {
   providers,
   session: {
     strategy: 'jwt',
   },
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger, session: clientSession }) {
+      // Initial sign-in
       if (user) {
         if (account?.provider === 'oidc') {
           const normalizedEmail = normalizeEmail(user.email);
@@ -120,11 +148,36 @@ export const authOptions = {
           token.role = user.role;
         }
       }
+
+      // Refresh memberships on first sign-in or when the client requests an
+      // update (e.g. after switching orgs or accepting an invite).
+      const needsRefresh = Boolean(user) || trigger === 'update';
+      if (token.id && (needsRefresh || !Array.isArray(token.organizations))) {
+        const memberships = await loadOrgMemberships(token.id);
+        token.organizations = memberships;
+
+        // Apply requested org-switch if it was passed via update().
+        const requestedOrg = clientSession?.currentOrganizationId;
+        if (
+          requestedOrg !== undefined &&
+          memberships.some((m) => String(m.id) === String(requestedOrg))
+        ) {
+          token.currentOrganizationId = requestedOrg;
+        }
+
+        // Default to the personal org (or the first available) when none set.
+        if (!token.currentOrganizationId && memberships.length > 0) {
+          const personal = memberships.find((m) => m.isPersonal) || memberships[0];
+          token.currentOrganizationId = personal.id;
+        }
+      }
       return token;
     },
     async session({ session, token }) {
       session.user.id = token.id;
       session.user.role = token.role;
+      session.user.organizations = Array.isArray(token.organizations) ? token.organizations : [];
+      session.user.currentOrganizationId = token.currentOrganizationId ?? null;
       return session;
     },
   },
