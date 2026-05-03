@@ -1,0 +1,206 @@
+# Vexa Remote-Meeting-Integration — Operator-Guide
+
+GhostTyper kann Live-Meetings (Google Meet, Microsoft Teams, Zoom) automatisch
+mitschneiden und transkribieren, indem ein Vexa-Lite-Bot dem Meeting beitritt
+und das Transkript an GhostTyper zurückliefert.
+
+## Zwei-Stufen-Opt-in
+
+Die Funktion ist standardmäßig **vollständig aus**. Sie wird durch zwei
+unabhängige Schalter aktiviert:
+
+1. **Operator-Stufe** — Compose-Profil `vexa` aktivieren (siehe unten).
+   Ohne Profil läuft kein Vexa-Container, GhostTyper ist unverändert.
+2. **Workspace-Stufe** — Org-Admin schaltet in *Settings → Integrationen
+   → Vexa Meeting-Bot* die Integration ein. Vor dem Toggle ist der
+   „Remote-Meeting"-Button für niemanden sichtbar.
+
+Beide Stufen müssen aktiv sein, damit ein Bot startet. Endnutzer brauchen
+zusätzlich die Permission `meeting.start` (member+) und müssen pro Bot-Start
+explizit per Consent-Checkbox zustimmen.
+
+## Schnellstart: Compose-Bundle
+
+Im selben `docker-compose.prod.yml` ist der Vexa-Lite-Container hinter dem
+Profil `vexa` mitgeliefert. Die Vexa-Datenbank wird in der bestehenden
+Postgres-Instanz angelegt (separate DB `vexa`, gleiches User/Password).
+
+```bash
+# .env (zusätzlich zu den bestehenden GhostTyper-Variablen)
+COMPOSE_PROFILES=vexa
+VEXA_TRANSCRIPTION_URL=https://api.cortecs.ai/v1/audio/transcriptions
+VEXA_TRANSCRIPTION_TOKEN=<cortecs-key>
+VEXA_ADMIN_API_TOKEN=$(openssl rand -hex 32)
+RECONCILE_API_SECRET=$(openssl rand -hex 32)
+
+# Hochfahren
+docker compose -f config/docker-compose.prod.yml --profile vexa up -d
+```
+
+Was du dadurch bekommst:
+- `vexa-lite` Container (gepinnt auf `vexaai/vexa-lite:0.10.4`, 2 GB RAM,
+  2 CPU, Health-Check auf Port 8056)
+- `vexa-db-init` One-shot, der `CREATE DATABASE vexa` ausführt (idempotent)
+- GhostTyper-Container weiß automatisch über `VEXA_BASE_URL=http://vexa-lite:8056`
+  Bescheid (interne Compose-Adresse, niemals nach außen exponiert)
+- Browser-Bots laufen als Kindprozesse innerhalb des Vexa-Lite-Containers
+  und beenden sich, sobald das Meeting endet — keine zurückbleibenden
+  Container, keine Docker-Socket-Mounts.
+
+## In-App-Konfiguration
+
+Pro Workspace (durch einen Admin in der GhostTyper-UI):
+
+1. **Settings → Integrationen → Vexa Meeting-Bot** öffnen.
+2. *Base-URL* und *Admin-Token* sind im Bundled-Setup nicht zwingend zu
+   pflegen — der Server-Fallback (`VEXA_BASE_URL`, `VEXA_ADMIN_API_TOKEN`
+   aus dem Compose-Stack) greift, wenn die Felder leer bleiben. Manuelles
+   Eintragen ist nur nötig, wenn die Org gegen einen externen Vexa läuft.
+3. *Webhook-Secret* setzen (frei gewähltes HMAC-Geheimnis, idealerweise
+   `openssl rand -hex 32`). Dieses Geheimnis bleibt org-spezifisch.
+4. *Standard-Bot-Anzeigename* und *Standard-Sprache* festlegen.
+5. „Verbindung testen" klicken — grün = OK.
+6. „Integration aktiv" einschalten und Speichern.
+
+GhostTyper speichert alle Werte verschlüsselt in `organization_integrations`
+(via `lib/secrets.js`, AES-256-GCM, Master-Key über `SETTINGS_ENCRYPTION_KEY`).
+Klartext-Tokens werden nie an den Browser zurückgegeben.
+
+## Architektur
+
+```
+GhostTyper (Next.js)                Vexa Lite (EU-Container)         Whisper-Backend
+──────────────────                  ──────────────────────           ─────────────────
+POST /api/meetings  ───────────►    POST /bots                       z.B. Cortecs
+SSE /api/transcriptions/[id]/                                        OpenAI-kompat.
+  stream  ◄────── lib/vexa-bridge ◄ GET /transcripts/...     ──────► /v1/audio/...
+POST /api/webhooks/vexa  ◄───── HMAC-Webhook (meeting.completed)
+```
+
+GhostTyper hat keinen direkten Zugriff auf die Audiospur — Vexa Lite
+orchestriert den Browser-Bot, ruft die Transkription auf und meldet
+Ereignisse via signiertem Webhook zurück.
+
+## Was du betreiben musst
+
+1. **Vexa Lite Container** (Apache-2.0, single container, GPU-frei)
+   — z. B. auf Fly.io Frankfurt, Hetzner, Render. Empfohlen: konkretes
+   Image-Tag pinnen (`vexaai/vexa-lite:0.10.x`), nicht `:latest`.
+2. **Whisper-Endpoint** mit OpenAI-kompatibler `/v1/audio/transcriptions`-Route.
+   Empfohlen: Cortecs (EU-Hosting, GDPR). **Vor Produktivgang testen, dass
+   `response_format=verbose_json` mit `timestamp_granularities=word` echte
+   Wort-Timestamps und `language_probability` liefert** — sonst leidet die
+   Speaker-Attribution bei Microsoft Teams.
+3. **Postgres** für Vexa Lite (Supabase EU oder Neon EU empfohlen).
+   GhostTypers eigene Postgres bleibt unverändert.
+
+## Vexa-Lite-ENV (auf dem Vexa-Container, nicht in GhostTyper)
+
+```
+DATABASE_URL=postgresql://…           # Postgres für Vexa
+TRANSCRIPTION_SERVICE_URL=https://<cortecs>/v1/audio/transcriptions
+TRANSCRIPTION_SERVICE_TOKEN=<cortecs-key>
+ADMIN_API_TOKEN=<32 zufällige hex bytes — openssl rand -hex 32>
+```
+
+Health-Check:
+```bash
+curl https://<vexa-host>/                                # 200 OK
+curl -H "X-Admin-API-Key: $ADMIN_API_TOKEN" \
+     https://<vexa-host>/admin/users?limit=1             # 200 + JSON
+```
+
+## GhostTyper-Konfiguration
+
+Pro Workspace einzeln, durch einen Admin in der GhostTyper-UI:
+
+1. **Settings → Integrationen → Vexa Meeting-Bot** öffnen.
+2. Felder ausfüllen:
+   - *Vexa Base-URL* — z. B. `https://vexa-lite.example.eu`
+   - *Admin-Token* — der `ADMIN_API_TOKEN` aus dem Vexa-Container
+   - *Webhook-Secret* — frei wählbares HMAC-Geheimnis (32 random bytes)
+   - *Standard-Bot-Anzeigename* — z. B. „Acme Notes"
+   - *Standard-Sprache* — `de`, `en` oder `auto`
+3. „Verbindung testen" klicken — grün = OK.
+4. „Integration aktiv" einschalten und Speichern.
+
+GhostTyper speichert alle Werte verschlüsselt in `organization_integrations`
+(via `lib/secrets.js`, AES-256-GCM, Master-Key über `SETTINGS_ENCRYPTION_KEY`).
+Klartext-Tokens werden nie an den Browser zurückgegeben.
+
+## Webhook-Registrierung (automatisch)
+
+Ab dem ersten Bot-Start je User legt GhostTyper automatisch einen
+Vexa-User-Token an *und* registriert für diesen Token die Webhook-URL
+(`<NEXTAUTH_URL>/api/webhooks/vexa`) plus das org-spezifische Webhook-Secret
+und die relevanten Events bei Vexa. Der Operator muss nichts manuell tun.
+
+Schlägt die Webhook-Registrierung fehl, bleibt der Bot trotzdem startbar —
+der Reconcile-Cron (siehe unten) holt verlorene Events nach.
+
+## Reconcile-Cron
+
+Webhooks haben Vexa-seitig eine Retry-Window von 24h. Trotzdem empfehlen wir
+einen Cron-Backstop, der offene Vexa-Meetings, die seit ≥5 min keinen
+Webhook mehr bekommen haben, aktiv pollt:
+
+```
+*/10 * * * *  curl -X POST https://<ghosttyper>/api/admin/vexa/reconcile \
+                -H "X-Reconcile-Secret: $RECONCILE_API_SECRET"
+```
+
+`RECONCILE_API_SECRET` ist eine separate ENV-Variable im GhostTyper-Server,
+die der Reconcile-Endpoint per timing-safe-Compare prüft.
+
+## Bot tritt einem authentifizierten Meeting bei
+
+Manche Meetings (Workspace-only, Lobby-pflichtig) erfordern einen
+eingeloggten Browser-Account. Der Vexa-Bot kann persistente Sessions in
+S3 speichern — siehe `features/authenticated-meetings/` im Vexa-Repo.
+Dieses Setup ist außerhalb des MVP, dokumentiere bei Bedarf separat.
+
+## DSGVO-Hinweise
+
+- Der Bot tritt **sichtbar** mit dem konfigurierten Anzeigenamen bei.
+  Teilnehmer müssen über die Aufzeichnung informiert sein und zustimmen.
+- GhostTyper erzwingt eine Consent-Checkbox vor jedem Bot-Start. Die
+  Bestätigung wird im Audit-Log persistiert
+  (`action='meeting.bot.start', metadata.consent=true`).
+- Daten-Lokalität: Vexa Lite läuft im EU-Container, Cortecs hostet in
+  DE/FR/ES/FI/PL. GhostTyper-DB unverändert.
+- Retention: `scripts/apply-retention-policy.js` greift weiterhin —
+  Vexa-Transkripte sind reguläre `transcriptions`-Rows mit `source='vexa'`.
+
+## Troubleshooting
+
+| Symptom | Ursache | Lösung |
+|---|---|---|
+| 400 INTEGRATION_DISABLED beim Start | Vexa-Toggle aus | Settings → Integrationen → aktivieren |
+| 502 VEXA_BOT_FAILED | Bot konnte Meeting nicht beitreten | Vexa-Logs prüfen; bei Lobby ggf. authentifizierte Session |
+| Webhook 401 INVALID_SIGNATURE | Webhook-Secret in Vexa und GhostTyper unterschiedlich | Org-Settings auf gleichen Wert setzen |
+| Status hängt auf 'processing' | Webhook erreicht GhostTyper nicht | Reconcile-Cron läuft? Vexa-User-Webhook gesetzt? |
+| Live-Transkript erscheint nicht | Bridge nicht gestartet | Detail-Seite refreshen; Worker läuft? `lib/vexa-bridge.js` Logs prüfen |
+| `ENCRYPTION_UNAVAILABLE` | `SETTINGS_ENCRYPTION_KEY` fehlt | ENV setzen und Server neu starten |
+
+## Verwandte Code-Stellen
+
+- `lib/api/vexa.js` — REST-Client + Adapter (`mapVexaTranscriptToGhostTyper`)
+- `lib/vexa-bridge.js` — Live-Polling-Bridge
+- `lib/vexa-webhook-signature.js` — HMAC-Verifikation
+- `lib/integrations.js` — verschlüsselte Org-Konfig
+- `pages/api/meetings/*` — Bot-Lifecycle
+- `pages/api/webhooks/vexa.js` — Event-Receiver
+- `pages/api/admin/vexa/reconcile.js` — Cron-Backstop
+- `components/MeetingStartForm.js` — Start-Dialog (mit Consent)
+- `components/MeetingControlBar.js` — Sprache wechseln / Stop
+- `components/settings/VexaIntegrationPanel.js` — Settings-UI
+
+## Tests
+
+```bash
+npm test  # Adapter, URL-Parser, HMAC-Verifikation
+```
+
+Ein End-to-End-Test gegen einen echten Vexa-Lite + ein Sandbox-Google-Meet
+ist manuell zu fahren — siehe `docs/code-review-priorities-*` für das
+Test-Protokoll.
