@@ -177,7 +177,12 @@ async function handler(req, res) {
   const language = typeof rawLanguage === 'string' && rawLanguage ? rawLanguage : (vexaConfig.defaultLanguage || 'de');
   const botName = (typeof rawBotName === 'string' && rawBotName.trim()) || vexaConfig.defaultBotName || `${req.org.name} Notes`;
   const shouldAutoAnalyze = autoAnalyze !== false;
-  const meetingUrlForOriginalName = rawUrl || `${platform}:${nativeMeetingId}`;
+  // Friendly placeholder until the auto-analyse step replaces it with
+  // the LLM-generated title. We avoid showing the raw join URL in the
+  // transcription list — it leaks the meeting credentials and looks
+  // ugly. Format: "Remote Meeting · Teams · 04.05.2026 09:42".
+  const platformLabel = { google_meet: 'Google Meet', teams: 'Teams', zoom: 'Zoom' }[platform] || platform;
+  const meetingUrlForOriginalName = `Remote Meeting · ${platformLabel} · ${new Date().toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
 
   let userInfo;
   try {
@@ -246,10 +251,22 @@ async function handler(req, res) {
   try {
     botResponse = await startBot(
       { baseUrl: vexaConfig.baseUrl, apiKey: userToken.apiKey },
-      { platform, nativeMeetingId, botName, language, passcode: resolvedPasscode },
+      {
+        platform,
+        nativeMeetingId,
+        botName,
+        language,
+        passcode: resolvedPasscode,
+        meetingUrl: rawUrl,
+      },
     );
   } catch (error) {
-    const upstreamMessage = error.response?.data?.message || error.response?.data?.detail || error.message;
+    // Vexa returns FastAPI-style errors. `detail` may be a string or an
+    // array of {loc, msg, type} entries — coerce both into a readable line.
+    const upstreamRaw = error.response?.data?.detail ?? error.response?.data?.message;
+    const upstreamMessage = Array.isArray(upstreamRaw)
+      ? upstreamRaw.map((d) => `${(d.loc || []).join('.')}: ${d.msg}`).join('; ')
+      : (typeof upstreamRaw === 'string' ? upstreamRaw : (upstreamRaw ? JSON.stringify(upstreamRaw) : error.message));
     await query(
       `UPDATE transcriptions SET status = 'error', bot_status = 'failed',
                                  error = $1, updated_at = NOW()
