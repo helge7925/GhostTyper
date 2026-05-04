@@ -14,7 +14,7 @@
 
 ### Authentifizierung
 - **JWT-Token**: Im Header `Authorization: Bearer <token>`
-- **API-Key**: Im Header `X-API-Key: <api-key>`
+- **API-Key**: Im Header `X-API-Key: <EXAMPLE_API_KEY>`
 
 ### Content-Type
 - **Request**: `application/json`
@@ -224,7 +224,7 @@ Hinweis:
 [
   {
     "id": "key-id",
-    "key": "api-key-here",
+    "key": "EXAMPLE_API_KEY",
     "createdAt": "2026-02-05T12:00:00Z",
     "expiresAt": "2026-08-05T12:00:00Z"
   }
@@ -239,7 +239,7 @@ Hinweis:
 ```json
 {
   "id": "key-id",
-  "key": "neuer-api-key-here",
+  "key": "EXAMPLE_NEW_API_KEY",
   "createdAt": "2026-02-05T12:00:00Z",
   "expiresAt": "2026-08-05T12:00:00Z"
 }
@@ -260,7 +260,7 @@ Hinweis:
 **Request**:
 ```bash
 curl -X POST \
-  -H "X-API-Key: your-api-key" \
+  -H "X-API-Key: EXAMPLE_API_KEY" \
   -H "Content-Type: multipart/form-data" \
   -F "audio=@datei.mp3" \
   -F "context=meeting" \
@@ -497,7 +497,7 @@ curl -X POST \
 1. **Upload**:
 ```bash
 curl -X POST \
-  -H "X-API-Key: your-api-key" \
+  -H "X-API-Key: EXAMPLE_API_KEY" \
   -F "audio=@meeting.mp3" \
   -F "context=meeting" \
   https://transkription.helgeroos.de/api/upload
@@ -505,13 +505,13 @@ curl -X POST \
 
 2. **Status abfragen**:
 ```bash
-curl -H "X-API-Key: your-api-key" \
+curl -H "X-API-Key: EXAMPLE_API_KEY" \
   https://transkription.helgeroos.de/api/jobs/job-id
 ```
 
 3. **Ergebnis abrufen**:
 ```bash
-curl -H "X-API-Key: your-api-key" \
+curl -H "X-API-Key: EXAMPLE_API_KEY" \
   https://transkription.helgeroos.de/api/transcriptions/transcript-id
 ```
 

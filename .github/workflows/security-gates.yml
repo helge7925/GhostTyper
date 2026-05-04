@@ -49,4 +49,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: gitleaks.toml
+          # Absolute path is the safe form — `gitleaks-action@v2` does not
+          # always resolve the relative `gitleaks.toml` against the repo
+          # root, which is why our allowlist was being ignored in CI.
+          GITLEAKS_CONFIG: ${{ github.workspace }}/gitleaks.toml

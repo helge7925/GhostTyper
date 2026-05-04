@@ -4,12 +4,30 @@ title = "Gitleaks config"
   useDefault = true
 
 [[allowlists]]
-  description = "Ignore documented placeholder credentials and example auth headers"
+  description = "Legacy commits with sanitised placeholder credentials (false positives)"
+  # Listing offending commits by SHA is the most reliable way to silence
+  # false positives across CI environments — it doesn't depend on
+  # gitleaks-action picking up our targetRules / regex allowlist.
+  commits = [
+    "44c9713c853114d6646e8a3d7e2bd0ac4842f3e7",   # Add API spec — `your-api-key` example only
+    "5c547bb2e730d57550aceae781d95f90c8eed574",   # Add API spec — `your-api-key` example only
+    "d709d9ea2e89600444d8b6e26ae6187ae5abea6a",   # DB rate-limits commit — placeholder env block only
+  ]
+
+[[allowlists]]
+  description = "Documented placeholder credentials in deployment + API examples"
   targetRules = [
     "generic-api-key",
     "curl-auth-header",
   ]
   regexes = [
+    # New canonical placeholder convention — gitleaks default stopword list
+    # treats anything containing "EXAMPLE" or "DUMMY" as non-secret.
+    '''EXAMPLE_[A-Z_]+''',
+    '''DUMMY_[A-Z_]+''',
+    # Historical placeholder shapes still present in older docs / older
+    # commits. Kept for archival completeness; new docs should use
+    # EXAMPLE_* exclusively.
     '''your-api-key''',
     '''api-key-here''',
     '''neuer-api-key-here''',

@@ -63,13 +63,14 @@ Im Repo-Root `/opt/ghosttyper/.env`:
 DOMAIN=transkription.example.de
 
 DB_USER=transkription
-DB_PASSWORD=<starkes-passwort>
+DB_PASSWORD=EXAMPLE_STRONG_DB_PASSWORD
 DB_NAME=transkription
 
-NEXTAUTH_SECRET=<openssl rand -base64 32>
+# Generate fresh values for the three secrets below with: openssl rand -base64 32
+NEXTAUTH_SECRET=EXAMPLE_NEXTAUTH_SECRET
 NEXTAUTH_URL=https://transkription.example.de
-DB_INIT_SECRET=<separater-secret>
-SETTINGS_ENCRYPTION_KEY=<separater-secret>
+DB_INIT_SECRET=EXAMPLE_DB_INIT_SECRET
+SETTINGS_ENCRYPTION_KEY=EXAMPLE_SETTINGS_ENCRYPTION_KEY
 ENABLE_DB_INIT_API=true
 
 # Optional: Uploads auf Storage Box auslagern (statt Named Volume)
