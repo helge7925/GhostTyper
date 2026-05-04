@@ -3,7 +3,11 @@ import { Loader2, Square, Languages } from 'lucide-react';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 
 export default function MeetingControlBar({ transcriptionId, currentLanguage, botStatus, onChanged }) {
-  const { showToast, confirm } = useUiFeedback();
+  // `useUiFeedback().confirm()` requires the consumer to render <ConfirmDialog />
+  // locally — this component does not, so the promise from `confirm()` would
+  // never resolve and the Stop button would silently hang. We use the browser
+  // native confirm here; it also lets us spell out the Whisper-chunk caveat.
+  const { showToast } = useUiFeedback();
   const [language, setLanguage] = useState(currentLanguage || 'de');
   const [updatingLanguage, setUpdatingLanguage] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -33,13 +37,16 @@ export default function MeetingControlBar({ transcriptionId, currentLanguage, bo
   };
 
   const handleStop = async () => {
-    const ok = await confirm({
-      title: 'Bot stoppen',
-      message: 'Bot aus dem Meeting entfernen? Bisher transkribierte Inhalte bleiben erhalten.',
-      confirmLabel: 'Stoppen',
-      danger: true,
-    });
-    if (!ok) return;
+    if (typeof window !== 'undefined' && !window.confirm(
+      'Bot jetzt aus dem Meeting entfernen?\n\n' +
+      'Wichtig: Whisper transkribiert in 20–30-Sekunden-Blöcken. Ein Block, der gerade läuft, ' +
+      'wenn der Bot stoppt, geht verloren – bis zu ~30 Sekunden Audio am Ende fehlen dann ' +
+      'eventuell im Transkript.\n\n' +
+      'Für ein vollständiges Transkript: das Meeting natürlich beenden lassen, der Bot verlässt ' +
+      'es dann automatisch nach Verarbeitung des letzten Blocks.'
+    )) {
+      return;
+    }
     setStopping(true);
     try {
       const res = await fetch(`/api/meetings/${transcriptionId}`, {
