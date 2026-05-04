@@ -9,7 +9,11 @@ import { getTranscript, mapVexaTranscriptToGhostTyper } from '../../../../lib/ap
 import { runManualAnalysisJob } from '../../../../lib/manual-analysis';
 import { logUsage } from '../../../../lib/usage';
 
-const STALE_MINUTES = 5;
+// Bridge keeps `updated_at` fresh while polling Vexa every 2 s, so a
+// row only goes stale once the in-process bridge stops (Vexa says
+// completed/failed, container restart, etc.). 1 minute is fast enough
+// to feel real-time and avoids racing with the bridge.
+const STALE_MINUTES = 1;
 const HARD_TIMEOUT_HOURS = 6;
 const PER_RUN_LIMIT = 25;
 
@@ -93,9 +97,27 @@ async function reconcileOne(row) {
 
   const meetingStatus = transcript?.meeting?.status || transcript?.status;
   const segments = Array.isArray(transcript?.segments) ? transcript.segments : [];
-  if (meetingStatus !== 'completed' && meetingStatus !== 'failed' && segments.length === 0) {
+
+  // While the meeting is still active in Vexa, sync segments so the
+  // editor sees them (catches up if the in-process bridge died), but
+  // do NOT finalize. Finalization is only legitimate when Vexa itself
+  // says the meeting is over.
+  if (meetingStatus !== 'completed' && meetingStatus !== 'failed') {
+    if (segments.length > 0) {
+      const mappedLive = mapVexaTranscriptToGhostTyper(transcript);
+      await query(
+        `UPDATE transcriptions
+            SET segments = $1::jsonb,
+                speakers = $2::jsonb,
+                text = $3,
+                updated_at = NOW()
+          WHERE id = $4 AND status IN ('pending','processing')`,
+        [JSON.stringify(mappedLive.segments), JSON.stringify(mappedLive.speakers), mappedLive.text, row.id],
+      );
+    }
     return { id: row.id, action: 'still_running' };
   }
+
   if (meetingStatus === 'failed') {
     await query(
       `UPDATE transcriptions SET status = 'error', bot_status = 'failed',
@@ -173,15 +195,12 @@ async function reconcileOne(row) {
   return { id: row.id, action: 'completed_via_reconcile' };
 }
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
-    return res.status(405).json({ code: 'METHOD_NOT_ALLOWED' });
-  }
-  if (!checkSecret(req)) {
-    return res.status(401).json({ code: 'UNAUTHORIZED' });
-  }
-
+/**
+ * Internal entry point shared between the HTTP endpoint and the
+ * in-process reconcile worker. No auth check; only call from trusted
+ * server-side code.
+ */
+export async function runReconcileScan() {
   const meetings = await loadOpenMeetings();
   const results = [];
   for (const row of meetings) {
@@ -193,15 +212,29 @@ export default async function handler(req, res) {
       results.push({ id: row.id, action: 'crashed', message: error.message });
     }
   }
+  if (results.length > 0) {
+    await logAuditEvent({
+      userId: null,
+      organizationId: null,
+      action: 'meeting.reconcile.run',
+      targetType: 'system',
+      targetId: 'vexa-reconcile',
+      metadata: { processed: results.length, summary: results },
+    });
+  }
+  return results;
+}
 
-  await logAuditEvent({
-    userId: null,
-    organizationId: null,
-    action: 'meeting.reconcile.run',
-    targetType: 'system',
-    targetId: 'vexa-reconcile',
-    metadata: { processed: results.length, summary: results },
-  });
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).json({ code: 'METHOD_NOT_ALLOWED' });
+  }
+  if (!checkSecret(req)) {
+    return res.status(401).json({ code: 'UNAUTHORIZED' });
+  }
+
+  const results = await runReconcileScan();
 
   return res.status(200).json({ ok: true, processed: results.length, results });
 }

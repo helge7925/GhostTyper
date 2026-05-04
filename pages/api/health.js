@@ -1,6 +1,7 @@
 import { query } from '../../lib/db';
 import { getObservabilitySnapshot, trackSecurityEvent } from '../../lib/observability';
 import { ensureTranscriptionWorkerRunning } from '../../lib/transcription-worker';
+import { ensureVexaReconcileWorkerRunning } from '../../lib/vexa-reconcile-worker';
 import { enforceRateLimit } from '../../lib/api-utils';
 import { isMaintenanceRequestAllowed } from '../../lib/network-guard';
 import { normalizeSingleHeaderValue, timingSafeEqualString } from '../../lib/security';
@@ -55,6 +56,7 @@ export default async function handler(req, res) {
   if (!allowed) return;
 
   ensureTranscriptionWorkerRunning();
+  ensureVexaReconcileWorkerRunning();
 
   let dbStatus = 'unknown';
 
