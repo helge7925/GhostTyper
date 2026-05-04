@@ -362,32 +362,6 @@ curl -X POST \
 }
 ```
 
-**Response (200) - Aufmaß**:
-```json
-{
-  "id": "transcript-id",
-  "type": "aufmass",
-  "status": "completed",
-  "createdAt": "2026-02-05T12:00:00Z",
-  "analysis": {
-    "rooms": [
-      {
-        "name": "Küche",
-        "measurements": [
-          {
-            "type": "Arbeitsplatte",
-            "value": 2.5,
-            "unit": "m"
-          }
-        ]
-      }
-    ],
-    "warnings": ["Raumhöhe 20 cm – bitte prüfen!"]
-  },
-  "rawTranscription": "Rohtext der Transkription..."
-}
-```
-
 ### 6. Template-Verwaltung
 
 #### GET `/api/templates`
@@ -405,8 +379,8 @@ curl -X POST \
   },
   {
     "id": "template-id",
-    "name": "Aufmaß-Vorlage",
-    "type": "aufmass",
+    "name": "Zusammenfassung",
+    "type": "generic",
     "createdAt": "2026-02-05T12:00:00Z"
   }
 ]

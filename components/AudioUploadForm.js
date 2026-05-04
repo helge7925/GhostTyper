@@ -4,7 +4,10 @@ import { uploadAudio, getTemplates, getSettings } from '../lib/api';
 import AudioRecorder from './AudioRecorder';
 import { useTranslations } from '../lib/i18n';
 
-const BUILTIN_TEMPLATE_VALUES = new Set(['generic', 'meeting', 'aufmass', 'data_table']);
+// `aufmass` is intentionally absent from the user-facing offering but
+// remains accepted by the backend (see lib/template-service.js) so legacy
+// DB rows still resolve.
+const BUILTIN_TEMPLATE_VALUES = new Set(['generic', 'meeting', 'data_table', 'aufmass']);
 const ALLOWED_CHAT_MODELS = new Set(['mistral-small-latest', 'mistral-medium-latest', 'mistral-large-latest']);
 const ALLOWED_UPLOAD_MODES = new Set(['file', 'record']);
 
@@ -275,7 +278,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
               <div>
                 <label htmlFor="upload-template" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">Analyse-Modus</label>
                 <select id="upload-template" value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none">
-                  <optgroup label="Standard"><option value="generic">Zusammenfassung</option><option value="meeting">Meeting-Protokoll</option><option value="aufmass">Aufmaß</option></optgroup>
+                  <optgroup label="Standard"><option value="generic">Zusammenfassung</option><option value="meeting">Meeting-Protokoll</option></optgroup>
                   {textTemplates.length > 0 && <optgroup label="Eigene Text-Vorlagen">{textTemplates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}</optgroup>}
                 </select>
               </div>

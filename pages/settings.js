@@ -40,10 +40,13 @@ const PRICE_LIST = [
 ];
 
 const SETTINGS_TAB_IDS = ['transcription', 'text-templates', 'table-templates', 'ocr-translate', 'account'];
+// `aufmass` is intentionally absent — removed from the user-facing
+// offering. Legacy DB rows that still reference it remain analysable
+// (see lib/template-service.js), they're just no longer offered as an
+// editable default in the settings UI.
 const DEFAULT_TEXT_TEMPLATE_OPTIONS = [
-  { key: 'meeting', label: 'Meeting-Protokoll' },
-  { key: 'aufmass', label: 'Aufmaß' },
   { key: 'generic', label: 'Zusammenfassung' },
+  { key: 'meeting', label: 'Meeting-Protokoll' },
 ];
 
 function parseContextTerms(rawValue) {

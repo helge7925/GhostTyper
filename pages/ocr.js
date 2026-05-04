@@ -323,7 +323,7 @@ export default function OCR() {
                         <div>
                           <label className="block text-[10px] font-bold text-secondary uppercase mb-1.5 ml-1">Modus</label>
                           <select value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none">
-                            <option value="generic">Zusammenfassung</option><option value="meeting">Meeting</option><option value="aufmass">Aufmaß</option>
+                            <option value="generic">Zusammenfassung</option><option value="meeting">Meeting</option>
                             {templates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}
                           </select>
                         </div>

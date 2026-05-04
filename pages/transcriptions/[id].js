@@ -383,15 +383,15 @@ export default function TranscriptionDetail() {
   const isOfficeDocument = isDownloadableOfficeDocument(transcription.mime_type);
   const typeLabel = isOfficeDocument ? 'Datei' : isOCR ? 'Dokument' : 'Transkription';
   const rawTextLabel = isOfficeDocument ? 'Datei-Hinweis' : isOCR ? 'Extrahierter Text' : 'Transkription';
-  const templateLabel = transcription.template === 'generic'
-    ? 'Zusammenfassung'
-    : transcription.template === 'meeting'
-      ? 'Meeting'
-      : transcription.template === 'aufmass'
-        ? 'Aufmaß'
-        : transcription.template === 'data_table'
-          ? 'Datentabelle'
-          : transcription.template;
+  // `aufmass` is kept here as a legacy label for pre-existing rows; it
+  // is no longer offered as a new template choice in the UI.
+  const TEMPLATE_DETAIL_LABELS = {
+    generic: 'Zusammenfassung',
+    meeting: 'Meeting',
+    data_table: 'Datentabelle',
+    aufmass: 'Aufmaß',
+  };
+  const templateLabel = TEMPLATE_DETAIL_LABELS[transcription.template] || transcription.template;
   const timelineEvents = Array.isArray(transcription.events) ? transcription.events : [];
 
   return (
