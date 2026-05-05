@@ -5,7 +5,9 @@ import { normalizeAnalysisTemplate, normalizeDefaultTemplate } from '../lib/cons
 test('normalizeDefaultTemplate allows transcription built-ins and rejects unknown templates', () => {
   assert.equal(normalizeDefaultTemplate('generic'), 'generic');
   assert.equal(normalizeDefaultTemplate('meeting'), 'meeting');
-  assert.equal(normalizeDefaultTemplate('aufmass'), 'aufmass');
+  // `aufmass` was removed from the user-facing default offering — legacy
+  // analysis still works, but it can no longer be picked as a default.
+  assert.equal(normalizeDefaultTemplate('aufmass'), 'generic');
   assert.equal(normalizeDefaultTemplate('data_table'), 'generic');
 });
 
