@@ -66,6 +66,7 @@ export default function OrgPreferencesPage() {
   const [costLimitEuros, setCostLimitEuros] = useState(null);
   const [memberMonthlyBudgetEuros, setMemberMonthlyBudgetEuros] = useState(null);
   const [auditRetentionDays, setAuditRetentionDays] = useState(null);
+  const [contextBias, setContextBias] = useState('');
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
@@ -91,6 +92,7 @@ export default function OrgPreferencesPage() {
             : null,
         );
         setAuditRetentionDays(s.audit_retention_days ?? null);
+        setContextBias(s.context_bias || '');
       })
       .catch(() => null)
       .finally(() => {
@@ -116,6 +118,7 @@ export default function OrgPreferencesPage() {
           memberMonthlyBudgetLimitCents:
             memberMonthlyBudgetEuros != null ? Math.round(memberMonthlyBudgetEuros * 100) : null,
           auditRetentionDays,
+          contextBias,
         }),
       });
       if (!response.ok) {
@@ -240,6 +243,21 @@ export default function OrgPreferencesPage() {
               step={1}
               disabled={!canEdit}
             />
+
+            <label htmlFor="org-context-bias" className="block">
+              <span className="block text-xs font-medium text-primary">{tPref('contextBias')}</span>
+              <span className="block text-[11px] text-secondary mt-0.5">
+                {tPref('contextBiasHint')}
+              </span>
+              <textarea
+                id="org-context-bias"
+                value={contextBias}
+                onChange={(event) => setContextBias(event.target.value)}
+                placeholder={tPref('contextBiasPlaceholder')}
+                rows={5}
+                className="mt-1.5 w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary outline-none focus:border-accent disabled:opacity-50 resize-none"
+              />
+            </label>
           </fieldset>
 
           {canEdit && (

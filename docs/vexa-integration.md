@@ -28,8 +28,9 @@ Postgres-Instanz angelegt (separate DB `vexa`, gleiches User/Password).
 ```bash
 # .env (zusätzlich zu den bestehenden GhostTyper-Variablen)
 COMPOSE_PROFILES=vexa
-VEXA_TRANSCRIPTION_URL=https://api.cortecs.ai/v1/audio/transcriptions
-VEXA_TRANSCRIPTION_TOKEN=<cortecs-key>
+# MISTRAL_API_KEY ist derselbe Schlüssel, den GhostTyper auch für die
+# Batch-Transkription nutzt — ein Schlüssel reicht für beide Pfade.
+MISTRAL_API_KEY=<mistral-key>
 VEXA_ADMIN_API_TOKEN=$(openssl rand -hex 32)
 RECONCILE_API_SECRET=$(openssl rand -hex 32)
 
@@ -69,28 +70,32 @@ Klartext-Tokens werden nie an den Browser zurückgegeben.
 ## Architektur
 
 ```
-GhostTyper (Next.js)                Vexa Lite (EU-Container)         Whisper-Backend
-──────────────────                  ──────────────────────           ─────────────────
-POST /api/meetings  ───────────►    POST /bots                       z.B. Cortecs
-SSE /api/transcriptions/[id]/                                        OpenAI-kompat.
-  stream  ◄────── lib/vexa-bridge ◄ GET /transcripts/...     ──────► /v1/audio/...
-POST /api/webhooks/vexa  ◄───── HMAC-Webhook (meeting.completed)
+GhostTyper (Next.js)        Vexa Lite (EU-Container)        Mistral Voxtral
+──────────────────          ──────────────────────          ─────────────────
+POST /api/meetings  ──►     POST /bots
+SSE /api/transcriptions/                                    OpenAI-kompat.
+  stream ◄── vexa-bridge ◄  GET /transcripts/…   ──────►   /v1/audio/transcriptions
+POST /api/webhooks/vexa  ◄── HMAC-Webhook (meeting.completed)
+                                  │
+                                  └─► fireworks-bridge (Modell-Rewrite,
+                                       MISTRAL_API_KEY-Lookup, context_bias-Injektion,
+                                       response_format=verbose_json)
 ```
 
 GhostTyper hat keinen direkten Zugriff auf die Audiospur — Vexa Lite
-orchestriert den Browser-Bot, ruft die Transkription auf und meldet
-Ereignisse via signiertem Webhook zurück.
+orchestriert den Browser-Bot, ruft die Transkription via Bridge bei
+Mistral Voxtral auf und meldet Ereignisse via signiertem Webhook zurück.
 
 ## Was du betreiben musst
 
 1. **Vexa Lite Container** (Apache-2.0, single container, GPU-frei)
    — z. B. auf Fly.io Frankfurt, Hetzner, Render. Empfohlen: konkretes
    Image-Tag pinnen (`vexaai/vexa-lite:0.10.x`), nicht `:latest`.
-2. **Whisper-Endpoint** mit OpenAI-kompatibler `/v1/audio/transcriptions`-Route.
-   Empfohlen: Cortecs (EU-Hosting, GDPR). **Vor Produktivgang testen, dass
-   `response_format=verbose_json` mit `timestamp_granularities=word` echte
-   Wort-Timestamps und `language_probability` liefert** — sonst leidet die
-   Speaker-Attribution bei Microsoft Teams.
+2. **Mistral Voxtral**: derselbe API-Key, den GhostTyper bereits für die
+   Batch-Transkription nutzt. Die Bridge schreibt den Modellnamen auf
+   `voxtral-mini-latest`, setzt `response_format=verbose_json` und
+   `timestamp_granularities=word`, falls Vexa-Lite sie nicht selbst
+   sendet, und injiziert die workspace-globale Kontext-Wörter-Liste.
 3. **Postgres** für Vexa Lite (Supabase EU oder Neon EU empfohlen).
    GhostTypers eigene Postgres bleibt unverändert.
 
@@ -98,10 +103,15 @@ Ereignisse via signiertem Webhook zurück.
 
 ```
 DATABASE_URL=postgresql://…           # Postgres für Vexa
-TRANSCRIPTION_SERVICE_URL=https://<cortecs>/v1/audio/transcriptions
-TRANSCRIPTION_SERVICE_TOKEN=<cortecs-key>
+TRANSCRIPTION_SERVICE_URL=http://fireworks-bridge:8080/v1/audio/transcriptions
+TRANSCRIPTION_SERVICE_TOKEN=<beliebiger Token; Bridge tauscht ihn>
 ADMIN_API_TOKEN=<32 zufällige hex bytes — openssl rand -hex 32>
 ```
+
+Der `TRANSCRIPTION_SERVICE_TOKEN` ist nur ein Platzhalter — der Bridge-
+Container ersetzt das Bearer-Token vor dem Forward zu Mistral durch den
+zur Laufzeit aufgelösten `MISTRAL_API_KEY` (Workspace-Override aus der
+GhostTyper-UI bevorzugt vor `MISTRAL_API_KEY`-ENV).
 
 Health-Check:
 ```bash
@@ -166,8 +176,8 @@ Dieses Setup ist außerhalb des MVP, dokumentiere bei Bedarf separat.
 - GhostTyper erzwingt eine Consent-Checkbox vor jedem Bot-Start. Die
   Bestätigung wird im Audit-Log persistiert
   (`action='meeting.bot.start', metadata.consent=true`).
-- Daten-Lokalität: Vexa Lite läuft im EU-Container, Cortecs hostet in
-  DE/FR/ES/FI/PL. GhostTyper-DB unverändert.
+- Daten-Lokalität: Vexa Lite läuft im EU-Container; Mistral hostet in
+  Frankreich (EU). GhostTyper-DB unverändert.
 - Retention: `scripts/apply-retention-policy.js` greift weiterhin —
   Vexa-Transkripte sind reguläre `transcriptions`-Rows mit `source='vexa'`.
 

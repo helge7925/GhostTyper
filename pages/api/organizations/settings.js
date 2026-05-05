@@ -21,7 +21,7 @@ async function handler(req, res) {
       try {
         const result = await query(
           `SELECT default_language, retention_days, cost_limit_cents, member_monthly_budget_limit_cents,
-                  audit_retention_days, sso_config, updated_at
+                  audit_retention_days, sso_config, context_bias, updated_at
              FROM organization_settings
             WHERE organization_id = $1`,
           [orgId],
@@ -47,20 +47,26 @@ async function handler(req, res) {
         costLimitCents = null,
         memberMonthlyBudgetLimitCents = null,
         auditRetentionDays = null,
+        contextBias = null,
       } = body;
+
+      const normalizedContextBias = typeof contextBias === 'string'
+        ? (contextBias.trim() || null)
+        : null;
 
       try {
         await query(
           `INSERT INTO organization_settings
              (organization_id, default_language, retention_days, cost_limit_cents,
-              member_monthly_budget_limit_cents, audit_retention_days, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, NOW())
+              member_monthly_budget_limit_cents, audit_retention_days, context_bias, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
            ON CONFLICT (organization_id) DO UPDATE SET
              default_language = EXCLUDED.default_language,
              retention_days = EXCLUDED.retention_days,
              cost_limit_cents = EXCLUDED.cost_limit_cents,
              member_monthly_budget_limit_cents = EXCLUDED.member_monthly_budget_limit_cents,
              audit_retention_days = EXCLUDED.audit_retention_days,
+             context_bias = EXCLUDED.context_bias,
              updated_at = NOW()`,
           [
             orgId,
@@ -69,6 +75,7 @@ async function handler(req, res) {
             Number.isFinite(Number(costLimitCents)) ? Number(costLimitCents) : null,
             Number.isFinite(Number(memberMonthlyBudgetLimitCents)) ? Number(memberMonthlyBudgetLimitCents) : null,
             Number.isFinite(Number(auditRetentionDays)) ? Number(auditRetentionDays) : null,
+            normalizedContextBias,
           ],
         );
         await logAuditEvent({

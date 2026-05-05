@@ -58,8 +58,8 @@ Audit-Trail sind Teil der Basis.
   `member`/`viewer`/`auditor`, Audit-Log.
 - **Kosten-Tracking**: Monatliche Aufschlüsselung pro Provider,
   Operation und Mitglied.
-- **Provider-Management**: Mistral, Fireworks Whisper, Vexa zentral pro
-  Workspace verwaltbar; Keys AES-256-GCM verschlüsselt.
+- **Provider-Management**: Mistral und Vexa zentral pro Workspace
+  verwaltbar; Keys AES-256-GCM verschlüsselt.
 
 ## Tech-Stack
 
@@ -67,7 +67,7 @@ Audit-Trail sind Teil der Basis.
 | -------- | ---------------------------------------------------------------- |
 | Frontend | Next.js 13 (Pages Router), React 18, Tailwind, Radix, Zustand    |
 | Backend  | Next.js API Routes, NextAuth, PostgreSQL 16 (`pg`)               |
-| AI       | Mistral (Chat / OCR / Voxtral), Fireworks Whisper-v3, Vexa Lite  |
+| AI       | Mistral (Chat / OCR / Voxtral batch + live), Vexa Lite           |
 | Infra    | Docker Compose, Traefik (optional), AES-256-GCM (`lib/secrets.js`) |
 | CI       | GitHub Actions: CodeQL, Security-Gates, Smoke                    |
 
@@ -82,10 +82,10 @@ Audit-Trail sind Teil der Basis.
    │ REST/SSE     │ Webhook + Bridge
    ▼              ▼
 ┌────────┐   ┌──────────────────┐    ┌────────────────────┐
-│ Mistral│   │ Vexa Lite        │───►│ Fireworks Whisper  │
-│ API    │   │ (Bot-Container)  │    │ (über fireworks-   │
-└────────┘   └──────────────────┘    │  bridge Translator)│
-                                     └────────────────────┘
+│ Mistral│◄──┤ Vexa Lite        │───►│ Mistral Voxtral    │
+│ API    │   │ (Bot-Container)  │    │ (über Voxtral-     │
+│ (Batch)│   │                  │    │  Bridge-Translator)│
+└────────┘   └──────────────────┘    └────────────────────┘
 ```
 
 Datenfluss-Details: [`docs/architecture.md`](docs/architecture.md).
@@ -99,7 +99,8 @@ Vexa-Integration: [`docs/vexa-integration.md`](docs/vexa-integration.md).
 | Mit `vexa`-Profil       | 4 GB  | 2 vCPU   | 20 GB   | + vexa-lite (2 GB) + bridge (256 MB) |
 | 5–10 aktive Nutzer      | 8 GB  | 4 vCPU   | 40 GB SSD | komfortabel für tägliche Team-Nutzung |
 
-Whisper-Inferenz läuft bei Fireworks AI, **GPU auf dem Host ist nicht
+Speech-to-Text-Inferenz läuft bei Mistral (Voxtral) — sowohl für Batch-
+Uploads als auch für den Vexa-Live-Pfad, **GPU auf dem Host ist nicht
 nötig**. Browser-Bots innerhalb von Vexa belegen pro paralleles
 Live-Meeting kurzzeitig zusätzlich ~1 GB RAM. Das `vexa-lite`-Image ist
 `linux/amd64`-only — auf Apple Silicon läuft es per Emulation und ist
@@ -140,13 +141,13 @@ Traefik auf `https://${DOMAIN}`).
 
 ### Mit Remote-Meeting-Bot
 
-Vexa Lite und die Fireworks-Bridge sind als optionales Compose-Profile
-vorbereitet:
+Vexa Lite und die Transkriptions-Bridge sind als optionales Compose-
+Profile vorbereitet. Die Bridge zeigt per Default auf Mistral Voxtral und
+nutzt denselben `MISTRAL_API_KEY` wie der Batch-Pfad:
 
 ```bash
 COMPOSE_PROFILES=vexa
-VEXA_TRANSCRIPTION_URL=https://api.fireworks.ai/inference/v1/audio/transcriptions
-VEXA_TRANSCRIPTION_TOKEN=fw_…
+MISTRAL_API_KEY=…           # gleicher Key wie für Batch-Transkriptionen
 VEXA_ADMIN_API_TOKEN=$(openssl rand -hex 32)
 BRIDGE_SHARED_SECRET=$(openssl rand -hex 32)
 ```
@@ -159,7 +160,7 @@ Hochfahren mit `--profile vexa`. Operator-Guide:
 Pro Workspace verwaltet der Admin in
 **Settings → Workspace verwalten**:
 
-- API-Keys & Integrationen (Mistral, Fireworks Whisper, Vexa)
+- API-Keys & Integrationen (Mistral, Vexa)
 - Mitglieder & Rollen (inkl. per-Member-Kostenlimits)
 - Aufbewahrungsfristen
 - Nutzung & Kosten-Dashboard
