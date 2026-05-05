@@ -12,7 +12,7 @@ the runtime topology and the data flows.
 | `transkription-db` | PostgreSQL 16 | yes |
 | `vexa-lite` | Meeting-bot orchestrator (Vexa, Apache‑2.0) | optional, profile `vexa` |
 | `vexa-db-init` | One-shot DB bootstrap for Vexa | optional, profile `vexa` |
-| `fireworks-bridge` | Tiny Python proxy that rewrites Whisper model name and pulls the API key from the webapp at request time | optional, profile `vexa` |
+| `fireworks-bridge` | Tiny Python proxy that rewrites the model name to `voxtral-mini-latest`, injects the workspace context bias, and pulls the Mistral API key from the webapp at request time | optional, profile `vexa` |
 
 The webapp and the database are always running. The remote-meeting stack
 is opt-in via the `vexa` Compose profile **and** a per-workspace toggle.
@@ -48,8 +48,8 @@ bridge and Postgres remain internal.
                        │
                        ▼
               ┌────────────────┐
-              │ Fireworks      │
-              │ Whisper API    │
+              │ Mistral        │
+              │ Voxtral API    │
               └────────────────┘
 ```
 
@@ -73,15 +73,17 @@ bridge and Postgres remain internal.
 2. Vexa joins the meeting (Playwright/Chromium), captures audio, and posts
    chunks to `http://fireworks-bridge:8080/v1/audio/transcriptions`.
 3. The bridge rewrites the model name (`whisper-1` / `large-v3-turbo` →
-   `whisper-v3`) and forwards the request to Fireworks. The Bearer token
-   is fetched from `/api/internal/whisper-config` (cached 60 s) — the
+   `voxtral-mini-latest`), defaults `response_format=verbose_json` and
+   `timestamp_granularities=word`, injects the workspace-global
+   `context_bias`, and forwards the request to Mistral Voxtral. The Bearer
+   token is fetched from `/api/internal/whisper-config` (cached 60 s) — the
    workspace admin can rotate the key in the UI without container restart.
-4. Fireworks returns segments. Vexa stores them and emits status webhooks
+4. Voxtral returns segments. Vexa stores them and emits status webhooks
    to `/api/webhooks/vexa` (HMAC-signed, replay-protected).
 5. On `meeting.completed`, the webhook handler pulls the final transcript,
    maps it to GhostTyper's segment format, and triggers the same analysis
-   path as file uploads. Whisper seconds are logged into `usage_log` for
-   per-user cost attribution.
+   path as file uploads. Voxtral audio seconds are logged into `usage_log`
+   for per-user cost attribution.
 
 ### Authentication and authorisation
 - NextAuth issues JWT cookies; sessions carry `currentOrganizationId` and
@@ -102,7 +104,7 @@ bridge and Postgres remain internal.
 | `transcription_events` | Stage timeline per transcription |
 | `usage_log` | Per-call cost accounting (model, operation, tokens, EUR) |
 | `audit_log` | Org-scoped audit trail |
-| `organization_integrations` | Encrypted provider configs (Mistral, Fireworks, Vexa) |
+| `organization_integrations` | Encrypted provider configs (Mistral, Vexa) |
 | `vexa_user_tokens` | Per-user Vexa identities (encrypted) |
 | `vexa_webhook_events` | Idempotency for inbound webhooks |
 | `settings` | Per-user prefs incl. `remote_meeting_enabled` opt-out |
@@ -112,8 +114,9 @@ Migrations live in `lib/db-init.js` and are applied via the protected
 
 ## Resource footprint
 
-Whisper inference is delegated to Fireworks AI, so the host does not
-need a GPU. A reasonable sizing matrix:
+Speech-to-text inference is delegated to Mistral's Voxtral API (both for
+batch uploads and the live/Vexa path), so the host does not need a GPU.
+A reasonable sizing matrix:
 
 | Profile               | RAM   | CPU    | Disk      | Notes                                |
 | --------------------- | ----- | ------ | --------- | ------------------------------------ |

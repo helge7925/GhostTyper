@@ -35,5 +35,11 @@ logs
 
 # Test coverage
 coverage
+
+# Python build artifacts (services/*-bridge are containerized; cache files
+# from local syntax checks should never end up in git).
+__pycache__/
+*.pyc
+
 # Claude Code (local dev tooling)
 .claude/

@@ -8,7 +8,6 @@ import { Plug, Wallet } from 'lucide-react';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import { Button } from '../../../components/ui/button';
 import MistralIntegrationPanel from '../../../components/settings/MistralIntegrationPanel';
-import FireworksIntegrationPanel from '../../../components/settings/FireworksIntegrationPanel';
 import VexaIntegrationPanel from '../../../components/settings/VexaIntegrationPanel';
 import { useCurrentOrg } from '../../../lib/use-current-org';
 import { usePermission } from '../../../lib/use-permission';
@@ -148,7 +147,6 @@ export default function WorkspaceIntegrationsPage() {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <MistralIntegrationPanel canEdit={canEditIntegrations} />
-            <FireworksIntegrationPanel canEdit={canEditIntegrations} />
           </div>
         </section>
 

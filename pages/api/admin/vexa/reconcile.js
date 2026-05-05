@@ -167,7 +167,7 @@ async function reconcileOne(row) {
   if (seconds > 0) {
     await logUsage(
       row.user_id,
-      'whisper-v3',
+      'voxtral-mini-latest',
       'meeting_transcription',
       { input_tokens: seconds, output_tokens: 0 },
       row.organization_id,

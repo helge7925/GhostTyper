@@ -174,13 +174,13 @@ async function handleCompleted(transcription, payload, vexaConfig) {
     meta: { segments: mapped.segments.length, speakers: mapped.speakers.length },
   });
 
-  // Whisper cost: input_tokens column doubles as audio-seconds (see usage.js
+  // Voxtral cost: input_tokens column doubles as audio-seconds (see usage.js
   // MODEL_PRICING comment). Per-user/org attribution flows through usage_log.
   const seconds = totalAudioSeconds(mapped.segments);
   if (seconds > 0) {
     await logUsage(
       transcription.user_id,
-      'whisper-v3',
+      'voxtral-mini-latest',
       'meeting_transcription',
       { input_tokens: seconds, output_tokens: 0 },
       transcription.organization_id,

@@ -32,10 +32,13 @@ services:
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-https://${DOMAIN}}
       - APP_PUBLIC_URL=${APP_PUBLIC_URL:-http://transkription-webapp:3000}
-      # Operator default for the Fireworks Whisper key. The admin UI in
+      # Operator default for the Mistral Voxtral key used by the live/Vexa
+      # transcription bridge. The admin UI in
       # /settings/organization/integrations can override this — the bridge
       # picks up the override via /api/internal/whisper-config.
-      - FIREWORKS_API_KEY=${VEXA_TRANSCRIPTION_TOKEN:-}
+      # Same key the batch-transcription path uses, so a single MISTRAL_API_KEY
+      # ENV is enough for both paths.
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-${VEXA_TRANSCRIPTION_TOKEN:-}}
       - BRIDGE_SHARED_SECRET=${BRIDGE_SHARED_SECRET}
       - AUTH_CREDENTIALS_ENABLED=${AUTH_CREDENTIALS_ENABLED:-false}
       - OIDC_PROVIDER_NAME=${OIDC_PROVIDER_NAME:-Single Sign-On}
@@ -117,8 +120,11 @@ services:
             -c "CREATE DATABASE vexa OWNER ${DB_USER}"
 
   # Tiny proxy that rewrites Vexa's hardcoded model name (whisper-1 /
-  # large-v3-turbo) to the upstream provider's actual id (Fireworks expects
-  # `whisper-v3`). The real Whisper key flows through unchanged via Bearer.
+  # large-v3-turbo) to Mistral Voxtral's id (`voxtral-mini-latest`) and
+  # forwards to https://api.mistral.ai/v1/audio/transcriptions. The bridge
+  # also injects the workspace-global context_bias and defaults
+  # response_format=verbose_json + timestamp_granularities=word so Vexa
+  # gets segments + speaker_id + words[] regardless of what it sends.
   fireworks-bridge:
     build:
       context: ../services/fireworks-bridge
@@ -130,14 +136,14 @@ services:
     networks: [internal]
     mem_limit: 256m
     environment:
-      - UPSTREAM_URL=${VEXA_TRANSCRIPTION_URL}
-      - MODEL_OVERRIDE=${VEXA_TRANSCRIPTION_MODEL:-whisper-v3}
+      - UPSTREAM_URL=${VEXA_TRANSCRIPTION_URL:-https://api.mistral.ai/v1/audio/transcriptions}
+      - MODEL_OVERRIDE=${VEXA_TRANSCRIPTION_MODEL:-voxtral-mini-latest}
       - UPSTREAM_TIMEOUT_S=${VEXA_TRANSCRIPTION_TIMEOUT_S:-120}
-      # Webapp callback so the Fireworks key set in the admin UI takes
-      # effect at runtime (cached ~60s). Falls back to FIREWORKS_API_KEY.
+      # Webapp callback so the Mistral key set in the admin UI takes
+      # effect at runtime (cached ~60s). Falls back to MISTRAL_API_KEY.
       - WEBAPP_URL=http://transkription-webapp:3000
       - BRIDGE_SECRET=${BRIDGE_SHARED_SECRET}
-      - FIREWORKS_API_KEY=${VEXA_TRANSCRIPTION_TOKEN:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-${VEXA_TRANSCRIPTION_TOKEN:-}}
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://0.0.0.0:8080/"]
       interval: 30s
