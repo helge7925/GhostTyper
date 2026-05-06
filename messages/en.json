@@ -55,7 +55,8 @@
     "translation": "Translation",
     "ocr": "OCR",
     "textOptimization": "Text Refinement",
-    "history": "History",
+    "files": "Files",
+    "history": "Files",
     "remoteMeeting": "Remote meeting",
     "settings": "Settings",
     "workspaceAdmin": "Workspace admin",
@@ -70,7 +71,8 @@
     "tables": "Tables",
     "translate": "Translate",
     "ocr": "OCR",
-    "history": "History"
+    "files": "Files",
+    "history": "Files"
   },
   "topbar": {
     "openSidebar": "Open navigation",

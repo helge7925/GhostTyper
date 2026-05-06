@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { History, Languages, Mic, ScanText, Table } from 'lucide-react';
+import { Files, Languages, Mic, ScanText, Table } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTranslations } from '../lib/i18n';
 
@@ -10,12 +10,16 @@ import { useTranslations } from '../lib/i18n';
  * Top-5 most-used routes; the rest is reachable via the hamburger sheet.
  * Respects iOS safe-area-inset via the trailing pb hack.
  */
+// Mirror the desktop sidebar order (Sidebar.js): Transcription →
+// Translation → OCR → Tables → Files. The handheld bar drops Text
+// Refinement to keep five icons. Remote-Meeting opens via the meeting
+// drawer on `/transcriptions?meeting=1` and isn't a separate slot here.
 const ITEMS = [
   { href: '/upload', labelKey: 'record', Icon: Mic },
-  { href: '/tabellen', labelKey: 'tables', Icon: Table },
   { href: '/translate', labelKey: 'translate', Icon: Languages },
   { href: '/ocr', labelKey: 'ocr', Icon: ScanText },
-  { href: '/transcriptions', labelKey: 'history', Icon: History },
+  { href: '/tabellen', labelKey: 'tables', Icon: Table },
+  { href: '/transcriptions', labelKey: 'files', Icon: Files },
 ];
 
 export default function BottomNav() {

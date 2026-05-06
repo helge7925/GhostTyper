@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { useSession, signOut } from 'next-auth/react';
 import {
   Building2,
-  History,
+  Files,
   Languages,
   LogOut,
   Mic,
@@ -21,14 +21,25 @@ import { useTranslations } from '../lib/i18n';
 import { useVexaIntegrationEnabled } from '../lib/use-vexa-integration';
 import { usePermission } from '../lib/use-permission';
 
-const NAV_LINKS = [
+// Primary workflow order, top → bottom:
+//   Remote Meeting (when permitted + workspace has Vexa enabled — see
+//   `showRemoteMeeting` below) is rendered as the first nav row.
+//   The other tools follow in the order Transcription → Translation
+//   → OCR → Tables → Text Refinement, and the document archive
+//   ("Dateien" / "Files", was "Historie" / "History") is always last.
+const PRIMARY_NAV_LINKS = [
   { href: '/upload', labelKey: 'transcription', Icon: Mic },
-  { href: '/tabellen', labelKey: 'tables', Icon: TableIcon },
   { href: '/translate', labelKey: 'translation', Icon: Languages },
   { href: '/ocr', labelKey: 'ocr', Icon: ScanText },
+  { href: '/tabellen', labelKey: 'tables', Icon: TableIcon },
   { href: '/textoptimierung', labelKey: 'textOptimization', Icon: PencilLine },
-  { href: '/transcriptions', labelKey: 'history', Icon: History },
 ];
+
+const FILES_NAV_LINK = {
+  href: '/transcriptions',
+  labelKey: 'files',
+  Icon: Files,
+};
 
 const REMOTE_MEETING_LINK = {
   href: '/transcriptions?meeting=1',
@@ -140,17 +151,7 @@ function SidebarBody({ collapsed = false, onNavigate }) {
         className={cn('flex-1 space-y-1 overflow-y-auto scrollbar-hide', collapsed ? 'px-2 py-2' : 'px-3 py-2')}
         aria-label={tNav('ariaCurrent')}
       >
-        {NAV_LINKS.map((link) => (
-          <NavRow
-            key={link.href}
-            href={link.href}
-            label={tNav(link.labelKey)}
-            Icon={link.Icon}
-            isActive={router.pathname === link.href || router.pathname.startsWith(link.href + '/')}
-            collapsed={collapsed}
-            onNavigate={onNavigate}
-          />
-        ))}
+        {/* Remote Meeting — always first when available */}
         {showRemoteMeeting && (
           <NavRow
             href={REMOTE_MEETING_LINK.href}
@@ -161,6 +162,36 @@ function SidebarBody({ collapsed = false, onNavigate }) {
             onNavigate={onNavigate}
           />
         )}
+
+        {/* Active-tool entries */}
+        {PRIMARY_NAV_LINKS.map((link) => (
+          <NavRow
+            key={link.href}
+            href={link.href}
+            label={tNav(link.labelKey)}
+            Icon={link.Icon}
+            isActive={router.pathname === link.href || router.pathname.startsWith(link.href + '/')}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        ))}
+
+        {/* Document archive — always last */}
+        <NavRow
+          href={FILES_NAV_LINK.href}
+          label={tNav(FILES_NAV_LINK.labelKey)}
+          Icon={FILES_NAV_LINK.Icon}
+          // `/transcriptions` (no query) is the archive view; the
+          // `?meeting=1` deep-link is handled by the Remote-Meeting row
+          // above. Match only the bare path so the two don't both
+          // highlight when a user has the meeting drawer open.
+          isActive={
+            router.pathname === FILES_NAV_LINK.href
+            && router.asPath.split('?')[0] === FILES_NAV_LINK.href
+          }
+          collapsed={collapsed}
+          onNavigate={onNavigate}
+        />
       </nav>
 
       {/* Footer: settings, admin, profile, logout */}
