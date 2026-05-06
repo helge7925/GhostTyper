@@ -19,7 +19,8 @@ async function loadTranscriptionSnapshot(transcriptionId, orgId, userId) {
             mime_type, model, text, segments, speakers, analysis, error, folder_id, is_favorite,
             document_html, created_at, updated_at, user_id,
             source, meeting_platform, native_meeting_id, external_meeting_id, bot_status,
-            meeting_started_at, meeting_ended_at
+            meeting_started_at, meeting_ended_at,
+            translated_segments, translation_config
      FROM transcriptions
      WHERE id = $1 AND organization_id = $2`,
     [transcriptionId, orgId]
@@ -58,6 +59,14 @@ function buildSnapshotSignature(snapshot) {
     ? snapshot.events[snapshot.events.length - 1]?.id
     : 0;
 
+  // Include translated_segments length so live-translation updates
+  // trigger an SSE push even when no other field changed (the polled
+  // updated_at gets bumped, but signing on length is cheaper than
+  // hashing the full array each tick).
+  const translatedCount = Array.isArray(snapshot.translated_segments)
+    ? snapshot.translated_segments.length
+    : 0;
+
   return [
     snapshot.status || '',
     snapshot.updated_at || '',
@@ -65,6 +74,7 @@ function buildSnapshotSignature(snapshot) {
     snapshot.analysis ? '1' : '0',
     snapshot.document_html ? '1' : '0',
     String(lastEventId || 0),
+    `t${translatedCount}`,
   ].join('|');
 }
 
