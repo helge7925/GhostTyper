@@ -61,6 +61,14 @@ export default function OrgUsagePage() {
   const tCommon = useTranslations('common');
   const tErrors = useTranslations('errors');
 
+  // Local state for the usage payload + fetch lifecycle. Declared here
+  // (not at module scope) so each visit gets a clean fetch — the
+  // useEffect below does the actual loading and toggles `loading`/`error`
+  // plus stores the response in `data`.
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const formatEuros = (value) =>
     value === null || value === undefined || Number.isNaN(value) ? '—' : currency.format(value);
   const formatNumber = (value) =>
