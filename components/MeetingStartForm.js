@@ -37,6 +37,12 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
   const [consent, setConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Live-translation block. Defaults to OFF; the configured pair (DE↔EN
+  // by default) only matters once the toggle is on.
+  const [translationEnabled, setTranslationEnabled] = useState(false);
+  const [translationLangA, setTranslationLangA] = useState('de');
+  const [translationLangB, setTranslationLangB] = useState('en');
+
   useEffect(() => {
     if (open) {
       setBotName(defaultBotName || '');
@@ -44,11 +50,15 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
       setConsent(false);
       setUrl('');
       setAutoAnalyze(true);
+      setTranslationEnabled(false);
+      setTranslationLangA('de');
+      setTranslationLangB('en');
     }
   }, [open, defaultBotName, defaultLanguage]);
 
   const platform = useMemo(() => detectPlatform(url), [url]);
-  const valid = !!platform && consent && !submitting;
+  const translationLanguagesValid = !translationEnabled || translationLangA !== translationLangB;
+  const valid = !!platform && consent && !submitting && translationLanguagesValid;
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -65,6 +75,9 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
           language,
           autoAnalyze,
           consentAccepted: true,
+          translation: translationEnabled
+            ? { enabled: true, fromLang: translationLangA, toLang: translationLangB }
+            : undefined,
         }),
       });
       const payload = await res.json().catch(() => ({}));
@@ -142,6 +155,61 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
             />
             <span>{t('autoAnalyze')}</span>
           </label>
+
+          <div className="border border-subtle rounded-xl p-3 space-y-2">
+            <label className="flex items-start gap-3 text-xs text-secondary">
+              <input
+                type="checkbox"
+                checked={translationEnabled}
+                onChange={(e) => setTranslationEnabled(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span className="text-primary font-medium">{t('translation.enable')}</span>
+            </label>
+            {translationEnabled && (
+              <>
+                <p className="text-[10px] text-secondary leading-snug">{t('translation.hint')}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-medium text-secondary mb-1 uppercase tracking-wider">{t('translation.languageA')}</label>
+                    <select
+                      value={translationLangA}
+                      onChange={(e) => setTranslationLangA(e.target.value)}
+                      className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none"
+                    >
+                      <option value="de">Deutsch</option>
+                      <option value="en">English</option>
+                      <option value="fr">Français</option>
+                      <option value="es">Español</option>
+                      <option value="it">Italiano</option>
+                      <option value="pt">Português</option>
+                      <option value="nl">Nederlands</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-secondary mb-1 uppercase tracking-wider">{t('translation.languageB')}</label>
+                    <select
+                      value={translationLangB}
+                      onChange={(e) => setTranslationLangB(e.target.value)}
+                      className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none"
+                    >
+                      <option value="en">English</option>
+                      <option value="de">Deutsch</option>
+                      <option value="fr">Français</option>
+                      <option value="es">Español</option>
+                      <option value="it">Italiano</option>
+                      <option value="pt">Português</option>
+                      <option value="nl">Nederlands</option>
+                    </select>
+                  </div>
+                </div>
+                {!translationLanguagesValid && (
+                  <p className="text-[10px] text-danger">{t('translation.sameLanguageError')}</p>
+                )}
+                <p className="text-[10px] text-warning">{t('translation.costWarning')}</p>
+              </>
+            )}
+          </div>
 
           <label className="flex items-start gap-3 text-xs text-primary bg-warning/10 border border-warning/30 rounded-xl px-3 py-2">
             <input

@@ -10,6 +10,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import TableRenderer from '../../components/TableRenderer';
 import ProcessStatusCard from '../../components/ProcessStatusCard';
 import MeetingControlBar from '../../components/MeetingControlBar';
+import TranslationCompanionPanel from '../../components/TranslationCompanionPanel';
 import { getTranscription, deleteTranscription, updateSpeakers, startAnalysis } from '../../lib/api';
 import { STATUS } from '../../lib/constants';
 import { useMessageList, useTranslations } from '../../lib/i18n';
@@ -527,8 +528,13 @@ export default function TranscriptionDetail() {
                   transcriptionId={transcription.id}
                   currentLanguage={transcription.language || 'de'}
                   botStatus={transcription.bot_status}
+                  translationConfig={transcription.translation_config}
                   onChanged={() => getTranscription(transcription.id).then(setTranscription).catch(() => {})}
                 />
+              )}
+
+              {transcription.source === 'vexa' && transcription.translation_config?.enabled && (
+                <TranslationCompanionPanel transcription={transcription} />
               )}
 
               {processState && [STATUS.PENDING, STATUS.QUEUED, STATUS.PROCESSING, STATUS.ANALYZING].includes(transcription.status) && (

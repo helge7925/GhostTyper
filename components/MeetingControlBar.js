@@ -1,8 +1,14 @@
 import { useState } from 'react';
-import { Loader2, Square, Languages } from 'lucide-react';
+import { Loader2, Square, Languages, ArrowLeftRight } from 'lucide-react';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 
-export default function MeetingControlBar({ transcriptionId, currentLanguage, botStatus, onChanged }) {
+export default function MeetingControlBar({
+  transcriptionId,
+  currentLanguage,
+  botStatus,
+  translationConfig,
+  onChanged,
+}) {
   // `useUiFeedback().confirm()` requires the consumer to render <ConfirmDialog />
   // locally — this component does not, so the promise from `confirm()` would
   // never resolve and the Stop button would silently hang. We use the browser
@@ -11,6 +17,46 @@ export default function MeetingControlBar({ transcriptionId, currentLanguage, bo
   const [language, setLanguage] = useState(currentLanguage || 'de');
   const [updatingLanguage, setUpdatingLanguage] = useState(false);
   const [stopping, setStopping] = useState(false);
+  const [updatingTranslation, setUpdatingTranslation] = useState(false);
+
+  const translationOn = !!translationConfig?.enabled;
+  const translationFrom = translationConfig?.fromLang || 'de';
+  const translationTo = translationConfig?.toLang || 'en';
+
+  const sendTranslation = async (next) => {
+    setUpdatingTranslation(true);
+    try {
+      const res = await fetch(`/api/meetings/${transcriptionId}/translation`, {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.message || 'Übersetzung konnte nicht aktualisiert werden.');
+      }
+      showToast(next.enabled ? 'Live-Übersetzung aktiv.' : 'Live-Übersetzung deaktiviert.', 'success');
+      onChanged?.();
+    } catch (error) {
+      showToast(error.message, 'error');
+    } finally {
+      setUpdatingTranslation(false);
+    }
+  };
+
+  const handleTranslationToggle = (event) => {
+    if (event.target.checked) {
+      sendTranslation({ enabled: true, fromLang: translationFrom, toLang: translationTo });
+    } else {
+      sendTranslation({ enabled: false });
+    }
+  };
+
+  const handleSwapLanguages = () => {
+    if (!translationOn) return;
+    sendTranslation({ enabled: true, fromLang: translationTo, toLang: translationFrom });
+  };
 
   const handleLanguage = async (next) => {
     if (next === language) return;
@@ -91,6 +137,35 @@ export default function MeetingControlBar({ transcriptionId, currentLanguage, bo
             </select>
             {updatingLanguage && <Loader2 className="w-3.5 h-3.5 animate-spin text-secondary" />}
           </div>
+          <label
+            className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs border border-subtle bg-hover-subtle cursor-pointer"
+            title="Live-Übersetzung an/aus"
+          >
+            <input
+              type="checkbox"
+              checked={translationOn}
+              disabled={updatingTranslation}
+              onChange={handleTranslationToggle}
+              className="accent-accent"
+            />
+            <span className="text-secondary">Übersetzung</span>
+            {translationOn && (
+              <>
+                <span className="text-primary font-mono">{translationFrom}↔{translationTo}</span>
+                <button
+                  type="button"
+                  onClick={handleSwapLanguages}
+                  disabled={updatingTranslation}
+                  className="text-secondary hover:text-primary disabled:opacity-50"
+                  aria-label="Sprachpaar tauschen"
+                >
+                  <ArrowLeftRight className="w-3 h-3" />
+                </button>
+              </>
+            )}
+            {updatingTranslation && <Loader2 className="w-3 h-3 animate-spin text-secondary" />}
+          </label>
+
           <button
             type="button"
             onClick={handleStop}

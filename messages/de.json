@@ -39,7 +39,25 @@
       "consent": "Ich bestätige, dass alle Teilnehmer über die Aufzeichnung und Transkription informiert sind und zugestimmt haben.",
       "cta": "Bot beitreten lassen",
       "success": "Bot wird gestartet.",
-      "error": "Bot konnte nicht gestartet werden."
+      "error": "Bot konnte nicht gestartet werden.",
+      "translation": {
+        "enable": "Live-Übersetzung aktivieren",
+        "hint": "Der Bot übersetzt automatisch zwischen den beiden gewählten Sprachen. Übersetzungen erscheinen in einem Begleit-Tab als Text und über Voxtral TTS als Audio.",
+        "languageA": "Sprache A",
+        "languageB": "Sprache B",
+        "sameLanguageError": "Bitte zwei verschiedene Sprachen wählen.",
+        "costWarning": "Die Live-Übersetzung verursacht zusätzliche Mistral-Kosten (Translate + Voxtral TTS) — typisch 3–5 €/Stunde Meeting."
+      }
+    },
+    "detail": {
+      "translation": {
+        "originalColumn": "Original",
+        "translatedColumn": "Übersetzung",
+        "listenInLabel": "Übersetzung anhören:",
+        "audioStartHint": "Audio starten — der Browser muss erst von Hand erlaubt werden, bevor er den Stream abspielt.",
+        "languageBadge": "{lang}",
+        "noSegmentsYet": "Noch keine Segmente."
+      }
     }
   },
   "errors": {
