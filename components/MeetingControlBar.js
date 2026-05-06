@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Loader2, Square, Languages, ArrowLeftRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Loader2, Square, Languages, ArrowLeftRight, Share2, Copy, Check } from 'lucide-react';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 
 export default function MeetingControlBar({
@@ -58,6 +58,71 @@ export default function MeetingControlBar({
     sendTranslation({ enabled: true, fromLang: translationTo, toLang: translationFrom });
   };
 
+  // Share-link state. We hydrate it once on mount via GET so a page
+  // reload still surfaces an already-active share — and re-fetch every
+  // time the toggle is flipped so the UI reflects what's actually in
+  // the DB rather than just what we wished for locally.
+  const [shareActive, setShareActive] = useState(false);
+  const [shareToken, setShareToken] = useState(null);
+  const [shareExpiresAt, setShareExpiresAt] = useState(null);
+  const [shareUpdating, setShareUpdating] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  useEffect(() => {
+    if (!translationOn) return;
+    let cancelled = false;
+    fetch(`/api/meetings/${transcriptionId}/share`, { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((payload) => {
+        if (cancelled || !payload) return;
+        setShareActive(!!payload.active);
+        setShareToken(payload.token || null);
+        setShareExpiresAt(payload.expiresAt || null);
+      })
+      .catch(() => { /* ignore — share is just unavailable */ });
+    return () => { cancelled = true; };
+  }, [transcriptionId, translationOn]);
+
+  const buildShareUrl = (token) => {
+    if (typeof window === 'undefined' || !token) return '';
+    return `${window.location.origin}/share/${encodeURIComponent(token)}`;
+  };
+
+  const handleShareToggle = async (event) => {
+    const wantOn = event.target.checked;
+    setShareUpdating(true);
+    try {
+      const res = await fetch(`/api/meetings/${transcriptionId}/share`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: wantOn }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.message || 'Share-Link konnte nicht aktualisiert werden.');
+      setShareActive(!!payload.active);
+      setShareToken(payload.token || null);
+      setShareExpiresAt(payload.expiresAt || null);
+      showToast(wantOn ? 'Share-Link aktiv.' : 'Share-Link deaktiviert.', 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    } finally {
+      setShareUpdating(false);
+    }
+  };
+
+  const handleCopyShare = async () => {
+    const url = buildShareUrl(shareToken);
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      showToast('Konnte Link nicht kopieren — bitte manuell aus der Adresszeile.', 'error');
+    }
+  };
+
   const handleLanguage = async (next) => {
     if (next === language) return;
     setUpdatingLanguage(true);
@@ -113,7 +178,7 @@ export default function MeetingControlBar({
   };
 
   return (
-    <div className="bg-surface border border-accent/30 rounded-2xl p-4 shadow-lg">
+    <div className="bg-surface border border-accent/30 rounded-2xl p-4 shadow-lg space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" aria-hidden />
@@ -177,6 +242,59 @@ export default function MeetingControlBar({
           </button>
         </div>
       </div>
+
+      {translationOn && (
+        <div className="border-t border-subtle pt-3 space-y-2">
+          <div className="flex items-center gap-3">
+            <Share2 className="w-4 h-4 text-secondary shrink-0" />
+            <label className="inline-flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={shareActive}
+                disabled={shareUpdating}
+                onChange={handleShareToggle}
+                className="accent-accent"
+              />
+              <span className="text-primary font-medium">
+                Public Share-Link für Übersetzung
+              </span>
+            </label>
+            {shareUpdating && <Loader2 className="w-3.5 h-3.5 animate-spin text-secondary" />}
+          </div>
+          {!shareActive && (
+            <p className="text-[11px] text-secondary leading-relaxed">
+              Mit Link teilen alle anderen Teilnehmer dieselbe Live-Übersetzung sehen und hören —
+              ohne GhostTyper-Account. Nur das Übersetzungs-Panel wird freigegeben, nicht der Editor
+              oder die Analyse.
+            </p>
+          )}
+          {shareActive && shareToken && (
+            <div className="flex items-center gap-2 bg-hover-subtle border border-subtle rounded-xl px-3 py-2">
+              <input
+                type="text"
+                readOnly
+                value={buildShareUrl(shareToken)}
+                onClick={(e) => e.target.select()}
+                className="flex-1 bg-transparent text-xs text-primary outline-none truncate"
+              />
+              <button
+                type="button"
+                onClick={handleCopyShare}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] border border-subtle text-primary hover:bg-surface-elevated"
+              >
+                {shareCopied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+                {shareCopied ? 'Kopiert' : 'Kopieren'}
+              </button>
+            </div>
+          )}
+          {shareActive && shareExpiresAt && (
+            <p className="text-[10px] text-secondary">
+              Gültig bis {new Date(shareExpiresAt).toLocaleString()}. Jeder mit dem Link sieht das
+              Original- und das Übersetzungs-Transkript live.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -18,6 +18,10 @@ import { I18nProvider, readLocaleFromCookie, DEFAULT_LOCALE } from '../lib/i18n'
 const NO_LAYOUT_ROUTES = new Set([
   '/transcriptions/[id]/edit',
   '/transcriptions/[id]/table',
+  // Public share-link companion view — visitors aren't necessarily
+  // logged in, so the GhostTyper sidebar/topbar would 404 on its
+  // session-dependent calls and create a confusing first impression.
+  '/share/[token]',
 ]);
 
 function isEditableTarget(target) {
