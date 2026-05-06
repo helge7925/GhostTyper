@@ -135,7 +135,20 @@ async function handler(req, res) {
     customPrompt,
     folderId,
     consentAccepted,
+    translation: rawTranslation,
   } = body;
+
+  // Optional live-translation block; if absent the row is created with
+  // translation_config = NULL and the bridge skips the translation hook.
+  // Shape: { enabled: bool, fromLang: 'de', toLang: 'en' }
+  const translationConfig = (() => {
+    if (!rawTranslation || typeof rawTranslation !== 'object') return null;
+    if (rawTranslation.enabled !== true) return null;
+    const fromLang = typeof rawTranslation.fromLang === 'string' ? rawTranslation.fromLang.slice(0, 8) : null;
+    const toLang = typeof rawTranslation.toLang === 'string' ? rawTranslation.toLang.slice(0, 8) : null;
+    if (!fromLang || !toLang || fromLang === toLang) return null;
+    return { enabled: true, fromLang, toLang, autoDetect: true };
+  })();
 
   if (consentAccepted !== true) {
     return res.status(400).json({
@@ -220,8 +233,9 @@ async function handler(req, res) {
   const insertResult = await query(
     `INSERT INTO transcriptions
        (user_id, organization_id, original_name, source, meeting_platform, native_meeting_id,
-        bot_status, status, template, model, diarize, custom_prompt, auto_analyze, folder_id)
-     VALUES ($1, $2, $3, 'vexa', $4, $5, 'requested', 'pending', $6, $7, true, $8, $9, $10)
+        bot_status, status, template, model, diarize, custom_prompt, auto_analyze, folder_id,
+        translation_config)
+     VALUES ($1, $2, $3, 'vexa', $4, $5, 'requested', 'pending', $6, $7, true, $8, $9, $10, $11::jsonb)
      RETURNING id, status, source, meeting_platform, native_meeting_id, created_at`,
     [
       userId,
@@ -234,6 +248,7 @@ async function handler(req, res) {
       typeof customPrompt === 'string' && customPrompt.trim() ? customPrompt.trim() : null,
       shouldAutoAnalyze,
       Number.isFinite(Number(folderId)) ? Number(folderId) : null,
+      translationConfig ? JSON.stringify(translationConfig) : null,
     ],
   );
   const transcription = insertResult.rows[0];
