@@ -120,11 +120,17 @@ services:
             -c "CREATE DATABASE vexa OWNER ${DB_USER}"
 
   # Tiny proxy that rewrites Vexa's hardcoded model name (whisper-1 /
-  # large-v3-turbo) to Mistral Voxtral's id (`voxtral-mini-latest`) and
-  # forwards to https://api.mistral.ai/v1/audio/transcriptions. The bridge
-  # also injects the workspace-global context_bias and defaults
-  # response_format=verbose_json + timestamp_granularities=word so Vexa
-  # gets segments + speaker_id + words[] regardless of what it sends.
+  # large-v3-turbo) to Mistral Voxtral's *realtime* id
+  # (`voxtral-mini-transcribe-realtime-2602`) and forwards to
+  # https://api.mistral.ai/v1/audio/transcriptions. Realtime is a
+  # drop-in replacement for `voxtral-mini-latest` (same endpoint, same
+  # multipart shape, same per-minute price) but is fine-tuned for
+  # low-latency live transcription — pairing it with the live-
+  # translation companion-tab keeps us inside the ≤5 s end-to-end
+  # window. The bridge also injects the workspace-global context_bias
+  # and defaults response_format=verbose_json + timestamp_granularities=word
+  # so Vexa gets segments + speaker_id + words[] regardless of what it
+  # sends.
   fireworks-bridge:
     build:
       context: ../services/fireworks-bridge
@@ -137,7 +143,7 @@ services:
     mem_limit: 256m
     environment:
       - UPSTREAM_URL=${VEXA_TRANSCRIPTION_URL:-https://api.mistral.ai/v1/audio/transcriptions}
-      - MODEL_OVERRIDE=${VEXA_TRANSCRIPTION_MODEL:-voxtral-mini-latest}
+      - MODEL_OVERRIDE=${VEXA_TRANSCRIPTION_MODEL:-voxtral-mini-transcribe-realtime-2602}
       - UPSTREAM_TIMEOUT_S=${VEXA_TRANSCRIPTION_TIMEOUT_S:-120}
       # Webapp callback so the Mistral key set in the admin UI takes
       # effect at runtime (cached ~60s). Falls back to MISTRAL_API_KEY.

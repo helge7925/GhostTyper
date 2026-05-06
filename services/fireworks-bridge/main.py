@@ -35,7 +35,7 @@ UPSTREAM_URL = os.environ.get(
     "UPSTREAM_URL",
     "https://api.mistral.ai/v1/audio/transcriptions",
 )
-DEFAULT_MODEL = os.environ.get("MODEL_OVERRIDE", "voxtral-mini-latest")
+DEFAULT_MODEL = os.environ.get("MODEL_OVERRIDE", "voxtral-mini-transcribe-realtime-2602")
 TIMEOUT_S = float(os.environ.get("UPSTREAM_TIMEOUT_S", "120"))
 
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "").rstrip("/")
