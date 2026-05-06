@@ -7,8 +7,13 @@ import { getIntegration, redactConfig, upsertIntegration } from '../../../../lib
 
 const PROVIDER = 'vexa';
 
-const STRING_FIELDS = ['baseUrl', 'defaultBotName', 'defaultLanguage', 'transcriptionBackend'];
-const SECRET_FIELDS = ['adminToken', 'webhookSecret'];
+// Vexa runs as a sibling container in the local Compose stack, so the
+// base URL and admin token are operator-managed (set via VEXA_BASE_URL
+// and VEXA_ADMIN_API_TOKEN in `.env`). They are intentionally not
+// user-editable — keeping per-org overrides for these would just
+// permit accidental misconfiguration toward a foreign Vexa instance.
+const STRING_FIELDS = ['defaultBotName', 'defaultLanguage', 'transcriptionBackend'];
+const SECRET_FIELDS = ['webhookSecret'];
 
 function pickConfigUpdate(body) {
   if (!body || typeof body !== 'object') return {};
@@ -52,12 +57,14 @@ async function handler(req, res) {
     case 'GET': {
       try {
         const integration = await getIntegration(orgId, PROVIDER);
-        const operatorBaseUrl = !!process.env.VEXA_BASE_URL;
-        const operatorAdminToken = !!process.env.VEXA_ADMIN_API_TOKEN;
         return res.status(200).json({
           provider: PROVIDER,
           enabled: integration.enabled,
-          operatorManaged: operatorBaseUrl && operatorAdminToken,
+          // The base URL and admin token are always operator-managed in
+          // this build. We still emit `operatorManaged: true` for any
+          // legacy clients that gate behaviour on it, but the UI no
+          // longer surfaces those fields at all.
+          operatorManaged: true,
           config: redactConfig(integration.config),
           updatedAt: integration.updatedAt || null,
         });
@@ -82,17 +89,6 @@ async function handler(req, res) {
         const existingIntegration = await getIntegration(orgId, PROVIDER);
         if (!existingIntegration.config?.webhookSecret) {
           partial.webhookSecret = `whsec_${crypto.randomBytes(32).toString('hex')}`;
-        }
-      }
-
-      if (partial.baseUrl) {
-        try {
-          const url = new URL(partial.baseUrl);
-          if (!['http:', 'https:'].includes(url.protocol)) {
-            return res.status(400).json({ code: 'INVALID_URL', message: 'Ungültiges Protokoll für die Vexa-URL.' });
-          }
-        } catch {
-          return res.status(400).json({ code: 'INVALID_URL', message: 'Ungültige Vexa-URL.' });
         }
       }
 

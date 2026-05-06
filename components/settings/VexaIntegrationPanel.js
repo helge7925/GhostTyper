@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Plug, ShieldCheck, ShieldAlert, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plug, ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react';
 import { useTranslations } from '../../lib/i18n';
 import { useUiFeedback } from '../../lib/use-ui-feedback';
 import { invalidateVexaIntegrationCache } from '../../lib/use-vexa-integration';
@@ -12,18 +12,17 @@ export default function VexaIntegrationPanel({ canEdit }) {
   const tCommon = useTranslations('common');
   const { showToast } = useUiFeedback();
 
+  // The Vexa base URL and admin token are always operator-managed — set
+  // once via ENV in the Compose stack and not user-editable. We don't
+  // surface them in the UI any more, so the only fields here are the
+  // enable toggle, the default bot name, and the default language.
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [operatorManaged, setOperatorManaged] = useState(false);
   const [enabled, setEnabled] = useState(false);
-  const [baseUrl, setBaseUrl] = useState('');
   const [defaultBotName, setDefaultBotName] = useState('');
   const [defaultLanguage, setDefaultLanguage] = useState('de');
-  const [adminTokenInput, setAdminTokenInput] = useState('');
-  const [adminTokenConfigured, setAdminTokenConfigured] = useState(false);
   const [healthState, setHealthState] = useState(null);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -32,13 +31,9 @@ export default function VexaIntegrationPanel({ canEdit }) {
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       const cfg = data.config || {};
-      setOperatorManaged(!!data.operatorManaged);
       setEnabled(!!data.enabled);
-      setBaseUrl(cfg.baseUrl || '');
       setDefaultBotName(cfg.defaultBotName || '');
       setDefaultLanguage(cfg.defaultLanguage || 'de');
-      setAdminTokenConfigured(!!cfg.adminTokenConfigured);
-      setAdminTokenInput('');
     } catch (error) {
       showToast(t('loadError'), 'error');
     } finally {
@@ -56,10 +51,6 @@ export default function VexaIntegrationPanel({ canEdit }) {
       defaultBotName: defaultBotName || null,
       defaultLanguage: defaultLanguage || 'de',
     };
-    if (!operatorManaged) {
-      body.baseUrl = baseUrl || null;
-      if (adminTokenInput) body.adminToken = adminTokenInput;
-    }
     const res = await fetch(ENDPOINT, {
       method: 'PUT',
       credentials: 'same-origin',
@@ -139,8 +130,6 @@ export default function VexaIntegrationPanel({ canEdit }) {
     );
   }
 
-  const showAdvanced = !operatorManaged || advancedOpen;
-
   return (
     <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl animate-fade-in space-y-6">
       <header className="flex items-start justify-between gap-4">
@@ -167,9 +156,7 @@ export default function VexaIntegrationPanel({ canEdit }) {
       <div className="flex items-center justify-between gap-4 bg-hover-subtle border border-subtle rounded-xl px-4 py-3">
         <div>
           <p className="text-sm text-primary font-medium">{t('enableLabel')}</p>
-          <p className="text-xs text-secondary mt-0.5">
-            {operatorManaged ? t('enableHintSimple') : t('enableHint')}
-          </p>
+          <p className="text-xs text-secondary mt-0.5">{t('enableHintSimple')}</p>
         </div>
         <label className="inline-flex items-center cursor-pointer">
           <input
@@ -209,55 +196,6 @@ export default function VexaIntegrationPanel({ canEdit }) {
           </select>
         </div>
       </div>
-
-      {operatorManaged && (
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen((v) => !v)}
-          className="text-[11px] text-secondary hover:text-primary inline-flex items-center gap-1"
-        >
-          {advancedOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          {t('advancedToggle')}
-        </button>
-      )}
-
-      {showAdvanced && (
-        <div className="space-y-4 border-t border-subtle pt-4">
-          {operatorManaged && (
-            <p className="text-[11px] text-secondary italic">{t('advancedHint')}</p>
-          )}
-          <div>
-            <label className="block text-xs font-medium text-secondary mb-1.5">{t('baseUrlLabel')}</label>
-            <input
-              type="url"
-              value={baseUrl}
-              disabled={!canEdit}
-              placeholder={operatorManaged ? t('managedByOperator') : 'https://vexa-lite.example.eu'}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none disabled:opacity-60"
-            />
-            <p className="mt-1 text-[10px] text-secondary italic">{t('baseUrlHint')}</p>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-secondary mb-1.5">
-              {t('adminTokenLabel')}
-              {adminTokenConfigured && (
-                <span className="ml-2 text-[10px] uppercase text-success/80 tracking-wider">{t('configured')}</span>
-              )}
-            </label>
-            <input
-              type="password"
-              autoComplete="off"
-              value={adminTokenInput}
-              disabled={!canEdit}
-              placeholder={adminTokenConfigured ? '••••••••' : (operatorManaged ? t('managedByOperator') : '')}
-              onChange={(e) => setAdminTokenInput(e.target.value)}
-              className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none disabled:opacity-60"
-            />
-            <p className="mt-1 text-[10px] text-secondary italic">{t('adminTokenHint')}</p>
-          </div>
-        </div>
-      )}
 
       <div className="flex items-center justify-end gap-3 pt-2 border-t border-subtle">
         <button
