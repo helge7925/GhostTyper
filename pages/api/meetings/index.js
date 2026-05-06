@@ -14,6 +14,7 @@ import {
   setUserWebhook,
 } from '../../../lib/api/vexa';
 import { startBridgeForTranscription } from '../../../lib/vexa-bridge';
+import { ensureShareTokenForRow } from '../../../lib/share-chat-poster';
 import { logError } from '../../../lib/observability';
 
 const PROVIDER = 'vexa';
@@ -252,6 +253,25 @@ async function handler(req, res) {
     ],
   );
   const transcription = insertResult.rows[0];
+
+  // When translation is enabled at meeting start we mint the public
+  // share-token NOW so it's ready by the time the bot joins. The
+  // `meeting.started` webhook will then auto-post the link into the
+  // meeting chat once the bot is actually in the room (see
+  // `lib/share-chat-poster.js`).
+  if (translationConfig) {
+    try {
+      await ensureShareTokenForRow({
+        transcriptionId: transcription.id,
+        organizationId: orgId,
+        ttlHours: 24,
+      });
+    } catch (error) {
+      logError('meetings.share_token_mint_failed', error, {
+        transcriptionId: transcription.id,
+      });
+    }
+  }
 
   await addTranscriptionEvent({
     transcriptionId: transcription.id,

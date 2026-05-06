@@ -206,6 +206,11 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
                 {!translationLanguagesValid && (
                   <p className="text-[10px] text-danger">{t('translation.sameLanguageError')}</p>
                 )}
+                <p className="text-[10px] text-secondary leading-snug">
+                  Sobald der Bot dem Meeting beitritt, postet er automatisch einen
+                  Übersetzungs-Link in den Meeting-Chat — alle Teilnehmer können ihn anklicken
+                  und sehen Original + Übersetzung als Text und hören das Audio.
+                </p>
                 <p className="text-[10px] text-warning">{t('translation.costWarning')}</p>
               </>
             )}

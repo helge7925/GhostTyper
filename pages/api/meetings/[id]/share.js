@@ -5,6 +5,7 @@ import { hasPermission } from '../../../../lib/permissions';
 import { logAuditEvent } from '../../../../lib/audit-log';
 import { addTranscriptionEvent } from '../../../../lib/transcription-events';
 import { mintShareToken, revokeShareToken } from '../../../../lib/share-tokens';
+import { ensureShareLinkPostedToChat } from '../../../../lib/share-chat-poster';
 
 /**
  * Manage the public share-link for the live-translation companion view.
@@ -73,12 +74,22 @@ async function handler(req, res) {
         return res.status(403).json({ code: 'FORBIDDEN', message: 'Keine Berechtigung.' });
       }
       const wantEnabled = req.body?.enabled === true;
+      const postToChat = req.body?.postToChat !== false; // default true
       try {
         if (wantEnabled) {
           const ttlHours = Number(req.body?.ttlHours) > 0 && Number(req.body?.ttlHours) <= 168
             ? Number(req.body.ttlHours)
             : 24;
           const result = await mintShareToken({ transcriptionId, organizationId: orgId, ttlHours });
+
+          // Reset the idempotency stamp so this newly-minted token
+          // gets posted into chat — the previous token (if any) is
+          // dead, so re-posting is exactly what we want.
+          await query(
+            `UPDATE transcriptions SET share_link_posted_at = NULL WHERE id = $1`,
+            [transcriptionId],
+          );
+
           await addTranscriptionEvent({
             transcriptionId,
             userId,
@@ -94,10 +105,29 @@ async function handler(req, res) {
             targetId: String(transcriptionId),
             metadata: { ttlHours, expiresAt: result.expiresAt },
           });
+
+          // Best-effort chat-post. Failure here doesn't fail the API
+          // call; the host always sees the URL in the UI and can
+          // copy/paste manually.
+          let chatPostResult = null;
+          if (postToChat) {
+            try {
+              chatPostResult = await ensureShareLinkPostedToChat({
+                transcriptionId,
+                organizationId: orgId,
+              });
+            } catch (error) {
+              logApiError('share-toggle chat post failed', error, { transcriptionId, orgId });
+              chatPostResult = { posted: false, reason: 'exception' };
+            }
+          }
+
           return res.status(200).json({
             active: true,
             token: result.token,
             expiresAt: result.expiresAt,
+            chatPosted: !!chatPostResult?.posted,
+            chatPostReason: chatPostResult?.reason || null,
           });
         }
 

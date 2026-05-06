@@ -8,6 +8,7 @@ import { decryptSecret } from '../../../lib/secrets';
 import { getTranscript, mapVexaTranscriptToGhostTyper } from '../../../lib/api/vexa';
 import { runManualAnalysisJob } from '../../../lib/manual-analysis';
 import { startBridgeForTranscription, stopBridgeForTranscription } from '../../../lib/vexa-bridge';
+import { ensureShareLinkPostedToChat } from '../../../lib/share-chat-poster';
 import { logUsage } from '../../../lib/usage';
 
 function totalAudioSeconds(segments) {
@@ -103,6 +104,22 @@ async function handleStarted(transcription, payload) {
     meta: { event: payload.event_type },
   });
   startBridgeForTranscription(transcription.id);
+
+  // If translation+share were enabled at meeting start, the bot is now
+  // in the room and can post the share-link into the meeting chat so
+  // every participant can open the companion view in their own
+  // browser. Idempotent — skipped if no share-token exists or the
+  // post already happened (manual toggle, retried webhook, etc.).
+  try {
+    await ensureShareLinkPostedToChat({
+      transcriptionId: transcription.id,
+      organizationId: transcription.organization_id,
+    });
+  } catch (error) {
+    logApiError('vexa webhook share-link auto-post failed', error, {
+      transcriptionId: transcription.id,
+    });
+  }
 }
 
 async function handleStatusChange(transcription, payload) {
