@@ -25,6 +25,27 @@ test('parseMeetingUrl returns null for unknown platforms', () => {
   assert.equal(parseMeetingUrl(null), null);
 });
 
+test('parseMeetingUrl recognises modern Nextcloud Talk URLs', () => {
+  const result = parseMeetingUrl('https://cloud.example.com/call/abc123def');
+  assert.equal(result.platform, 'nextcloud_talk');
+  assert.equal(result.nativeMeetingId, 'abc123def');
+  assert.equal(result.nextcloudHost, 'cloud.example.com');
+});
+
+test('parseMeetingUrl recognises legacy Nextcloud Talk URLs (index.php)', () => {
+  const result = parseMeetingUrl('https://cloud.example.com/index.php/call/Tk2024xyz');
+  assert.equal(result.platform, 'nextcloud_talk');
+  assert.equal(result.nativeMeetingId, 'Tk2024xyz');
+  assert.equal(result.nextcloudHost, 'cloud.example.com');
+});
+
+test('parseMeetingUrl ignores generic /call paths without a token', () => {
+  // Path component must be /call/<6+ alphanumeric>; `/call` alone or
+  // `/some-call` must NOT trigger the Talk branch.
+  assert.equal(parseMeetingUrl('https://example.com/call'), null);
+  assert.equal(parseMeetingUrl('https://example.com/calling/team'), null);
+});
+
 test('mapVexaTranscriptToGhostTyper builds text and unique speakers', () => {
   const result = mapVexaTranscriptToGhostTyper({
     segments: [

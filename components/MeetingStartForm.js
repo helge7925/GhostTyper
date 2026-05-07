@@ -15,12 +15,16 @@ import { useUiFeedback } from '../lib/use-ui-feedback';
 const MEET_REGEX = /(?:meet\.google\.com\/)([a-z]{3}-[a-z]{4}-[a-z]{3})/i;
 const ZOOM_REGEX = /zoom\.us\/j\/(\d+)/i;
 const TEAMS_REGEX = /teams\.(?:microsoft|live)\.com\/[^\s]+meeting/i;
+// Nextcloud Talk public-link shape — host varies per install. Modern
+// path is /call/<token>; legacy installs use /index.php/call/<token>.
+const NEXTCLOUD_TALK_REGEX = /^https?:\/\/[^/\s]+\/(?:index\.php\/)?call\/[A-Za-z0-9]{6,}/i;
 
 function detectPlatform(url) {
   if (!url) return null;
   if (MEET_REGEX.test(url)) return 'google_meet';
   if (TEAMS_REGEX.test(url)) return 'teams';
   if (ZOOM_REGEX.test(url)) return 'zoom';
+  if (NEXTCLOUD_TALK_REGEX.test(url)) return 'nextcloud_talk';
   return null;
 }
 
@@ -146,6 +150,11 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
             <p className="mt-1 text-[10px] text-secondary">
               {platform ? t(`platform.${platform}`) : t('urlHint')}
             </p>
+            {platform === 'nextcloud_talk' && (
+              <p className="mt-1.5 text-[10px] text-warning">
+                {t('nextcloudTalkLobbyHint')}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

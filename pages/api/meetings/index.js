@@ -18,7 +18,7 @@ import { ensureShareTokenForRow } from '../../../lib/share-chat-poster';
 import { logError } from '../../../lib/observability';
 
 const PROVIDER = 'vexa';
-const SUPPORTED_PLATFORMS = new Set(['google_meet', 'teams', 'zoom']);
+const SUPPORTED_PLATFORMS = new Set(['google_meet', 'teams', 'zoom', 'nextcloud_talk']);
 
 async function loadUserEmail(userId) {
   const result = await query('SELECT email, name FROM users WHERE id = $1', [userId]);

@@ -26,11 +26,12 @@
       "title": "Remote-Meeting transkribieren",
       "description": "Ein Bot tritt als Teilnehmer dem Meeting bei und liefert das Transkript live.",
       "urlLabel": "Meeting-Link",
-      "urlHint": "Google Meet, Microsoft Teams oder Zoom.",
+      "urlHint": "Google Meet, Microsoft Teams, Zoom oder Nextcloud Talk.",
       "platform": {
         "google_meet": "Google Meet erkannt.",
         "teams": "Microsoft Teams erkannt.",
-        "zoom": "Zoom erkannt."
+        "zoom": "Zoom erkannt.",
+        "nextcloud_talk": "Nextcloud Talk erkannt."
       },
       "botNameLabel": "Anzeigename des Bots im Meeting",
       "languageLabel": "Sprache",
@@ -57,7 +58,8 @@
           "speakIn": "Sprechen in",
           "costWarning": "Kostet Voxtral-TTS pro generierter Audio-Sekunde — typisch 0,90 €/Stunde Meeting."
         }
-      }
+      },
+      "nextcloudTalkLobbyHint": "Hinweis: Bei Nextcloud Talk muss der Lobby-Modus deaktiviert sein, damit der Bot ohne Moderator-Bestätigung beitreten kann."
     },
     "detail": {
       "translation": {
@@ -161,7 +163,18 @@
     "teamLong": "Team-Workspace",
     "plan": "Plan",
     "yourRole": "Ihre Rolle",
-    "members": "Mitglieder",
+    "members": {
+      "title": "Mitglieder",
+      "inviteCta": "Person einladen",
+      "inviteEmail": "E-Mail",
+      "inviteRole": "Rolle",
+      "inviteSubmit": "Einladen",
+      "removeMember": "Entfernen",
+      "changeRole": "Rolle ändern",
+      "pendingInvites": "Offene Einladungen",
+      "expires": "Läuft ab am {date}",
+      "revoke": "Zurückziehen"
+    },
     "memberCount": "Mitglieder",
     "type": "Workspace-Typ",
     "switcherLabel": "Workspace wechseln",
@@ -248,18 +261,6 @@
         "template_generation": "Vorlagen-Generierung",
         "meeting_transcription": "Meeting-Transkription (Whisper)"
       }
-    },
-    "members": {
-      "title": "Mitglieder",
-      "inviteCta": "Person einladen",
-      "inviteEmail": "E-Mail",
-      "inviteRole": "Rolle",
-      "inviteSubmit": "Einladen",
-      "removeMember": "Entfernen",
-      "changeRole": "Rolle ändern",
-      "pendingInvites": "Offene Einladungen",
-      "expires": "Läuft ab am {date}",
-      "revoke": "Zurückziehen"
     }
   },
   "audit": {
@@ -779,9 +780,18 @@
     "quickstartHint": "Vorlage wählen oder aus einer kurzen Beschreibung erzeugen.",
     "showKeys": "Keys anzeigen",
     "presets": {
-      "invoice": { "label": "Rechnung", "description": "Positionen mit Datum und Person" },
-      "fixed": { "label": "Festes Formular", "description": "Zeilentitel und Spalten vorgeben" },
-      "actions": { "label": "Aktionsliste", "description": "Aufgaben aus Protokollen" }
+      "invoice": {
+        "label": "Rechnung",
+        "description": "Positionen mit Datum und Person"
+      },
+      "fixed": {
+        "label": "Festes Formular",
+        "description": "Zeilentitel und Spalten vorgeben"
+      },
+      "actions": {
+        "label": "Aktionsliste",
+        "description": "Aufgaben aus Protokollen"
+      }
     },
     "describePlaceholder": "z. B. Tabelle mit Datum, ausgefüllt von, drei Prüfpunkten als Zeilen und Spalten für Wert und Bemerkung",
     "generateSuggestion": "Vorschlag erzeugen",

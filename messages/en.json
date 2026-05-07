@@ -26,11 +26,12 @@
       "title": "Transcribe a remote meeting",
       "description": "A bot joins the meeting as a participant and streams the transcript live.",
       "urlLabel": "Meeting link",
-      "urlHint": "Google Meet, Microsoft Teams or Zoom.",
+      "urlHint": "Google Meet, Microsoft Teams, Zoom or Nextcloud Talk.",
       "platform": {
         "google_meet": "Google Meet detected.",
         "teams": "Microsoft Teams detected.",
-        "zoom": "Zoom detected."
+        "zoom": "Zoom detected.",
+        "nextcloud_talk": "Nextcloud Talk detected."
       },
       "botNameLabel": "Bot display name in the meeting",
       "languageLabel": "Language",
@@ -57,7 +58,8 @@
           "speakIn": "Speak in",
           "costWarning": "Costs Voxtral TTS per generated audio second — typically €0.90 per meeting hour."
         }
-      }
+      },
+      "nextcloudTalkLobbyHint": "Note: For Nextcloud Talk the room's lobby mode must be disabled so the bot can join without moderator approval."
     },
     "detail": {
       "translation": {
@@ -161,7 +163,18 @@
     "teamLong": "Team workspace",
     "plan": "Plan",
     "yourRole": "Your role",
-    "members": "Members",
+    "members": {
+      "title": "Members",
+      "inviteCta": "Invite a person",
+      "inviteEmail": "Email",
+      "inviteRole": "Role",
+      "inviteSubmit": "Invite",
+      "removeMember": "Remove",
+      "changeRole": "Change role",
+      "pendingInvites": "Pending invites",
+      "expires": "Expires on {date}",
+      "revoke": "Revoke"
+    },
     "memberCount": "Members",
     "type": "Workspace type",
     "switcherLabel": "Switch workspace",
@@ -248,18 +261,6 @@
         "template_generation": "Template generation",
         "meeting_transcription": "Meeting transcription (Whisper)"
       }
-    },
-    "members": {
-      "title": "Members",
-      "inviteCta": "Invite a person",
-      "inviteEmail": "Email",
-      "inviteRole": "Role",
-      "inviteSubmit": "Invite",
-      "removeMember": "Remove",
-      "changeRole": "Change role",
-      "pendingInvites": "Pending invites",
-      "expires": "Expires on {date}",
-      "revoke": "Revoke"
     }
   },
   "audit": {
@@ -779,9 +780,18 @@
     "quickstartHint": "Pick a template or generate one from a short description.",
     "showKeys": "Show keys",
     "presets": {
-      "invoice": { "label": "Invoice", "description": "Line items with date and person" },
-      "fixed": { "label": "Fixed form", "description": "Predefined rows and columns" },
-      "actions": { "label": "Action list", "description": "Tasks from minutes" }
+      "invoice": {
+        "label": "Invoice",
+        "description": "Line items with date and person"
+      },
+      "fixed": {
+        "label": "Fixed form",
+        "description": "Predefined rows and columns"
+      },
+      "actions": {
+        "label": "Action list",
+        "description": "Tasks from minutes"
+      }
     },
     "describePlaceholder": "e.g. table with date, filled out by, three checkpoints as rows and columns for value and remark",
     "generateSuggestion": "Generate suggestion",
