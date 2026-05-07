@@ -172,6 +172,14 @@ services:
     restart: unless-stopped
     profiles: ["vexa"]
     networks: [internal]
+    # Vexa-Dashboard läuft inside the all-in-one vexa-lite image auf
+    # Port 3000. Standard-Bind ist localhost-only — als Operator-Tool
+    # gedacht (Bot-Health, VNC, Live-Transcript-Debug). Auth läuft über
+    # Vexa's eigenen admin-api-Token, NICHT über GhostTyper-NextAuth.
+    # Für externen Zugriff: hinter SSH-Tunnel oder Traefik mit eigener
+    # Auth davorsetzen, oder den 127.0.0.1-Prefix entfernen.
+    ports:
+      - "127.0.0.1:${VEXA_DASHBOARD_HOST_PORT:-3300}:3000"
     mem_limit: 2g
     cpus: 2
     environment:
