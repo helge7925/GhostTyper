@@ -22,6 +22,10 @@ const NO_LAYOUT_ROUTES = new Set([
   // logged in, so the GhostTyper sidebar/topbar would 404 on its
   // session-dependent calls and create a confusing first impression.
   '/share/[token]',
+  // Bot-camera overlay rendered into the Vexa bot's webcam canvas.
+  // Headless Chromium iframe — must be a bare-bones black HTML page
+  // with no GhostTyper layout chrome.
+  '/share/[token]/overlay',
 ]);
 
 function isEditableTarget(target) {

@@ -20,7 +20,7 @@ async function loadTranscriptionSnapshot(transcriptionId, orgId, userId) {
             document_html, created_at, updated_at, user_id,
             source, meeting_platform, native_meeting_id, external_meeting_id, bot_status,
             meeting_started_at, meeting_ended_at,
-            translated_segments, translation_config
+            translated_segments, translation_config, in_meeting_overlay_enabled
      FROM transcriptions
      WHERE id = $1 AND organization_id = $2`,
     [transcriptionId, orgId]

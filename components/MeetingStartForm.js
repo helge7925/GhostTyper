@@ -42,6 +42,11 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
   const [translationEnabled, setTranslationEnabled] = useState(false);
   const [translationLangA, setTranslationLangA] = useState('de');
   const [translationLangB, setTranslationLangB] = useState('en');
+  // In-meeting overlay (Phase 1 of in-meeting-translation): when on,
+  // the bot renders the share-link companion page on its webcam tile
+  // so participants see live subtitles + QR-code without opening the
+  // companion-tab themselves. Only meaningful when translation is on.
+  const [overlayEnabled, setOverlayEnabled] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -53,6 +58,7 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
       setTranslationEnabled(false);
       setTranslationLangA('de');
       setTranslationLangB('en');
+      setOverlayEnabled(false);
     }
   }, [open, defaultBotName, defaultLanguage]);
 
@@ -78,6 +84,7 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
           translation: translationEnabled
             ? { enabled: true, fromLang: translationLangA, toLang: translationLangB }
             : undefined,
+          inMeetingOverlay: translationEnabled && overlayEnabled ? true : undefined,
         }),
       });
       const payload = await res.json().catch(() => ({}));
@@ -211,6 +218,22 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
                   Übersetzungs-Link in den Meeting-Chat — alle Teilnehmer können ihn anklicken
                   und sehen Original + Übersetzung als Text und hören das Audio.
                 </p>
+
+                <label className="flex items-start gap-3 text-xs text-secondary border-t border-subtle pt-2">
+                  <input
+                    type="checkbox"
+                    checked={overlayEnabled}
+                    onChange={(e) => setOverlayEnabled(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="text-primary font-medium">{t('translation.overlay.enable')}</span>
+                    <span className="block text-[10px] text-secondary mt-0.5 leading-snug">
+                      {t('translation.overlay.hint')}
+                    </span>
+                  </span>
+                </label>
+
                 <p className="text-[10px] text-warning">{t('translation.costWarning')}</p>
               </>
             )}

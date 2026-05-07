@@ -51,7 +51,8 @@ async function handler(req, res) {
                   text, segments, speakers, analysis, analysis_type, analysis_meta, table_schema, document_html,
                   error, folder_id, is_favorite, created_at, updated_at,
                   source, meeting_platform, native_meeting_id, external_meeting_id, bot_status,
-                  meeting_started_at, meeting_ended_at
+                  meeting_started_at, meeting_ended_at,
+                  translated_segments, translation_config, in_meeting_overlay_enabled
            FROM transcriptions
            WHERE id = $1 AND organization_id = $2`,
           [transId, orgId]

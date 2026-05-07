@@ -9,6 +9,7 @@ import { getTranscript, mapVexaTranscriptToGhostTyper } from '../../../lib/api/v
 import { runManualAnalysisJob } from '../../../lib/manual-analysis';
 import { startBridgeForTranscription, stopBridgeForTranscription } from '../../../lib/vexa-bridge';
 import { ensureShareLinkPostedToChat } from '../../../lib/share-chat-poster';
+import { ensureOverlayStarted, clearOverlay } from '../../../lib/in-meeting-overlay';
 import { logUsage } from '../../../lib/usage';
 
 function totalAudioSeconds(segments) {
@@ -120,6 +121,21 @@ async function handleStarted(transcription, payload) {
       transcriptionId: transcription.id,
     });
   }
+
+  // If the host opted into the in-meeting subtitle overlay, switch the
+  // bot's webcam canvas to the public `/share/[token]/overlay` page so
+  // participants see the live translation on the bot's gallery tile —
+  // even without opening the companion-tab themselves.
+  try {
+    await ensureOverlayStarted({
+      transcriptionId: transcription.id,
+      organizationId: transcription.organization_id,
+    });
+  } catch (error) {
+    logApiError('vexa webhook overlay start failed', error, {
+      transcriptionId: transcription.id,
+    });
+  }
 }
 
 async function handleStatusChange(transcription, payload) {
@@ -153,10 +169,24 @@ async function handleFailed(transcription, payload) {
     message: `Bot fehlgeschlagen: ${reason}`,
     meta: { event: payload.event_type },
   });
+  // Best-effort overlay cleanup. If the bot got far enough to have an
+  // overlay running, revert its camera so it doesn't keep showing
+  // stale subtitles while it leaves.
+  await clearOverlay({
+    transcriptionId: transcription.id,
+    organizationId: transcription.organization_id,
+  }).catch(() => { /* best-effort */ });
 }
 
 async function handleCompleted(transcription, payload, vexaConfig) {
   stopBridgeForTranscription(transcription.id, 'meeting.completed');
+  // Clear the bot-camera overlay before the bot leaves (best-effort).
+  // Doing this early — before the long getTranscript path — so the
+  // bot's tile reverts as fast as possible if it's still in the room.
+  await clearOverlay({
+    transcriptionId: transcription.id,
+    organizationId: transcription.organization_id,
+  }).catch(() => { /* best-effort */ });
   const meeting = pickMeetingFields(payload);
   const apiKey = await loadUserToken(transcription.user_id, transcription.organization_id);
   if (!apiKey) {

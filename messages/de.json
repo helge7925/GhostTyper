@@ -46,7 +46,11 @@
         "languageA": "Sprache A",
         "languageB": "Sprache B",
         "sameLanguageError": "Bitte zwei verschiedene Sprachen wählen.",
-        "costWarning": "Die Live-Übersetzung verursacht zusätzliche Mistral-Kosten (Translate + Voxtral TTS) — typisch 3–5 €/Stunde Meeting."
+        "costWarning": "Die Live-Übersetzung verursacht zusätzliche Mistral-Kosten (Translate + Voxtral TTS) — typisch 3–5 €/Stunde Meeting.",
+        "overlay": {
+          "enable": "Untertitel im Meeting auf Bot-Kachel anzeigen",
+          "hint": "Der Bot zeigt die letzte Übersetzung in großer Schrift auf seiner Webcam-Kachel — auch ohne Companion-Tab sichtbar. Teilnehmer pinnen die Bot-Kachel, um die Untertitel zu lesen."
+        }
       }
     },
     "detail": {

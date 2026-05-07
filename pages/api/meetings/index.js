@@ -137,6 +137,7 @@ async function handler(req, res) {
     folderId,
     consentAccepted,
     translation: rawTranslation,
+    inMeetingOverlay: rawInMeetingOverlay,
   } = body;
 
   // Optional live-translation block; if absent the row is created with
@@ -150,6 +151,10 @@ async function handler(req, res) {
     if (!fromLang || !toLang || fromLang === toLang) return null;
     return { enabled: true, fromLang, toLang, autoDetect: true };
   })();
+
+  // Subtitle overlay only makes sense when translation is on. If the
+  // caller asks for overlay without translation we silently drop it.
+  const inMeetingOverlay = !!translationConfig && rawInMeetingOverlay === true;
 
   if (consentAccepted !== true) {
     return res.status(400).json({
@@ -235,8 +240,8 @@ async function handler(req, res) {
     `INSERT INTO transcriptions
        (user_id, organization_id, original_name, source, meeting_platform, native_meeting_id,
         bot_status, status, template, model, diarize, custom_prompt, auto_analyze, folder_id,
-        translation_config)
-     VALUES ($1, $2, $3, 'vexa', $4, $5, 'requested', 'pending', $6, $7, true, $8, $9, $10, $11::jsonb)
+        translation_config, in_meeting_overlay_enabled)
+     VALUES ($1, $2, $3, 'vexa', $4, $5, 'requested', 'pending', $6, $7, true, $8, $9, $10, $11::jsonb, $12)
      RETURNING id, status, source, meeting_platform, native_meeting_id, created_at`,
     [
       userId,
@@ -250,6 +255,7 @@ async function handler(req, res) {
       shouldAutoAnalyze,
       Number.isFinite(Number(folderId)) ? Number(folderId) : null,
       translationConfig ? JSON.stringify(translationConfig) : null,
+      inMeetingOverlay,
     ],
   );
   const transcription = insertResult.rows[0];

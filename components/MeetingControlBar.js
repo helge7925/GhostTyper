@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Square, Languages, ArrowLeftRight, Share2, Copy, Check } from 'lucide-react';
+import { Loader2, Square, Languages, ArrowLeftRight, Share2, Copy, Check, Tv } from 'lucide-react';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 
 export default function MeetingControlBar({
@@ -7,6 +7,7 @@ export default function MeetingControlBar({
   currentLanguage,
   botStatus,
   translationConfig,
+  inMeetingOverlayEnabled = false,
   onChanged,
 }) {
   // `useUiFeedback().confirm()` requires the consumer to render <ConfirmDialog />
@@ -56,6 +57,38 @@ export default function MeetingControlBar({
   const handleSwapLanguages = () => {
     if (!translationOn) return;
     sendTranslation({ enabled: true, fromLang: translationTo, toLang: translationFrom });
+  };
+
+  // Overlay toggle: piggy-backs on the same /translation PUT endpoint
+  // by sending the current translation config + the overlay flag.
+  const [updatingOverlay, setUpdatingOverlay] = useState(false);
+  const handleOverlayToggle = async (event) => {
+    if (!translationOn) return;
+    const next = event.target.checked;
+    setUpdatingOverlay(true);
+    try {
+      const res = await fetch(`/api/meetings/${transcriptionId}/translation`, {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: true,
+          fromLang: translationFrom,
+          toLang: translationTo,
+          inMeetingOverlay: next,
+        }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.message || 'Untertitel-Kachel konnte nicht aktualisiert werden.');
+      }
+      showToast(next ? 'Untertitel-Kachel aktiv.' : 'Untertitel-Kachel deaktiviert.', 'success');
+      onChanged?.();
+    } catch (error) {
+      showToast(error.message, 'error');
+    } finally {
+      setUpdatingOverlay(false);
+    }
   };
 
   // Share-link state. We hydrate it once on mount via GET so a page
@@ -230,6 +263,24 @@ export default function MeetingControlBar({
             )}
             {updatingTranslation && <Loader2 className="w-3 h-3 animate-spin text-secondary" />}
           </label>
+
+          {translationOn && (
+            <label
+              className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs border border-subtle bg-hover-subtle cursor-pointer"
+              title="Untertitel-Kachel im Meeting (Bot-Webcam)"
+            >
+              <Tv className="w-3.5 h-3.5 text-secondary" />
+              <input
+                type="checkbox"
+                checked={inMeetingOverlayEnabled}
+                disabled={updatingOverlay}
+                onChange={handleOverlayToggle}
+                className="accent-accent"
+              />
+              <span className="text-secondary">Untertitel-Kachel</span>
+              {updatingOverlay && <Loader2 className="w-3 h-3 animate-spin text-secondary" />}
+            </label>
+          )}
 
           <button
             type="button"

@@ -529,6 +529,7 @@ export default function TranscriptionDetail() {
                   currentLanguage={transcription.language || 'de'}
                   botStatus={transcription.bot_status}
                   translationConfig={transcription.translation_config}
+                  inMeetingOverlayEnabled={!!transcription.in_meeting_overlay_enabled}
                   onChanged={() => getTranscription(transcription.id).then(setTranscription).catch(() => {})}
                 />
               )}

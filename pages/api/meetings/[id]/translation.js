@@ -4,6 +4,7 @@ import { withOrgScope } from '../../../../lib/api/with-org-scope';
 import { hasPermission } from '../../../../lib/permissions';
 import { logAuditEvent } from '../../../../lib/audit-log';
 import { addTranscriptionEvent } from '../../../../lib/transcription-events';
+import { ensureOverlayStarted, clearOverlay } from '../../../../lib/in-meeting-overlay';
 
 /**
  * PUT /api/meetings/[id]/translation
@@ -44,6 +45,12 @@ async function handler(req, res) {
   const wantEnabled = body.enabled === true;
   const fromLang = typeof body.fromLang === 'string' ? body.fromLang.slice(0, 8).trim() : '';
   const toLang = typeof body.toLang === 'string' ? body.toLang.slice(0, 8).trim() : '';
+  // Overlay can only be enabled when translation is on. Pass `null`
+  // (or omit the key) to leave it untouched; pass `true`/`false` to
+  // explicitly toggle.
+  const wantOverlayRaw = body.inMeetingOverlay;
+  const overlayTouched = typeof wantOverlayRaw === 'boolean';
+  const wantOverlay = wantEnabled && wantOverlayRaw === true;
 
   if (wantEnabled && (!fromLang || !toLang)) {
     return res.status(400).json({
@@ -76,16 +83,48 @@ async function handler(req, res) {
     : null;
 
   try {
-    await query(
-      `UPDATE transcriptions
-          SET translation_config = $1::jsonb,
-              updated_at = NOW()
-        WHERE id = $2 AND organization_id = $3`,
-      [nextConfig ? JSON.stringify(nextConfig) : null, transcriptionId, orgId],
-    );
+    if (overlayTouched) {
+      await query(
+        `UPDATE transcriptions
+            SET translation_config = $1::jsonb,
+                in_meeting_overlay_enabled = $2,
+                updated_at = NOW()
+          WHERE id = $3 AND organization_id = $4`,
+        [nextConfig ? JSON.stringify(nextConfig) : null, wantOverlay, transcriptionId, orgId],
+      );
+    } else {
+      await query(
+        `UPDATE transcriptions
+            SET translation_config = $1::jsonb,
+                updated_at = NOW()
+          WHERE id = $2 AND organization_id = $3`,
+        [nextConfig ? JSON.stringify(nextConfig) : null, transcriptionId, orgId],
+      );
+    }
   } catch (error) {
     logApiError('Meeting translation update failed', error, { transcriptionId, orgId });
     return res.status(500).json({ code: 'UPDATE_FAILED' });
+  }
+
+  // Side-effects on the bot: if overlay was just turned ON (and
+  // translation is also on) we trigger the screen-content POST. If
+  // it was just turned OFF or translation was disabled entirely we
+  // clear the overlay. Best-effort; failures don't break the flow.
+  if (overlayTouched && wantOverlay) {
+    await ensureOverlayStarted({
+      transcriptionId,
+      organizationId: orgId,
+      forceRestart: true,
+    }).catch((error) => {
+      logApiError('Overlay start (manual toggle) failed', error, { transcriptionId, orgId });
+    });
+  } else if (overlayTouched && !wantOverlay) {
+    await clearOverlay({ transcriptionId, organizationId: orgId }).catch(() => {});
+  }
+  // If translation got disabled entirely, the overlay is meaningless
+  // — also clear it.
+  if (!wantEnabled) {
+    await clearOverlay({ transcriptionId, organizationId: orgId }).catch(() => {});
   }
 
   await addTranscriptionEvent({
@@ -107,7 +146,11 @@ async function handler(req, res) {
     metadata: { enabled: wantEnabled, fromLang: fromLang || null, toLang: toLang || null },
   });
 
-  return res.status(200).json({ ok: true, translation_config: nextConfig });
+  return res.status(200).json({
+    ok: true,
+    translation_config: nextConfig,
+    in_meeting_overlay_enabled: overlayTouched ? wantOverlay : undefined,
+  });
 }
 
 export default withOrgScope({ permission: 'transcription.read' }, handler);
