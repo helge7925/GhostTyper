@@ -158,7 +158,16 @@ services:
       start_period: 15s
 
   vexa-lite:
-    image: vexaai/vexa-lite:0.10.0-260430-1701
+    # Default tracks upstream Vexa-Lite (Meet/Teams/Zoom only).
+    # To enable Nextcloud Talk, set in .env:
+    #   VEXA_LITE_IMAGE=ghcr.io/helge7925/vexa-bot-talk:0.10.0-talk.1
+    # The forked image is built from
+    #   https://github.com/helge7925/vexa, branch
+    #   feat/nextcloud-talk-adapter, via the
+    #   .github/workflows/build-vexa-bot-talk.yml workflow.
+    # See helge7925/vexa/UPSTREAM-SYNC.md for the tag-naming scheme
+    # and rebase procedure.
+    image: ${VEXA_LITE_IMAGE:-vexaai/vexa-lite:0.10.0-260430-1701}
     container_name: transkription-vexa-lite
     restart: unless-stopped
     profiles: ["vexa"]
