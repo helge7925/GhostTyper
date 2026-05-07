@@ -5,6 +5,7 @@ import { hasPermission } from '../../../../lib/permissions';
 import { logAuditEvent } from '../../../../lib/audit-log';
 import { addTranscriptionEvent } from '../../../../lib/transcription-events';
 import { ensureOverlayStarted, clearOverlay } from '../../../../lib/in-meeting-overlay';
+import { stopInMeetingAudio } from '../../../../lib/in-meeting-audio';
 
 /**
  * PUT /api/meetings/[id]/translation
@@ -51,6 +52,30 @@ async function handler(req, res) {
   const wantOverlayRaw = body.inMeetingOverlay;
   const overlayTouched = typeof wantOverlayRaw === 'boolean';
   const wantOverlay = wantEnabled && wantOverlayRaw === true;
+  // Phase-2 audio-injection: pass `null` (or omit) to leave the
+  // current value untouched, pass a language string to enable, pass
+  // `null` explicitly via `audioInjectionLang: null` from the client
+  // to disable. Validated against the meeting's translation pair so
+  // we can't speak a language nobody is translating to.
+  const wantAudioRaw = body.audioInjectionLang;
+  const audioTouched = wantAudioRaw === null || (typeof wantAudioRaw === 'string');
+  let wantAudio = null;
+  if (audioTouched && typeof wantAudioRaw === 'string' && wantAudioRaw.trim()) {
+    const lang = wantAudioRaw.slice(0, 8).trim().toLowerCase();
+    if (!wantEnabled) {
+      return res.status(400).json({
+        code: 'AUDIO_REQUIRES_TRANSLATION',
+        message: 'Audio-Injection ist nur aktiv, wenn die Übersetzung läuft.',
+      });
+    }
+    if (lang !== fromLang.toLowerCase() && lang !== toLang.toLowerCase()) {
+      return res.status(400).json({
+        code: 'INVALID_AUDIO_LANG',
+        message: 'audioInjectionLang muss eine der beiden Übersetzungssprachen sein.',
+      });
+    }
+    wantAudio = lang;
+  }
 
   if (wantEnabled && (!fromLang || !toLang)) {
     return res.status(400).json({
@@ -83,24 +108,34 @@ async function handler(req, res) {
     : null;
 
   try {
+    // Build the SET clause dynamically so we only touch fields the
+    // caller actually asked to change. Keeps unrelated state (e.g.
+    // overlay flag during a pure audio-toggle) intact.
+    const sets = ['translation_config = $1::jsonb', 'updated_at = NOW()'];
+    const values = [nextConfig ? JSON.stringify(nextConfig) : null];
+    let p = 2;
     if (overlayTouched) {
-      await query(
-        `UPDATE transcriptions
-            SET translation_config = $1::jsonb,
-                in_meeting_overlay_enabled = $2,
-                updated_at = NOW()
-          WHERE id = $3 AND organization_id = $4`,
-        [nextConfig ? JSON.stringify(nextConfig) : null, wantOverlay, transcriptionId, orgId],
-      );
-    } else {
-      await query(
-        `UPDATE transcriptions
-            SET translation_config = $1::jsonb,
-                updated_at = NOW()
-          WHERE id = $2 AND organization_id = $3`,
-        [nextConfig ? JSON.stringify(nextConfig) : null, transcriptionId, orgId],
-      );
+      sets.push(`in_meeting_overlay_enabled = $${p++}`);
+      values.push(wantOverlay);
     }
+    if (audioTouched) {
+      sets.push(`audio_injection_lang = $${p++}`);
+      values.push(wantAudio);
+    }
+    // Disabling translation entirely should also wipe the dependent
+    // toggles so a re-enable starts from a clean slate.
+    if (!wantEnabled) {
+      sets.push(`in_meeting_overlay_enabled = $${p++}`);
+      values.push(false);
+      sets.push(`audio_injection_lang = $${p++}`);
+      values.push(null);
+    }
+    values.push(transcriptionId, orgId);
+    await query(
+      `UPDATE transcriptions SET ${sets.join(', ')}
+        WHERE id = $${p++} AND organization_id = $${p++}`,
+      values,
+    );
   } catch (error) {
     logApiError('Meeting translation update failed', error, { transcriptionId, orgId });
     return res.status(500).json({ code: 'UPDATE_FAILED' });
@@ -127,6 +162,15 @@ async function handler(req, res) {
     await clearOverlay({ transcriptionId, organizationId: orgId }).catch(() => {});
   }
 
+  // Audio-injection side-effects: explicit "off" (audioTouched +
+  // wantAudio===null) and "translation off" both stop any in-flight
+  // playback. Turning audio ON has no immediate side-effect — the
+  // bridge hook picks up the new column value on the next translated
+  // segment and starts feeding the queue.
+  if ((audioTouched && wantAudio === null) || !wantEnabled) {
+    await stopInMeetingAudio({ transcriptionId, organizationId: orgId }).catch(() => {});
+  }
+
   await addTranscriptionEvent({
     transcriptionId,
     userId,
@@ -150,6 +194,7 @@ async function handler(req, res) {
     ok: true,
     translation_config: nextConfig,
     in_meeting_overlay_enabled: overlayTouched ? wantOverlay : undefined,
+    audio_injection_lang: audioTouched ? wantAudio : undefined,
   });
 }
 

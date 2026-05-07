@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Square, Languages, ArrowLeftRight, Share2, Copy, Check, Tv } from 'lucide-react';
+import { Loader2, Square, Languages, ArrowLeftRight, Share2, Copy, Check, Tv, Volume2 } from 'lucide-react';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 
 export default function MeetingControlBar({
@@ -8,6 +8,7 @@ export default function MeetingControlBar({
   botStatus,
   translationConfig,
   inMeetingOverlayEnabled = false,
+  audioInjectionLang = null,
   onChanged,
 }) {
   // `useUiFeedback().confirm()` requires the consumer to render <ConfirmDialog />
@@ -62,6 +63,37 @@ export default function MeetingControlBar({
   // Overlay toggle: piggy-backs on the same /translation PUT endpoint
   // by sending the current translation config + the overlay flag.
   const [updatingOverlay, setUpdatingOverlay] = useState(false);
+  // Audio-injection live-toggle. Sends the same /translation PUT
+  // with `audioInjectionLang: <lang>` to start, or `null` to stop.
+  const [updatingAudio, setUpdatingAudio] = useState(false);
+  const handleAudioToggle = async (next) => {
+    if (!translationOn) return;
+    setUpdatingAudio(true);
+    try {
+      const res = await fetch(`/api/meetings/${transcriptionId}/translation`, {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: true,
+          fromLang: translationFrom,
+          toLang: translationTo,
+          audioInjectionLang: next,
+        }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.message || 'Audio-Injection konnte nicht aktualisiert werden.');
+      }
+      showToast(next ? `Audio-Injection: bot spricht ${next.toUpperCase()}.` : 'Audio-Injection deaktiviert.', 'success');
+      onChanged?.();
+    } catch (error) {
+      showToast(error.message, 'error');
+    } finally {
+      setUpdatingAudio(false);
+    }
+  };
+
   const handleOverlayToggle = async (event) => {
     if (!translationOn) return;
     const next = event.target.checked;
@@ -279,6 +311,36 @@ export default function MeetingControlBar({
               />
               <span className="text-secondary">Untertitel-Kachel</span>
               {updatingOverlay && <Loader2 className="w-3 h-3 animate-spin text-secondary" />}
+            </label>
+          )}
+
+          {translationOn && (
+            <label
+              className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs border border-subtle bg-hover-subtle cursor-pointer"
+              title="Audio-Injection — Bot spricht Übersetzung im Meeting"
+            >
+              <Volume2 className="w-3.5 h-3.5 text-secondary" />
+              <input
+                type="checkbox"
+                checked={!!audioInjectionLang}
+                disabled={updatingAudio}
+                onChange={(e) => handleAudioToggle(e.target.checked ? translationTo : null)}
+                className="accent-accent"
+              />
+              <span className="text-secondary">Audio</span>
+              {audioInjectionLang && (
+                <select
+                  value={audioInjectionLang}
+                  disabled={updatingAudio}
+                  onChange={(e) => handleAudioToggle(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="bg-transparent text-primary font-mono text-xs outline-none"
+                >
+                  <option value={translationFrom}>{translationFrom.toUpperCase()}</option>
+                  <option value={translationTo}>{translationTo.toUpperCase()}</option>
+                </select>
+              )}
+              {updatingAudio && <Loader2 className="w-3 h-3 animate-spin text-secondary" />}
             </label>
           )}
 

@@ -530,6 +530,7 @@ export default function TranscriptionDetail() {
                   botStatus={transcription.bot_status}
                   translationConfig={transcription.translation_config}
                   inMeetingOverlayEnabled={!!transcription.in_meeting_overlay_enabled}
+                  audioInjectionLang={transcription.audio_injection_lang || null}
                   onChanged={() => getTranscription(transcription.id).then(setTranscription).catch(() => {})}
                 />
               )}

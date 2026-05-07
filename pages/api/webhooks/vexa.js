@@ -10,6 +10,7 @@ import { runManualAnalysisJob } from '../../../lib/manual-analysis';
 import { startBridgeForTranscription, stopBridgeForTranscription } from '../../../lib/vexa-bridge';
 import { ensureShareLinkPostedToChat } from '../../../lib/share-chat-poster';
 import { ensureOverlayStarted, clearOverlay } from '../../../lib/in-meeting-overlay';
+import { stopInMeetingAudio } from '../../../lib/in-meeting-audio';
 import { logUsage } from '../../../lib/usage';
 
 function totalAudioSeconds(segments) {
@@ -176,6 +177,10 @@ async function handleFailed(transcription, payload) {
     transcriptionId: transcription.id,
     organizationId: transcription.organization_id,
   }).catch(() => { /* best-effort */ });
+  await stopInMeetingAudio({
+    transcriptionId: transcription.id,
+    organizationId: transcription.organization_id,
+  }).catch(() => { /* best-effort */ });
 }
 
 async function handleCompleted(transcription, payload, vexaConfig) {
@@ -184,6 +189,10 @@ async function handleCompleted(transcription, payload, vexaConfig) {
   // Doing this early — before the long getTranscript path — so the
   // bot's tile reverts as fast as possible if it's still in the room.
   await clearOverlay({
+    transcriptionId: transcription.id,
+    organizationId: transcription.organization_id,
+  }).catch(() => { /* best-effort */ });
+  await stopInMeetingAudio({
     transcriptionId: transcription.id,
     organizationId: transcription.organization_id,
   }).catch(() => { /* best-effort */ });

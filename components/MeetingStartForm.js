@@ -47,6 +47,11 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
   // so participants see live subtitles + QR-code without opening the
   // companion-tab themselves. Only meaningful when translation is on.
   const [overlayEnabled, setOverlayEnabled] = useState(false);
+  // Phase 2 — audio injection. `null` = off. When set to a language
+  // code (must match one of the translation pair), the bot speaks the
+  // translated segments in that language into the meeting via Vexa
+  // /speak. One direction only.
+  const [audioInjectionLang, setAudioInjectionLang] = useState(null);
 
   useEffect(() => {
     if (open) {
@@ -59,8 +64,22 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
       setTranslationLangA('de');
       setTranslationLangB('en');
       setOverlayEnabled(false);
+      setAudioInjectionLang(null);
     }
   }, [open, defaultBotName, defaultLanguage]);
+
+  // Reset audio language if translation pair becomes invalid for it.
+  useEffect(() => {
+    if (!translationEnabled) {
+      setAudioInjectionLang(null);
+      return;
+    }
+    if (audioInjectionLang
+        && audioInjectionLang !== translationLangA
+        && audioInjectionLang !== translationLangB) {
+      setAudioInjectionLang(null);
+    }
+  }, [translationEnabled, translationLangA, translationLangB, audioInjectionLang]);
 
   const platform = useMemo(() => detectPlatform(url), [url]);
   const translationLanguagesValid = !translationEnabled || translationLangA !== translationLangB;
@@ -85,6 +104,7 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
             ? { enabled: true, fromLang: translationLangA, toLang: translationLangB }
             : undefined,
           inMeetingOverlay: translationEnabled && overlayEnabled ? true : undefined,
+          audioInjectionLang: translationEnabled && audioInjectionLang ? audioInjectionLang : undefined,
         }),
       });
       const payload = await res.json().catch(() => ({}));
@@ -231,6 +251,36 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
                     <span className="block text-[10px] text-secondary mt-0.5 leading-snug">
                       {t('translation.overlay.hint')}
                     </span>
+                  </span>
+                </label>
+
+                <label className="flex items-start gap-3 text-xs text-secondary border-t border-subtle pt-2">
+                  <input
+                    type="checkbox"
+                    checked={!!audioInjectionLang}
+                    onChange={(e) => setAudioInjectionLang(e.target.checked ? translationLangB : null)}
+                    className="mt-0.5"
+                  />
+                  <span className="flex-1">
+                    <span className="text-primary font-medium">{t('translation.audio.enable')}</span>
+                    <span className="block text-[10px] text-secondary mt-0.5 leading-snug">
+                      {t('translation.audio.hint')}
+                    </span>
+                    {audioInjectionLang && (
+                      <select
+                        value={audioInjectionLang}
+                        onChange={(e) => setAudioInjectionLang(e.target.value)}
+                        className="mt-2 bg-surface-elevated border border-subtle rounded-lg px-2 py-1 text-xs text-primary outline-none"
+                      >
+                        <option value={translationLangA}>{t('translation.audio.speakIn')}: {translationLangA.toUpperCase()}</option>
+                        <option value={translationLangB}>{t('translation.audio.speakIn')}: {translationLangB.toUpperCase()}</option>
+                      </select>
+                    )}
+                    {audioInjectionLang && (
+                      <span className="block text-[10px] text-warning mt-2 leading-snug">
+                        {t('translation.audio.costWarning')}
+                      </span>
+                    )}
                   </span>
                 </label>
 

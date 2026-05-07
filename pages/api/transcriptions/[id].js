@@ -52,7 +52,8 @@ async function handler(req, res) {
                   error, folder_id, is_favorite, created_at, updated_at,
                   source, meeting_platform, native_meeting_id, external_meeting_id, bot_status,
                   meeting_started_at, meeting_ended_at,
-                  translated_segments, translation_config, in_meeting_overlay_enabled
+                  translated_segments, translation_config, in_meeting_overlay_enabled,
+                  audio_injection_lang
            FROM transcriptions
            WHERE id = $1 AND organization_id = $2`,
           [transId, orgId]

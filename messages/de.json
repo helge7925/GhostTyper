@@ -50,6 +50,12 @@
         "overlay": {
           "enable": "Untertitel im Meeting auf Bot-Kachel anzeigen",
           "hint": "Der Bot zeigt die letzte Übersetzung in großer Schrift auf seiner Webcam-Kachel — auch ohne Companion-Tab sichtbar. Teilnehmer pinnen die Bot-Kachel, um die Untertitel zu lesen."
+        },
+        "audio": {
+          "enable": "Übersetzung laut im Meeting sprechen",
+          "hint": "Der Bot spricht die übersetzten Segmente in der gewählten Sprache als zweite Stimme im Meeting. Original-Stimmen bleiben hörbar.",
+          "speakIn": "Sprechen in",
+          "costWarning": "Kostet Voxtral-TTS pro generierter Audio-Sekunde — typisch 0,90 €/Stunde Meeting."
         }
       }
     },

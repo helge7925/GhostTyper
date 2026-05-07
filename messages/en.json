@@ -50,6 +50,12 @@
         "overlay": {
           "enable": "Show subtitles in the meeting on the bot tile",
           "hint": "The bot displays the latest translation in large type on its webcam tile — visible even without the companion tab. Participants can pin the bot tile to read along."
+        },
+        "audio": {
+          "enable": "Speak the translation aloud in the meeting",
+          "hint": "The bot speaks translated segments in the selected language as a second voice in the meeting. Original voices remain audible.",
+          "speakIn": "Speak in",
+          "costWarning": "Costs Voxtral TTS per generated audio second — typically €0.90 per meeting hour."
         }
       }
     },

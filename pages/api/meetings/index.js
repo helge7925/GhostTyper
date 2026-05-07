@@ -138,6 +138,7 @@ async function handler(req, res) {
     consentAccepted,
     translation: rawTranslation,
     inMeetingOverlay: rawInMeetingOverlay,
+    audioInjectionLang: rawAudioInjectionLang,
   } = body;
 
   // Optional live-translation block; if absent the row is created with
@@ -155,6 +156,20 @@ async function handler(req, res) {
   // Subtitle overlay only makes sense when translation is on. If the
   // caller asks for overlay without translation we silently drop it.
   const inMeetingOverlay = !!translationConfig && rawInMeetingOverlay === true;
+  // Audio injection: only meaningful when translation is on, and the
+  // chosen language must be one of the configured pair. Silently drop
+  // anything else so a malformed request can't enable audio in an
+  // unintended state.
+  const audioInjectionLang = (() => {
+    if (!translationConfig) return null;
+    if (typeof rawAudioInjectionLang !== 'string') return null;
+    const lang = rawAudioInjectionLang.slice(0, 8).trim().toLowerCase();
+    if (!lang) return null;
+    if (lang !== translationConfig.fromLang.toLowerCase() && lang !== translationConfig.toLang.toLowerCase()) {
+      return null;
+    }
+    return lang;
+  })();
 
   if (consentAccepted !== true) {
     return res.status(400).json({
@@ -240,8 +255,8 @@ async function handler(req, res) {
     `INSERT INTO transcriptions
        (user_id, organization_id, original_name, source, meeting_platform, native_meeting_id,
         bot_status, status, template, model, diarize, custom_prompt, auto_analyze, folder_id,
-        translation_config, in_meeting_overlay_enabled)
-     VALUES ($1, $2, $3, 'vexa', $4, $5, 'requested', 'pending', $6, $7, true, $8, $9, $10, $11::jsonb, $12)
+        translation_config, in_meeting_overlay_enabled, audio_injection_lang)
+     VALUES ($1, $2, $3, 'vexa', $4, $5, 'requested', 'pending', $6, $7, true, $8, $9, $10, $11::jsonb, $12, $13)
      RETURNING id, status, source, meeting_platform, native_meeting_id, created_at`,
     [
       userId,
@@ -256,6 +271,7 @@ async function handler(req, res) {
       Number.isFinite(Number(folderId)) ? Number(folderId) : null,
       translationConfig ? JSON.stringify(translationConfig) : null,
       inMeetingOverlay,
+      audioInjectionLang,
     ],
   );
   const transcription = insertResult.rows[0];
