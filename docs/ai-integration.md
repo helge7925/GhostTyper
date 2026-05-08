@@ -29,11 +29,14 @@ Nutzt den `/audio/transcriptions` Endpoint. Unterstützt Diarization (Sprecherer
 Nutzt den `/chat/completions` Endpoint mit JSON-Response-Format für strukturierte Analysen.
 
 ### Unterstützte Modelle
-- **Transkription**: `voxtral-mini-latest` (Voxtral Mini)
-- **Analyse**: `mistral-large-latest`, `mistral-medium-latest`, `mistral-small-latest`
+- **Batch-Transkription** (Datei-Upload): `voxtral-mini-latest` (Voxtral Mini)
+- **Live-Transkription** (Vexa-Pfad): `voxtral-mini-transcribe-realtime-2602`
+  (Realtime-Tuning für ≤5 s End-to-End-Latenz, gleicher Endpoint, gleicher
+  Preis pro Minute)
+- **Analyse / Chat**: `mistral-large-latest` (Standard), wahlweise auch
+  `mistral-medium-latest` oder `mistral-small-latest` für Kosten/Geschwindigkeits-Trade-off
 - **OCR**: `mistral-ocr-latest`
-- **Übersetzung**: Wählbar (Standard: `mistral-medium-latest`)
-- **Sketch Summary**: `gemini-3-pro-image-preview`
+- **Übersetzung**: Standard `mistral-medium-latest`, wählbar pro Workspace
 
 ## Umgebung
 

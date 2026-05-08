@@ -5,6 +5,54 @@ Alle relevanten Änderungen an diesem Projekt werden in dieser Datei dokumentier
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [0.4.0] – 2026-05-07
+
+### Added
+- **Nextcloud Talk als vierte Meeting-Plattform** (via Vexa-Fork). Neuer
+  Pattern-Eintrag in `lib/api/vexa.js → MEETING_URL_PATTERNS` für Talk-
+  URLs (`/call/<token>` und `/index.php/call/<token>`); Erweiterung von
+  `pages/api/meetings/index.js → SUPPORTED_PLATFORMS`. Der Bot-Code
+  selbst lebt in einem separaten Repo
+  ([helge7925/vexa, Branch `feat/nextcloud-talk-adapter`](https://github.com/helge7925/vexa))
+  und liefert ein eigenes Image
+  `ghcr.io/helge7925/vexa-bot-talk:<upstream>-talk.<patch>`.
+- **`VEXA_LITE_IMAGE` Override** in `config/docker-compose.prod.yml`:
+  Operator kann das Vexa-Lite-Image per ENV-Variable austauschen
+  (Default = upstream Vexa-AI; Override = Talk-Fork). Default-Verhalten
+  unverändert für bestehende Deployments.
+- **Vexa-Operator-Dashboard** auf `127.0.0.1:${VEXA_DASHBOARD_HOST_PORT:-3300}`
+  exposed. Ist bereits im `vexa-lite`-Image enthalten (Vexa-AIs eigene
+  Next.js-UI: Bot-Health, VNC, Live-Transcript-Debug). Auth läuft gegen
+  Vexa-admin-api, nicht gegen GhostTyper-NextAuth — bewusst Operator-
+  only, lokalhost-bind by default.
+- **Tests** (`tests/vexa-adapter.test.mjs`): drei neue Cases für die
+  Talk-URL-Erkennung (modern path, legacy `/index.php/`, negative cases).
+
+### Fixed
+- Voxtral-Bias-Filter in `lib/ai-service.js`: ungültige Bias-Terms
+  (Whitespace-/Komma-haltig) werden vor dem Mistral-Call gestript,
+  Cap auf 64 Terms / 1000 Zeichen, damit ein zu großer
+  `context_bias` aus Workspace-Settings nicht den ganzen
+  Transcription-Run mit einem 422 abbricht.
+- Mistral-Fehler-Logging: `transcribeAudio()` schreibt jetzt das
+  vollständige Validation-Detail in den Log statt eines
+  unbrauchbaren `[object Object]`.
+
+### Docs
+- `docs/architecture.md`: erklärt jetzt warum der Service noch
+  „fireworks-bridge" heißt (Legacy-Name, zeigt heute auf Mistral
+  Voxtral) und welche Customer-Forks abweichen.
+- `docs/vexa-integration.md`: Image-Pin-Hinweis korrigiert,
+  `VEXA_LITE_IMAGE`/`VEXA_DASHBOARD_HOST_PORT` dokumentiert,
+  neue Operator-Dashboard-Sektion.
+- `docs/docker-setup.md`: kompletter Rewrite — alte
+  „paperless-db"-Copy-Paste-Reste, Postgres-13-Stand und
+  fehlende Vexa-Container-Beschreibung ersetzt durch
+  aktuellen Stand.
+- `docs/api-specification.md`: Header-Stand auf 2026-05-07
+  aktualisiert, falsche `localhost:5000`-Basis-URL korrigiert,
+  Auth-Header-Liste vervollständigt.
+
 ## [0.3.0] – 2026-05-03
 
 Erstes öffentliches Release auf GitHub. Project switched from internal

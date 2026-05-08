@@ -1,84 +1,94 @@
 # GhostTyper Dokumentation
 
-Stand: 2026-04-28
+Stand: 2026-05-07 · Aktuelle Version: siehe [`../CHANGELOG.md`](../CHANGELOG.md)
+
+Quelle der Wahrheit für laufende Releases ist immer der Changelog;
+diese Index-Seite ist eine Navigation, kein Status-Tracker.
 
 ## Start hier
 
-- Produkt/Setup: `../README.md`
-- Aktueller Planstatus: `../PROJECT_PLAN.md`
-- Release Notes: `release-notes-2026-02-12.md`
-- Changelog: `../CHANGELOG.md`
+- **Produkt-Übersicht & Schnellstart**: [`../README.md`](../README.md)
+- **Architektur**: [`architecture.md`](architecture.md) — Container,
+  Datenflüsse, DB-Tabellen, Resource-Footprint
+- **Docker-Setup**: [`docker-setup.md`](docker-setup.md) — Compose-Stack
+  Production + Development, ENV-Variablen, Build-Details
 
-## Version 1.2.0 (2026-02-19)
+## Operations
 
-### Neue Features
+- **VPS-Deployment**: [`vps-deployment-guide.md`](vps-deployment-guide.md) —
+  Production-Deploy mit Traefik
+- **Vexa-Remote-Meeting**: [`vexa-integration.md`](vexa-integration.md) —
+  Bot-Stack, Webhook-Auto-Registrierung, Operator-Dashboard,
+  `VEXA_LITE_IMAGE`-Override für den Nextcloud-Talk-Fork, Reconcile-Cron
+- **CI/CD**: [`ci-cd-pipeline.md`](ci-cd-pipeline.md) — GitHub-Actions-
+  Workflows
+- **Docker-Troubleshooting**: [`docker-troubleshooting.md`](docker-troubleshooting.md)
+- **Auth-Troubleshooting**: [`troubleshooting-auth.md`](troubleshooting-auth.md)
+
+## Funktion & API
+
+- **API-Referenz**: [`api-specification.md`](api-specification.md)
+- **AI-Integration**: [`ai-integration.md`](ai-integration.md) — Mistral-
+  Modell-Auswahl (Voxtral / Large / Medium / Small / OCR)
+- **Authentifizierung**: [`authentication.md`](authentication.md) —
+  NextAuth, OIDC, Credentials
+- **Audio-Upload-Pipeline**: [`audio-upload.md`](audio-upload.md)
+- **Tabellen-Vorlagen**: [`TABLE_TEMPLATES.md`](TABLE_TEMPLATES.md) —
+  Schema, Excel-Export, manueller Builder
+- **Konzept Auto-Tabellen aus Fotos**: [`konzept-automatische-tabellengenerierung-aus-foto.md`](konzept-automatische-tabellengenerierung-aus-foto.md)
+  (Roadmap, nicht implementiert)
+- **Feature-Liste**: [`features-and-improvements.md`](features-and-improvements.md)
+
+## Tests & Quality
+
+- **Test-Strategie**: [`testing.md`](testing.md)
+- **E2E-Regression-Matrix**: [`e2e-regression-matrix.md`](e2e-regression-matrix.md)
+- **Cybersecurity-Audit (2026-02-21)**: [`cybersecurity-audit-2026-02-21.md`](cybersecurity-audit-2026-02-21.md)
+
+## Customer-Varianten (separate Repos)
+
+GhostTyper ist die Upstream-Codebase. Zwei Customer-Variants leben in
+eigenen Repositories und kommen mit reduzierten Feature-Sets:
+
+- **Romaco-Scriptor** ([`helge7925/romaco-scriptor`](https://github.com/helge7925/romaco-scriptor))
+  — Pharma-Variante mit Vexa, Pharma-Glossar, eigenem Branding
+- **Korrotec-Scriptor** ([`helge7925/korrotec_scriptor`](https://github.com/helge7925/korrotec_scriptor))
+  — Korrosionsschutz-Variante OHNE Vexa, mit Tagesrapport-Tabellenvorlage,
+  4 eingebauten Datentabellen-Schemas, Korrotec-Glossar
+
+Beide forken Schema und Code von hier. Cross-Repo-Cherry-Picks sind der
+übliche Weg, Features upstream zu pushen.
+
+## Doku-Philosophie
+
+- **Link-first**: Details leben im Fachdokument, nicht im Index.
+- **Quelle der Wahrheit für aktuellen Stand** ist der Changelog
+  (`../CHANGELOG.md`) — nicht diese Index-Seite. Die Versions-Sektionen
+  unten sind ein Archiv großer Sprünge, nicht eine laufende Status-
+  Anzeige.
+
+---
+
+## Archivierte Sprung-Notizen
+
+### 1.2.0 (2026-02-19)
+
 - **Volltext-Suche**: Durchsucht Transkripte und Analysen serverseitig
 - **Vorlagen-Kategorien**: Organisation in selbst erstellten Kategorien
+- API: `GET /api/transcriptions?search=`, `*/api/template-categories`
+- Schema: Tabelle `template_categories` + FK `templates.category_id`
 
-### API-Änderungen
-- `GET /api/transcriptions?search=` - Neuer Suchparameter
-- `GET/POST/PUT/DELETE /api/template-categories` - Neue Endpunkte
+### Update 2026-03-08
 
-### Datenbank-Migration
-- Tabelle `template_categories` (id, user_id, name, color, position)
-- Spalte `templates.category_id` (FK zu template_categories)
+- Neue Seite `/datentabelle`: Extraktion als Datentabelle aus Audio,
+  Text und OCR
+- Settings: `member_monthly_budget_limit`-Feld + DB-Spalte
 
-## Update (2026-03-08)
+### Update 2026-04-28
 
-### Datentabelle + Dashboard API-Status
-- Neue Seite: `/datentabelle`
-- Extraktion als Datentabelle aus Audio, Text und OCR
-- Rollout-/Abnahmedetails: `datentabelle-rollout-2026-03-08.md`
-
-### Settings & Migration
-- Neues Settings-Feld in der UI: Mitglieder-Budgetlimit
-- Neue DB-Spalte in `settings`: `member_monthly_budget_limit`
-
-## Update (2026-04-28)
-
-### Funktionsbereinigung
-- Entfernt: Echtzeitverarbeitung, Wissensgraph, Mindmap, Infografik/Sketch, Text-Assistent und Workflow-Seiten.
-- Google/Gemini-Key-Verwaltung wurde aus UI, API und Abhängigkeiten entfernt.
-- Die aktive App konzentriert sich auf Upload/OCR, Transkription, Übersetzung, Zusammenfassung, Datentabellen, Editor und Export.
-
-### Tabellen-Vorlagen und Excel-Export
-- Tabellen-Vorlagen sind content-only: keine Berechnungen, Formeln oder Summen durch das KI-Modell.
-- Neuer Excel-artiger Editor für Metadaten, Spaltentitel und Zeilentitel in den Einstellungen.
-- Text-Templates und Tabellen-Templates sind getrennt, aber über dieselben Kategorien auffindbar.
-- Befüllte Tabellen sind in der Transkriptionsdetailansicht in einem Canvas-artigen Tabelleneditor bearbeitbar.
-- Export nach CSV, HTML und sauber formatiertem Excel (`.xlsx`) mit Metadaten oberhalb der Tabelle.
-- Technische Details: `TABLE_TEMPLATES.md`
-- Konzept nächste Ausbaustufe: `konzept-automatische-tabellengenerierung-aus-foto.md`
-
-## Reviews & Prioritäten
-
-- Internes Hardening-Review (2026-02-11): `code-review-hardening-2026-02-11.md`
-- Externes Kollegenreview (2026-02-12): `external-review-2026-02-12.md`
-- Umsetzungsstatus P0-P3: `code-review-priorities-p0-p3-2026-02-12.md`
-- Debug-/Abnahmebericht (2026-02-20): `debug-report-2026-02-20.md`
-
-## Technik & Betrieb
-
-- Implementierung: `implementation.md`
-- Tests/Abnahme: `testing.md`
-- API: `api-specification.md`
-- Docker lokal: `docker-setup.md`
-- VPS/Traefik: `vps-deployment-guide.md`
-- Umgebungsanalyse Ziel-VPS: `umgebungsanalyse.md`
-- Troubleshooting Docker: `docker-troubleshooting.md`
-- Auth Troubleshooting: `troubleshooting-auth.md`
-
-## Produktdokumente
-
-- Features (Kurzfassung im README): `../README.md`
-- Feature-Index/Weiterführende Links: `features-and-improvements.md`
-- Tabellen-Vorlagen: `TABLE_TEMPLATES.md`
-- Konzept Foto-zu-Tabellenvorlage: `konzept-automatische-tabellengenerierung-aus-foto.md`
-- Audio-Flow: `audio-upload.md`
-- KI-Integration: `ai-integration.md`
-
-## Hinweis zur Doku-Philosophie
-
-- Link-first: Details nur in Fachdokumenten.
-- Keine redundanten Volltexte über mehrere Dateien hinweg.
-- `PROJECT_PLAN.md` und Release Notes sind die maßgeblichen Statusquellen.
+- **Funktionsbereinigung**: Echtzeitverarbeitung, Wissensgraph, Mindmap,
+  Infografik/Sketch, Text-Assistent und Workflow-Seiten entfernt;
+  Google/Gemini-Key-Verwaltung aus UI/API/Deps gestrichen.
+- Tabellen-Vorlagen sind content-only (keine Berechnungen/Formeln durch
+  das KI-Modell). Excel-Export mit sauberen Metadaten-Headern.
+- Text- und Tabellen-Templates getrennt, aber gemeinsame Kategorien.

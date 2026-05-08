@@ -14,11 +14,11 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-orange" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.4.0-orange" />
     <img alt="Stack" src="https://img.shields.io/badge/Next.js-13-black" />
     <img alt="Node" src="https://img.shields.io/badge/Node-18%2B-success" />
     <img alt="Postgres" src="https://img.shields.io/badge/Postgres-16-blue" />
-    <img alt="Tests" src="https://img.shields.io/badge/tests-60%20passing-success" />
+    <img alt="Tests" src="https://img.shields.io/badge/tests-72%20passing-success" />
     <img alt="License" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue" />
   </p>
 </div>
@@ -46,9 +46,12 @@ Audit-Trail sind Teil der Basis.
 
 - **Audio-Transkription** mit Sprechertrennung; Direktaufnahme oder
   Datei-Upload.
-- **Remote-Meeting-Bot** für Google Meet und Microsoft Teams via
+- **Remote-Meeting-Bot** für Google Meet, Microsoft Teams und Zoom via
   [Vexa Lite](https://github.com/Vexa-ai/vexa) — Live-Transkript fließt
-  in den gleichen Editor.
+  in den gleichen Editor. Ein Community-Fork
+  ([helge7925/vexa](https://github.com/helge7925/vexa), Branch
+  `feat/nextcloud-talk-adapter`) ergänzt Nextcloud Talk als vierte
+  Plattform; aktivierbar via `VEXA_LITE_IMAGE`-Override.
 - **OCR** für PDFs und Bilder.
 - **KI-Analyse**: Zusammenfassungen, freie Prompts, Vorlagen,
   Übersetzungen.

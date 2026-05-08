@@ -39,11 +39,18 @@ docker compose -f config/docker-compose.prod.yml --profile vexa up -d
 ```
 
 Was du dadurch bekommst:
-- `vexa-lite` Container (gepinnt auf `vexaai/vexa-lite:0.10.4`, 2 GB RAM,
-  2 CPU, Health-Check auf Port 8056)
+- `vexa-lite` Container (Default-Pin: `vexaai/vexa-lite:0.10.0-260430-1701`,
+  2 GB RAM, 2 CPU, Health-Check auf Port 8056). Override via
+  `VEXA_LITE_IMAGE` in der `.env` — z.B. auf den Nextcloud-Talk-fähigen
+  Fork `ghcr.io/helge7925/vexa-bot-talk:0.10.0-talk.1`.
 - `vexa-db-init` One-shot, der `CREATE DATABASE vexa` ausführt (idempotent)
 - GhostTyper-Container weiß automatisch über `VEXA_BASE_URL=http://vexa-lite:8056`
   Bescheid (interne Compose-Adresse, niemals nach außen exponiert)
+- **Operator-Dashboard** (Vexas eigene Next.js-UI für Bot-Health, VNC-View,
+  Live-Transcript-Debug) ist im selben Container auf Port 3000 enthalten,
+  exposed auf Host `127.0.0.1:${VEXA_DASHBOARD_HOST_PORT:-3300}`.
+  Auth läuft über Vexas admin-api-Token, NICHT über GhostTyper-NextAuth —
+  bewusst kein End-User-Tool.
 - Browser-Bots laufen als Kindprozesse innerhalb des Vexa-Lite-Containers
   und beenden sich, sobald das Meeting endet — keine zurückbleibenden
   Container, keine Docker-Socket-Mounts.
@@ -86,18 +93,58 @@ GhostTyper hat keinen direkten Zugriff auf die Audiospur — Vexa Lite
 orchestriert den Browser-Bot, ruft die Transkription via Bridge bei
 Mistral Voxtral auf und meldet Ereignisse via signiertem Webhook zurück.
 
+## Operator-Dashboard
+
+Im `vexa-lite`-Image ist Vexas eigene Next.js-Dashboard-UI gebündelt
+(Port 3000 intern). Der Compose-Stack mappt sie auf Host
+`127.0.0.1:${VEXA_DASHBOARD_HOST_PORT:-3300}` — also nur lokal vom
+Server aus erreichbar. Per SSH-Tunnel kommst du vom Laptop ran:
+
+```bash
+ssh -L 3300:127.0.0.1:3300 user@<vps>
+# dann im Browser http://localhost:3300
+```
+
+Was die Dashboard-UI bietet (komplementär zu GhostTyper):
+- **Live-Transkript-Viewer** mit Speaker-Labels (WebSocket-basiert)
+- **Recording-Playback** synchron zu Segmenten
+- **VNC-View** für „authenticated mode"-Bots (echtes Google-Login im Bot-Browser)
+- **Browser-Session-Verwaltung** für persistente Bot-Logins
+- **Vexa-API-Token-Verwaltung** + Webhook-Konfiguration
+- **Admin-Analytics** (User- und Meeting-Statistiken)
+
+**Auth-Hinweis:** Die UI authentifiziert sich gegen Vexas eigene
+admin-api (eigener User-Pool, eigene Tokens) — **nicht** gegen
+GhostTyper-NextAuth. Endnutzer haben in dieser UI nichts zu suchen;
+sie ist als Operator-Debug-Tool gedacht und Auth-mäßig schwach
+gegenüber Public-Traffic-Brute-Force. Falls du das Dashboard doch
+public exponieren willst (z.B. hinter Traefik), unbedingt eine
+zweite Auth-Schicht (Basic-Auth, Forward-Auth) davorsetzen und den
+`127.0.0.1`-Bind-Prefix in der Compose-Datei entfernen.
+
+Erst-Login: per `VEXA_ADMIN_API_TOKEN` einen Vexa-User mit API-Token
+anlegen (siehe `admin-api`-Doku im Vexa-Repo), dann im Dashboard mit
+diesem Token einloggen.
+
 ## Was du betreiben musst
 
 1. **Vexa Lite Container** (Apache-2.0, single container, GPU-frei)
    — z. B. auf Fly.io Frankfurt, Hetzner, Render. Empfohlen: konkretes
-   Image-Tag pinnen (`vexaai/vexa-lite:0.10.x`), nicht `:latest`.
+   Image-Tag pinnen (z.B. `vexaai/vexa-lite:0.10.0-260430-1701`),
+   nicht `:latest`. Für Nextcloud-Talk-Support setze `VEXA_LITE_IMAGE`
+   in der `.env` auf den Fork-Build aus
+   [helge7925/vexa](https://github.com/helge7925/vexa) — siehe dort
+   `UPSTREAM-SYNC.md` für die Tag-Konvention.
 2. **Mistral Voxtral**: derselbe API-Key, den GhostTyper bereits für die
    Batch-Transkription nutzt. Die Bridge schreibt den Modellnamen auf
    `voxtral-mini-latest`, setzt `response_format=verbose_json` und
    `timestamp_granularities=word`, falls Vexa-Lite sie nicht selbst
    sendet, und injiziert die workspace-globale Kontext-Wörter-Liste.
-3. **Postgres** für Vexa Lite (Supabase EU oder Neon EU empfohlen).
-   GhostTypers eigene Postgres bleibt unverändert.
+3. **Postgres** für Vexa Lite — im Default-Compose-Stack wird die DB
+   `vexa` in derselben Postgres-Instanz angelegt wie die GhostTyper-DB
+   (siehe `vexa-db-init`-Service). Externe Postgres (Supabase EU,
+   Neon EU) sind möglich, dann `DATABASE_URL` in den Vexa-ENV
+   überschreiben.
 
 ## Vexa-Lite-ENV (auf dem Vexa-Container, nicht in GhostTyper)
 

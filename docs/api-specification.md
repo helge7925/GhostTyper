@@ -1,20 +1,25 @@
-# API-Spezifikation - Transkriptions-WebApp
+# API-Spezifikation - GhostTyper
 
 ## Dokumentationsstand
 - **Erstellt**: 05.02.2026
-- **Letzte Aktualisierung**: 28.04.2026
-- **Status**: Inkrementell aktualisiert (Legacy-Inhalte + aktuelle Ergänzungen)
-- **Version**: 0.2
+- **Letzte Aktualisierung**: 07.05.2026
+- **Status**: Inkrementell gepflegt; Quelle der Wahrheit sind die
+  Handler-Files unter `pages/api/`
+- **Version**: 0.3
 
 ## Übersicht
 
 ### Basis-URL
-- **Lokale Entwicklung**: `http://localhost:5000/api`
-- **Produktion**: `https://transkription.helgeroos.de/api`
+- **Lokale Entwicklung**: `http://localhost:${WEBAPP_HOST_PORT:-3000}/api`
+  (Default 3000; Korrotec-Variante 3200)
+- **Produktion**: `https://${DOMAIN}/api` hinter Traefik
 
 ### Authentifizierung
-- **JWT-Token**: Im Header `Authorization: Bearer <token>`
-- **API-Key**: Im Header `X-API-Key: <EXAMPLE_API_KEY>`
+- **NextAuth-Session-Cookie**: für alle Endpoints unter `/api/*`,
+  außer den explizit operator-/öffentlich-gekennzeichneten
+- **Header `X-Init-Secret`** für `/api/db-init` (Schema-Migration)
+- **Header `X-Reconcile-Secret`** für `/api/admin/vexa/reconcile` (Cron-Backstop)
+- **HMAC-Signatur in `X-Vexa-Signature`** für `/api/webhooks/vexa`
 
 ### Content-Type
 - **Request**: `application/json`

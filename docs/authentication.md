@@ -1,15 +1,30 @@
 # Authentifizierung
 
-Stand: 2026-02-11
+Stand: 2026-05-07
 
 Dieses Dokument beschreibt die aktuelle Authentifizierungs- und Autorisierungslogik in GhostTyper.
 
 ## 1. Auth-Architektur
 
-- Auth-Framework: NextAuth (Credentials Provider)
-- Session-Modell: JWT-basierte Sessions
-- Benutzerquellen: Tabelle `users` in PostgreSQL
-- Rollenmodell: `user`, `admin`
+- Auth-Framework: NextAuth mit zwei Providern parallel:
+  - **OIDC** (default) — gegen einen externen IdP (Authentik, Keycloak,
+    Authelia, Auth0, …) konfiguriert via `OIDC_ISSUER`,
+    `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`. Erstes Login eines neuen
+    OIDC-Users legt automatisch eine `users`-Row mit zufälligem
+    bcrypt-Hash an (kein Passwort-Login möglich).
+  - **Credentials** (Opt-in via `AUTH_CREDENTIALS_ENABLED=true`) —
+    Email + bcrypt-Passwort gegen `users.password_hash`. Nutzbar wenn
+    kein IdP vorhanden, bewusst standardmäßig aus.
+- Session-Modell: JWT-basierte Sessions; Cookie enthält
+  `currentOrganizationId` + `organizations[]`-Memberships.
+- Benutzerquellen: Tabelle `users` in PostgreSQL.
+- Globales User-Rollenmodell (Spalte `users.role`): `user`, `admin`
+  (admin nur für globale System-Admin-Aktionen wie Workspace-
+  Anlage über `/admin/workspaces`).
+- **Workspace-Rollen-Matrix** für alles Org-Scoped: siehe
+  `lib/permissions.js` mit den Rollen `viewer`, `auditor`, `member`,
+  `admin`, `owner`. Permissions-Check über `withOrgScope({ permission })`-
+  Wrapper an jedem Org-bezogenen API-Endpoint.
 
 ## 2. Login-Flow
 

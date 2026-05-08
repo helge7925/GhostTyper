@@ -10,9 +10,9 @@ the runtime topology and the data flows.
 | --- | --- | --- |
 | `transkription-webapp` | Next.js app + background worker | yes |
 | `transkription-db` | PostgreSQL 16 | yes |
-| `vexa-lite` | Meeting-bot orchestrator (Vexa, Apache‑2.0) | optional, profile `vexa` |
+| `vexa-lite` | Meeting-bot orchestrator (Vexa-AI, Apache-2.0). Image is overridable via `VEXA_LITE_IMAGE` — e.g. `ghcr.io/helge7925/vexa-bot-talk:<tag>` for the Nextcloud-Talk-capable fork. The image bundles a Next.js operator dashboard on port 3000 (mapped to host `127.0.0.1:${VEXA_DASHBOARD_HOST_PORT:-3300}`). | optional, profile `vexa` |
 | `vexa-db-init` | One-shot DB bootstrap for Vexa | optional, profile `vexa` |
-| `fireworks-bridge` | Tiny Python proxy that rewrites the model name to `voxtral-mini-latest`, injects the workspace context bias, and pulls the Mistral API key from the webapp at request time | optional, profile `vexa` |
+| `fireworks-bridge` | Tiny Python proxy that rewrites the model name to `voxtral-mini-latest`, injects the workspace context bias, and pulls the Mistral API key from the webapp at request time. Service is named `fireworks-bridge` for legacy reasons (originally pointed at Fireworks AI) — current upstream is Mistral Voxtral. | optional, profile `vexa` |
 
 The webapp and the database are always running. The remote-meeting stack
 is opt-in via the `vexa` Compose profile **and** a per-workspace toggle.
@@ -108,6 +108,13 @@ bridge and Postgres remain internal.
 | `vexa_user_tokens` | Per-user Vexa identities (encrypted) |
 | `vexa_webhook_events` | Idempotency for inbound webhooks |
 | `settings` | Per-user prefs incl. `remote_meeting_enabled` opt-out |
+
+> **Customer-variant note:** the `korrotec_scriptor` fork removes the Vexa
+> path entirely (no Vexa-Lite container, no Vexa-related schema tables, no
+> remote-meeting feature). The `romaco-scriptor` fork keeps Vexa intact
+> and adds Romaco-specific branding/glossary on top. This document describes
+> the upstream feature set; consult each customer repo's README for variant
+> specifics.
 
 Migrations live in `lib/db-init.js` and are applied via the protected
 `POST /api/db-init` endpoint at deploy time.
