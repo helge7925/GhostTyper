@@ -141,18 +141,24 @@ on `https://${DOMAIN}`).
 ### With remote-meeting bot
 
 Vexa Lite + the transcription bridge are wired up as an optional Compose
-profile. The bridge points at Mistral Voxtral by default and reuses the
-same `MISTRAL_API_KEY` as the batch path:
+profile. Default audio path is **Mistral Voxtral (Paris, EU)** so the
+biometric meeting audio (GDPR Art. 9) does not leave the EU. The bridge
+container is still called `fireworks-bridge` for historical reasons but
+proxies to Mistral by default — see "GDPR-conformant setup" below.
 
 ```bash
 COMPOSE_PROFILES=vexa
-MISTRAL_API_KEY=…           # same key the batch transcription path uses
+# EU default — recommended
+VEXA_TRANSCRIPTION_URL=https://api.mistral.ai/v1/audio/transcriptions
+VEXA_TRANSCRIPTION_TOKEN=$MISTRAL_API_KEY
 VEXA_ADMIN_API_TOKEN=$(openssl rand -hex 32)
 BRIDGE_SHARED_SECRET=$(openssl rand -hex 32)
 ```
 
 Then bring it up with `--profile vexa`. Operator guide:
-[`docs/vexa-integration.md`](docs/vexa-integration.md).
+[`docs/vexa-integration.md`](docs/vexa-integration.md). For the full
+data-flow review and SCC/TIA implications when switching providers, see
+[`docs/gdpr-setup.md`](docs/gdpr-setup.md).
 
 ## Configuration
 
