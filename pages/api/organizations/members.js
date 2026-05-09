@@ -59,9 +59,31 @@ async function handler(req, res) {
       if (!Number.isFinite(targetUserId) || !ROLES.includes(role)) {
         return res.status(400).json({ message: 'Ungültige Eingabe.' });
       }
-      // Prevent demoting the last owner.
+      // Only owners can grant the owner role.
       if (req.role !== 'owner' && role === 'owner') {
         return res.status(403).json({ code: 'FORBIDDEN', message: 'Owner-Rolle kann nur ein Owner vergeben.' });
+      }
+      // Prevent demoting the last owner of the workspace. We need the
+      // target's current role; if they are the only owner and the new
+      // role is not 'owner', reject.
+      if (role !== 'owner') {
+        const target = await query(
+          `SELECT role FROM organization_members
+             WHERE organization_id = $1 AND user_id = $2`,
+          [orgId, targetUserId],
+        );
+        if (target.rows[0]?.role === 'owner') {
+          const remaining = await query(
+            `SELECT COUNT(*)::int AS n FROM organization_members
+               WHERE organization_id = $1 AND role = 'owner' AND user_id != $2`,
+            [orgId, targetUserId],
+          );
+          if ((remaining.rows[0]?.n || 0) === 0) {
+            return res.status(400).json({
+              message: 'Mindestens ein Owner muss im Workspace verbleiben.',
+            });
+          }
+        }
       }
       try {
         const result = await query(
@@ -100,6 +122,25 @@ async function handler(req, res) {
         return res.status(400).json({ message: 'Sie können sich nicht selbst entfernen.' });
       }
       try {
+        // Prevent removal of the last remaining owner.
+        const target = await query(
+          `SELECT role FROM organization_members
+             WHERE organization_id = $1 AND user_id = $2`,
+          [orgId, targetUserId],
+        );
+        if (target.rows[0]?.role === 'owner') {
+          const remaining = await query(
+            `SELECT COUNT(*)::int AS n FROM organization_members
+               WHERE organization_id = $1 AND role = 'owner' AND user_id != $2`,
+            [orgId, targetUserId],
+          );
+          if ((remaining.rows[0]?.n || 0) === 0) {
+            return res.status(400).json({
+              message: 'Mindestens ein Owner muss im Workspace verbleiben.',
+            });
+          }
+        }
+
         const result = await query(
           'DELETE FROM organization_members WHERE organization_id = $1 AND user_id = $2 RETURNING role',
           [orgId, targetUserId],
