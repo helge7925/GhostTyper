@@ -5,12 +5,67 @@ import { randomUUID } from 'crypto';
 import { query } from '../../../lib/db';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { normalizeEmail } from '../../../lib/email';
+import { trackSecurityEvent } from '../../../lib/observability';
 
 if (!process.env.NEXTAUTH_SECRET) {
   throw new Error('NEXTAUTH_SECRET ist nicht gesetzt. Bitte Umgebungsvariablen prüfen.');
 }
 
 const providers = [];
+const OIDC_LINK_BY_EMAIL = String(process.env.OIDC_LINK_BY_EMAIL || 'false').toLowerCase() === 'true';
+const OIDC_ALLOWED_EMAIL_DOMAINS = new Set(
+  String(process.env.OIDC_ALLOWED_EMAIL_DOMAINS || '')
+    .split(',')
+    .map((domain) => domain.trim().toLowerCase())
+    .filter(Boolean)
+);
+
+function parseEmailVerified(value) {
+  return value === true || value === 'true' || value === 1 || value === '1';
+}
+
+function isAllowedOidcDomain(normalizedEmail) {
+  if (!normalizedEmail) return false;
+  if (OIDC_ALLOWED_EMAIL_DOMAINS.size === 0) return true;
+  const domain = normalizedEmail.split('@')[1]?.toLowerCase() || '';
+  return OIDC_ALLOWED_EMAIL_DOMAINS.has(domain);
+}
+
+async function resolveOidcUser({ provider, providerAccountId, normalizedEmail, displayName }) {
+  const bound = await query(
+    `SELECT u.id, u.email, u.name, u.role
+       FROM oidc_account_bindings b
+       JOIN users u ON u.id = b.user_id
+      WHERE b.provider = $1 AND b.provider_account_id = $2
+      LIMIT 1`,
+    [provider, providerAccountId]
+  );
+  if (bound.rows[0]) return bound.rows[0];
+
+  if (!OIDC_LINK_BY_EMAIL) return null;
+  const existing = await query(
+    'SELECT id, email, name, role FROM users WHERE lower(email) = $1 LIMIT 1',
+    [normalizedEmail]
+  );
+  const dbUser = existing.rows[0] || (await query(
+    `INSERT INTO users (email, name, password_hash, role)
+     VALUES ($1, $2, $3, 'user')
+     RETURNING id, email, name, role`,
+    [
+      normalizedEmail,
+      displayName || normalizedEmail,
+      await bcrypt.hash(randomUUID(), 12),
+    ]
+  )).rows[0];
+
+  await query(
+    `INSERT INTO oidc_account_bindings (provider, provider_account_id, user_id)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (provider, provider_account_id) DO NOTHING`,
+    [provider, providerAccountId, dbUser.id]
+  );
+  return dbUser;
+}
 
 if (process.env.AUTH_CREDENTIALS_ENABLED === 'true') {
   providers.push(
@@ -78,6 +133,7 @@ if (process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID && process.env.OIDC_CL
           id: profile.sub,
           name: profile.name || profile.preferred_username || profile.email,
           email: profile.email,
+          emailVerified: parseEmailVerified(profile.email_verified),
           image: profile.picture,
         };
       },
@@ -123,21 +179,38 @@ export const authOptions = {
       if (user) {
         if (account?.provider === 'oidc') {
           const normalizedEmail = normalizeEmail(user.email);
-          if (!normalizedEmail) return token;
-          const existing = await query(
-            'SELECT id, email, name, role FROM users WHERE lower(email) = $1',
-            [normalizedEmail]
-          );
-          const dbUser = existing.rows[0] || (await query(
-            `INSERT INTO users (email, name, password_hash, role)
-             VALUES ($1, $2, $3, 'user')
-             RETURNING id, email, name, role`,
-            [
-              normalizedEmail,
-              user.name || normalizedEmail,
-              await bcrypt.hash(randomUUID(), 12),
-            ]
-          )).rows[0];
+          const providerAccountId = String(account.providerAccountId || '').trim();
+          if (!normalizedEmail || !providerAccountId) {
+            throw new Error('OIDC_IDENTITY_INCOMPLETE');
+          }
+          if (!user.emailVerified) {
+            trackSecurityEvent('oidc_email_unverified', {
+              route: '/api/auth/[...nextauth]',
+              provider: account.provider,
+            });
+            throw new Error('OIDC_EMAIL_NOT_VERIFIED');
+          }
+          if (!isAllowedOidcDomain(normalizedEmail)) {
+            trackSecurityEvent('oidc_domain_rejected', {
+              route: '/api/auth/[...nextauth]',
+              provider: account.provider,
+              domain: normalizedEmail.split('@')[1] || null,
+            });
+            throw new Error('OIDC_EMAIL_DOMAIN_NOT_ALLOWED');
+          }
+          const dbUser = await resolveOidcUser({
+            provider: account.provider,
+            providerAccountId,
+            normalizedEmail,
+            displayName: user.name,
+          });
+          if (!dbUser) {
+            trackSecurityEvent('oidc_not_linked', {
+              route: '/api/auth/[...nextauth]',
+              provider: account.provider,
+            });
+            throw new Error('OIDC_ACCOUNT_NOT_LINKED');
+          }
 
           token.id = dbUser.id;
           token.role = dbUser.role;
