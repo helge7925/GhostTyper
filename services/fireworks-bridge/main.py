@@ -55,40 +55,68 @@ logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
 logger = logging.getLogger("voxtral-bridge")
 
 app = FastAPI()
-_cache: dict = {
-    "expires": 0,
-    "api_key": None,
-    "model": DEFAULT_MODEL,
-    "context_bias": [],
-    "source": None,
-}
+_cache_by_scope: dict[str, dict] = {}
+
+def _scope_key(org_id: str | None, platform: str | None, native_meeting_id: str | None) -> str:
+    if org_id:
+        return f"org:{org_id}"
+    if platform and native_meeting_id:
+        return f"meeting:{platform}:{native_meeting_id}"
+    return "global"
 
 
-async def fetch_effective_config() -> dict:
+def _cache_default() -> dict:
+    return {
+        "expires": 0,
+        "api_key": None,
+        "model": DEFAULT_MODEL,
+        "context_bias": [],
+        "source": None,
+    }
+
+
+async def fetch_effective_config(
+    org_id: str | None = None,
+    platform: str | None = None,
+    native_meeting_id: str | None = None,
+) -> dict:
     """Pull the live effective Mistral key + context bias from the webapp.
 
     Cached ``CACHE_TTL_S`` seconds so we don't hammer the webapp on every
     transcription, but short enough that admin-side key rotations take
     effect within a minute.
     """
+    scope = _scope_key(org_id, platform, native_meeting_id)
     now = time.monotonic()
-    if _cache["api_key"] and now < _cache["expires"]:
-        return _cache
+    cached = _cache_by_scope.get(scope)
+    if not cached:
+        cached = _cache_default()
+        _cache_by_scope[scope] = cached
+
+    if cached["api_key"] and now < cached["expires"]:
+        return cached
     if not WEBAPP_URL or not BRIDGE_SECRET:
-        return _cache
+        return cached
     try:
         timeout = aiohttp.ClientTimeout(total=WEBAPP_TIMEOUT_S)
         async with aiohttp.ClientSession(timeout=timeout) as session:
+            callback_headers = {"X-Bridge-Secret": BRIDGE_SECRET}
+            if org_id:
+                callback_headers["X-Romaco-Org"] = org_id
+            if platform:
+                callback_headers["X-Romaco-Platform"] = platform
+            if native_meeting_id:
+                callback_headers["X-Romaco-Native-Meeting-Id"] = native_meeting_id
             async with session.post(
                 f"{WEBAPP_URL}/api/internal/whisper-config",
-                headers={"X-Bridge-Secret": BRIDGE_SECRET},
+                headers=callback_headers,
             ) as resp:
                 if resp.status == 200:
                     body = await resp.json()
                     bias = body.get("contextBias") or []
                     if not isinstance(bias, list):
                         bias = []
-                    _cache.update(
+                    cached.update(
                         api_key=body.get("apiKey"),
                         model=body.get("model") or DEFAULT_MODEL,
                         context_bias=[str(term) for term in bias if term],
@@ -98,13 +126,13 @@ async def fetch_effective_config() -> dict:
                     logger.info(
                         "bridge config refreshed (source=%s, bias_terms=%d)",
                         body.get("source"),
-                        len(_cache["context_bias"]),
+                        len(cached["context_bias"]),
                     )
                 else:
                     logger.warning("bridge config callback returned %s", resp.status)
     except Exception as exc:  # noqa: BLE001
         logger.warning("bridge config callback failed: %s", exc)
-    return _cache
+    return cached
 
 
 @app.get("/")
@@ -120,7 +148,15 @@ async def proxy(request: Request) -> Response:
     data: list[tuple[str, str]] = []
     seen_fields: set[str] = set()
 
-    config = await fetch_effective_config()
+    org_id = (request.headers.get("x-romaco-org") or "").strip() or None
+    platform = str(form.get("platform") or "").strip() or None
+    native_meeting_id = str(form.get("native_meeting_id") or "").strip() or None
+
+    config = await fetch_effective_config(
+        org_id=org_id,
+        platform=platform,
+        native_meeting_id=native_meeting_id,
+    )
     effective_model = config.get("model") or DEFAULT_MODEL
 
     for key, value in form.multi_items():
