@@ -11,6 +11,23 @@ if (!process.env.NEXTAUTH_SECRET) {
   throw new Error('NEXTAUTH_SECRET ist nicht gesetzt. Bitte Umgebungsvariablen prüfen.');
 }
 
+// M6 (cybersecurity-audit-2026-05-09): close the user-enumeration timing
+// side channel on the credentials provider. Pre-Phase-3, a non-existent
+// email returned `null` immediately while an existing email always paid
+// the ~100 ms bcrypt.compare cost. Even with rate-limiting, the timing
+// gap leaks "this email exists" to anyone who can wall-clock a single
+// failed login. Fix: when the user lookup misses, run bcrypt.compare
+// against a fixed dummy hash so the response time matches.
+//
+// The dummy hash is pre-computed at module-load time using bcryptjs's
+// 12-round cost (matching new-user creation), so the constant is
+// real-cost equivalent. The plaintext doesn't matter — comparison will
+// always fail, we only care about the timing.
+const DUMMY_BCRYPT_HASH = bcrypt.hashSync(
+  'd0_n0t_match_anything_b75e2c8b_dummy',
+  12,
+);
+
 const providers = [];
 const OIDC_LINK_BY_EMAIL = String(process.env.OIDC_LINK_BY_EMAIL || 'false').toLowerCase() === 'true';
 const OIDC_ALLOWED_EMAIL_DOMAINS = new Set(
@@ -96,12 +113,12 @@ if (process.env.AUTH_CREDENTIALS_ENABLED === 'true') {
         );
 
         const user = result.rows[0];
-        if (!user) {
-          return null;
-        }
-
-        const valid = await bcrypt.compare(credentials.password, user.password_hash);
-        if (!valid) {
+        // Always run bcrypt.compare so the response timing does not leak
+        // whether the email exists. When `user` is missing we compare
+        // against a fixed dummy hash; the result is discarded.
+        const passwordHash = user ? user.password_hash : DUMMY_BCRYPT_HASH;
+        const valid = await bcrypt.compare(credentials.password, passwordHash);
+        if (!user || !valid) {
           return null;
         }
 
