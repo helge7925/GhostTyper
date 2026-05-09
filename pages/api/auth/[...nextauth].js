@@ -5,7 +5,8 @@ import { randomUUID } from 'crypto';
 import { query } from '../../../lib/db';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { normalizeEmail } from '../../../lib/email';
-import { trackSecurityEvent } from '../../../lib/observability';
+import { hashPassword, verifyPassword } from '../../../lib/password-hash';
+import { logError, trackSecurityEvent } from '../../../lib/observability';
 import {
   isEmailLockedOut,
   recordFailedLogin,
@@ -28,6 +29,12 @@ if (!process.env.NEXTAUTH_SECRET) {
 // 12-round cost (matching new-user creation), so the constant is
 // real-cost equivalent. The plaintext doesn't matter — comparison will
 // always fail, we only care about the timing.
+//
+// M12 note: new hashes are argon2id while the dummy remains bcrypt. That
+// may introduce a small timing split between "user exists + argon2 hash"
+// and "user missing / user exists + legacy bcrypt", but this does not
+// create an auth bypass; it only reduces timing uniformity across hash
+// generations during the migration window.
 const DUMMY_BCRYPT_HASH = bcrypt.hashSync(
   'd0_n0t_match_anything_b75e2c8b_dummy',
   12,
@@ -87,13 +94,13 @@ async function resolveOidcUser({ provider, providerAccountId, normalizedEmail, d
       return null;
     }
     dbUser = (await query(
-      `INSERT INTO users (email, name, password_hash, role)
-       VALUES ($1, $2, $3, 'user')
+      `INSERT INTO users (email, name, password_hash, password_hash_version, role)
+       VALUES ($1, $2, $3, 2, 'user')
        RETURNING id, email, name, role`,
       [
         normalizedEmail,
         displayName || normalizedEmail,
-        await bcrypt.hash(randomUUID(), 12),
+        (await hashPassword(randomUUID())).hash,
       ]
     )).rows[0];
   }
@@ -143,19 +150,41 @@ if (process.env.AUTH_CREDENTIALS_ENABLED === 'true') {
         }
 
         const result = await query(
-          'SELECT id, email, name, password_hash, role FROM users WHERE lower(email) = $1',
+          'SELECT id, email, name, password_hash, password_hash_version, role FROM users WHERE lower(email) = $1',
           [normalizedEmail]
         );
 
         const user = result.rows[0];
-        // Always run bcrypt.compare so the response timing does not leak
-        // whether the email exists. When `user` is missing we compare
-        // against a fixed dummy hash; the result is discarded.
-        const passwordHash = user ? user.password_hash : DUMMY_BCRYPT_HASH;
-        const valid = await bcrypt.compare(credentials.password, passwordHash);
+        let valid = false;
+        if (!user) {
+          // Always run bcrypt.compare for unknown users so the response timing
+          // does not leak whether the email exists.
+          await bcrypt.compare(credentials.password, DUMMY_BCRYPT_HASH);
+        } else {
+          valid = await verifyPassword(
+            credentials.password,
+            user.password_hash,
+            user.password_hash_version
+          );
+        }
         if (!user || !valid) {
           await recordFailedLogin(normalizedEmail);
           return null;
+        }
+
+        if (user.password_hash_version === 1) {
+          try {
+            const { hash, version } = await hashPassword(credentials.password);
+            await query(
+              'UPDATE users SET password_hash = $1, password_hash_version = $2, updated_at = NOW() WHERE id = $3',
+              [hash, version, user.id]
+            );
+          } catch (error) {
+            logError('credentials_rehash_failed', error, {
+              route: '/api/auth/[...nextauth]',
+              userId: user.id,
+            });
+          }
         }
 
         await recordSuccessfulLogin(normalizedEmail);

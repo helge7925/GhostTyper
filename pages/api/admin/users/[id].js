@@ -1,4 +1,3 @@
-import bcrypt from 'bcryptjs';
 import { requireAdmin } from '../../../../lib/admin';
 import pool, { query } from '../../../../lib/db';
 import { validatePassword } from '../../../../lib/constants';
@@ -6,6 +5,7 @@ import { serializeApiKeyForStorage } from '../../../../lib/settings-service';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { isValidEmail, normalizeEmail } from '../../../../lib/email';
 import { logAuditEvent } from '../../../../lib/audit-log';
+import { hashPassword } from '../../../../lib/password-hash';
 
 function normalizeRole(role) {
   return ['admin', 'auditor', 'user'].includes(role) ? role : 'user';
@@ -122,9 +122,11 @@ export default async function handler(req, res) {
         }
 
         if (password) {
-          const passwordHash = await bcrypt.hash(password, 12);
+          const { hash: passwordHash, version: passwordHashVersion } = await hashPassword(password);
           updates.push(`password_hash = $${paramIndex++}`);
           values.push(passwordHash);
+          updates.push(`password_hash_version = $${paramIndex++}`);
+          values.push(passwordHashVersion);
         }
 
         if (role !== undefined) {
