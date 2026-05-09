@@ -75,6 +75,28 @@ export default async function handler(req, res) {
           return res.status(400).json({ message: 'Sie können Ihre eigene Admin-Rolle nicht entfernen' });
         }
 
+        // Prevent the last platform admin from being demoted. We need to
+        // know the target's CURRENT role to decide whether the role change
+        // is "admin → not-admin"; if so, reject when no other admin exists.
+        if (role !== undefined && role !== 'admin') {
+          const target = await client.query(
+            'SELECT role FROM users WHERE id = $1',
+            [userId]
+          );
+          if (target.rows[0]?.role === 'admin') {
+            const remaining = await client.query(
+              "SELECT COUNT(*)::int AS n FROM users WHERE role = 'admin' AND id != $1",
+              [userId]
+            );
+            if ((remaining.rows[0]?.n || 0) === 0) {
+              await client.query('ROLLBACK');
+              return res.status(400).json({
+                message: 'Mindestens ein Plattform-Admin muss verbleiben.',
+              });
+            }
+          }
+        }
+
         // Update user fields
         const updates = [];
         const values = [];
@@ -202,6 +224,21 @@ export default async function handler(req, res) {
       }
 
       try {
+        // Block deletion of the last remaining platform admin so the
+        // platform can't end up without admin coverage.
+        const target = await query('SELECT role FROM users WHERE id = $1', [userId]);
+        if (target.rows[0]?.role === 'admin') {
+          const remaining = await query(
+            "SELECT COUNT(*)::int AS n FROM users WHERE role = 'admin' AND id != $1",
+            [userId]
+          );
+          if ((remaining.rows[0]?.n || 0) === 0) {
+            return res.status(400).json({
+              message: 'Mindestens ein Plattform-Admin muss verbleiben.',
+            });
+          }
+        }
+
         const result = await query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
         if (result.rows.length === 0) {
           return res.status(404).json({ message: 'User nicht gefunden' });
