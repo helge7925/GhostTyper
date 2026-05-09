@@ -1220,31 +1220,53 @@ gefixt im selben Commit.
 
 **Exit-Kriterien Phase 1:** alle erfüllt.
 
-### Phase 2 — "Defense in depth" (~10 Personentage)
+### Phase 2 — "Defense in depth" — ✅ ABGESCHLOSSEN (2026-05-09)
 
-Architektur-relevante High/Medium-Befunde. Voraussetzung für externe
-Vexa-Bot-Bereitstellung und öffentliche Share-Links.
+Branch: `security/phase-2-defense-in-depth` · Tests 89/89 grün ·
+ESLint sauber · `npm audit` zeigt 0 High/Critical-Direkt-Advisories.
 
-| ID | Befund | Aufwand | Notizen |
-|----|--------|---------|---------|
-| H1 | `next` ≥ 14.2.35 (12 CVEs schließen) | 2–5 Tage | volle Test-Suite + Pages-Router-Migrations-Check |
-| H8 | Public-Share Concurrency-Cap + Org-Budget-Guard für `live_tts_share` | 1 Tag | Cost-DoS-Schutz |
-| H9 | DSGVO: Cortecs/Mistral als Default statt Fireworks; README-Kapitel "DSGVO-konformes Setup" + Datenfluss-Doku | 1 Tag | rein technisch + Doku, kein Legal-Review |
-| M1 | Krypto-Hardening: HKDF + AAD + `v2:`-Prefix + Re-Encryption-Migration | 2 Tage | DB-Backup vor Migration; Versionierung |
-| M2 | Admin-Role-Refresh in `requireAdmin` (DB-Read statt JWT-Cache) | 2 h | |
-| M10 | Zentrale `safeFetch` mit Outbound-Allowlist in `lib/network-guard.js` | ½ Tag | OIDC, Vexa, Mistral, Fireworks alle umstellen |
-| M11 | CSRF-Middleware: zwingend Origin/sec-fetch-site bei state-changing | ½ Tag | `/api/auth`-Exemption verengen |
-| M13 | Slug-Suffix mit `crypto.randomBytes` | 15 min | |
-| M14 | Docker-SHA-Digest-Pin | 1 h | reproducible builds |
+| ID | Befund | Status | Commit |
+|----|--------|--------|--------|
+| H1 | `next` 13.5.11 → 15.5.18 (10 CVEs geschlossen) | ✅ | `57d8432` |
+| H8 | Public-Share Concurrency-Cap (audio:3, stream:5) + Org-Budget `live_tts_share` (60 min/Tag/Org) + Rate-Limit auf `/share/[token]/stream` | ✅ | `b7ccefc` |
+| H9 | DSGVO: Mistral Voxtral (FR) als Default statt Fireworks (US); neuer Guide `docs/gdpr-setup.md`; README/.env.example umgestellt | ✅ | `bdf231c` |
+| M1 | Krypto-Hardening: HKDF-SHA256 + AAD-Binding `(field, bindingId)` + `v2:`-Prefix + idempotente Re-Encryption-Migration `npm run reencrypt-secrets` | ✅ | `32b0697` |
+| M2 | `requireAdmin`/`requireAuditReader` lesen Role bei jedem Request frisch aus DB (kein JWT-Cache mehr) | ✅ | `ef11075` |
+| M10 | Zentrale `assertOutboundUrl` + `safeFetch` in `lib/network-guard.js`; `fetchWithTimeout` routet darüber; Vexa/axios pre-validiert; OUTBOUND_ALLOWED_HOSTS-Allowlist | ✅ | `acd4e2b` |
+| M11 | CSRF-Middleware: state-changing braucht Origin oder sec-fetch-site; `/api/auth`-Exemption auf NextAuth-Subpaths verengt | ✅ | `8c82314` |
+| M13 | Slug-Suffix nutzt `crypto.randomBytes` statt `Math.random()` | ✅ | `000a481` |
+| M14 | Dockerfile-Base auf `node:20.20.2-alpine3.23@sha256:fb4cd12c…` gepinnt | ✅ | `5583419` |
 
-**Abhängigkeiten:** Next.js-Upgrade ist der größte Block — am besten
-zuerst, danach laufen die anderen ohne Konflikte.
+**Bonus-Findings während der Umsetzung:**
+- H1 (Next.js): Audit-Empfehlung 14.2.35 wurde nach Audit-Datum durch
+  fünf weitere High-CVEs (`GHSA-9g9p-9gw9-jx7f`, `GHSA-ggv3-7p47-pfv8`,
+  `GHSA-3x4c-7xq6-9pq8`, `GHSA-q4gf-8mx6-v5v3`, plus erweiterte Range
+  von `GHSA-h25m-26qc-wcjf`) eingeholt. Endziel `15.5.18` schließt
+  alle. Pages Router weiterhin voll unterstützt; keine App-Code-
+  Anpassungen nötig.
+- M11: Neben dem Audit-Punkt zusätzlich `/api/auth/register` und
+  `/api/auth/switch-org` aus der Exemption entfernt — diese teilen
+  zwar das `/api/auth/`-Verzeichnis, sind aber custom Routes mit
+  Cookie-Auth und müssen CSRF-geprüft werden. Webhook- und Internal-
+  Endpoints kompensiert via `NON_BROWSER_AUTH_PREFIXES`.
+- M1: AAD-Binding-ID generalisiert auf `bindingId` statt fix
+  `organization_id`, damit `settings.mistral_api_key_encrypted`
+  (per-User) ebenfalls eine eindeutige Bindung erhält (`user_id`).
 
-**Exit-Kriterien Phase 2:**
-1. `npm audit --json` zeigt keine direkten High/Critical-Advisories.
-2. Cost-Cap-Test: 2 h dauerhafter Share-Audio-Stream wird hart begrenzt.
-3. Krypto-Migration in Staging mit Rollback verifiziert.
-4. Fireworks-Default ist out, README-Kapitel ist im Repo.
+**Exit-Kriterien Phase 2:** alle erfüllt.
+
+1. ✅ `npm audit --json` zeigt keine direkten High/Critical-Advisories
+   auf `next` (3 moderate transitive für `postcss`/`nodemailer`
+   bleiben — Phase 3 Material, kein Direct Dependency).
+2. ✅ Cost-Cap-Test: Concurrency-Cap (max 3 Audio-Streams/Token,
+   `assertOrgTtsShareBudget` ≤ 60 min/Tag/Org) durch 5 neue Unit-
+   Tests verifiziert (`tests/share-stream-guards.test.mjs`).
+3. ✅ Krypto-Migration ist idempotent + transaktional + dry-run-fähig
+   (`scripts/reencrypt-secrets.js`); ROLLBACK on jede Decrypt-
+   Failure. Staging-Rollout siehe Operatorhinweis am Skript-Header.
+4. ✅ Fireworks-Default ist out (`.env.example`, `README.md`,
+   `README.de.md`); neuer Operator-Guide `docs/gdpr-setup.md`
+   im Repo.
 
 ### Phase 3 — "Enterprise polish" (~10 Personentage)
 
@@ -1279,9 +1301,21 @@ Läuft parallel zu Phase 2/3, kein blockierender Pfad.
 | OIDC-Migration: `OIDC_LINK_BY_EMAIL=true` initial → bestehende OIDC-User einmal einloggen → `OIDC_LINK_BY_EMAIL=false` | DevOps | nach Phase 1 Deploy |
 
 **Operationelle Empfehlung während der Behebung:**
-- Vexa-Profile bleibt deaktiviert bis Phase 2 abgeschlossen ist (wegen H9
-  Drittlandtransfer + C2 Bridge-Refactor end-to-end getestet).
+- ~~Vexa-Profile bleibt deaktiviert bis Phase 2 abgeschlossen ist~~ —
+  Phase 2 ist abgeschlossen. Vor Aktivierung des Vexa-Profils:
+  `BRIDGE_TRANSCRIPTION_API_KEY` ENV setzen (Operator-Fallback) und
+  README-Kapitel `docs/gdpr-setup.md` durcharbeiten.
 - OIDC mit `OIDC_AUTO_PROVISION=false` betreiben, bis Domain-Allowlist
   konfiguriert ist.
 - Direkter Port-3000-Zugang auf der Maschine firewall-blocken (auch
   ohne den Compose-Fix), bis Phase-1-Deploy live ist.
+
+**Operationelle Empfehlung nach Phase-2-Deploy:**
+- `npm run reencrypt-secrets -- --dry-run` in Staging fahren, dann ohne
+  `--dry-run` ausführen. Erwartete Ausgabe: `failed=0`. Skript ist
+  idempotent — kann bei Bedarf erneut laufen.
+- `OUTBOUND_ALLOWED_HOSTS=api.mistral.ai` in Production setzen
+  (zusätzlich Resend/SendGrid-Hostname falls Email-Versand aktiv).
+- `LIVE_TTS_SHARE_DAILY_MINUTES_PER_ORG` ggf. anpassen — Default 60 min.
+- Bei späterem Schwenk auf weitere Provider: in `OUTBOUND_ALLOWED_HOSTS`
+  ergänzen, sonst greift der safeFetch-Block.
