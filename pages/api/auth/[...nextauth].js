@@ -30,6 +30,14 @@ const DUMMY_BCRYPT_HASH = bcrypt.hashSync(
 
 const providers = [];
 const OIDC_LINK_BY_EMAIL = String(process.env.OIDC_LINK_BY_EMAIL || 'false').toLowerCase() === 'true';
+// M7: when LINK_BY_EMAIL is on (typically a one-off migration window),
+// default behaviour is still to auto-create a user record if the email
+// doesn't exist yet. Operators who want SSO restricted to pre-existing
+// accounts only — even during the migration window — can flip
+// OIDC_AUTO_PROVISION=false and the auto-INSERT path is disabled, so
+// SSO logins for unknown emails fail closed instead of silently
+// minting a new `role=user` row.
+const OIDC_AUTO_PROVISION = String(process.env.OIDC_AUTO_PROVISION || 'true').toLowerCase() !== 'false';
 const OIDC_ALLOWED_EMAIL_DOMAINS = new Set(
   String(process.env.OIDC_ALLOWED_EMAIL_DOMAINS || '')
     .split(',')
@@ -64,16 +72,26 @@ async function resolveOidcUser({ provider, providerAccountId, normalizedEmail, d
     'SELECT id, email, name, role FROM users WHERE lower(email) = $1 LIMIT 1',
     [normalizedEmail]
   );
-  const dbUser = existing.rows[0] || (await query(
-    `INSERT INTO users (email, name, password_hash, role)
-     VALUES ($1, $2, $3, 'user')
-     RETURNING id, email, name, role`,
-    [
-      normalizedEmail,
-      displayName || normalizedEmail,
-      await bcrypt.hash(randomUUID(), 12),
-    ]
-  )).rows[0];
+  let dbUser = existing.rows[0];
+  if (!dbUser) {
+    if (!OIDC_AUTO_PROVISION) {
+      trackSecurityEvent('oidc_auto_provision_blocked', {
+        route: '/api/auth/[...nextauth]',
+        provider,
+      });
+      return null;
+    }
+    dbUser = (await query(
+      `INSERT INTO users (email, name, password_hash, role)
+       VALUES ($1, $2, $3, 'user')
+       RETURNING id, email, name, role`,
+      [
+        normalizedEmail,
+        displayName || normalizedEmail,
+        await bcrypt.hash(randomUUID(), 12),
+      ]
+    )).rows[0];
+  }
 
   await query(
     `INSERT INTO oidc_account_bindings (provider, provider_account_id, user_id)
