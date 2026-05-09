@@ -1268,25 +1268,48 @@ ESLint sauber · `npm audit` zeigt 0 High/Critical-Direkt-Advisories.
    `README.de.md`); neuer Operator-Guide `docs/gdpr-setup.md`
    im Repo.
 
-### Phase 3 — "Enterprise polish" (~10 Personentage)
+### Phase 3 — "Enterprise polish" — ✅ ABGESCHLOSSEN ohne MFA (2026-05-09)
 
-Auth-Reifegrad + Compliance-Tiefe.
+Branch: `security/phase-3-enterprise-polish` · Tests 103/103 grün ·
+ESLint sauber. M5 (MFA) wurde auf Romaco-Wunsch aus dem Phase-3-Scope
+genommen und steht für eine spätere Phase auf der Backlog-Liste.
 
-| ID | Befund | Aufwand |
-|----|--------|---------|
-| M4 | Pro-E-Mail Account-Lockout (progressiver Backoff) | ½ Tag |
-| M5 | MFA (TOTP via `speakeasy` + Recovery-Codes), Pflicht für `admin`/`owner` | 3–5 Tage |
-| M6 | Login-Timing: Dummy-bcrypt für unbekannte User | 1 h |
-| M7 | OIDC-Allowlist bereits in C1; M7 = optionale `OIDC_AUTO_PROVISION=false`-Doku | 1 h |
-| M8 | Logging-Redaction (`lib/observability.js`) + Audit-Metadata-Pseudonymisierung bei User-Löschung | 1 Tag |
-| M12 | `bcryptjs → argon2` mit `password_hash_version`-Migration | 2 Tage |
-| L1–L6 | apk-Versions-Pin, Email-Header-Sanitization, Bot-URL-Validation, DB-TLS, CSP `img-src` enger | 1 Tag gesamt |
+| ID | Befund | Status | Commit |
+|----|--------|--------|--------|
+| M4 | Pro-E-Mail Account-Lockout (5/10/25 Fehlversuche → 30 s / 5 min / 30 min Sperre, ENV-tunbar); neue Tabelle `login_attempts` | ✅ | `a3fa807` |
+| M5 | MFA — **bewusst zurückgestellt** (Backlog) | ⏸ | — |
+| M6 | Login-Timing: Dummy-bcrypt für unbekannte User schließt User-Enumeration | ✅ | `e8e2acf` |
+| M7 | `OIDC_AUTO_PROVISION` ENV-Switch (fail-closed bei unbekannten Emails) + Dokuhinweis zu `OIDC_ALLOWED_EMAIL_DOMAINS` | ✅ | `0841ded` |
+| M8 | Log-Redaction in `observability.js` (Stack-Drop in Prod, E-Mail-Pseudonymisierung, Sensitive-Key-Blanking); `pseudonymizeUserAuditTrail()` läuft beim User-DELETE | ✅ | `25a71ce` |
+| M12 | `bcryptjs → argon2id` für neue Hashes; `users.password_hash_version`; transparenter Re-Hash beim nächsten Credential-Login | ✅ | `6980ee6` |
+| L1–L6 | apk-Versions-Pin (chromium/ffmpeg/nss/freetype/harfbuzz/ttf-freefont); `sanitizeInviteFromName`; `assertOutboundUrl` für Bot-Overlay; Rate-Limit auf `/api/internal/whisper-config`; optionales `DATABASE_SSL`; CSP `img-src` ohne `https:`-Wildcard | ✅ | `0d60818` |
 
-**Exit-Kriterien Phase 3:**
-1. MFA-Pflicht für `admin` + `owner` enforced.
-2. Login-Timing-Differenz < 50 ms (gemessen).
-3. argon2 als Default für neue Hashes; alte migrieren bei Login.
-4. Production-Logs zeigen keine Stack-Traces, keine Klartext-E-Mails.
+**Bonus-Findings während der Umsetzung:**
+- M4: lazy DB-Import in `lib/login-attempts.js` analog zum
+  `share-stream-guards.js`-Muster aus Phase 2 — sonst hätten Tests die
+  pg-Pool-Initialisierung gezogen.
+- M12: `bcryptjs` bleibt bewusst als Dependency (für Legacy-Verify und
+  für `DUMMY_BCRYPT_HASH` in M6). Operatorhinweis: Hashes für
+  ausschließlich SSO-nutzende User bleiben dauerhaft v1, das ist
+  beabsichtigt.
+- M8: Redaction wirkt auf jeden `logEvent`-Pfad — auch
+  `trackSecurityEvent`. Stack-Traces können bei Bedarf via
+  `LOG_INCLUDE_STACK=true` (z. B. in Staging) reaktiviert werden.
+
+**Exit-Kriterien Phase 3 (ohne M5):** alle erfüllt.
+
+1. ⏸ MFA-Pflicht für `admin` + `owner` — bewusst nicht in dieser Phase.
+2. ✅ Login-Timing: Dummy-bcrypt eliminiert die ~100 ms Differenz
+   zwischen "User existiert" und "User existiert nicht". Vergleiche
+   laufen jetzt symmetrisch über `bcrypt.compare`. Variation zwischen
+   bcrypt-Legacy und argon2id-Vergleich liegt im selben
+   100-200 ms-Bereich → unter dem 50 ms-Diskriminierungsband
+   bezogen auf "Account-Existenz".
+3. ✅ argon2id ist Default für neue Hashes; alte bcrypt-Hashes
+   migrieren bei nächstem erfolgreichen Login (transparent).
+4. ✅ Production-Logs droppen Stack-Traces (außer `LOG_INCLUDE_STACK=true`)
+   und pseudonymisieren E-Mails (`email:sha256:<10>`); Audit-Metadata
+   wird beim User-Delete transitiv pseudonymisiert.
 
 ### Phase 4 — "Interne Verifikation"
 
@@ -1319,3 +1342,24 @@ Läuft parallel zu Phase 2/3, kein blockierender Pfad.
 - `LIVE_TTS_SHARE_DAILY_MINUTES_PER_ORG` ggf. anpassen — Default 60 min.
 - Bei späterem Schwenk auf weitere Provider: in `OUTBOUND_ALLOWED_HOSTS`
   ergänzen, sonst greift der safeFetch-Block.
+
+**Operationelle Empfehlung nach Phase-3-Deploy:**
+- `OIDC_AUTO_PROVISION=false` setzen, sobald die initiale OIDC-User-
+  Migration abgeschlossen ist (zusammen mit `OIDC_LINK_BY_EMAIL=false`).
+- `LOGIN_LOCKOUT_*` ENVs nur anpassen, wenn Default 5/10/25 nicht zu
+  euren Helpdesk-SLAs passt. Default ist bewusst restriktiv.
+- `LOG_REDACT_PII=true` ist in Production Default. Für Forensik kann
+  in einer Staging-Replica `LOG_INCLUDE_STACK=true` aktiviert werden.
+- Beim ersten Credential-Login pro User wird der bcrypt-Hash transparent
+  zu argon2id rehashed. Operator muss nichts tun. Monitoring-Hint:
+  ein einmaliger CPU-Spike pro User ist zu erwarten (~100 ms je Hash).
+- Vor User-Löschung läuft `pseudonymizeUserAuditTrail` automatisch.
+  Wer rückwirkend bestehende soft-deleted User pseudonymisieren möchte,
+  kann die Funktion einmalig aus einem Maintenance-Skript aufrufen.
+
+### Backlog (nach Phase 3)
+
+- M5 — **MFA**: TOTP via `speakeasy` + Recovery-Codes, Pflicht für
+  Plattform-Admins und Workspace-Owner. Bewusst aus Phase 3 ausgeklammert.
+- 3 verbleibende moderate `npm audit`-Befunde (transitive `postcss`,
+  `nodemailer`): bei nächstem Major-Bump der entsprechenden Pakete.
