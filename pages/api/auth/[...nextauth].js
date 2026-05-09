@@ -6,6 +6,11 @@ import { query } from '../../../lib/db';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { normalizeEmail } from '../../../lib/email';
 import { trackSecurityEvent } from '../../../lib/observability';
+import {
+  isEmailLockedOut,
+  recordFailedLogin,
+  recordSuccessfulLogin,
+} from '../../../lib/login-attempts';
 
 if (!process.env.NEXTAUTH_SECRET) {
   throw new Error('NEXTAUTH_SECRET ist nicht gesetzt. Bitte Umgebungsvariablen prüfen.');
@@ -125,6 +130,18 @@ if (process.env.AUTH_CREDENTIALS_ENABLED === 'true') {
           return null;
         }
 
+        // M4: per-email lockout check before any DB lookup or password
+        // hashing. Distributed brute-force across many source IPs would
+        // otherwise bypass the per-IP rate-limiter.
+        const lockout = await isEmailLockedOut(normalizedEmail);
+        if (lockout.locked) {
+          trackSecurityEvent('login_email_locked', {
+            route: '/api/auth/[...nextauth]',
+            failureCount: lockout.failureCount,
+          });
+          return null;
+        }
+
         const result = await query(
           'SELECT id, email, name, password_hash, role FROM users WHERE lower(email) = $1',
           [normalizedEmail]
@@ -137,9 +154,11 @@ if (process.env.AUTH_CREDENTIALS_ENABLED === 'true') {
         const passwordHash = user ? user.password_hash : DUMMY_BCRYPT_HASH;
         const valid = await bcrypt.compare(credentials.password, passwordHash);
         if (!user || !valid) {
+          await recordFailedLogin(normalizedEmail);
           return null;
         }
 
+        await recordSuccessfulLogin(normalizedEmail);
         return {
           id: user.id,
           email: user.email,
