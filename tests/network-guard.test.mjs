@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  assertOutboundUrl,
   extractClientIp,
   isIpAllowedByList,
   isMaintenanceRequestAllowed,
@@ -90,4 +91,64 @@ test('isMaintenanceRequestAllowed permits loopback even without configured allow
 
     assert.equal(allowed, true);
   });
+});
+
+// ---------------------------------------------------------------------------
+// M10 — assertOutboundUrl: SSRF / metadata-host / private-IP guard.
+// We pin allowLoopback:false so the production-style check applies regardless
+// of NODE_ENV during the test run.
+// ---------------------------------------------------------------------------
+
+test('assertOutboundUrl rejects cloud metadata hostnames', async () => {
+  await assert.rejects(
+    () => assertOutboundUrl('http://169.254.169.254/latest/meta-data/', { allowLoopback: false }),
+    (err) => err.code === 'OUTBOUND_HOST_BLOCKED' || err.code === 'OUTBOUND_PRIVATE_IP',
+  );
+  await assert.rejects(
+    () => assertOutboundUrl('http://metadata.google.internal/', { allowLoopback: false }),
+    (err) => err.code === 'OUTBOUND_HOST_BLOCKED',
+  );
+});
+
+test('assertOutboundUrl rejects file:// and other non-http schemes', async () => {
+  await assert.rejects(
+    () => assertOutboundUrl('file:///etc/passwd', { allowLoopback: false }),
+    (err) => err.code === 'OUTBOUND_PROTOCOL_BLOCKED',
+  );
+  await assert.rejects(
+    () => assertOutboundUrl('gopher://attacker.example/', { allowLoopback: false }),
+    (err) => err.code === 'OUTBOUND_PROTOCOL_BLOCKED',
+  );
+});
+
+test('assertOutboundUrl rejects literal private IP destinations', async () => {
+  await assert.rejects(
+    () => assertOutboundUrl('http://10.0.0.5/', { allowLoopback: false }),
+    (err) => err.code === 'OUTBOUND_PRIVATE_IP',
+  );
+  await assert.rejects(
+    () => assertOutboundUrl('http://127.0.0.1:8080/', { allowLoopback: false }),
+    (err) => err.code === 'OUTBOUND_PRIVATE_IP',
+  );
+});
+
+test('assertOutboundUrl honours OUTBOUND_ALLOWED_HOSTS when set', async () => {
+  const previous = process.env.OUTBOUND_ALLOWED_HOSTS;
+  process.env.OUTBOUND_ALLOWED_HOSTS = 'api.mistral.ai,api.resend.com';
+  try {
+    await assert.rejects(
+      () => assertOutboundUrl('https://attacker.example/', { allowLoopback: false }),
+      (err) => err.code === 'OUTBOUND_HOST_NOT_ALLOWLISTED',
+    );
+  } finally {
+    if (previous === undefined) delete process.env.OUTBOUND_ALLOWED_HOSTS;
+    else process.env.OUTBOUND_ALLOWED_HOSTS = previous;
+  }
+});
+
+test('assertOutboundUrl rejects malformed URLs', async () => {
+  await assert.rejects(
+    () => assertOutboundUrl('not a url', { allowLoopback: false }),
+    (err) => err.code === 'OUTBOUND_INVALID_URL',
+  );
 });
