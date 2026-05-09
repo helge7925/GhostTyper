@@ -12,6 +12,12 @@ import {
   PCM_BITS_PER_SAMPLE,
 } from '../../../../lib/tts';
 import { logError, logInfo } from '../../../../lib/observability';
+import {
+  acquireStreamSlot,
+  assertOrgTtsShareBudget,
+  ShareConcurrencyLimitError,
+  ShareDailyBudgetError,
+} from '../../../../lib/share-stream-guards';
 
 /**
  * Public TTS stream for share-link viewers.
@@ -63,13 +69,43 @@ export default async function handler(req, res) {
     return res.status(400).json({ code: 'TRANSLATION_DISABLED' });
   }
 
+  // H8: cap simultaneous TTS streams per share token *and* check the org's
+  // daily live_tts_share budget *before* we hand back any keys or open a
+  // long-lived response. Both checks happen pre-flight so an attacker can't
+  // chain rapid 4 h connections to drain the row owner's Mistral budget.
+  let releaseSlot;
+  try {
+    releaseSlot = acquireStreamSlot(token, 'audio', 3);
+  } catch (error) {
+    if (error instanceof ShareConcurrencyLimitError) {
+      return res.status(429).json({ code: 'CONCURRENCY_LIMIT' });
+    }
+    throw error;
+  }
+  try {
+    await assertOrgTtsShareBudget(row.organization_id);
+  } catch (error) {
+    releaseSlot();
+    if (error instanceof ShareDailyBudgetError) {
+      return res.status(429).json({
+        code: 'BUDGET_EXHAUSTED',
+        usedSeconds: error.usedSeconds,
+        limitSeconds: error.limitSeconds,
+      });
+    }
+    throw error;
+  }
+
   // Use the row owner's Mistral key — share viewers don't have one,
   // and the workspace that owns the meeting pays for the TTS bytes.
   const apiKey = await resolveMistralApiKey({
     userId: row.user_id,
     organizationId: row.organization_id,
   });
-  if (!apiKey) return res.status(503).json({ code: 'NO_API_KEY' });
+  if (!apiKey) {
+    releaseSlot();
+    return res.status(503).json({ code: 'NO_API_KEY' });
+  }
 
   res.status(200);
   res.setHeader('Content-Type', 'audio/wav');
@@ -92,6 +128,7 @@ export default async function handler(req, res) {
     cancelled = true;
     clearInterval(interval);
     try { res.end(); } catch { /* ignore */ }
+    releaseSlot();
     if (totalPcmBytes > 0) {
       const seconds = estimatePcmDurationSeconds(totalPcmBytes);
       logUsage(ownerUserId, 'voxtral-tts-latest', 'live_tts_share', {
