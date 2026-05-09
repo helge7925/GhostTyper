@@ -60,7 +60,7 @@ export default async function handler(req, res) {
       try {
         await client.query('BEGIN');
         const apiKeyPayload = shouldUpdateApiKey && !shouldClearApiKey
-          ? serializeApiKeyForStorage(String(mistralApiKey).trim())
+          ? serializeApiKeyForStorage(String(mistralApiKey).trim(), { userId })
           : { plainApiKey: null, encryptedApiKey: null };
 
         const existing = await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);

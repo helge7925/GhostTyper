@@ -35,6 +35,7 @@
     "lint": "next lint",
     "seed-admin": "node scripts/seed-admin.js",
     "migrate-api-keys": "node scripts/migrate-api-keys.js",
+    "reencrypt-secrets": "node scripts/reencrypt-secrets.js",
     "retention:apply": "node scripts/apply-retention-policy.js"
   },
   "dependencies": {
