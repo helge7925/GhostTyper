@@ -4,7 +4,7 @@ import { validatePassword } from '../../../../lib/constants';
 import { serializeApiKeyForStorage } from '../../../../lib/settings-service';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { isValidEmail, normalizeEmail } from '../../../../lib/email';
-import { logAuditEvent } from '../../../../lib/audit-log';
+import { logAuditEvent, pseudonymizeUserAuditTrail } from '../../../../lib/audit-log';
 import { hashPassword } from '../../../../lib/password-hash';
 
 function normalizeRole(role) {
@@ -239,6 +239,16 @@ export default async function handler(req, res) {
               message: 'Mindestens ein Plattform-Admin muss verbleiben.',
             });
           }
+        }
+
+        // M8: pseudonymize the user's PII in audit metadata BEFORE the
+        // user row is deleted, so existing trail entries lose plaintext
+        // email/name fields but retain their evidentiary value.
+        try {
+          await pseudonymizeUserAuditTrail(userId);
+        } catch (error) {
+          logApiError('audit pseudonymization failed before user delete', error);
+          return res.status(500).json({ message: 'User-Löschung fehlgeschlagen' });
         }
 
         const result = await query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
