@@ -78,7 +78,7 @@ function buildContentSecurityPolicy(nonce) {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}'`,
     `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
-    "img-src 'self' data: blob: https:",
+    "img-src 'self' data: blob:",
     "font-src 'self' data: https://fonts.gstatic.com",
     "connect-src 'self'",
     "media-src 'self' blob: data:",

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { logApiError, serverError } from '../../../lib/api-utils';
+import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { resolveBridgeTranscriptionConfig } from '../../../lib/integrations';
 import { parseContextBias } from '../../../lib/context-bias';
 import { logAuditEvent } from '../../../lib/audit-log';
@@ -24,6 +24,16 @@ export default async function handler(req, res) {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ code: 'METHOD_NOT_ALLOWED' });
   }
+
+  // Defense-in-depth: Docker internal network is normally trusted, but
+  // rate-limit against a compromised bridge container.
+  const allowed = await enforceRateLimit(req, res, {
+    keyPrefix: 'internal-whisper-config',
+    identifier: `${headerValue(req.headers['x-romaco-org']).trim() || 'unknown'}:${req.socket?.remoteAddress || 'unknown'}`,
+    limit: 60,
+    windowMs: 60_000,
+  });
+  if (!allowed) return;
 
   const expected = process.env.BRIDGE_SHARED_SECRET;
   if (!expected) {
