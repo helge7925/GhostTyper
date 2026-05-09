@@ -1,7 +1,36 @@
 import { NextResponse } from 'next/server';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-const EXEMPT_API_PREFIXES = ['/api/auth'];
+
+// NextAuth maintains its own CSRF token for /api/auth/* endpoints. We exempt
+// only the NextAuth-managed subpaths and explicitly NOT the custom routes
+// (register.js, switch-org.js) that live in the same directory but reuse the
+// app's session model. This was the M11 finding: a blanket /api/auth prefix
+// exemption let our own state-changing endpoints bypass CSRF checks.
+const NEXTAUTH_EXEMPT_PATHS = new Set([
+  '/api/auth/signin',
+  '/api/auth/signout',
+  '/api/auth/session',
+  '/api/auth/csrf',
+  '/api/auth/providers',
+  '/api/auth/error',
+  '/api/auth/verify-request',
+  '/api/auth/_log',
+]);
+const NEXTAUTH_EXEMPT_PREFIXES = [
+  '/api/auth/signin/',
+  '/api/auth/signout/',
+  '/api/auth/callback/',
+];
+
+// Endpoints that authenticate via their own non-cookie mechanism (HMAC for
+// Vexa webhooks, X-Bridge-Secret for internal bridge). They are routinely
+// called by non-browser clients that never send Origin or sec-fetch-site,
+// so the CSRF middleware would falsely block them.
+const NON_BROWSER_AUTH_PREFIXES = [
+  '/api/webhooks/',
+  '/api/internal/',
+];
 const ALLOWED_SEC_FETCH_SITE = new Set(['same-origin', 'same-site', 'none']);
 const STATIC_PATH_PREFIXES = ['/_next/static', '/_next/image', '/_next/data'];
 const STATIC_FILE_PATTERN = /\.[^/]+$/;
@@ -11,7 +40,10 @@ function isApiPath(pathname) {
 }
 
 function isExemptPath(pathname) {
-  return EXEMPT_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  if (NEXTAUTH_EXEMPT_PATHS.has(pathname)) return true;
+  if (NEXTAUTH_EXEMPT_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
+  if (NON_BROWSER_AUTH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
+  return false;
 }
 
 function isSameOrigin(request, originHeader) {
@@ -67,15 +99,18 @@ function handleApiRequest(request, pathname) {
   const originHeader = request.headers.get('origin');
   const secFetchSite = request.headers.get('sec-fetch-site');
 
-  // Browser request with Origin must be same-origin for state-changing API calls.
-  if (originHeader) {
-    if (!isSameOrigin(request, originHeader)) {
-      return NextResponse.json({ message: 'Cross-site request blocked' }, { status: 403 });
-    }
-    return NextResponse.next();
+  // M11: state-changing requests must carry at least one trustworthy CSRF
+  // signal. Modern browsers always send sec-fetch-site; cross-site fetches
+  // also send Origin. Requests with neither are either non-browser clients
+  // or attacker-controlled flows that strip headers — block them.
+  if (!originHeader && !secFetchSite) {
+    return NextResponse.json({ message: 'Cross-site request blocked' }, { status: 403 });
   }
 
-  // When Origin is absent, still block explicit cross-site browser fetch contexts.
+  if (originHeader && !isSameOrigin(request, originHeader)) {
+    return NextResponse.json({ message: 'Cross-site request blocked' }, { status: 403 });
+  }
+
   if (secFetchSite && !ALLOWED_SEC_FETCH_SITE.has(secFetchSite)) {
     return NextResponse.json({ message: 'Cross-site request blocked' }, { status: 403 });
   }
