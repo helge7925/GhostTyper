@@ -1186,69 +1186,102 @@ new file mode 100644
 
 ---
 
-## Phasenplan (pragmatisch)
+## Phasenplan (granular, mit Status)
 
-### Phase 1 — Blocking Critical Fixes
+Dieser Plan erweitert Codex' kompakten 3-Phasen-Vorschlag (oben hatte
+Codex nur C1/C2/H5 in Phase 1; in der Umsetzung wurden alle Phase-1-
+fähigen Befunde gebündelt). Externe Aktivitäten (Pen-Test durch
+Drittanbieter, Legal-Review von DSGVO-Templates, externe Tools wie
+`socket.dev`) wurden auf Romaco-Wunsch gestrichen — Verifikation wird
+intern durchgeführt.
 
-**Umfang:**
-- C1 OIDC Binding + `email_verified` + Domain-Allowlist
-- C2 Org-scoped Bridge-Key + Operator-Fallback-Key
-- H5 Virus-Scan-Bug + Test
+### Phase 1 — "Stop the bleeding" — ✅ ABGESCHLOSSEN (2026-05-09)
 
-**Abhängigkeiten:**
-1. DB-Migration `oidc_account_bindings` vor C1-GoLive.
-2. Gemeinsames Deployment Webapp + Bridge für C2.
-3. Zugriff auf Vexa-Staging für End-to-End Test (C2).
+Branch: `security/phase-1-hardening` · Tests 71/71 grün · ESLint sauber
 
-**Gesamtaufwand:** 26–40 Stunden.
+| ID | Befund | Status | Commit |
+|----|--------|--------|--------|
+| C1 | OIDC `email_verified` + Provider-Account-Binding + Domain-Allowlist | ✅ | `b6dafc9` |
+| C2 | Bridge-Key strikt org-scoped + Operator-Fallback `BRIDGE_TRANSCRIPTION_API_KEY` | ✅ | `35442b1` |
+| H2 | Vexa-Webhook konstanter 202-ACK (kein Status-Code-Leak) | ✅ | `495b923` |
+| H3 | Vexa-Webhook 256-KB-Body-Cap vor Auth | ✅ | `495b923` |
+| H4 | Rate-Limit IP-Extraktion zentralisiert + Direkt-Port-3000-Mapping entfernt | ✅ | `ded772b` |
+| H5 | Virus-Scan-Wrapper: Token-Parser + raw `filePath` + 2 Tests | ✅ | `2a719fe` |
+| H6 | Chromium-Sandbox-Default-on + Auto-`--no-sandbox`-Fallback entfernt | ✅ | `2ba3101` |
+| H7 | `mdToHtml` mit DOMPurify gewrappt | ✅ | `886e3a2` |
+| H10 | Last-Plattform-Admin-Schutz (PUT + DELETE) | ✅ | `f43ca97` |
+| M3 | Last-Org-Owner-Schutz (PATCH + DELETE) | ✅ | `758d123` |
+| M9 | Share-Endpoint nutzt `extractClientIp` statt rohem XFF | ✅ | `2954e5e` |
 
-**Exit-Kriterien:**
-1. OIDC-Login ohne verified Mail wird abgewiesen.
-2. Jeder OIDC-Login nutzt Binding; `OIDC_LINK_BY_EMAIL=false` nach Migration.
-3. Bridge-Key-Auswahl ist org-spezifisch oder explizit operator-fallback.
-4. EICAR-Test in CI/Staging schlägt wie erwartet an.
+**Bonus:** Während H5 wurde ein zweiter Bug entdeckt — der Token-Parser
+in `lib/virus-scan.js` zerlegte `clamscan --no-summary {file}` als ein
+einziges `cmd`-Argument und produzierte unter `shell: false` ENOENT. Mit
+gefixt im selben Commit.
 
-### Phase 2 — High Severity Hardening
+**Exit-Kriterien Phase 1:** alle erfüllt.
 
-**Umfang:**
-- H1 Next.js Upgrade (>=14.2.35)
-- H2/H3 Vexa-Webhook Reihenfolge + Body-Limit vor Auth
-- H4 Rate-Limit IP-Trust konsolidieren + Port 3000 Direktmapping entfernen
-- H6 Chromium Sandbox Default fixen
-- H7 Markdown-XSS Sanitizing
-- H8 Public-share Cost-DoS Guardrails
+### Phase 2 — "Defense in depth" (~10 Personentage)
 
-**Abhängigkeiten:**
-1. Regression-Suite nach Next.js Upgrade.
-2. Traefik-/Network-Konfiguration für H4.
-3. PDF rendering smoke-tests für H6.
+Architektur-relevante High/Medium-Befunde. Voraussetzung für externe
+Vexa-Bot-Bereitstellung und öffentliche Share-Links.
 
-**Gesamtaufwand:** 6–10 Arbeitstage.
+| ID | Befund | Aufwand | Notizen |
+|----|--------|---------|---------|
+| H1 | `next` ≥ 14.2.35 (12 CVEs schließen) | 2–5 Tage | volle Test-Suite + Pages-Router-Migrations-Check |
+| H8 | Public-Share Concurrency-Cap + Org-Budget-Guard für `live_tts_share` | 1 Tag | Cost-DoS-Schutz |
+| H9 | DSGVO: Cortecs/Mistral als Default statt Fireworks; README-Kapitel "DSGVO-konformes Setup" + Datenfluss-Doku | 1 Tag | rein technisch + Doku, kein Legal-Review |
+| M1 | Krypto-Hardening: HKDF + AAD + `v2:`-Prefix + Re-Encryption-Migration | 2 Tage | DB-Backup vor Migration; Versionierung |
+| M2 | Admin-Role-Refresh in `requireAdmin` (DB-Read statt JWT-Cache) | 2 h | |
+| M10 | Zentrale `safeFetch` mit Outbound-Allowlist in `lib/network-guard.js` | ½ Tag | OIDC, Vexa, Mistral, Fireworks alle umstellen |
+| M11 | CSRF-Middleware: zwingend Origin/sec-fetch-site bei state-changing | ½ Tag | `/api/auth`-Exemption verengen |
+| M13 | Slug-Suffix mit `crypto.randomBytes` | 15 min | |
+| M14 | Docker-SHA-Digest-Pin | 1 h | reproducible builds |
 
-**Exit-Kriterien:**
-1. `npm audit --json` zeigt keine bekannten High/Critical Next.js Advisories für den gewählten Target-Stand.
-2. Webhook prüft Auth vor DB-Lookup und erzwingt Body-Limit.
-3. Rate-Limit kann nicht über `X-Forwarded-For` manipuliert werden.
-4. XSS Regression-Tests für Markdown-Renderpfade sind grün.
+**Abhängigkeiten:** Next.js-Upgrade ist der größte Block — am besten
+zuerst, danach laufen die anderen ohne Konflikte.
 
-### Phase 3 — Enterprise-Polish
+**Exit-Kriterien Phase 2:**
+1. `npm audit --json` zeigt keine direkten High/Critical-Advisories.
+2. Cost-Cap-Test: 2 h dauerhafter Share-Audio-Stream wird hart begrenzt.
+3. Krypto-Migration in Staging mit Rollback verifiziert.
+4. Fireworks-Default ist out, README-Kapitel ist im Repo.
 
-**Umfang:**
-- M1 Krypto-Hardening (`HKDF`, AAD, Key-Rotation)
-- M2 JWT Privilege-Revocation-Lag
-- M3 Last-Org-Owner Protection
-- H9 DSGVO-Flows/Fireworks Default Governance
-- H10 Last-Platform-Admin Lockout
-- M4/M5 MFA + Account-Lockout/Bruteforce-Härtung
+### Phase 3 — "Enterprise polish" (~10 Personentage)
 
-**Abhängigkeiten:**
-1. Produkt-/Betriebsentscheidungen zu MFA-UX und Recovery-Prozess.
-2. DPA/Transfer Impact Assessment für US-Provider-Pfade.
-3. Schlüssel-Rotationsrunbook inkl. Backfill-Skript.
+Auth-Reifegrad + Compliance-Tiefe.
 
-**Gesamtaufwand:** 2–4 Wochen.
+| ID | Befund | Aufwand |
+|----|--------|---------|
+| M4 | Pro-E-Mail Account-Lockout (progressiver Backoff) | ½ Tag |
+| M5 | MFA (TOTP via `speakeasy` + Recovery-Codes), Pflicht für `admin`/`owner` | 3–5 Tage |
+| M6 | Login-Timing: Dummy-bcrypt für unbekannte User | 1 h |
+| M7 | OIDC-Allowlist bereits in C1; M7 = optionale `OIDC_AUTO_PROVISION=false`-Doku | 1 h |
+| M8 | Logging-Redaction (`lib/observability.js`) + Audit-Metadata-Pseudonymisierung bei User-Löschung | 1 Tag |
+| M12 | `bcryptjs → argon2` mit `password_hash_version`-Migration | 2 Tage |
+| L1–L6 | apk-Versions-Pin, Email-Header-Sanitization, Bot-URL-Validation, DB-TLS, CSP `img-src` enger | 1 Tag gesamt |
 
-**Exit-Kriterien:**
-1. Enterprise Auth Baseline erreicht (MFA, Lockout, Privilege revocation).
-2. Secrets-Lifecycle dokumentiert und regelmäßig testbar (Rotation Drill).
-3. Datenschutzpfade vollständig dokumentiert (Art. 9, Drittlandtransfer, Auftragsverarbeitung).
+**Exit-Kriterien Phase 3:**
+1. MFA-Pflicht für `admin` + `owner` enforced.
+2. Login-Timing-Differenz < 50 ms (gemessen).
+3. argon2 als Default für neue Hashes; alte migrieren bei Login.
+4. Production-Logs zeigen keine Stack-Traces, keine Klartext-E-Mails.
+
+### Phase 4 — "Interne Verifikation"
+
+Läuft parallel zu Phase 2/3, kein blockierender Pfad.
+
+| Tätigkeit | Verantwortlich | Aufwand |
+|-----------|----------------|---------|
+| Frontend-XSS-Audit aller React-Komponenten (sukzessive in Sprints) | intern | 2–3 Tage |
+| Retention-Schedule-Verifikation (cron läuft täglich, Logs prüfen) | DevOps | 2 h |
+| Security-Regression-Tests in CI: Webhook-Replay-Test, Rate-Limit-Spoofing-Test, OIDC-Email-Verified-Test | intern | 1–2 Tage |
+| GitHub-Actions-Hook für `npm audit --json` mit Fail-Gate auf High/Critical | DevOps | 2 h |
+| OIDC-Migration: `OIDC_LINK_BY_EMAIL=true` initial → bestehende OIDC-User einmal einloggen → `OIDC_LINK_BY_EMAIL=false` | DevOps | nach Phase 1 Deploy |
+
+**Operationelle Empfehlung während der Behebung:**
+- Vexa-Profile bleibt deaktiviert bis Phase 2 abgeschlossen ist (wegen H9
+  Drittlandtransfer + C2 Bridge-Refactor end-to-end getestet).
+- OIDC mit `OIDC_AUTO_PROVISION=false` betreiben, bis Domain-Allowlist
+  konfiguriert ist.
+- Direkter Port-3000-Zugang auf der Maschine firewall-blocken (auch
+  ohne den Compose-Fix), bis Phase-1-Deploy live ist.
