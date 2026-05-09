@@ -9,10 +9,17 @@ services:
     networks:
       - web
       - internal
-    ports:
-      # Direkt-Zugriff (lokal/ohne Traefik). In Traefik-Setups optional, da
-      # die `web`-Network + Labels darunter ohnehin greifen.
-      - "${WEBAPP_HOST_PORT:-3000}:3000"
+    # SECURITY: In production behind Traefik, the `web` network + traefik
+    # labels above are sufficient — there is no need to publish 3000 on the
+    # host. Direct host exposure (a) bypasses Traefik's TLS/headers and
+    # (b) lets clients spoof X-Forwarded-For because the immediate socket
+    # peer is no longer a private-network proxy (see lib/network-guard.js).
+    # Set WEBAPP_HOST_PORT explicitly (e.g. 127.0.0.1:3000) ONLY for local
+    # dev, on-host troubleshooting, or topologies without Traefik. The
+    # block is commented out by default; uncomment + set the env var
+    # consciously.
+    # ports:
+    #   - "127.0.0.1:${WEBAPP_HOST_PORT:-3000}:3000"
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
