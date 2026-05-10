@@ -25,9 +25,9 @@ from __future__ import annotations
 
 import logging
 import os
-import time
 
 import aiohttp
+import cachetools
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
@@ -42,6 +42,13 @@ WEBAPP_URL = os.environ.get("WEBAPP_URL", "").rstrip("/")
 BRIDGE_SECRET = os.environ.get("BRIDGE_SECRET", "")
 WEBAPP_TIMEOUT_S = float(os.environ.get("WEBAPP_TIMEOUT_S", "5"))
 CACHE_TTL_S = float(os.environ.get("WEBAPP_CACHE_TTL_S", "60"))
+# Per-scope config cache. Keyed by (org_id | meeting | "global"); a
+# multi-tenant deployment can therefore accumulate one entry per org +
+# one per active meeting. The previous implementation used a plain dict
+# with no eviction, which would grow unbounded in long-running pods.
+# TTLCache evicts on access once an entry's age exceeds CACHE_TTL_S
+# AND caps the working set at WEBAPP_CACHE_MAXSIZE (LRU when full).
+CACHE_MAXSIZE = max(1, int(os.environ.get("WEBAPP_CACHE_MAXSIZE", "1024")))
 
 FALLBACK_API_KEY = (
     os.environ.get("MISTRAL_API_KEY")
@@ -55,7 +62,9 @@ logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
 logger = logging.getLogger("voxtral-bridge")
 
 app = FastAPI()
-_cache_by_scope: dict[str, dict] = {}
+_cache_by_scope: cachetools.TTLCache[str, dict] = cachetools.TTLCache(
+    maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_S,
+)
 
 def _scope_key(org_id: str | None, platform: str | None, native_meeting_id: str | None) -> str:
     if org_id:
@@ -67,7 +76,6 @@ def _scope_key(org_id: str | None, platform: str | None, native_meeting_id: str 
 
 def _cache_default() -> dict:
     return {
-        "expires": 0,
         "api_key": None,
         "model": DEFAULT_MODEL,
         "context_bias": [],
@@ -87,16 +95,13 @@ async def fetch_effective_config(
     effect within a minute.
     """
     scope = _scope_key(org_id, platform, native_meeting_id)
-    now = time.monotonic()
     cached = _cache_by_scope.get(scope)
-    if not cached:
-        cached = _cache_default()
-        _cache_by_scope[scope] = cached
-
-    if cached["api_key"] and now < cached["expires"]:
+    if cached is not None and cached.get("api_key"):
+        # Still inside the TTL window — TTLCache lazily evicts older
+        # entries on access, so a non-None hit means it has not aged out.
         return cached
     if not WEBAPP_URL or not BRIDGE_SECRET:
-        return cached
+        return cached if cached is not None else _cache_default()
     try:
         timeout = aiohttp.ClientTimeout(total=WEBAPP_TIMEOUT_S)
         async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -116,23 +121,27 @@ async def fetch_effective_config(
                     bias = body.get("contextBias") or []
                     if not isinstance(bias, list):
                         bias = []
-                    cached.update(
+                    fresh = _cache_default()
+                    fresh.update(
                         api_key=body.get("apiKey"),
                         model=body.get("model") or DEFAULT_MODEL,
                         context_bias=[str(term) for term in bias if term],
                         source=body.get("source"),
-                        expires=now + CACHE_TTL_S,
                     )
+                    # __setitem__ on a TTLCache stamps the entry with a
+                    # fresh expiry, so the per-scope cache only hits the
+                    # webapp once per CACHE_TTL_S window.
+                    _cache_by_scope[scope] = fresh
                     logger.info(
                         "bridge config refreshed (source=%s, bias_terms=%d)",
                         body.get("source"),
-                        len(cached["context_bias"]),
+                        len(fresh["context_bias"]),
                     )
-                else:
-                    logger.warning("bridge config callback returned %s", resp.status)
+                    return fresh
+                logger.warning("bridge config callback returned %s", resp.status)
     except Exception as exc:  # noqa: BLE001
         logger.warning("bridge config callback failed: %s", exc)
-    return cached
+    return cached if cached is not None else _cache_default()
 
 
 @app.get("/")
