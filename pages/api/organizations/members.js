@@ -1,8 +1,35 @@
-import { query } from '../../../lib/db';
+import pool, { query } from '../../../lib/db';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { hasPermission, ROLES } from '../../../lib/permissions';
 import { logAuditEvent } from '../../../lib/audit-log';
+
+const LAST_OWNER_ERROR = 'LAST_OWNER_PROTECTED';
+
+// Locks every owner row in the org and verifies that demoting/removing
+// targetUserId still leaves at least one owner. Must run inside an open
+// transaction (BEGIN already issued on `client`). Throws an Error with
+// code LAST_OWNER_PROTECTED if the operation would orphan the workspace,
+// so the calling handler can ROLLBACK and return 400.
+async function assertNotLastOwner(client, orgId, targetUserId) {
+  const result = await client.query(
+    `SELECT user_id FROM organization_members
+       WHERE organization_id = $1 AND role = 'owner'
+       FOR UPDATE`,
+    [orgId],
+  );
+  const ownerIds = result.rows.map((r) => Number(r.user_id));
+  if (!ownerIds.includes(Number(targetUserId))) {
+    // Target is not currently an owner — nothing to protect against.
+    return;
+  }
+  const remaining = ownerIds.filter((id) => id !== Number(targetUserId));
+  if (remaining.length === 0) {
+    const error = new Error('Mindestens ein Owner muss im Workspace verbleiben.');
+    error.code = LAST_OWNER_ERROR;
+    throw error;
+  }
+}
 
 async function handler(req, res) {
   const userId = req.userId;
@@ -63,38 +90,26 @@ async function handler(req, res) {
       if (req.role !== 'owner' && role === 'owner') {
         return res.status(403).json({ code: 'FORBIDDEN', message: 'Owner-Rolle kann nur ein Owner vergeben.' });
       }
-      // Prevent demoting the last owner of the workspace. We need the
-      // target's current role; if they are the only owner and the new
-      // role is not 'owner', reject.
-      if (role !== 'owner') {
-        const target = await query(
-          `SELECT role FROM organization_members
-             WHERE organization_id = $1 AND user_id = $2`,
-          [orgId, targetUserId],
-        );
-        if (target.rows[0]?.role === 'owner') {
-          const remaining = await query(
-            `SELECT COUNT(*)::int AS n FROM organization_members
-               WHERE organization_id = $1 AND role = 'owner' AND user_id != $2`,
-            [orgId, targetUserId],
-          );
-          if ((remaining.rows[0]?.n || 0) === 0) {
-            return res.status(400).json({
-              message: 'Mindestens ein Owner muss im Workspace verbleiben.',
-            });
-          }
-        }
-      }
+      // Last-owner check + UPDATE must be one transaction with a row lock,
+      // otherwise two concurrent demotions can both pass the count check
+      // and orphan the workspace (Copilot B4).
+      const client = await pool.connect();
       try {
-        const result = await query(
+        await client.query('BEGIN');
+        if (role !== 'owner') {
+          await assertNotLastOwner(client, orgId, targetUserId);
+        }
+        const result = await client.query(
           `UPDATE organization_members SET role = $1
              WHERE organization_id = $2 AND user_id = $3
              RETURNING role`,
           [role, orgId, targetUserId],
         );
         if (result.rowCount === 0) {
+          await client.query('ROLLBACK');
           return res.status(404).json({ message: 'Mitglied nicht gefunden.' });
         }
+        await client.query('COMMIT');
         await logAuditEvent({
           userId,
           organizationId: orgId,
@@ -105,8 +120,14 @@ async function handler(req, res) {
         });
         return res.status(200).json({ ok: true });
       } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        if (error?.code === LAST_OWNER_ERROR) {
+          return res.status(400).json({ message: error.message });
+        }
         logApiError('Org member role change failed', error);
         return serverError(res, 'Rollenänderung fehlgeschlagen.');
+      } finally {
+        client.release();
       }
     }
 
@@ -121,33 +142,22 @@ async function handler(req, res) {
       if (targetUserId === userId) {
         return res.status(400).json({ message: 'Sie können sich nicht selbst entfernen.' });
       }
+      // Same TOCTOU as the PATCH branch (Copilot B5): two concurrent
+      // DELETEs must not both pass the last-owner check. Wrap lock + check
+      // + DELETE in one transaction.
+      const client = await pool.connect();
       try {
-        // Prevent removal of the last remaining owner.
-        const target = await query(
-          `SELECT role FROM organization_members
-             WHERE organization_id = $1 AND user_id = $2`,
-          [orgId, targetUserId],
-        );
-        if (target.rows[0]?.role === 'owner') {
-          const remaining = await query(
-            `SELECT COUNT(*)::int AS n FROM organization_members
-               WHERE organization_id = $1 AND role = 'owner' AND user_id != $2`,
-            [orgId, targetUserId],
-          );
-          if ((remaining.rows[0]?.n || 0) === 0) {
-            return res.status(400).json({
-              message: 'Mindestens ein Owner muss im Workspace verbleiben.',
-            });
-          }
-        }
-
-        const result = await query(
+        await client.query('BEGIN');
+        await assertNotLastOwner(client, orgId, targetUserId);
+        const result = await client.query(
           'DELETE FROM organization_members WHERE organization_id = $1 AND user_id = $2 RETURNING role',
           [orgId, targetUserId],
         );
         if (result.rowCount === 0) {
+          await client.query('ROLLBACK');
           return res.status(404).json({ message: 'Mitglied nicht gefunden.' });
         }
+        await client.query('COMMIT');
         await logAuditEvent({
           userId,
           organizationId: orgId,
@@ -158,8 +168,14 @@ async function handler(req, res) {
         });
         return res.status(200).json({ ok: true });
       } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        if (error?.code === LAST_OWNER_ERROR) {
+          return res.status(400).json({ message: error.message });
+        }
         logApiError('Org member remove failed', error);
         return serverError(res, 'Mitglied konnte nicht entfernt werden.');
+      } finally {
+        client.release();
       }
     }
 
