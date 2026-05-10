@@ -1,5 +1,16 @@
 # Cybersecurity Audit (2026-05-09) — Enterprise Tandem Review
 
+> **Provenance:** This audit was originally executed against the
+> `romaco-scriptor` fork during Phases 1–3. It is preserved here because
+> the findings apply identically to GhostTyper (the fork shares the same
+> code lineage), and PR #9 ports every fix back to upstream. Where the
+> audit references `Romaco` as an organisational decision-maker (e.g.
+> "Top-10-Prioritäten für Romaco", "auf Romaco-Wunsch"), treat that as
+> the audit subject at the time of writing — the technical conclusions
+> remain valid for any operator. Header names like `X-Romaco-Org`
+> reflect the actual code shipped in the bridge today and are kept
+> verbatim so this document continues to match `services/fireworks-bridge/main.py`.
+
 ## Scope
 
 Vollständiger Enterprise-Sicherheits- und Datenschutz-Audit der gesamten Codebase

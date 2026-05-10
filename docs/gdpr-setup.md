@@ -1,13 +1,16 @@
-# GDPR-conformant setup (Romaco-Scriptor)
+# GDPR-conformant setup (GhostTyper)
 
 > Status: defensive baseline guidance for self-hosted operators. This is
 > not legal advice. The recommendations below reflect the architecture
 > as of v1.2.0 + Phase 2 hardening (2026-05-09). For a binding
 > assessment, consult your DPO and your legal team.
+>
+> The same setup applies to downstream forks (e.g. Romaco-Scriptor) —
+> they share GhostTyper's transcription pipeline.
 
 ## Why this matters
 
-Romaco-Scriptor processes audio from voice memos and live meetings.
+GhostTyper processes audio from voice memos and live meetings.
 Biometric voice data is a **special category** under
 [GDPR Art. 9](https://gdpr-info.eu/art-9-gdpr/) and may not be
 transferred to a third country without an Art. 46 safeguard plus a
@@ -107,7 +110,7 @@ the internal hostname to `OUTBOUND_ALLOWED_HOSTS`.
 
 ```
 ┌──────────────┐  audio  ┌─────────────────┐  audio   ┌────────────┐
-│ Browser /    │────────►│ Romaco webapp   │─────────►│ Mistral AI │
+│ Browser /    │────────►│ GhostTyper      │─────────►│ Mistral AI │
 │ Vexa bot     │         │ (self-hosted)   │ encrypted│ (FR)       │
 └──────────────┘         └────────┬────────┘  TLS     └────────────┘
                                   │
