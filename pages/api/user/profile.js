@@ -54,12 +54,19 @@ export default async function handler(req, res) {
           return res.status(400).json({ message: 'Ungültige E-Mail-Adresse' });
         }
 
-        // Fetch current user data for password verification
+        // Fetch current user data for password verification.
+        // The session JWT can outlive the DB row (admin deletes a user, the
+        // token is still valid until expiry). Without this guard the
+        // verifyPassword call below would crash on `user.password_hash` of
+        // undefined and return a 500 instead of a clean 401.
         const userResult = await query(
           'SELECT password_hash, password_hash_version FROM users WHERE id = $1',
           [userId]
         );
         const user = userResult.rows[0];
+        if (!user) {
+          return res.status(401).json({ message: 'Sitzung ungültig — Konto nicht mehr vorhanden.' });
+        }
 
         // Update basic info
         if (name !== undefined || shouldUpdateEmail || avatarUrl !== undefined) {
