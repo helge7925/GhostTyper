@@ -83,3 +83,27 @@ test('isLegacySecret rejects v2 / null / non-string', () => {
   assert.equal(isLegacySecret(''), false);
   assert.equal(isLegacySecret(42), false);
 });
+
+// Pinned v2 vector — the migration script (scripts/reencrypt-secrets.js)
+// re-runs the same decrypt as a self-check before touching any DB row.
+// If lib/secrets.js HKDF salt/info, AAD format, KEY_LENGTH or IV_LENGTH
+// drift, this test fails first in CI — the migration would not actually
+// run because its self-check would also fail. Re-generate the vector
+// (and the matching constants in scripts/reencrypt-secrets.js) only as
+// part of a deliberate v2 → v3 format upgrade.
+test('decryptSecret v2 — pinned vector matches migration self-check', () => {
+  const SELF_CHECK_IKM = 'reencrypt-self-check-key-do-not-use-32';
+  const SELF_CHECK_PLAINTEXT = 'reencrypt-self-check OK';
+  const SELF_CHECK_CIPHERTEXT =
+    'v2:c2VsZmNoZWNraXYw:+n69QOqRIGMMMZkIkmFzRg==:X9WbQ3uGE4mHqXCGnxCK3rmp2EwoqUI=';
+
+  const previousKey = process.env.SETTINGS_ENCRYPTION_KEY;
+  process.env.SETTINGS_ENCRYPTION_KEY = SELF_CHECK_IKM;
+  try {
+    const got = decryptSecret(SELF_CHECK_CIPHERTEXT, { field: 'self-check', bindingId: '42' });
+    assert.equal(got, SELF_CHECK_PLAINTEXT);
+  } finally {
+    if (previousKey === undefined) delete process.env.SETTINGS_ENCRYPTION_KEY;
+    else process.env.SETTINGS_ENCRYPTION_KEY = previousKey;
+  }
+});
