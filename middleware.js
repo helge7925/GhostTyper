@@ -24,13 +24,17 @@ const NEXTAUTH_EXEMPT_PREFIXES = [
 ];
 
 // Endpoints that authenticate via their own non-cookie mechanism (HMAC for
-// Vexa webhooks, X-Bridge-Secret for internal bridge). They are routinely
-// called by non-browser clients that never send Origin or sec-fetch-site,
-// so the CSRF middleware would falsely block them.
+// Vexa webhooks, X-Bridge-Secret for internal bridge, x-init-secret for the
+// operator bootstrap). They are routinely called by non-browser clients that
+// never send Origin or sec-fetch-site, so the CSRF middleware would falsely
+// block them.
 const NON_BROWSER_AUTH_PREFIXES = [
   '/api/webhooks/',
   '/api/internal/',
 ];
+const NON_BROWSER_AUTH_PATHS = new Set([
+  '/api/db-init',
+]);
 const ALLOWED_SEC_FETCH_SITE = new Set(['same-origin', 'same-site', 'none']);
 const STATIC_PATH_PREFIXES = ['/_next/static', '/_next/image', '/_next/data'];
 const STATIC_FILE_PATTERN = /\.[^/]+$/;
@@ -43,6 +47,7 @@ function isExemptPath(pathname) {
   if (NEXTAUTH_EXEMPT_PATHS.has(pathname)) return true;
   if (NEXTAUTH_EXEMPT_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
   if (NON_BROWSER_AUTH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
+  if (NON_BROWSER_AUTH_PATHS.has(pathname)) return true;
   return false;
 }
 
