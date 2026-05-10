@@ -57,3 +57,17 @@ title = "Gitleaks config"
     '''scripts/smoke-test\.sh''',
     '''docs/testing\.md''',
   ]
+
+[[allowlists]]
+  description = "Synthetic fixtures inside test files"
+  # Covers obvious-looking fake tokens that gitleaks classifies as generic
+  # API keys (e.g. share-stream guard tests build collision pairs like
+  # `0123456789abcdefAAAAAAAA`). Scoped to tests/ so it cannot mask a
+  # real leak elsewhere.
+  targetRules = [
+    "generic-api-key",
+  ]
+  paths = [
+    '''tests/.+\.test\.mjs''',
+    '''tests/.+\.test\.js''',
+  ]
