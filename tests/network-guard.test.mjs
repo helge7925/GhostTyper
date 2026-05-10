@@ -6,6 +6,7 @@ import {
   isIpAllowedByList,
   isMaintenanceRequestAllowed,
   isPrivateOrLoopbackIp,
+  safeFetch,
 } from '../lib/network-guard.js';
 
 function withEnv(key, value, fn) {
@@ -151,4 +152,96 @@ test('assertOutboundUrl rejects malformed URLs', async () => {
     () => assertOutboundUrl('not a url', { allowLoopback: false }),
     (err) => err.code === 'OUTBOUND_INVALID_URL',
   );
+});
+
+// ---------------------------------------------------------------------------
+// SSRF redirect-bypass + extended IP-range coverage (Copilot B1, B2, B3).
+// ---------------------------------------------------------------------------
+
+test('isPrivateOrLoopbackIp covers IPv4 link-local 169.254.0.0/16', () => {
+  // Whole range — the metadata IP 169.254.169.254 was already covered via
+  // METADATA_HOSTS but the rest of the link-local block was reachable.
+  assert.equal(isPrivateOrLoopbackIp('169.254.0.1'), true);
+  assert.equal(isPrivateOrLoopbackIp('169.254.169.123'), true);
+  assert.equal(isPrivateOrLoopbackIp('169.254.255.254'), true);
+  // Boundary — 169.255.x is outside the link-local /16.
+  assert.equal(isPrivateOrLoopbackIp('169.255.0.1'), false);
+});
+
+test('isPrivateOrLoopbackIp covers IPv4-mapped IPv6 in compact form', () => {
+  // Compact hex form survives normalize (only the dotted form is rewritten),
+  // so the explicit ::ffff:0:0/96 entry has to do the work.
+  assert.equal(isPrivateOrLoopbackIp('::ffff:7f00:1'), true);
+  assert.equal(isPrivateOrLoopbackIp('::ffff:a9fe:a9fe'), true); // ::ffff:169.254.169.254
+});
+
+test('assertOutboundUrl rejects link-local destinations', async () => {
+  await assert.rejects(
+    () => assertOutboundUrl('http://169.254.0.7/probe', { allowLoopback: false }),
+    (err) => err.code === 'OUTBOUND_PRIVATE_IP',
+  );
+});
+
+test('safeFetch validates every redirect hop', async () => {
+  // Stub global fetch so the test never hits the network. The handler returns
+  // a 302 to 127.0.0.1, which must trip assertOutboundUrl on hop 2 — proving
+  // the per-hop validation works.
+  const originalFetch = globalThis.fetch;
+  let firstUrl = '';
+  globalThis.fetch = async (url) => {
+    if (firstUrl === '') firstUrl = url;
+    if (url === 'https://example.com/') {
+      return new Response(null, {
+        status: 302,
+        headers: { location: 'http://127.0.0.1:8080/secrets' },
+      });
+    }
+    return new Response('ok', { status: 200 });
+  };
+  try {
+    await assert.rejects(
+      () => safeFetch('https://example.com/', {}, { allowLoopback: false }),
+      (err) => err.code === 'OUTBOUND_PRIVATE_IP',
+    );
+    assert.equal(firstUrl, 'https://example.com/');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('safeFetch enforces redirect hop limit', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return new Response(null, {
+      status: 302,
+      headers: { location: `https://example.com/hop-${calls}` },
+    });
+  };
+  try {
+    await assert.rejects(
+      () => safeFetch('https://example.com/start', {}, { allowLoopback: false, maxRedirects: 2 }),
+      (err) => err.code === 'OUTBOUND_TOO_MANY_REDIRECTS',
+    );
+    // 2 hops allowed → 3 actual fetch invocations (start + hop-1 + hop-2),
+    // then the third Location push triggers the limit error.
+    assert.equal(calls, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('safeFetch with maxRedirects=0 forbids any redirect', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(null, { status: 302, headers: { location: 'https://example.com/next' } });
+  try {
+    await assert.rejects(
+      () => safeFetch('https://example.com/', {}, { allowLoopback: false, maxRedirects: 0 }),
+      (err) => err.code === 'OUTBOUND_TOO_MANY_REDIRECTS',
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
