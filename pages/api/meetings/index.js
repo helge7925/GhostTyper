@@ -19,6 +19,12 @@ import { logError } from '../../../lib/observability';
 
 const PROVIDER = 'vexa';
 const SUPPORTED_PLATFORMS = new Set(['google_meet', 'teams', 'zoom', 'nextcloud_talk']);
+const PLATFORM_LABELS = {
+  google_meet: 'Google Meet',
+  teams: 'Microsoft Teams',
+  zoom: 'Zoom',
+  nextcloud_talk: 'Nextcloud Talk',
+};
 
 async function loadUserEmail(userId) {
   const result = await query('SELECT email, name FROM users WHERE id = $1', [userId]);
