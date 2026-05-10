@@ -23,7 +23,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-RUN apk add --no-cache chromium=138.0.7204.183-r0 ffmpeg=6.1.2-r1 nss=3.108-r0 freetype=2.13.3-r0 harfbuzz=9.0.0-r0 ttf-freefont=20120503-r1
+RUN apk add --no-cache chromium=147.0.7727.116-r0 ffmpeg=8.0.1-r1 nss=3.118.1-r0 freetype=2.14.1-r0 harfbuzz=12.2.0-r0 font-freefont=20120503-r4
 RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
 
 USER nextjs
