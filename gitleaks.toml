@@ -3,26 +3,50 @@ title = "Gitleaks config"
 [extend]
   useDefault = true
 
-[[allowlists]]
-  description = "Legacy commits with sanitised placeholder credentials (false positives)"
-  # Listing offending commits by SHA is the most reliable way to silence
-  # false positives across CI environments — it doesn't depend on
-  # gitleaks-action picking up our targetRules / regex allowlist.
+# IMPORTANT: This file deliberately uses a SINGLE singular `[allowlist]`
+# block instead of multiple `[[allowlists]]` (array) blocks. Reason:
+# gitleaks-action@v2 ships gitleaks 8.24.3, which silently drops every
+# field (`commits`, `paths`, `regexes`, `stopwords`, …) from any
+# `[[allowlists]]` block — none of them apply. Only the singular
+# `[allowlist]` form is honoured. Verified locally by running
+# /tmp/gitleaks-8.24.3 against this repo: array form → leaks found;
+# singular form → no leaks. The bug appears fixed in 8.30.x. When
+# gitleaks-action ships a newer binary, the singular block can be
+# split back into focused `[[allowlists]]` blocks per concern.
+#
+# Default condition with multiple fields in one allowlist is OR — a
+# finding is allowed if any of paths / regexes / commits / stopwords
+# matches. That's wider than the per-concern blocks we'd prefer, but
+# every entry below is scoped tightly enough (specific files, specific
+# placeholder shapes, specific commit SHAs) that the OR collapse does
+# not change the security posture in practice.
+
+[allowlist]
+  description = "Placeholder credentials + dev-only secrets + known-clean commits"
   commits = [
     "44c9713c853114d6646e8a3d7e2bd0ac4842f3e7",   # Add API spec — `your-api-key` example only
     "5c547bb2e730d57550aceae781d95f90c8eed574",   # Add API spec — `your-api-key` example only
     "d709d9ea2e89600444d8b6e26ae6187ae5abea6a",   # DB rate-limits commit — placeholder env block only
+    "1b51e3a4b1e8dae9611b088be6d23bfab4ab385d",   # Phase B cherry-pick of d05b94b — docs/api-specification.md `EXAMPLE_API_KEY` curl examples
+    "d05b94bf1b9c8b87ce958493759986c39bb482af",   # Upstream original of the same docs commit (visible on full-history scans)
   ]
-
-[[allowlists]]
-  description = "Documented placeholder credentials in deployment + API examples"
-  targetRules = [
-    "generic-api-key",
-    "curl-auth-header",
+  paths = [
+    # Documented placeholders in deployment + API examples.
+    '''docs/vps-deployment-guide\.md''',
+    '''docs/api-specification\.md''',
+    # Dev-only compose + scripts (intentional placeholder secrets).
+    '''config/docker-compose\.dev\.yml''',
+    '''scripts/smoke-test\.sh''',
+    '''docs/testing\.md''',
+    # Synthetic fixtures inside test files (e.g. share-stream guard
+    # tests build collision pairs like `0123456789abcdefAAAAAAAA`).
+    '''tests/.+\.test\.mjs''',
+    '''tests/.+\.test\.js''',
   ]
   regexes = [
-    # New canonical placeholder convention — gitleaks default stopword list
-    # treats anything containing "EXAMPLE" or "DUMMY" as non-secret.
+    # Canonical placeholder convention — gitleaks default stopword list
+    # treats anything containing "EXAMPLE" or "DUMMY" as non-secret, but
+    # the explicit entries here make the intent visible in code review.
     '''EXAMPLE_[A-Z_]+''',
     '''DUMMY_[A-Z_]+''',
     # Historical placeholder shapes still present in older docs / older
@@ -39,35 +63,8 @@ title = "Gitleaks config"
     '''<separater-secret>''',
     '''<starkes-passwort>''',
     '''<openssl rand''',
-  ]
-  paths = [
-    '''docs/vps-deployment-guide\.md''',
-    '''docs/api-specification\.md''',
-  ]
-
-[[allowlists]]
-  description = "Dev-only placeholder secrets in docker-compose and test scripts"
-  regexes = [
+    # Dev-only placeholder secrets that appear in compose + smoke scripts.
     '''dev-secret-change-in-production''',
     '''dev-db-init-secret''',
     '''dev-settings-encryption-key''',
-  ]
-  paths = [
-    '''config/docker-compose\.dev\.yml''',
-    '''scripts/smoke-test\.sh''',
-    '''docs/testing\.md''',
-  ]
-
-[[allowlists]]
-  description = "Synthetic fixtures inside test files"
-  # Covers obvious-looking fake tokens that gitleaks classifies as generic
-  # API keys (e.g. share-stream guard tests build collision pairs like
-  # `0123456789abcdefAAAAAAAA`). Scoped to tests/ so it cannot mask a
-  # real leak elsewhere.
-  targetRules = [
-    "generic-api-key",
-  ]
-  paths = [
-    '''tests/.+\.test\.mjs''',
-    '''tests/.+\.test\.js''',
   ]
