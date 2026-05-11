@@ -131,7 +131,7 @@ export default async function handler(req, res) {
     releaseSlot();
     if (totalPcmBytes > 0) {
       const seconds = estimatePcmDurationSeconds(totalPcmBytes);
-      logUsage(ownerUserId, 'voxtral-tts-latest', 'live_tts_share', {
+      logUsage(ownerUserId, 'voxtral-mini-tts-2603', 'live_tts_share', {
         input_tokens: Math.ceil(seconds),
         output_tokens: 0,
       }, orgId).catch((err) => logError('share_audio.usage_log_failed', err));
