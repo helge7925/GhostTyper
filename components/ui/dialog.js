@@ -34,6 +34,10 @@ const DialogContent = forwardRef(function DialogContent(
         ref={ref}
         className={cn(
           'fixed left-1/2 top-1/2 z-[70] grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4',
+          // Cap height to viewport and let inner content scroll — without
+          // this, long dialogs (e.g. the meeting form with live-translation
+          // toggled on) overflow off-screen with no way to reach the footer.
+          'max-h-[90vh] overflow-y-auto',
           'bg-surface text-primary border border-subtle rounded-2xl shadow-2xl p-5',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',
           'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
