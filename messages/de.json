@@ -37,6 +37,8 @@
       "languageLabel": "Sprache",
       "languageAuto": "Automatisch erkennen",
       "autoAnalyze": "Nach Meeting-Ende automatisch zusammenfassen lassen.",
+      "gdprNotice": "DSGVO-Hinweis automatisch in den Meeting-Chat senden.",
+      "gdprNoticeHint": "Der Bot kündigt nach dem Beitritt im Chat an, dass das Meeting transkribiert wird. Standardtext wird in den Workspace-Einstellungen gepflegt.",
       "consent": "Ich bestätige, dass alle Teilnehmer über die Aufzeichnung und Transkription informiert sind und zugestimmt haben.",
       "cta": "Bot beitreten lassen",
       "success": "Bot wird gestartet.",
@@ -671,7 +673,12 @@
         "loadError": "Konfiguration konnte nicht geladen werden.",
         "testSuccess": "Verbindung erfolgreich.",
         "testError": "Verbindungstest fehlgeschlagen.",
-        "readOnlyHint": "Nur Workspace-Admins können diese Funktion verwalten."
+        "readOnlyHint": "Nur Workspace-Admins können diese Funktion verwalten.",
+        "gdprNoticeLabel": "DSGVO-Hinweis im Meeting-Chat",
+        "gdprNoticeHint": "Sobald der Bot dem Meeting beitritt, postet er einen Hinweis in den Chat, dass das Meeting transkribiert wird. Hilft, die Aufklärungspflicht aus Art. 13 DSGVO zu erfüllen.",
+        "gdprNoticeTextLabel": "Hinweistext",
+        "gdprNoticeTextPlaceholder": "Hinweis: Dieses Meeting wird zu Protokollzwecken automatisch transkribiert. Wenn Sie nicht einverstanden sind, melden Sie sich bitte jetzt.",
+        "gdprNoticeTextHint": "Maximal 1000 Zeichen. Leer lassen für den Standard-Text."
       }
     },
     "saveAll": "Speichern",

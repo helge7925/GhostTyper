@@ -12,7 +12,8 @@ const PROVIDER = 'vexa';
 // and VEXA_ADMIN_API_TOKEN in `.env`). They are intentionally not
 // user-editable — keeping per-org overrides for these would just
 // permit accidental misconfiguration toward a foreign Vexa instance.
-const STRING_FIELDS = ['defaultBotName', 'defaultLanguage', 'transcriptionBackend'];
+const STRING_FIELDS = ['defaultBotName', 'defaultLanguage', 'transcriptionBackend', 'gdprChatNoticeText'];
+const BOOL_FIELDS = ['gdprChatNoticeEnabled'];
 const SECRET_FIELDS = ['webhookSecret'];
 
 function pickConfigUpdate(body) {
@@ -26,6 +27,11 @@ function pickConfigUpdate(body) {
       } else if (typeof value === 'string') {
         update[field] = value.trim();
       }
+    }
+  }
+  for (const field of BOOL_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(body, field)) {
+      update[field] = body[field] === true;
     }
   }
   for (const field of SECRET_FIELDS) {

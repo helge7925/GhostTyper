@@ -9,6 +9,7 @@ import { getTranscript, mapVexaTranscriptToGhostTyper } from '../../../lib/api/v
 import { runManualAnalysisJob } from '../../../lib/manual-analysis';
 import { startBridgeForTranscription, stopBridgeForTranscription } from '../../../lib/vexa-bridge';
 import { ensureShareLinkPostedToChat } from '../../../lib/share-chat-poster';
+import { ensureGdprNoticePostedToChat } from '../../../lib/gdpr-chat-poster';
 import { ensureOverlayStarted, clearOverlay } from '../../../lib/in-meeting-overlay';
 import { stopInMeetingAudio } from '../../../lib/in-meeting-audio';
 import { logUsage } from '../../../lib/usage';
@@ -160,6 +161,20 @@ async function handleStarted(transcription, payload) {
     });
   } catch (error) {
     logApiError('vexa webhook overlay start failed', error, {
+      transcriptionId: transcription.id,
+    });
+  }
+
+  // GDPR chat notice: if the host (or workspace default) asked for it,
+  // post the announcement into the meeting chat now that the bot is
+  // actually in the room. Idempotent via gdpr_notice_posted_at.
+  try {
+    await ensureGdprNoticePostedToChat({
+      transcriptionId: transcription.id,
+      organizationId: transcription.organization_id,
+    });
+  } catch (error) {
+    logApiError('vexa webhook GDPR notice post failed', error, {
       transcriptionId: transcription.id,
     });
   }

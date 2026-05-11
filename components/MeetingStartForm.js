@@ -28,7 +28,7 @@ function detectPlatform(url) {
   return null;
 }
 
-export default function MeetingStartForm({ open, onOpenChange, defaultBotName, defaultLanguage }) {
+export default function MeetingStartForm({ open, onOpenChange, defaultBotName, defaultLanguage, gdprChatNoticeDefault = false }) {
   const router = useRouter();
   const t = useTranslations('meeting.start');
   const tCommon = useTranslations('common');
@@ -56,6 +56,10 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
   // translated segments in that language into the meeting via Vexa
   // /speak. One direction only.
   const [audioInjectionLang, setAudioInjectionLang] = useState(null);
+  // GDPR chat notice — pre-set from the workspace default so an admin
+  // who flipped the org-wide toggle on doesn't have to remember it for
+  // every meeting. Host can still uncheck it on a per-meeting basis.
+  const [gdprNoticeEnabled, setGdprNoticeEnabled] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -69,8 +73,9 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
       setTranslationLangB('en');
       setOverlayEnabled(false);
       setAudioInjectionLang(null);
+      setGdprNoticeEnabled(gdprChatNoticeDefault);
     }
-  }, [open, defaultBotName, defaultLanguage]);
+  }, [open, defaultBotName, defaultLanguage, gdprChatNoticeDefault]);
 
   // Reset audio language if translation pair becomes invalid for it.
   useEffect(() => {
@@ -109,6 +114,7 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
             : undefined,
           inMeetingOverlay: translationEnabled && overlayEnabled ? true : undefined,
           audioInjectionLang: translationEnabled && audioInjectionLang ? audioInjectionLang : undefined,
+          gdprChatNotice: gdprNoticeEnabled ? true : undefined,
         }),
       });
       const payload = await res.json().catch(() => ({}));
@@ -190,6 +196,21 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
               className="mt-0.5"
             />
             <span>{t('autoAnalyze')}</span>
+          </label>
+
+          <label className="flex items-start gap-3 text-xs text-secondary">
+            <input
+              type="checkbox"
+              checked={gdprNoticeEnabled}
+              onChange={(e) => setGdprNoticeEnabled(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className="flex-1">
+              <span className="text-primary">{t('gdprNotice')}</span>
+              <span className="block text-[10px] text-secondary mt-0.5 leading-snug">
+                {t('gdprNoticeHint')}
+              </span>
+            </span>
           </label>
 
           <div className="border border-subtle rounded-xl p-3 space-y-2">

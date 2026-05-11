@@ -22,6 +22,8 @@ export default function VexaIntegrationPanel({ canEdit }) {
   const [enabled, setEnabled] = useState(false);
   const [defaultBotName, setDefaultBotName] = useState('');
   const [defaultLanguage, setDefaultLanguage] = useState('de');
+  const [gdprNoticeEnabled, setGdprNoticeEnabled] = useState(false);
+  const [gdprNoticeText, setGdprNoticeText] = useState('');
   const [healthState, setHealthState] = useState(null);
 
   const load = useCallback(async () => {
@@ -34,6 +36,8 @@ export default function VexaIntegrationPanel({ canEdit }) {
       setEnabled(!!data.enabled);
       setDefaultBotName(cfg.defaultBotName || '');
       setDefaultLanguage(cfg.defaultLanguage || 'de');
+      setGdprNoticeEnabled(cfg.gdprChatNoticeEnabled === true);
+      setGdprNoticeText(cfg.gdprChatNoticeText || '');
     } catch (error) {
       showToast(t('loadError'), 'error');
     } finally {
@@ -50,6 +54,8 @@ export default function VexaIntegrationPanel({ canEdit }) {
       enabled: typeof overrides.enabled === 'boolean' ? overrides.enabled : enabled,
       defaultBotName: defaultBotName || null,
       defaultLanguage: defaultLanguage || 'de',
+      gdprChatNoticeEnabled: gdprNoticeEnabled,
+      gdprChatNoticeText: gdprNoticeText || null,
     };
     const res = await fetch(ENDPOINT, {
       method: 'PUT',
@@ -195,6 +201,39 @@ export default function VexaIntegrationPanel({ canEdit }) {
             <option value="auto">{t('languageAuto')}</option>
           </select>
         </div>
+      </div>
+
+      <div className="border border-subtle rounded-xl p-4 space-y-3 bg-hover-subtle/40">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <p className="text-sm text-primary font-medium">{t('gdprNoticeLabel')}</p>
+            <p className="text-xs text-secondary mt-0.5 leading-snug">{t('gdprNoticeHint')}</p>
+          </div>
+          <label className="inline-flex items-center cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={gdprNoticeEnabled}
+              disabled={!canEdit}
+              onChange={(e) => setGdprNoticeEnabled(e.target.checked)}
+            />
+            <span className="w-10 h-6 rounded-full bg-subtle peer-checked:bg-accent transition-colors relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-4" />
+          </label>
+        </div>
+        {gdprNoticeEnabled && (
+          <div>
+            <label className="block text-xs font-medium text-secondary mb-1.5">{t('gdprNoticeTextLabel')}</label>
+            <textarea
+              rows={3}
+              value={gdprNoticeText}
+              disabled={!canEdit}
+              placeholder={t('gdprNoticeTextPlaceholder')}
+              onChange={(e) => setGdprNoticeText(e.target.value.slice(0, 1000))}
+              className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none disabled:opacity-60 leading-relaxed"
+            />
+            <p className="mt-1 text-[10px] text-secondary italic">{t('gdprNoticeTextHint')}</p>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-end gap-3 pt-2 border-t border-subtle">
