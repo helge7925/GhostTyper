@@ -4,7 +4,7 @@ import { logApiError } from '../../../../lib/api-utils';
 import { addTranscriptionEvent } from '../../../../lib/transcription-events';
 import { logAuditEvent } from '../../../../lib/audit-log';
 import { resolveVexaConfig } from '../../../../lib/integrations';
-import { decryptSecret } from '../../../../lib/secrets';
+import { decryptSecret, SECRET_CONTEXTS } from '../../../../lib/secrets';
 import { getTranscript, mapVexaTranscriptToGhostTyper } from '../../../../lib/api/vexa';
 import { runManualAnalysisJob } from '../../../../lib/manual-analysis';
 import { logUsage } from '../../../../lib/usage';
@@ -51,7 +51,10 @@ async function loadUserToken(userId, orgId) {
     [userId, orgId],
   );
   if (!result.rows.length) return null;
-  return decryptSecret(result.rows[0].api_key_encrypted);
+  return decryptSecret(result.rows[0].api_key_encrypted, {
+    field: SECRET_CONTEXTS.vexaUserToken,
+    bindingId: orgId,
+  });
 }
 
 async function reconcileOne(row) {

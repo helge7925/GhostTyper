@@ -1,11 +1,11 @@
-import bcrypt from 'bcryptjs';
 import { requireAdmin } from '../../../../lib/admin';
 import pool, { query } from '../../../../lib/db';
 import { validatePassword } from '../../../../lib/constants';
 import { serializeApiKeyForStorage } from '../../../../lib/settings-service';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { isValidEmail, normalizeEmail } from '../../../../lib/email';
-import { logAuditEvent } from '../../../../lib/audit-log';
+import { logAuditEvent, pseudonymizeUserAuditTrail } from '../../../../lib/audit-log';
+import { hashPassword } from '../../../../lib/password-hash';
 
 function normalizeRole(role) {
   return ['admin', 'auditor', 'user'].includes(role) ? role : 'user';
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
       try {
         await client.query('BEGIN');
         const apiKeyPayload = shouldUpdateApiKey && !shouldClearApiKey
-          ? serializeApiKeyForStorage(String(mistralApiKey).trim())
+          ? serializeApiKeyForStorage(String(mistralApiKey).trim(), { userId })
           : { plainApiKey: null, encryptedApiKey: null };
 
         const existing = await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
@@ -73,6 +73,28 @@ export default async function handler(req, res) {
         if (userId === sessionUserId && role && role !== 'admin') {
           await client.query('ROLLBACK');
           return res.status(400).json({ message: 'Sie können Ihre eigene Admin-Rolle nicht entfernen' });
+        }
+
+        // Prevent the last platform admin from being demoted. We need to
+        // know the target's CURRENT role to decide whether the role change
+        // is "admin → not-admin"; if so, reject when no other admin exists.
+        if (role !== undefined && role !== 'admin') {
+          const target = await client.query(
+            'SELECT role FROM users WHERE id = $1',
+            [userId]
+          );
+          if (target.rows[0]?.role === 'admin') {
+            const remaining = await client.query(
+              "SELECT COUNT(*)::int AS n FROM users WHERE role = 'admin' AND id != $1",
+              [userId]
+            );
+            if ((remaining.rows[0]?.n || 0) === 0) {
+              await client.query('ROLLBACK');
+              return res.status(400).json({
+                message: 'Mindestens ein Plattform-Admin muss verbleiben.',
+              });
+            }
+          }
         }
 
         // Update user fields
@@ -100,9 +122,11 @@ export default async function handler(req, res) {
         }
 
         if (password) {
-          const passwordHash = await bcrypt.hash(password, 12);
+          const { hash: passwordHash, version: passwordHashVersion } = await hashPassword(password);
           updates.push(`password_hash = $${paramIndex++}`);
           values.push(passwordHash);
+          updates.push(`password_hash_version = $${paramIndex++}`);
+          values.push(passwordHashVersion);
         }
 
         if (role !== undefined) {
@@ -202,6 +226,31 @@ export default async function handler(req, res) {
       }
 
       try {
+        // Block deletion of the last remaining platform admin so the
+        // platform can't end up without admin coverage.
+        const target = await query('SELECT role FROM users WHERE id = $1', [userId]);
+        if (target.rows[0]?.role === 'admin') {
+          const remaining = await query(
+            "SELECT COUNT(*)::int AS n FROM users WHERE role = 'admin' AND id != $1",
+            [userId]
+          );
+          if ((remaining.rows[0]?.n || 0) === 0) {
+            return res.status(400).json({
+              message: 'Mindestens ein Plattform-Admin muss verbleiben.',
+            });
+          }
+        }
+
+        // M8: pseudonymize the user's PII in audit metadata BEFORE the
+        // user row is deleted, so existing trail entries lose plaintext
+        // email/name fields but retain their evidentiary value.
+        try {
+          await pseudonymizeUserAuditTrail(userId);
+        } catch (error) {
+          logApiError('audit pseudonymization failed before user delete', error);
+          return res.status(500).json({ message: 'User-Löschung fehlgeschlagen' });
+        }
+
         const result = await query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
         if (result.rows.length === 0) {
           return res.status(404).json({ message: 'User nicht gefunden' });

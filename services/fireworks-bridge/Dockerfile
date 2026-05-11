@@ -6,7 +6,8 @@ RUN pip install --no-cache-dir \
       fastapi==0.115.6 \
       "uvicorn[standard]==0.34.0" \
       aiohttp==3.11.11 \
-      python-multipart==0.0.20
+      python-multipart==0.0.20 \
+      cachetools==5.5.0
 
 COPY main.py /app/main.py
 

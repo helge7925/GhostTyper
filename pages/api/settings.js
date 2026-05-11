@@ -189,7 +189,7 @@ async function handler(req, res) {
           if (shouldUpdateApiKey) {
             const apiKeyPayload = shouldClearApiKey
               ? { encryptedApiKey: null, plainApiKey: null }
-              : serializeApiKeyForStorage(String(mistralApiKey).trim());
+              : serializeApiKeyForStorage(String(mistralApiKey).trim(), { userId });
             addUpdate(updates, values, 'mistral_api_key', apiKeyPayload.plainApiKey);
             addUpdate(updates, values, 'mistral_api_key_encrypted', apiKeyPayload.encryptedApiKey);
           }

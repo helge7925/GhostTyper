@@ -1,6 +1,10 @@
 import { query } from '../../../../lib/db';
-import { logApiError } from '../../../../lib/api-utils';
+import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { resolveShareToken } from '../../../../lib/share-tokens';
+import {
+  acquireStreamSlot,
+  ShareConcurrencyLimitError,
+} from '../../../../lib/share-stream-guards';
 
 /**
  * Public SSE stream for the share-link companion view. Pushes the
@@ -51,6 +55,19 @@ export default async function handler(req, res) {
 
   const token = String(req.query.token || '').trim();
 
+  // H8: stream.js previously had no rate-limit at all and no concurrency cap.
+  // Mirror the audio endpoint shape — per-token bucket so a single share
+  // link can't host an unbounded number of public viewers, plus a hard cap
+  // of 5 simultaneous SSE streams per token (slightly higher than the audio
+  // cap of 3 because SSE has no Mistral cost — only memory/CPU footprint).
+  const allowed = await enforceRateLimit(req, res, {
+    keyPrefix: 'share-stream',
+    identifier: `tok:${token.slice(0, 16)}`,
+    limit: 20,
+    windowMs: 60_000,
+  });
+  if (!allowed) return;
+
   let initial;
   try {
     initial = await resolveShareToken(token);
@@ -59,6 +76,16 @@ export default async function handler(req, res) {
     return res.status(500).json({ code: 'INTERNAL' });
   }
   if (!initial) return res.status(404).json({ code: 'NOT_FOUND' });
+
+  let releaseSlot;
+  try {
+    releaseSlot = acquireStreamSlot(token, 'stream', 5);
+  } catch (error) {
+    if (error instanceof ShareConcurrencyLimitError) {
+      return res.status(429).json({ code: 'CONCURRENCY_LIMIT' });
+    }
+    throw error;
+  }
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -106,6 +133,7 @@ export default async function handler(req, res) {
     clearInterval(tick);
     clearInterval(heartbeat);
     try { res.end(); } catch { /* ignore */ }
+    releaseSlot();
   };
 
   req.on('close', cleanup);

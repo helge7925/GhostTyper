@@ -5,7 +5,7 @@ import { hasPermission } from '../../../lib/permissions';
 import { logAuditEvent } from '../../../lib/audit-log';
 import { addTranscriptionEvent } from '../../../lib/transcription-events';
 import { resolveVexaConfig } from '../../../lib/integrations';
-import { decryptSecret } from '../../../lib/secrets';
+import { decryptSecret, SECRET_CONTEXTS } from '../../../lib/secrets';
 import { stopBot } from '../../../lib/api/vexa';
 
 async function handler(req, res) {
@@ -59,7 +59,12 @@ async function handler(req, res) {
     `SELECT api_key_encrypted FROM vexa_user_tokens WHERE user_id = $1 AND organization_id = $2`,
     [row.user_id, orgId],
   );
-  const apiKey = tokenRow.rows.length ? decryptSecret(tokenRow.rows[0].api_key_encrypted) : null;
+  const apiKey = tokenRow.rows.length
+    ? decryptSecret(tokenRow.rows[0].api_key_encrypted, {
+        field: SECRET_CONTEXTS.vexaUserToken,
+        bindingId: orgId,
+      })
+    : null;
   if (!apiKey) {
     return res.status(400).json({ code: 'NO_USER_TOKEN', message: 'Kein Vexa-Token für diesen Nutzer.' });
   }

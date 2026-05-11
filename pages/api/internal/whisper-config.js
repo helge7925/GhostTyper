@@ -1,7 +1,13 @@
 import crypto from 'crypto';
-import { logApiError, serverError } from '../../../lib/api-utils';
+import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { resolveBridgeTranscriptionConfig } from '../../../lib/integrations';
 import { parseContextBias } from '../../../lib/context-bias';
+import { logAuditEvent } from '../../../lib/audit-log';
+
+function headerValue(raw) {
+  if (Array.isArray(raw)) return raw[0] || '';
+  return typeof raw === 'string' ? raw : '';
+}
 
 /**
  * Bridge-only callback. The transcription bridge container POSTs here on
@@ -18,6 +24,16 @@ export default async function handler(req, res) {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ code: 'METHOD_NOT_ALLOWED' });
   }
+
+  // Defense-in-depth: Docker internal network is normally trusted, but
+  // rate-limit against a compromised bridge container.
+  const allowed = await enforceRateLimit(req, res, {
+    keyPrefix: 'internal-whisper-config',
+    identifier: `${headerValue(req.headers['x-romaco-org']).trim() || 'unknown'}:${req.socket?.remoteAddress || 'unknown'}`,
+    limit: 60,
+    windowMs: 60_000,
+  });
+  if (!allowed) return;
 
   const expected = process.env.BRIDGE_SHARED_SECRET;
   if (!expected) {
@@ -39,15 +55,40 @@ export default async function handler(req, res) {
   }
 
   try {
-    const config = await resolveBridgeTranscriptionConfig();
+    const orgHeader = headerValue(req.headers['x-romaco-org']).trim();
+    const platformHeader = headerValue(req.headers['x-romaco-platform']).trim();
+    const nativeMeetingHeader = headerValue(req.headers['x-romaco-native-meeting-id']).trim();
+    const organizationId = /^\d+$/.test(orgHeader) ? Number(orgHeader) : null;
+
+    const config = await resolveBridgeTranscriptionConfig({
+      organizationId,
+      platform: platformHeader || null,
+      nativeMeetingId: nativeMeetingHeader || null,
+    });
     if (!config.apiKey) {
       return res.status(503).json({ code: 'NO_KEY' });
+    }
+    if (config.source === 'operator') {
+      await logAuditEvent({
+        userId: null,
+        organizationId: config.organizationId || null,
+        action: 'bridge.transcription.operator_fallback',
+        targetType: 'bridge_transcription',
+        targetId: config.organizationId ? String(config.organizationId) : null,
+        severity: 'warn',
+        metadata: {
+          source: 'operator',
+          organizationId: config.organizationId || null,
+          scope: 'bridge_transcription',
+        },
+      });
     }
     return res.status(200).json({
       apiKey: config.apiKey,
       model: config.model,
       contextBias: parseContextBias(config.contextBias),
       source: config.source,
+      organizationId: config.organizationId,
     });
   } catch (error) {
     logApiError('whisper-config callback failed', error);

@@ -8,6 +8,12 @@ on:
 
 permissions:
   contents: read
+  # pull-requests: read lets gitleaks-action@v2 call
+  # GET /repos/.../pulls/N/commits on pull_request events so it can scan
+  # only the PR's own commits. Without it the action fails fast with
+  # "Resource not accessible by integration" — push-event runs are
+  # unaffected because they use the contents:read scope only.
+  pull-requests: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

@@ -1,5 +1,6 @@
 import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
 import { resolveShareToken } from '../../../lib/share-tokens';
+import { extractClientIp } from '../../../lib/network-guard';
 
 /**
  * Public snapshot for the live-translation companion view.
@@ -20,9 +21,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ code: 'METHOD_NOT_ALLOWED' });
   }
 
+  // Use the proxy-trust-aware extractor so a direct (non-proxy) client
+  // can't spoof their bucket via X-Forwarded-For. Falls back to the
+  // socket peer when no trusted proxy is in front.
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'share-view',
-    identifier: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'anon',
+    identifier: extractClientIp(req) || 'anon',
     limit: 120,
     windowMs: 60_000,
   });

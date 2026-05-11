@@ -9,10 +9,17 @@ services:
     networks:
       - web
       - internal
-    ports:
-      # Direkt-Zugriff (lokal/ohne Traefik). In Traefik-Setups optional, da
-      # die `web`-Network + Labels darunter ohnehin greifen.
-      - "${WEBAPP_HOST_PORT:-3000}:3000"
+    # SECURITY: In production behind Traefik, the `web` network + traefik
+    # labels above are sufficient — there is no need to publish 3000 on the
+    # host. Direct host exposure (a) bypasses Traefik's TLS/headers and
+    # (b) lets clients spoof X-Forwarded-For because the immediate socket
+    # peer is no longer a private-network proxy (see lib/network-guard.js).
+    # Set WEBAPP_HOST_PORT explicitly (e.g. 127.0.0.1:3000) ONLY for local
+    # dev, on-host troubleshooting, or topologies without Traefik. The
+    # block is commented out by default; uncomment + set the env var
+    # consciously.
+    # ports:
+    #   - "127.0.0.1:${WEBAPP_HOST_PORT:-3000}:3000"
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
@@ -49,7 +56,13 @@ services:
       - SETTINGS_ENCRYPTION_KEY=${SETTINGS_ENCRYPTION_KEY}
       - ENABLE_DB_INIT_API=${ENABLE_DB_INIT_API:-false}
       - PDF_CHROMIUM_PATH=${PDF_CHROMIUM_PATH:-/usr/bin/chromium-browser}
-      - PDF_CHROMIUM_NO_SANDBOX=${PDF_CHROMIUM_NO_SANDBOX:-true}
+      # SECURITY: Default-on Chromium sandbox. PDF rendering takes
+      # editor-supplied HTML; running Chromium without sandbox in that
+      # context turns a renderer bug into container RCE. Override only
+      # in environments where the container itself cannot grant the
+      # required capabilities (e.g. unprivileged podman without
+      # CAP_SYS_ADMIN), and accept the risk explicitly.
+      - PDF_CHROMIUM_NO_SANDBOX=${PDF_CHROMIUM_NO_SANDBOX:-false}
       - RATE_LIMIT_STORE=${RATE_LIMIT_STORE:-db}
       - RATE_LIMIT_TRUST_PROXY=${RATE_LIMIT_TRUST_PROXY:-true}
       - HTTP_CLIENT_TIMEOUT_MS=${HTTP_CLIENT_TIMEOUT_MS:-30000}

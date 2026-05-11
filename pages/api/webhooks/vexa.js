@@ -4,7 +4,7 @@ import { logApiError, serverError } from '../../../lib/api-utils';
 import { logAuditEvent } from '../../../lib/audit-log';
 import { addTranscriptionEvent } from '../../../lib/transcription-events';
 import { resolveVexaConfig } from '../../../lib/integrations';
-import { decryptSecret } from '../../../lib/secrets';
+import { decryptSecret, SECRET_CONTEXTS } from '../../../lib/secrets';
 import { getTranscript, mapVexaTranscriptToGhostTyper } from '../../../lib/api/vexa';
 import { runManualAnalysisJob } from '../../../lib/manual-analysis';
 import { startBridgeForTranscription, stopBridgeForTranscription } from '../../../lib/vexa-bridge';
@@ -25,12 +25,35 @@ export const config = {
   api: { bodyParser: false },
 };
 
-async function readRawBody(req) {
+// Hard cap on the webhook body. Vexa events are tiny status payloads (well
+// under 8 KB in practice); 256 KB leaves room for future fields without
+// allowing an unauthenticated POST to exhaust the heap before HMAC is
+// even checked. Hit-the-cap → 413, no buffering of the rest.
+const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
+
+async function readRawBody(req, maxBytes = MAX_WEBHOOK_BODY_BYTES) {
   return new Promise((resolve, reject) => {
+    let total = 0;
     const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
+    let done = false;
+    const finish = (fn, value) => {
+      if (done) return;
+      done = true;
+      fn(value);
+    };
+    req.on('data', (chunk) => {
+      total += chunk.length;
+      if (total > maxBytes) {
+        const err = new Error('WEBHOOK_BODY_TOO_LARGE');
+        err.code = 'WEBHOOK_BODY_TOO_LARGE';
+        try { req.destroy(err); } catch { /* noop */ }
+        finish(reject, err);
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => finish(resolve, Buffer.concat(chunks)));
+    req.on('error', (err) => finish(reject, err));
   });
 }
 
@@ -87,7 +110,10 @@ async function loadUserToken(userId, orgId) {
     [userId, orgId],
   );
   if (!result.rows.length) return null;
-  return decryptSecret(result.rows[0].api_key_encrypted);
+  return decryptSecret(result.rows[0].api_key_encrypted, {
+    field: SECRET_CONTEXTS.vexaUserToken,
+    bindingId: orgId,
+  });
 }
 
 async function handleStarted(transcription, payload) {
@@ -276,30 +302,43 @@ export default async function handler(req, res) {
     return res.status(405).json({ code: 'METHOD_NOT_ALLOWED' });
   }
 
+  // We respond with the same uninformative 202 for *every* pre-auth or
+  // pre-match rejection so an unauthenticated attacker can't enumerate
+  // existing meetings, active orgs, or signature validity by diffing
+  // status codes. All real failure paths still produce a (warn-level)
+  // audit event for operators.
+  const ACK = () => res.status(202).json({ ok: true });
+
   let rawBody;
   try {
     rawBody = await readRawBody(req);
   } catch (error) {
+    if (error?.code === 'WEBHOOK_BODY_TOO_LARGE') {
+      // Body exceeded our hard cap before HMAC could even be evaluated —
+      // surface 413 because there is no security-sensitive distinction:
+      // the request never reached the HMAC step.
+      return res.status(413).json({ code: 'BODY_TOO_LARGE' });
+    }
     logApiError('Webhook body read failed', error);
-    return serverError(res, 'Body konnte nicht gelesen werden.');
+    return ACK();
   }
 
   let payload;
   try {
     payload = JSON.parse(rawBody.toString('utf8'));
   } catch {
-    return res.status(400).json({ code: 'INVALID_JSON' });
+    return ACK();
   }
 
   const meeting = pickMeetingFields(payload);
   const transcription = await loadTranscriptionByMeeting(meeting);
   if (!transcription) {
-    return res.status(202).json({ code: 'IGNORED', message: 'No matching meeting.' });
+    return ACK();
   }
 
   const integration = await resolveVexaConfig(transcription.organization_id);
   if (!integration.enabled) {
-    return res.status(202).json({ code: 'IGNORED', message: 'Integration disabled for org.' });
+    return ACK();
   }
   const vexaConfig = integration.config;
   const secret = vexaConfig.webhookSecret;
@@ -319,7 +358,9 @@ export default async function handler(req, res) {
       severity: 'warn',
       metadata: { eventType: payload.event_type, reason: 'bad_signature' },
     });
-    return res.status(401).json({ code: 'INVALID_SIGNATURE' });
+    // Constant-shape ACK: same as "ignored / not found" so attackers can't
+    // distinguish "wrong signature for known meeting" from "unknown meeting".
+    return ACK();
   }
 
   const fresh = await recordEventOnce(payload.event_id);

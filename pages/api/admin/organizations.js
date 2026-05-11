@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { requireAdmin } from '../../../lib/admin';
 import pool, { query } from '../../../lib/db';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
         for (let i = 0; i < 5; i++) {
           const exists = await client.query('SELECT 1 FROM organizations WHERE slug = $1', [candidate]);
           if (exists.rowCount === 0) break;
-          candidate = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
+          candidate = `${slug}-${crypto.randomBytes(2).toString('hex')}`;
         }
 
         const insertRes = await client.query(

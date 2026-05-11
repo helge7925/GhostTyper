@@ -1,10 +1,10 @@
-import bcrypt from 'bcryptjs';
 import { requireAdmin } from '../../../../lib/admin';
 import { query } from '../../../../lib/db';
 import { validatePassword } from '../../../../lib/constants';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { isValidEmail, normalizeEmail } from '../../../../lib/email';
 import { logAuditEvent } from '../../../../lib/audit-log';
+import { hashPassword } from '../../../../lib/password-hash';
 
 function normalizeRole(role) {
   return ['admin', 'auditor', 'user'].includes(role) ? role : 'user';
@@ -61,12 +61,12 @@ export default async function handler(req, res) {
           return res.status(409).json({ message: 'Ein Konto mit dieser Email existiert bereits' });
         }
 
-        const passwordHash = await bcrypt.hash(password, 12);
+        const { hash: passwordHash, version: passwordHashVersion } = await hashPassword(password);
         const userRole = normalizeRole(role);
 
         const result = await query(
-          'INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role',
-          [normalizedEmail, name || null, passwordHash, userRole]
+          'INSERT INTO users (email, name, password_hash, password_hash_version, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role',
+          [normalizedEmail, name || null, passwordHash, passwordHashVersion, userRole]
         );
 
         await logAuditEvent({

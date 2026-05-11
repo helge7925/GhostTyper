@@ -1,10 +1,10 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { query } from '../../../lib/db';
-import bcrypt from 'bcryptjs';
 import { validatePassword } from '../../../lib/constants';
 import { enforceRateLimit, logApiError } from '../../../lib/api-utils';
 import { isValidEmail, normalizeEmail } from '../../../lib/email';
+import { hashPassword, verifyPassword } from '../../../lib/password-hash';
 
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions);
@@ -54,9 +54,19 @@ export default async function handler(req, res) {
           return res.status(400).json({ message: 'Ungültige E-Mail-Adresse' });
         }
 
-        // Fetch current user data for password verification
-        const userResult = await query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+        // Fetch current user data for password verification.
+        // The session JWT can outlive the DB row (admin deletes a user, the
+        // token is still valid until expiry). Without this guard the
+        // verifyPassword call below would crash on `user.password_hash` of
+        // undefined and return a 500 instead of a clean 401.
+        const userResult = await query(
+          'SELECT password_hash, password_hash_version FROM users WHERE id = $1',
+          [userId]
+        );
         const user = userResult.rows[0];
+        if (!user) {
+          return res.status(401).json({ message: 'Sitzung ungültig — Konto nicht mehr vorhanden.' });
+        }
 
         // Update basic info
         if (name !== undefined || shouldUpdateEmail || avatarUrl !== undefined) {
@@ -77,7 +87,11 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Das aktuelle Passwort ist erforderlich, um ein neues zu setzen.' });
           }
 
-          const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
+          const isMatch = await verifyPassword(
+            currentPassword,
+            user.password_hash,
+            user.password_hash_version
+          );
           if (!isMatch) {
             return res.status(400).json({ message: 'Das aktuelle Passwort ist nicht korrekt.' });
           }
@@ -87,10 +101,10 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: passwordError });
           }
 
-          const passwordHash = await bcrypt.hash(password, 12);
+          const { hash: passwordHash, version: passwordHashVersion } = await hashPassword(password);
           await query(
-            'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
-            [passwordHash, userId]
+            'UPDATE users SET password_hash = $1, password_hash_version = $2, updated_at = NOW() WHERE id = $3',
+            [passwordHash, passwordHashVersion, userId]
           );
         }
 
