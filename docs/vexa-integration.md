@@ -223,10 +223,36 @@ Dieses Setup ist außerhalb des MVP, dokumentiere bei Bedarf separat.
 - GhostTyper erzwingt eine Consent-Checkbox vor jedem Bot-Start. Die
   Bestätigung wird im Audit-Log persistiert
   (`action='meeting.bot.start', metadata.consent=true`).
+- **Auto-Hinweis im Meeting-Chat (optional).** Workspace-Admins können
+  unter *Settings → Integrationen → Vexa Meeting-Bot* den DSGVO-Toggle
+  aktivieren und einen Hinweistext (≤ 1000 Zeichen) hinterlegen. Sobald
+  der Bot dem Meeting beigetreten ist (`meeting.started`-Webhook),
+  postet er diesen Text einmalig als Chat-Nachricht — hilft die
+  Aufklärungspflicht aus Art. 13 DSGVO ohne mündliche Ansage zu
+  erfüllen. Idempotent via `transcriptions.gdpr_notice_posted_at`, also
+  keine Doppel-Posts bei Webhook-Retries. Der Host kann den Toggle pro
+  Meeting im Start-Dialog überschreiben (vorbelegt aus dem Org-Default).
 - Daten-Lokalität: Vexa Lite läuft im EU-Container; Mistral hostet in
   Frankreich (EU). GhostTyper-DB unverändert.
 - Retention: `scripts/apply-retention-policy.js` greift weiterhin —
   Vexa-Transkripte sind reguläre `transcriptions`-Rows mit `source='vexa'`.
+
+### Chat-Auto-Posts pro Plattform
+
+Der DSGVO-Hinweis (und der Companion-Link-Post für Live-Übersetzung)
+geht via `POST /bots/{platform}/{nativeMeetingId}/chat` an Vexa. Welche
+Plattformen das real ins Chat-Fenster schreiben, hängt vom Bot-Image ab:
+
+| Plattform | Vanilla `vexaai/vexa-lite` | `vexa-bot-talk` Fork |
+|---|---|---|
+| Google Meet | ✅ | ✅ |
+| Microsoft Teams | ✅ | ✅ |
+| Zoom | ✅ | ✅ |
+| Nextcloud Talk | ❌ Bot tritt nicht bei | ⚠ tritt bei, **Chat-Sender im Bot muss noch verifiziert werden** (`services/vexa-bot/core/src/services/chat.ts` Talk-Branch + Selectors in `platforms/nextcloudtalk/selectors.ts` — siehe `feat/nextcloud-talk-chat` im Vexa-Fork) |
+
+Bei einer Plattform ohne Chat-Sender im Bot wird der Webapp-seitige
+Call still im Log abgelegt (`gdpr_chat_poster.send_failed`); das
+Meeting läuft weiter, nur die Chat-Nachricht erscheint nicht.
 
 ## Troubleshooting
 
