@@ -58,7 +58,8 @@
           "enable": "Übersetzung laut im Meeting sprechen",
           "hint": "Der Bot spricht die übersetzten Segmente in der gewählten Sprache als zweite Stimme im Meeting. Original-Stimmen bleiben hörbar.",
           "speakIn": "Sprechen in",
-          "costWarning": "Kostet Voxtral-TTS pro generierter Audio-Sekunde — typisch 0,90 €/Stunde Meeting."
+          "costWarning": "Kostet Voxtral-TTS pro generierter Audio-Sekunde — typisch 0,90 €/Stunde Meeting.",
+          "zhFallback": "Voxtral hat noch keine chinesische Stimme — der Bot nutzt die englische Standardstimme, um Chinesisch vorzulesen."
         }
       },
       "nextcloudTalkLobbyHint": "Hinweis: Bei Nextcloud Talk muss der Lobby-Modus deaktiviert sein, damit der Bot ohne Moderator-Bestätigung beitreten kann."

@@ -58,7 +58,8 @@
           "enable": "Speak the translation aloud in the meeting",
           "hint": "The bot speaks translated segments in the selected language as a second voice in the meeting. Original voices remain audible.",
           "speakIn": "Speak in",
-          "costWarning": "Costs Voxtral TTS per generated audio second — typically €0.90 per meeting hour."
+          "costWarning": "Costs Voxtral TTS per generated audio second — typically €0.90 per meeting hour.",
+          "zhFallback": "Voxtral has no Chinese voice yet — the bot uses the default English voice to read Chinese text aloud."
         }
       },
       "nextcloudTalkLobbyHint": "Note: For Nextcloud Talk the room's lobby mode must be disabled so the bot can join without moderator approval."

@@ -183,6 +183,9 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
               >
                 <option value="de">Deutsch</option>
                 <option value="en">English</option>
+                <option value="zh">中文</option>
+                <option value="fr">Français</option>
+                <option value="it">Italiano</option>
                 <option value="auto">{t('languageAuto')}</option>
               </select>
             </div>
@@ -236,6 +239,7 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
                     >
                       <option value="de">Deutsch</option>
                       <option value="en">English</option>
+                      <option value="zh">中文</option>
                       <option value="fr">Français</option>
                       <option value="es">Español</option>
                       <option value="it">Italiano</option>
@@ -252,6 +256,7 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
                     >
                       <option value="en">English</option>
                       <option value="de">Deutsch</option>
+                      <option value="zh">中文</option>
                       <option value="fr">Français</option>
                       <option value="es">Español</option>
                       <option value="it">Italiano</option>
@@ -305,6 +310,11 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
                         <option value={translationLangA}>{t('translation.audio.speakIn')}: {translationLangA.toUpperCase()}</option>
                         <option value={translationLangB}>{t('translation.audio.speakIn')}: {translationLangB.toUpperCase()}</option>
                       </select>
+                    )}
+                    {audioInjectionLang === 'zh' && (
+                      <span className="block text-[10px] text-secondary mt-2 leading-snug italic">
+                        {t('translation.audio.zhFallback')}
+                      </span>
                     )}
                     {audioInjectionLang && (
                       <span className="block text-[10px] text-warning mt-2 leading-snug">

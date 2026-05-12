@@ -266,6 +266,9 @@ export default function MeetingControlBar({
             >
               <option value="de">Deutsch</option>
               <option value="en">English</option>
+              <option value="zh">中文</option>
+              <option value="fr">Français</option>
+              <option value="it">Italiano</option>
               <option value="auto">Auto</option>
             </select>
             {updatingLanguage && <Loader2 className="w-3.5 h-3.5 animate-spin text-secondary" />}
