@@ -143,8 +143,9 @@ on `https://${DOMAIN}`).
 Vexa Lite + the transcription bridge are wired up as an optional Compose
 profile. Default audio path is **Mistral Voxtral (Paris, EU)** so the
 biometric meeting audio (GDPR Art. 9) does not leave the EU. The bridge
-container is still called `fireworks-bridge` for historical reasons but
-proxies to Mistral by default — see "GDPR-conformant setup" below.
+service is `voxtral-bridge` (it proxies to Mistral Voxtral; the legacy
+`FIREWORKS_API_KEY` env var is still honoured as a fallback) — see
+"GDPR-conformant setup" below.
 
 ```bash
 COMPOSE_PROFILES=vexa

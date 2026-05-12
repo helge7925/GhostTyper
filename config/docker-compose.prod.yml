@@ -144,12 +144,12 @@ services:
   # and defaults response_format=verbose_json + timestamp_granularities=word
   # so Vexa gets segments + speaker_id + words[] regardless of what it
   # sends.
-  fireworks-bridge:
+  voxtral-bridge:
     build:
-      context: ../services/fireworks-bridge
+      context: ../services/voxtral-bridge
       dockerfile: Dockerfile
-    image: fireworks-bridge:prod
-    container_name: transkription-fireworks-bridge
+    image: voxtral-bridge:prod
+    container_name: transkription-voxtral-bridge
     restart: unless-stopped
     profiles: ["vexa"]
     networks: [internal]
@@ -198,7 +198,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@transkription-db:5432/vexa
       - DB_SSL_MODE=disable
-      - TRANSCRIPTION_SERVICE_URL=http://fireworks-bridge:8080/v1/audio/transcriptions
+      - TRANSCRIPTION_SERVICE_URL=http://voxtral-bridge:8080/v1/audio/transcriptions
       - TRANSCRIPTION_SERVICE_TOKEN=${VEXA_TRANSCRIPTION_TOKEN}
       - ADMIN_API_TOKEN=${VEXA_ADMIN_API_TOKEN}
     depends_on:
@@ -206,7 +206,7 @@ services:
         condition: service_healthy
       vexa-db-init:
         condition: service_completed_successfully
-      fireworks-bridge:
+      voxtral-bridge:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://0.0.0.0:8056/docs >/dev/null 2>&1 || exit 1"]

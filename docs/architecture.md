@@ -12,7 +12,7 @@ the runtime topology and the data flows.
 | `transkription-db` | PostgreSQL 16 | yes |
 | `vexa-lite` | Meeting-bot orchestrator (Vexa-AI, Apache-2.0). Image is overridable via `VEXA_LITE_IMAGE` — e.g. `ghcr.io/helge7925/vexa-bot-talk:<tag>` for the Nextcloud-Talk-capable fork. The image bundles a Next.js operator dashboard on port 3000 (mapped to host `127.0.0.1:${VEXA_DASHBOARD_HOST_PORT:-3300}`). | optional, profile `vexa` |
 | `vexa-db-init` | One-shot DB bootstrap for Vexa | optional, profile `vexa` |
-| `fireworks-bridge` | Tiny Python proxy that rewrites the model name to `voxtral-mini-latest`, injects the workspace context bias, and pulls the Mistral API key from the webapp at request time. Service is named `fireworks-bridge` for legacy reasons (originally pointed at Fireworks AI) — current upstream is Mistral Voxtral. | optional, profile `vexa` |
+| `voxtral-bridge` (container `transkription-voxtral-bridge`) | Tiny Python proxy that rewrites the model name to `voxtral-mini-transcribe-realtime-2602`, injects the workspace context bias, and pulls the Mistral API key from the webapp at request time. Originally named `fireworks-bridge` when the upstream was Fireworks AI; renamed alongside the Mistral Voxtral migration. The legacy `FIREWORKS_API_KEY` env var is still honoured as a fallback for setups that haven't rotated their env yet. | optional, profile `vexa` |
 
 The webapp and the database are always running. The remote-meeting stack
 is opt-in via the `vexa` Compose profile **and** a per-workspace toggle.
@@ -43,7 +43,7 @@ bridge and Postgres remain internal.
                      │ POST /v1/audio/transcriptions
                      ▼
              ┌─────────────────────┐
-             │ fireworks-bridge    │  ◄── pulls effective key
+             │ voxtral-bridge      │  ◄── pulls effective key
              └─────────┬───────────┘     from webapp every 60 s
                        │
                        ▼
@@ -71,7 +71,7 @@ bridge and Postgres remain internal.
    workspace's Vexa config (`lib/integrations.js → resolveVexaConfig`),
    provisions a per-user Vexa token, and asks Vexa to spawn a bot.
 2. Vexa joins the meeting (Playwright/Chromium), captures audio, and posts
-   chunks to `http://fireworks-bridge:8080/v1/audio/transcriptions`.
+   chunks to `http://voxtral-bridge:8080/v1/audio/transcriptions`.
 3. The bridge rewrites the model name (`whisper-1` / `large-v3-turbo` →
    `voxtral-mini-latest`), defaults `response_format=verbose_json` and
    `timestamp_granularities=word`, injects the workspace-global

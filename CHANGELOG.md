@@ -5,6 +5,19 @@ Alle relevanten Änderungen an diesem Projekt werden in dieser Datei dokumentier
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unreleased]
+
+### Changed
+- **Service rename: `fireworks-bridge` → `voxtral-bridge`.** Der
+  Transkriptions-Proxy hieß historisch `fireworks-bridge` (als die
+  Upstream-STT noch Fireworks AI war), spricht aber seit der Mistral-
+  Migration ausschließlich Voxtral. Umbenannt: Verzeichnis
+  `services/voxtral-bridge/`, Image-Tag `voxtral-bridge:prod`,
+  Container `transkription-voxtral-bridge`, Compose-Service
+  `voxtral-bridge`, Hostname-Referenzen in `vexa-lite`. Der
+  `FIREWORKS_API_KEY`-Env-Fallback bleibt als Legacy-Alias für ältere
+  Setups.
+
 ## [0.4.0] – 2026-05-07
 
 ### Added

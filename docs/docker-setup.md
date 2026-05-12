@@ -21,10 +21,13 @@ selbst — dieses Dokument fasst nur den Stand für Operatoren zusammen.
 | `transkription-db` | `transkription-db` | `postgres:16-alpine` | ja | intern :5432 |
 | `vexa-lite` | `transkription-vexa-lite` | `${VEXA_LITE_IMAGE:-vexaai/vexa-lite:0.10.0-260430-1701}` | optional, Profile `vexa` | intern :8056, Dashboard exposed auf `127.0.0.1:${VEXA_DASHBOARD_HOST_PORT:-3300}:3000` |
 | `vexa-db-init` | `transkription-vexa-db-init` | `postgres:16-alpine` | optional, Profile `vexa` | — (One-shot) |
-| `fireworks-bridge` | `transkription-fireworks-bridge` | gebaut aus `services/fireworks-bridge/` (Tag `fireworks-bridge:prod`) | optional, Profile `vexa` | intern :8080 |
+| `voxtral-bridge` | `transkription-voxtral-bridge` | gebaut aus `services/voxtral-bridge/` (Tag `voxtral-bridge:prod`) | optional, Profile `vexa` | intern :8080 |
 
-`fireworks-bridge` heißt aus historischen Gründen so — der Service spricht
-heute Mistral Voxtral, nicht mehr Fireworks AI.
+`voxtral-bridge` hieß ursprünglich `fireworks-bridge`, als der Upstream-
+Transkriptionsdienst noch Fireworks AI war. Mit dem Migrate auf Mistral
+Voxtral wurde der Service umbenannt; der alte `FIREWORKS_API_KEY`-Env-
+Fallback bleibt im Code für Setups, die ihre `.env` noch nicht rotiert
+haben.
 
 ## Netzwerke
 

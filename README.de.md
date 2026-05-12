@@ -147,9 +147,9 @@ Traefik auf `https://${DOMAIN}`).
 Vexa Lite und die Transkriptions-Bridge sind als optionales Compose-Profile
 vorbereitet. Standard-Audiopfad ist **Mistral Voxtral (Paris, EU)**, damit
 biometrische Meeting-Audio-Daten (DSGVO Art. 9) den EU-Raum nicht
-verlassen. Der Bridge-Container heißt aus historischen Gründen weiter
-`fireworks-bridge`, routet aber per Default zu Mistral — siehe
-„DSGVO-konformes Setup" unten.
+verlassen. Der Bridge-Service heißt `voxtral-bridge` (proxied zu Mistral
+Voxtral; der alte `FIREWORKS_API_KEY`-Env-Wert bleibt als Fallback
+erhalten) — siehe „DSGVO-konformes Setup" unten.
 
 ```bash
 COMPOSE_PROFILES=vexa

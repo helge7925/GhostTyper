@@ -41,5 +41,5 @@ GhostTyper is designed to run self-hosted. Operators are expected to:
   via `lib/secrets.js`.
 - **Webhook payloads** from Vexa are HMAC-signed with a per-org secret and
   validated with timing-safe compare.
-- **Inter-container traffic** (webapp ↔ vexa-lite ↔ fireworks-bridge) stays
+- **Inter-container traffic** (webapp ↔ vexa-lite ↔ voxtral-bridge) stays
   on the internal Docker network; no ports exposed except the webapp.
