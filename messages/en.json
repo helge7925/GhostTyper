@@ -37,6 +37,8 @@
       "languageLabel": "Language",
       "languageAuto": "Auto-detect",
       "autoAnalyze": "Auto-summarize after the meeting ends.",
+      "gdprNotice": "Send a GDPR notice into the meeting chat automatically.",
+      "gdprNoticeHint": "After joining the meeting the bot posts a chat message announcing that the meeting is being transcribed. The default text is managed in the workspace settings.",
       "consent": "I confirm that all participants have been informed about and consent to the recording and transcription.",
       "cta": "Send bot to meeting",
       "success": "Bot is starting.",
@@ -671,7 +673,12 @@
         "loadError": "Could not load configuration.",
         "testSuccess": "Successfully connected.",
         "testError": "Connection test failed.",
-        "readOnlyHint": "Only workspace admins can manage this feature."
+        "readOnlyHint": "Only workspace admins can manage this feature.",
+        "gdprNoticeLabel": "GDPR notice in meeting chat",
+        "gdprNoticeHint": "When the bot joins the meeting it posts a notice into the chat that the meeting is being transcribed. Helps satisfy the GDPR Art. 13 information duty.",
+        "gdprNoticeTextLabel": "Notice text",
+        "gdprNoticeTextPlaceholder": "Notice: This meeting is being transcribed automatically for record-keeping purposes. If you do not consent, please speak up now.",
+        "gdprNoticeTextHint": "Up to 1000 characters. Leave blank to use the default text."
       }
     },
     "saveAll": "Save",

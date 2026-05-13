@@ -46,7 +46,12 @@ export default function Transcriptions() {
   const tSidebar = useTranslations('transcriptionsList');
   const tMeeting = useTranslations('meeting.start');
   const canStartMeeting = usePermission('meeting.start');
-  const { enabled: vexaEnabled } = useVexaIntegrationEnabled();
+  const {
+    enabled: vexaEnabled,
+    defaultBotName: vexaDefaultBotName,
+    defaultLanguage: vexaDefaultLanguage,
+    gdprChatNoticeDefault,
+  } = useVexaIntegrationEnabled();
   const showMeetingButton = canStartMeeting && vexaEnabled;
   const [meetingDialogOpen, setMeetingDialogOpen] = useState(false);
 
@@ -459,6 +464,9 @@ export default function Transcriptions() {
         <MeetingStartForm
           open={meetingDialogOpen}
           onOpenChange={setMeetingDialogOpen}
+          defaultBotName={vexaDefaultBotName}
+          defaultLanguage={vexaDefaultLanguage}
+          gdprChatNoticeDefault={gdprChatNoticeDefault}
         />
       )}
     </>
