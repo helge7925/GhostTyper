@@ -18,7 +18,7 @@
     <img alt="Stack" src="https://img.shields.io/badge/Next.js-13-black" />
     <img alt="Node" src="https://img.shields.io/badge/Node-18%2B-success" />
     <img alt="Postgres" src="https://img.shields.io/badge/Postgres-16-blue" />
-    <img alt="Tests" src="https://img.shields.io/badge/tests-72%20passing-success" />
+    <img alt="Tests" src="https://img.shields.io/badge/tests-106%20passing-success" />
     <img alt="License" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue" />
   </p>
 </div>
@@ -182,7 +182,7 @@ Vollständige ENV-Referenz: [`.env.example`](.env.example).
 
 | Befehl                   | Zweck                                                |
 | ------------------------ | ---------------------------------------------------- |
-| `npm test`               | 60 Unit-Tests (Tabellenlogik, Vexa-Mapping, Webhooks)|
+| `npm test`               | 106 Unit-Tests (Tabellenlogik, Vexa-Mapping, Webhooks, Satz-Buffering, Permissions, Secrets, …) |
 | `npm run lint`           | ESLint mit Next.js-Regelsatz                         |
 | `npm run smoke`          | Docker/API-Smoke-Test                                |
 | `npm run smoke:full`     | Smoke + Tests + Lint + Build + PDF-Renderer          |

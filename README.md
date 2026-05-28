@@ -18,7 +18,7 @@
     <img alt="Stack" src="https://img.shields.io/badge/Next.js-13-black" />
     <img alt="Node" src="https://img.shields.io/badge/Node-18%2B-success" />
     <img alt="Postgres" src="https://img.shields.io/badge/Postgres-16-blue" />
-    <img alt="Tests" src="https://img.shields.io/badge/tests-72%20passing-success" />
+    <img alt="Tests" src="https://img.shields.io/badge/tests-106%20passing-success" />
     <img alt="License" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue" />
   </p>
 </div>
@@ -178,7 +178,7 @@ Full ENV reference: [`.env.example`](.env.example).
 
 | Command                  | Purpose                                              |
 | ------------------------ | ---------------------------------------------------- |
-| `npm test`               | 60 unit tests (table logic, Vexa mapper, webhooks…)  |
+| `npm test`               | 106 unit tests (table logic, Vexa mapper, webhooks, sentence buffer, permissions, secrets, …) |
 | `npm run lint`           | ESLint with the Next.js rule set                     |
 | `npm run smoke`          | Docker / API smoke test                              |
 | `npm run smoke:full`     | Smoke + tests + lint + build + PDF renderer         |

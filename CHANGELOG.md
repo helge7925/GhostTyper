@@ -17,6 +17,44 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
   `voxtral-bridge`, Hostname-Referenzen in `vexa-lite`. Der
   `FIREWORKS_API_KEY`-Env-Fallback bleibt als Legacy-Alias für ältere
   Setups.
+- **Per-Sprache Voxtral-TTS-Stimme + Chinesisch.** `lib/tts.js` mappt
+  DE/EN/ZH/FR/IT/ES/PT/NL/AR/HI auf Voxtral-Preset-Stimmen; ZH ohne
+  eigenen Preset fällt auf `casual_male` (englische Stimme) zurück.
+  STT-Dropdown im Dialog + In-Call um ZH/FR/IT erweitert.
+
+### Fixed
+- **Voxtral-TTS-Modell-ID korrigiert.** `voxtral-tts-latest` (existiert
+  nicht) → `voxtral-mini-tts-2603`. Voice-Feld umbenannt `voice_id` →
+  `voice` (live-API verlangt `voice`, OpenAPI-Doku-Bug). Default-Stimme
+  `casual_male` aus der offiziellen Hugging-Face-Code-Beispiel-Doku.
+- **TTS-Resilienz.** `voxtralTts` wiederholt transiente Fehler (429 /
+  5xx / Netzwerk-Abort) mit Exponential-Backoff (Standard 3 Versuche),
+  statt das Audio-Segment beim ersten Hiccup still zu verwerfen.
+  Permanente 4xx (falsches Modell/Voice/Key) scheitern weiterhin sofort.
+  Tunebar via `TTS_MAX_ATTEMPTS` / `TTS_RETRY_BASE_MS`.
+- **Fehlgeschlagene Übersetzung wird nicht mehr als Audio gesprochen.**
+  Wenn Mistral-Translate ausfällt, echot die Bridge zwar den Quelltext
+  für die UI-Konsistenz, markiert ihn aber mit `translationFailed` —
+  der Audio-Inject-Hook überspringt solche Segmente, damit der Bot
+  nicht den unübersetzten Originaltext in der Zielstimme vorliest.
+- **Chat-Post-Fehler sichtbar in der Meeting-Timeline.** DSGVO-Hinweis-
+  und Share-Link-Poster legen bei Sende-Fehler (z.B. Plattform ohne
+  Bot-Chat-Handler wie aktuell Nextcloud Talk) jetzt ein
+  `*_failed`-Transcription-Event an, statt nur ins Server-Log zu
+  schreiben — der Host sieht, dass er manuell ankündigen/teilen muss.
+
+### Security / Ops
+- **`.dockerignore`** schließt jetzt `.env` / `.env.*` aus, damit lokale
+  Secrets nie ins Image gebacken werden.
+- **`.env.example`** dokumentiert die neuen TTS-Variablen
+  (`MISTRAL_TTS_MODEL`, `MISTRAL_TTS_VOICE`, `TTS_HTTP_TIMEOUT_MS`,
+  `TTS_MAX_ATTEMPTS`, `TTS_RETRY_BASE_MS`).
+
+### Tests
+- **+19 Unit-Tests** (gesamt 106): `tests/permissions.test.mjs` deckt die
+  Rollen→Permission-Matrix + Fail-Closed-Verhalten ab,
+  `tests/secrets.test.mjs` deckt AES-256-GCM Round-Trip, Versions-Prefix,
+  Auth-Tag-Integrität (Tamper → null) und Wrong-Key-Verhalten ab.
 
 ## [0.4.0] – 2026-05-07
 
