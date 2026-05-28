@@ -6,3 +6,10 @@ config
 README.md
 PROJECT_PLAN.md
 docs
+# Never bake local secrets / env files into the image
+.env
+.env.*
+!.env.example
+# Local test + tooling artefacts
+test-results
+.claude
