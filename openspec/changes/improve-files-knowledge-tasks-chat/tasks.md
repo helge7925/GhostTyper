@@ -46,7 +46,7 @@
 - [x] Add `document_chunk_embeddings` migration using Cortecs embeddings stored as arrays.
 - [x] Add `document_index_jobs` migration.
 - [x] Implement transcript chunker using segments and timestamps.
-- [ ] Implement OCR/Markdown chunker using pages/headings/paragraphs.
+- [x] Implement OCR/Markdown chunker using pages/headings/paragraphs. (`chunkMarkdown` splits on headings, records the heading in chunk metadata, and falls back to size-based splitting for oversized sections; used by `buildDocumentChunks` for non-segment documents.)
 - [x] Implement translation/text chunker.
 - [x] Implement indexing job runner.
 - [x] Add manual reindex action and index status in `Dateien`.
@@ -54,8 +54,8 @@
 - [x] Implement Cortecs embedding client and cosine reranker.
 - [x] Backfill chunks for existing completed documents. (`POST /api/admin/documents/backfill-index`, shared-secret, bounded batches, idempotent — rebuilds chunks via `indexDocument`.)
 - [x] Backfill embeddings for existing indexed chunks. (Same endpoint: `indexDocument` writes chunks + embeddings together, so the backfill covers both; documents without a completed index job are reprocessed.)
-- [ ] Implement `POST /api/retrieval/query`.
-- [ ] Add retrieval tests for access filtering and citation metadata.
+- [x] Implement `POST /api/retrieval/query`. (Access-filtered semantic search over the workspace index via `retrieveDocumentSources`; optional `documentIds` scope can only narrow, never widen, the caller's reach.)
+- [ ] Add retrieval tests for access filtering and citation metadata. (Citation/heading metadata is covered by `chunkMarkdown` unit tests; access-filtering needs DB-level integration coverage — still open.)
 
 ## 5. Workspace Wissen
 

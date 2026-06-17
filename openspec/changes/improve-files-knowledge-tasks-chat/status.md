@@ -34,16 +34,17 @@ Last updated: 2026-06-17
 
 ## Next Steps
 
-1. Implement `POST /api/retrieval/query` + a dedicated OCR/Markdown chunker (foundation for knowledge-scoped retrieval).
-2. Implement `chat_context_items` for multiple attached documents/knowledge bases + context chips in the chat header.
-3. Implement Workspace-Wissen tables, APIs, and UI.
-4. Implement Aufgaben extraction, member matching, task APIs, and task UI.
+1. Implement `chat_context_items` for multiple attached documents/knowledge bases + context chips in the chat header.
+2. Implement Workspace-Wissen tables, APIs, and UI (builds on `retrieveDocumentSources` for knowledge-scoped retrieval).
+3. Implement Aufgaben extraction, member matching, task APIs, and task UI.
+4. Add DB-level retrieval tests for access filtering.
 
 ## Done since last update
 
 - Automatic indexing after upload/OCR/text/meeting creation and on transcript edits/speaker assignment (translations excluded by design).
 - Backfill endpoint for pre-existing documents without a completed index job (`POST /api/admin/documents/backfill-index`).
 - Streaming chat: `POST /api/chat/stream` SSE endpoint sharing `lib/chat-service` with the non-streaming turn, client-side token streaming with non-streaming fallback, and source/citation chips rendered in `ChatMessage`. Streaming-shape unit tests added.
+- Markdown/OCR-aware chunker (`chunkMarkdown`, heading-scoped) wired into `buildDocumentChunks`, and a general access-filtered retrieval endpoint `POST /api/retrieval/query` (refactored shared core `rankDocumentChunks`). Chunker unit tests added.
 
 ## Notes
 

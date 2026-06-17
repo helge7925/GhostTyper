@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildDocumentChunks,
   buildRetrievalPrompt,
+  chunkMarkdown,
   chunkPlainText,
   cosineSimilarity,
   runAutoIndex,
@@ -134,4 +135,43 @@ test('runAutoIndex returns null when org/user missing or document unresolvable',
     resolveDocumentIdForTranscription: async () => null,
   });
   assert.equal(noDoc, null);
+});
+
+test('chunkMarkdown splits on headings and records the heading in metadata', () => {
+  const md = '# Einleitung\nErster Absatz der Einleitung.\n\n## Methoden\nBeschreibung der Methode.';
+  const chunks = chunkMarkdown(md);
+  assert.equal(chunks.length, 2);
+  assert.equal(chunks[0].metadata.heading, 'Einleitung');
+  assert.match(chunks[0].content, /Erster Absatz/);
+  assert.equal(chunks[1].metadata.heading, 'Methoden');
+  assert.match(chunks[1].content, /Beschreibung der Methode/);
+});
+
+test('chunkMarkdown falls back to size-based splitting for oversized sections', () => {
+  const big = `# Titel\n${'A'.repeat(1500)}. ${'B'.repeat(1500)}.`;
+  const chunks = chunkMarkdown(big, { maxChars: 1000, overlapChars: 50 });
+  assert.ok(chunks.length >= 2);
+  // Heading metadata is propagated to every sub-chunk of the section.
+  assert.ok(chunks.every((c) => c.metadata.heading === 'Titel'));
+});
+
+test('chunkMarkdown handles heading-less plain text gracefully', () => {
+  const chunks = chunkMarkdown('Nur ein einfacher Satz ohne Überschrift.');
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0].metadata.heading, undefined);
+  assert.match(chunks[0].content, /einfacher Satz/);
+});
+
+test('buildDocumentChunks uses the markdown chunker for OCR documents', () => {
+  const doc = {
+    source_type: 'ocr',
+    title: 'Scan.pdf',
+    text: '# Rechnung\nPosition 1: 10 EUR\n\n## Summe\nGesamt: 10 EUR',
+  };
+  const chunks = buildDocumentChunks(doc);
+  assert.ok(chunks.length >= 2);
+  assert.equal(chunks[0].chunkIndex, 0);
+  assert.equal(chunks[0].metadata.source_type, 'ocr');
+  assert.equal(chunks[0].metadata.heading, 'Rechnung');
+  assert.equal(chunks[0].metadata.title, 'Scan.pdf');
 });
