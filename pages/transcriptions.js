@@ -79,6 +79,7 @@ export default function Transcriptions() {
   const [reindexingIds, setReindexingIds] = useState(() => new Set());
   const searchTimeoutRef = useRef(null);
   const canReindexDocuments = usePermission('document.write');
+  const canAddToKnowledge = usePermission('knowledge.write');
   const {
     toast,
     showToast,
@@ -464,6 +465,7 @@ export default function Transcriptions() {
                   onReindex={canReindexDocuments ? () => handleReindexDocument(t.id) : undefined}
                   reindexing={reindexingIds.has(t.id)}
                   onDelete={() => handleDeleteTranscription(t.id)}
+                  canAddToKnowledge={canAddToKnowledge}
                 />
               ))}
 

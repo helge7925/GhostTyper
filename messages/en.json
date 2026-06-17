@@ -1085,6 +1085,8 @@
     "modeFullContext": "Full context",
     "modeOff": "Off",
     "loadError": "Knowledge bases could not be loaded.",
-    "saveError": "Action failed."
+    "saveError": "Action failed.",
+    "addTo": "Add to knowledge base",
+    "noBasesShort": "No knowledge bases"
   }
 }

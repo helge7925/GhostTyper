@@ -34,9 +34,9 @@ Last updated: 2026-06-17
 
 ## Next Steps
 
-1. Wire knowledge-base scope into chat retrieval (focused/full_context/off) + add a `Zu Workspace-Wissen hinzufügen` action in Dateien.
+1. Surface knowledge bases in the chat context bar (attach a KB to a conversation) so chat turns use `retrieveKnowledgeSources` — the retrieval engine already honours focused/full_context/off.
 2. Implement Aufgaben extraction, member matching, task APIs, and task UI.
-3. Chat polish: copy/regenerate/edit actions, follow-up prompt generation, knowledge-base attachments in the context bar.
+3. Chat polish: copy/regenerate/edit actions, follow-up prompt generation.
 4. Add DB-level tests for retrieval access filtering and private-document knowledge restrictions.
 
 ## Done since last update
@@ -48,6 +48,7 @@ Last updated: 2026-06-17
 - Multi-document chat context: `chat_context_items` table, `GET/POST/DELETE /api/chat/context` (access-checked), retrieval now unions the conversation's origin document with attached context items, and a `ChatContextBar` header UI with remove + search-based add picker.
 - Workspace-Wissen data + APIs (slice 1): `knowledge_bases`/`knowledge_directories`/`knowledge_items` migrations, `lib/knowledge` service, and CRUD endpoints (`/api/knowledge`, `/api/knowledge/[id]`, `.../items`, `.../directories`). Only workspace-visible documents can be added (private docs rejected); items carry a focused/full_context/off retrieval mode.
 - Workspace-Wissen UI (slice 2): `/knowledge` master-detail page (create/list/delete bases, add/remove documents via a workspace-only search picker, per-item retrieval-mode selector) and a `knowledge.read`-gated nav entry.
+- Workspace-Wissen retrieval + Dateien action (slice 3): `retrieveKnowledgeSources` scopes retrieval to a knowledge base honouring focused/full_context/off (full_context injects whole documents ahead of chunk-ranked focused ones), exposed via `knowledgeBaseId` on `/api/retrieval/query`; an `AddToKnowledgeButton` adds workspace documents to a base directly from Dateien.
 
 ## Notes
 

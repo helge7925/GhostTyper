@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_RETRIEVAL_MODE, RETRIEVAL_MODES, normalizeRetrievalMode, sanitizeName } from '../lib/knowledge-utils.js';
+import { DEFAULT_RETRIEVAL_MODE, RETRIEVAL_MODES, normalizeRetrievalMode, partitionRetrievalModes, sanitizeName } from '../lib/knowledge-utils.js';
 
 test('normalizeRetrievalMode keeps valid modes', () => {
   for (const mode of RETRIEVAL_MODES) {
@@ -19,4 +19,16 @@ test('sanitizeName trims and caps length, empty for blank', () => {
   assert.equal(sanitizeName(''), '');
   assert.equal(sanitizeName('   '), '');
   assert.equal(sanitizeName('x'.repeat(300)).length, 255);
+});
+
+test('partitionRetrievalModes splits focused/full_context and drops off + invalid', () => {
+  const { focusedDocumentIds, fullContextDocumentIds } = partitionRetrievalModes([
+    { document_id: 1, retrieval_mode: 'focused' },
+    { document_id: 2, retrieval_mode: 'full_context' },
+    { document_id: 3, retrieval_mode: 'off' },
+    { document_id: 4, retrieval_mode: 'bogus' },
+    { document_id: 'x', retrieval_mode: 'focused' },
+  ]);
+  assert.deepEqual(focusedDocumentIds, [1, 4]); // bogus → focused default
+  assert.deepEqual(fullContextDocumentIds, [2]);
 });

@@ -1,7 +1,8 @@
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { resolveCortecsConfig } from '../../../lib/settings-service';
-import { retrieveDocumentSources } from '../../../lib/document-index';
+import { retrieveDocumentSources, retrieveKnowledgeSources } from '../../../lib/document-index';
+import { getKnowledgeBase } from '../../../lib/knowledge';
 
 const MAX_QUERY_LENGTH = 2000;
 const DEFAULT_TOP_K = 8;
@@ -57,6 +58,9 @@ async function handler(req, res) {
   }
 
   const topK = clampTopK(body.topK);
+  const knowledgeBaseId = Number.isFinite(Number(body.knowledgeBaseId)) && Number(body.knowledgeBaseId) > 0
+    ? Number(body.knowledgeBaseId)
+    : null;
 
   try {
     const cortecs = await resolveCortecsConfig({ userId, organizationId: orgId });
@@ -64,14 +68,28 @@ async function handler(req, res) {
       return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert' });
     }
 
-    const result = await retrieveDocumentSources({
-      documentIds,
-      message: queryText,
-      organizationId: orgId,
-      userId,
-      cortecs,
-      topK,
-    });
+    let result;
+    if (knowledgeBaseId) {
+      const kb = await getKnowledgeBase(knowledgeBaseId, orgId);
+      if (!kb) return res.status(404).json({ message: 'Wissensbasis nicht gefunden' });
+      result = await retrieveKnowledgeSources({
+        knowledgeBaseId,
+        message: queryText,
+        organizationId: orgId,
+        userId,
+        cortecs,
+        topK,
+      });
+    } else {
+      result = await retrieveDocumentSources({
+        documentIds,
+        message: queryText,
+        organizationId: orgId,
+        userId,
+        cortecs,
+        topK,
+      });
+    }
 
     return res.status(200).json({ sources: result.sources, documentIds: result.documentIds });
   } catch (error) {

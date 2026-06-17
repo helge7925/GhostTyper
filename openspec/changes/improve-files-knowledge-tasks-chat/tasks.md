@@ -54,7 +54,7 @@
 - [x] Implement Cortecs embedding client and cosine reranker.
 - [x] Backfill chunks for existing completed documents. (`POST /api/admin/documents/backfill-index`, shared-secret, bounded batches, idempotent — rebuilds chunks via `indexDocument`.)
 - [x] Backfill embeddings for existing indexed chunks. (Same endpoint: `indexDocument` writes chunks + embeddings together, so the backfill covers both; documents without a completed index job are reprocessed.)
-- [x] Implement `POST /api/retrieval/query`. (Access-filtered semantic search over the workspace index via `retrieveDocumentSources`; optional `documentIds` scope can only narrow, never widen, the caller's reach.)
+- [x] Implement `POST /api/retrieval/query`. (Access-filtered semantic search over the workspace index via `retrieveDocumentSources`; optional `documentIds` scope can only narrow, never widen, the caller's reach. Optional `knowledgeBaseId` scopes to a knowledge base via `retrieveKnowledgeSources`, honouring per-item focused/full_context/off retrieval modes.)
 - [ ] Add retrieval tests for access filtering and citation metadata. (Citation/heading metadata is covered by `chunkMarkdown` unit tests; access-filtering needs DB-level integration coverage — still open.)
 
 ## 5. Workspace Wissen
@@ -66,7 +66,7 @@
 - [x] Implement add/remove document APIs. (`/api/knowledge/[id]/items`; only workspace-visible documents may be added — private docs are rejected.)
 - [x] Implement directory CRUD APIs. (`/api/knowledge/[id]/directories`.)
 - [x] Add `Workspace Wissen` UI page. (`/knowledge` master-detail: list/create bases, add/remove documents via search picker, delete base; nav entry gated by `knowledge.read`.)
-- [ ] Add `Zu Workspace-Wissen hinzufügen` action in Dateien.
+- [x] Add `Zu Workspace-Wissen hinzufügen` action in Dateien. (Per-card `AddToKnowledgeButton` for workspace documents, gated by `knowledge.write`.)
 - [x] Add retrieval mode selector per knowledge item. (Per-item focused/full_context/off dropdown on the Workspace Wissen page, persisted via item PATCH.)
 - [ ] Add tests for private document restrictions in knowledge bases. (Restriction enforced in `addKnowledgeItem`; DB-level test still open.)
 

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import StatusBadge from './StatusBadge';
+import AddToKnowledgeButton from './AddToKnowledgeButton';
 import { useFormatter, useLocale, useTranslations } from '../lib/i18n';
 
 const TEMPLATE_LABELS = {
@@ -18,6 +19,7 @@ export default function TranscriptionCard({
   onReindex,
   reindexing = false,
   onDelete,
+  canAddToKnowledge = false,
 }) {
   const {
     id,
@@ -168,6 +170,9 @@ export default function TranscriptionCard({
             </select>
           )}
           <StatusBadge status={status} />
+          {canAddToKnowledge && visibility === 'workspace' && (
+            <AddToKnowledgeButton documentId={id} displayName={displayName} />
+          )}
           {onReindex && (
             <button
               type="button"

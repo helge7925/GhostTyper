@@ -1085,6 +1085,8 @@
     "modeFullContext": "Voller Kontext",
     "modeOff": "Aus",
     "loadError": "Wissensbasen konnten nicht geladen werden.",
-    "saveError": "Aktion fehlgeschlagen."
+    "saveError": "Aktion fehlgeschlagen.",
+    "addTo": "Zu Wissensbasis hinzufügen",
+    "noBasesShort": "Keine Wissensbasen"
   }
 }
