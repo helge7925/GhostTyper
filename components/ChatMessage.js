@@ -1,6 +1,23 @@
 import { useMemo } from 'react';
-import { User, Bot } from 'lucide-react';
-import { useFormatter } from '../lib/i18n';
+import Link from 'next/link';
+import { User, Bot, FileText } from 'lucide-react';
+import { useFormatter, useTranslations } from '../lib/i18n';
+
+function parseRetrievalSources(metadata) {
+  let meta = metadata;
+  if (typeof meta === 'string') {
+    try { meta = JSON.parse(meta); } catch { return []; }
+  }
+  const sources = meta?.retrieval_results;
+  if (!Array.isArray(sources)) return [];
+  // De-duplicate by document so multiple chunks of the same file show once.
+  const seen = new Map();
+  for (const s of sources) {
+    const key = s.documentId ?? s.transcriptionId ?? s.id;
+    if (key != null && !seen.has(key)) seen.set(key, s);
+  }
+  return Array.from(seen.values());
+}
 
 function mdToSimpleHtml(md) {
   const escaped = String(md || '')
@@ -16,8 +33,13 @@ function mdToSimpleHtml(md) {
 
 export default function ChatMessage({ message }) {
   const formatter = useFormatter();
+  const t = useTranslations('chatPage');
   const isUser = message.role === 'user';
   const html = useMemo(() => mdToSimpleHtml(message.content), [message.content]);
+  const sources = useMemo(
+    () => (isUser ? [] : parseRetrievalSources(message.metadata)),
+    [isUser, message.metadata],
+  );
   const time = useMemo(() => {
     if (!message.created_at) return '';
     return formatter.dateTime.format(new Date(message.created_at));
@@ -38,6 +60,29 @@ export default function ChatMessage({ message }) {
         }`}>
           <span dangerouslySetInnerHTML={{ __html: html }} />
         </div>
+        {sources.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-medium text-secondary">{t('sources')}</span>
+            {sources.map((src, i) => {
+              const label = src.title || t('sourceFallback', { index: i + 1 });
+              const href = src.transcriptionId ? `/transcriptions/${src.transcriptionId}` : null;
+              const chipClass = 'inline-flex items-center gap-1 max-w-[200px] px-2 py-0.5 rounded-full bg-subtle text-secondary text-[10px] border border-subtle';
+              const inner = (
+                <>
+                  <FileText className="w-2.5 h-2.5 shrink-0" />
+                  <span className="truncate">{label}</span>
+                </>
+              );
+              return href ? (
+                <Link key={src.id ?? i} href={href} className={`${chipClass} hover:text-accent hover:border-accent/40 transition-colors`} title={label}>
+                  {inner}
+                </Link>
+              ) : (
+                <span key={src.id ?? i} className={chipClass} title={label}>{inner}</span>
+              );
+            })}
+          </div>
+        )}
         {time && (
           <p className={`text-[10px] text-secondary mt-1 ${isUser ? 'text-right' : 'text-left'}`}>{time}</p>
         )}

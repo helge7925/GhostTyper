@@ -34,15 +34,16 @@ Last updated: 2026-06-17
 
 ## Next Steps
 
-1. Add source rendering in chat (`ChatMessage`) from `chat_messages.metadata.retrieval_results`.
-2. Implement `chat_context_items` for multiple attached documents/knowledge bases.
+1. Implement `POST /api/retrieval/query` + a dedicated OCR/Markdown chunker (foundation for knowledge-scoped retrieval).
+2. Implement `chat_context_items` for multiple attached documents/knowledge bases + context chips in the chat header.
 3. Implement Workspace-Wissen tables, APIs, and UI.
 4. Implement Aufgaben extraction, member matching, task APIs, and task UI.
 
 ## Done since last update
 
 - Automatic indexing after upload/OCR/text/meeting creation and on transcript edits/speaker assignment (translations excluded by design).
-- Backfill endpoint for pre-existing documents without a completed index job (`POST /api/admin/documents/backfill-index`). See Indexing and Retrieval task list.
+- Backfill endpoint for pre-existing documents without a completed index job (`POST /api/admin/documents/backfill-index`).
+- Streaming chat: `POST /api/chat/stream` SSE endpoint sharing `lib/chat-service` with the non-streaming turn, client-side token streaming with non-streaming fallback, and source/citation chips rendered in `ChatMessage`. Streaming-shape unit tests added.
 
 ## Notes
 

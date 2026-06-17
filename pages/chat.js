@@ -16,6 +16,61 @@ async function fetchJson(url, options = {}) {
   return data;
 }
 
+/**
+ * POST to the SSE chat endpoint and parse the event stream. Calls
+ * `onDelta(text)` for each token and resolves with the final stored message
+ * from the `done` event. Throws on HTTP errors (with `.status`) or `error`
+ * events so the caller can decide whether to fall back to the non-streaming
+ * endpoint.
+ */
+async function streamChatRequest(conversationId, message, onDelta) {
+  const res = await fetch('/api/chat/stream', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conversationId, message }),
+  });
+  if (!res.ok || !res.body) {
+    const data = await res.json().catch(() => ({}));
+    const err = new Error(data.message || `HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let finalMessage = null;
+  let streamError = null;
+
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep;
+    while ((sep = buffer.indexOf('\n\n')) !== -1) {
+      const rawEvent = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      let eventName = 'message';
+      let dataStr = '';
+      for (const line of rawEvent.split('\n')) {
+        if (line.startsWith('event:')) eventName = line.slice(6).trim();
+        else if (line.startsWith('data:')) dataStr += line.slice(5).trim();
+      }
+      if (!dataStr) continue;
+      let payload;
+      try { payload = JSON.parse(dataStr); } catch { continue; }
+      if (eventName === 'delta') onDelta(payload.content || '');
+      else if (eventName === 'done') finalMessage = payload.message;
+      else if (eventName === 'error') streamError = new Error(payload.message || 'stream error');
+    }
+  }
+
+  if (streamError) throw streamError;
+  if (!finalMessage) throw new Error('Kein Ergebnis vom Stream');
+  return finalMessage;
+}
+
 export default function ChatPage() {
   const router = useRouter();
   const { status } = useSession();
@@ -185,28 +240,60 @@ export default function ChatPage() {
     }
   };
 
+  const bumpConversation = useCallback((id) => {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, updated_at: new Date().toISOString(), message_count: (c.message_count || 0) + 2 } : c)),
+    );
+  }, []);
+
   const handleSend = async (message) => {
     if (!activeId) return;
+    const convId = activeId;
     setSending(true);
     setError('');
-    const optimisticUser = { id: Date.now(), role: 'user', content: message, created_at: new Date().toISOString() };
+    const optimisticUser = { id: `user-${Date.now()}`, role: 'user', content: message, created_at: new Date().toISOString() };
+    const assistantId = `assistant-${Date.now()}`;
     setMessages((prev) => [...prev, optimisticUser]);
-    try {
-      const data = await fetchJson('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId: activeId, message }),
-      });
+
+    const appendDelta = (delta) => {
       setMessages((prev) => {
-        const filtered = prev.filter((m) => m.id !== optimisticUser.id);
-        return [...filtered, optimisticUser, data.message];
+        const existing = prev.find((m) => m.id === assistantId);
+        if (existing) {
+          return prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + delta } : m));
+        }
+        return [...prev, { id: assistantId, role: 'assistant', content: delta, streaming: true, created_at: new Date().toISOString() }];
       });
-      setConversations((prev) =>
-        prev.map((c) => (c.id === activeId ? { ...c, updated_at: new Date().toISOString(), message_count: (c.message_count || 0) + 2 } : c)),
-      );
-    } catch (err) {
-      setError(err.message || t('sendError'));
-      setMessages((prev) => prev.filter((m) => m.id !== optimisticUser.id));
+    };
+
+    try {
+      const finalMessage = await streamChatRequest(convId, message, appendDelta);
+      setMessages((prev) => {
+        const withoutPlaceholder = prev.filter((m) => m.id !== assistantId);
+        return [...withoutPlaceholder, finalMessage];
+      });
+      bumpConversation(convId);
+    } catch (streamErr) {
+      // Fall back to the non-streaming endpoint only when the stream endpoint
+      // is unavailable (network error or 404) — nothing was persisted yet in
+      // those cases, so a clean retry won't duplicate the user message.
+      const canFallback = !streamErr.status || streamErr.status === 404;
+      setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+      if (canFallback) {
+        try {
+          const data = await fetchJson('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ conversationId: convId, message }),
+          });
+          setMessages((prev) => [...prev, data.message]);
+          bumpConversation(convId);
+        } catch (err) {
+          setError(err.message || t('sendError'));
+          setMessages((prev) => prev.filter((m) => m.id !== optimisticUser.id));
+        }
+      } else {
+        setError(streamErr.message || t('sendError'));
+      }
     } finally {
       setSending(false);
     }
@@ -262,7 +349,7 @@ export default function ChatPage() {
                     {messages.map((msg) => (
                       <ChatMessage key={msg.id} message={msg} />
                     ))}
-                    {sending && (
+                    {sending && !messages.some((m) => m.streaming) && (
                       <div className="flex gap-3">
                         <div className="shrink-0 w-8 h-8 rounded-full bg-subtle flex items-center justify-center">
                           <Bot className="w-4 h-4 text-secondary" />

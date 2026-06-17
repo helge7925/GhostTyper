@@ -1048,6 +1048,8 @@
     "contextTranscription": "Transcription",
     "contextOcr": "OCR result",
     "contextTranslate": "Translation",
-    "contextTextopt": "Text refinement"
+    "contextTextopt": "Text refinement",
+    "sources": "Sources:",
+    "sourceFallback": "Source {index}"
   }
 }

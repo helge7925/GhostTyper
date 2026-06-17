@@ -1048,6 +1048,8 @@
     "contextTranscription": "Transkription",
     "contextOcr": "OCR-Ergebnis",
     "contextTranslate": "Übersetzung",
-    "contextTextopt": "Textoptimierung"
+    "contextTextopt": "Textoptimierung",
+    "sources": "Quellen:",
+    "sourceFallback": "Quelle {index}"
   }
 }

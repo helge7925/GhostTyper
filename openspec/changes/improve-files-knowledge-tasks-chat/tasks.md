@@ -76,14 +76,14 @@
 - [x] Add `chat_messages.metadata` migration.
 - [ ] Implement automatic document context when opening chat from a document.
 - [ ] Implement chat context add/remove APIs.
-- [ ] Implement `POST /api/chat/stream` SSE endpoint.
-- [ ] Add non-streaming fallback behavior.
+- [x] Implement `POST /api/chat/stream` SSE endpoint. (Shared `lib/chat-service` with the non-streaming turn; same retrieval/cost-lock/usage/citations; forwards Cortecs tokens as `delta`/`done`/`error` SSE events.)
+- [x] Add non-streaming fallback behavior. (Client falls back to `POST /api/chat` when the stream endpoint is unavailable — network error or 404 — so nothing is double-persisted.)
 - [x] Store citation metadata on assistant messages.
-- [ ] Render source chips in `ChatMessage`.
+- [x] Render source chips in `ChatMessage`. (De-duplicated per document, linking to the transcription detail when available.)
 - [ ] Add context chips in chat header.
 - [ ] Add copy/regenerate/edit actions.
 - [ ] Add follow-up prompt generation.
-- [ ] Add tests for streaming event shape.
+- [x] Add tests for streaming event shape. (`tests/chat-stream-utils.test.mjs` covers SSE line parsing + request-body shape.)
 - [ ] Add tests for citations and source authorization.
 
 ## 7. Aufgabenextraktion
