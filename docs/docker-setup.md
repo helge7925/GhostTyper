@@ -4,7 +4,7 @@ GhostTyper läuft als Stack aus Docker-Containern. Zwei Compose-Dateien in
 `config/`:
 
 - `docker-compose.prod.yml` — Production. Webapp + Postgres als Pflicht-
-  Services, Vexa-Lite + Fireworks-Bridge als optionale Services hinter
+  Services, Vexa-Lite + Voxtral-Bridge als optionale Services hinter
   dem `vexa`-Profile. Traefik-Labels für TLS-Routing sind vorbereitet,
   greifen aber erst, wenn ein Traefik im selben `web`-Netzwerk läuft.
 - `docker-compose.dev.yml` — Lokale Entwicklung. Volume-Mount des

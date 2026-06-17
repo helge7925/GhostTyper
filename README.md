@@ -14,17 +14,17 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.4.0-orange" />
-    <img alt="Stack" src="https://img.shields.io/badge/Next.js-13-black" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-orange" />
+    <img alt="Stack" src="https://img.shields.io/badge/Next.js-15.5.x-black" />
     <img alt="Node" src="https://img.shields.io/badge/Node-18%2B-success" />
     <img alt="Postgres" src="https://img.shields.io/badge/Postgres-16-blue" />
-    <img alt="Tests" src="https://img.shields.io/badge/tests-106%20passing-success" />
+    <img alt="Tests" src="https://img.shields.io/badge/tests-139%20passing-success" />
     <img alt="License" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue" />
   </p>
 </div>
 
 <p align="center">
-  <img src="docs/screenshots/02-dashboard.png" alt="GhostTyper dashboard after login" width="100%" />
+  <img src="docs/screenshots/01-login.png" alt="GhostTyper login screen" width="100%" />
 </p>
 
 GhostTyper bundles audio transcription, OCR, AI summaries, structured data
@@ -35,7 +35,8 @@ audit trail are part of the baseline.
 <details>
 <summary>More screenshots</summary>
 
-<p align="center"><img src="docs/screenshots/01-login.png" alt="Login screen" width="49%" /> <img src="docs/screenshots/07-remote-meeting.png" alt="Remote-meeting modal" width="49%" /></p>
+Currently available: `docs/screenshots/01-login.png`. Dashboard and
+remote-meeting screenshots are TODO / need capture before they are embedded.
 
 </details>
 
@@ -65,7 +66,7 @@ audit trail are part of the baseline.
 
 | Layer    | Technology                                                       |
 | -------- | ---------------------------------------------------------------- |
-| Frontend | Next.js 13 (Pages Router), React 18, Tailwind, Radix, Zustand    |
+| Frontend | Next.js 15.5.x (Pages Router), React 18, Tailwind, Radix, Zustand |
 | Backend  | Next.js API Routes, NextAuth, PostgreSQL 16 (`pg`)               |
 | AI       | Mistral (Chat / OCR / Voxtral batch + live), Vexa Lite           |
 | Infra    | Docker Compose, Traefik (optional), AES-256-GCM (`lib/secrets.js`) |
@@ -76,7 +77,7 @@ audit trail are part of the baseline.
 ```
 ┌─────────────────────────┐    ┌──────────────────────────┐
 │ GhostTyper webapp       │    │ Postgres 16              │
-│ Next.js 13 + worker     │◄──►│ workspaces · audit · logs│
+│ Next.js 15.5.x + worker │◄──►│ workspaces · audit · logs│
 └──┬──────────────┬───────┘    └──────────────────────────┘
    │              │
    │ REST/SSE     │ webhook + bridge
@@ -178,7 +179,7 @@ Full ENV reference: [`.env.example`](.env.example).
 
 | Command                  | Purpose                                              |
 | ------------------------ | ---------------------------------------------------- |
-| `npm test`               | 106 unit tests (table logic, Vexa mapper, webhooks, sentence buffer, permissions, secrets, …) |
+| `npm test`               | 139 unit tests (table logic, Vexa mapper, webhooks, sentence buffer, permissions, secrets, …) |
 | `npm run lint`           | ESLint with the Next.js rule set                     |
 | `npm run smoke`          | Docker / API smoke test                              |
 | `npm run smoke:full`     | Smoke + tests + lint + build + PDF renderer         |

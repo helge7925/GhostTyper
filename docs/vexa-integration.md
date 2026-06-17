@@ -84,7 +84,7 @@ SSE /api/transcriptions/                                    OpenAI-kompat.
   stream ◄── vexa-bridge ◄  GET /transcripts/…   ──────►   /v1/audio/transcriptions
 POST /api/webhooks/vexa  ◄── HMAC-Webhook (meeting.completed)
                                   │
-                                  └─► fireworks-bridge (Modell-Rewrite,
+                                  └─► voxtral-bridge (Modell-Rewrite,
                                        MISTRAL_API_KEY-Lookup, context_bias-Injektion,
                                        response_format=verbose_json)
 ```
@@ -135,11 +135,11 @@ diesem Token einloggen.
    in der `.env` auf den Fork-Build aus
    [helge7925/vexa](https://github.com/helge7925/vexa) — siehe dort
    `UPSTREAM-SYNC.md` für die Tag-Konvention.
-2. **Mistral Voxtral**: derselbe API-Key, den GhostTyper bereits für die
-   Batch-Transkription nutzt. Die Bridge schreibt den Modellnamen auf
-   `voxtral-mini-latest`, setzt `response_format=verbose_json` und
-   `timestamp_granularities=word`, falls Vexa-Lite sie nicht selbst
-   sendet, und injiziert die workspace-globale Kontext-Wörter-Liste.
+2. **Cortecs Whisper**: derselbe Cortecs-API-Key, den GhostTyper bereits für
+   Batch-Transkription und Analyse nutzt. Die Bridge schreibt den Modellnamen
+   auf `whisper-large-v3`, setzt `response_format=verbose_json`, falls Vexa-Lite
+   es nicht selbst sendet, und injiziert die workspace-globale Kontext-Wörter-
+   Liste als `prompt`.
 3. **Postgres** für Vexa Lite — im Default-Compose-Stack wird die DB
    `vexa` in derselben Postgres-Instanz angelegt wie die GhostTyper-DB
    (siehe `vexa-db-init`-Service). Externe Postgres (Supabase EU,
@@ -150,15 +150,15 @@ diesem Token einloggen.
 
 ```
 DATABASE_URL=postgresql://…           # Postgres für Vexa
-TRANSCRIPTION_SERVICE_URL=http://fireworks-bridge:8080/v1/audio/transcriptions
+TRANSCRIPTION_SERVICE_URL=http://voxtral-bridge:8080/v1/audio/transcriptions
 TRANSCRIPTION_SERVICE_TOKEN=<beliebiger Token; Bridge tauscht ihn>
 ADMIN_API_TOKEN=<32 zufällige hex bytes — openssl rand -hex 32>
 ```
 
 Der `TRANSCRIPTION_SERVICE_TOKEN` ist nur ein Platzhalter — der Bridge-
-Container ersetzt das Bearer-Token vor dem Forward zu Mistral durch den
-zur Laufzeit aufgelösten `MISTRAL_API_KEY` (Workspace-Override aus der
-GhostTyper-UI bevorzugt vor `MISTRAL_API_KEY`-ENV).
+Container ersetzt das Bearer-Token vor dem Forward zu Cortecs durch den
+zur Laufzeit aufgelösten Cortecs-Key (Workspace-Override aus der
+GhostTyper-UI bevorzugt vor `CORTECS_API_KEY`-ENV).
 
 Health-Check:
 ```bash

@@ -2,7 +2,7 @@
 
 > Status: defensive baseline guidance for self-hosted operators. This is
 > not legal advice. The recommendations below reflect the architecture
-> as of v1.2.0 + Phase 2 hardening (2026-05-09). For a binding
+> as of v0.3.0 + Phase 2 hardening (2026-05-09). For a binding
 > assessment, consult your DPO and your legal team.
 >
 > The same setup applies to downstream forks (e.g. Romaco-Scriptor) —
@@ -56,11 +56,11 @@ Operator obligations:
 
 ## If you must use Fireworks AI (US)
 
-Fireworks AI is *technically* still wired through the
-`fireworks-bridge` container as a fallback, because the original
-upstream Vexa-Lite contract was built around their Whisper-v3
-inference. The bridge directory name is now misleading — by default
-the bridge calls Mistral.
+Fireworks AI is *technically* still reachable through the
+`voxtral-bridge` container as a fallback, because the original upstream
+Vexa-Lite contract was built around their Whisper-v3 inference. The
+legacy `fireworks-bridge` name appears only in historical/audit notes;
+by default the bridge calls Mistral.
 
 If your scenario genuinely requires Fireworks (e.g. on-prem GPU not
 available, no Mistral DPA possible), you must:

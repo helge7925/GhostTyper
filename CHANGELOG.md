@@ -51,12 +51,12 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
   `TTS_MAX_ATTEMPTS`, `TTS_RETRY_BASE_MS`).
 
 ### Tests
-- **+19 Unit-Tests** (gesamt 106): `tests/permissions.test.mjs` deckt die
+- **Unit-Test-Suite auf 139 Tests aktualisiert**: `tests/permissions.test.mjs` deckt die
   Rollen→Permission-Matrix + Fail-Closed-Verhalten ab,
   `tests/secrets.test.mjs` deckt AES-256-GCM Round-Trip, Versions-Prefix,
   Auth-Tag-Integrität (Tamper → null) und Wrong-Key-Verhalten ab.
 
-## [0.4.0] – 2026-05-07
+## [Unreleased draft] – 2026-05-07
 
 ### Added
 - **Nextcloud Talk als vierte Meeting-Plattform** (via Vexa-Fork). Neuer
@@ -196,55 +196,26 @@ Erstes öffentliches Release auf GitHub. Project switched from internal
 - **Produktivitätsfunktionen (Punkte 1-3)**:
   - Auto-Glossar für Kontextbegriffe aus Historie (`GET /api/glossary/suggestions`).
   - Intelligente Modellauswahl mit Kosten-/Token-Vorschau (`POST /api/model-assistant`).
-  - 1-Klick-Workflows im Text-Assistenten (`GET /api/workflows`, `POST /api/workflows/execute`).
-- **Wissensgraph-Generator**:
-  - Native Integration der Knowledge-Graph Generierung.
-  - Interaktives Rendering von Entitäten und Relationen mittels `vis-network`.
-  - PNG-Export-Funktionalität des generierten Graphen.
-- **Team Realtime**:
-  - Neue Realtime-Seite `/realtime` für Live-Transkript, Live-Dokument und Live-Wissensgraph.
-  - Neue Realtime-API-Endpunkte:
-    - `GET|POST /api/realtime/sessions`
-    - `GET|PATCH /api/realtime/sessions/[id]`
-    - `POST|DELETE /api/realtime/sessions/[id]/members`
-    - `POST /api/realtime/sessions/[id]/ingest`
-    - `GET /api/realtime/sessions/[id]/stream`
-  - Neue DB-Tabellen:
-    - `realtime_sessions`
-    - `realtime_session_members`
-    - `realtime_session_events`
-- **Workflow Editor + Versionierung**:
-  - Eigene Workflows als versionierte Definitionen in der DB.
-  - Rollback auf frühere Versionen.
-  - Neue API-Endpunkte:
-    - `POST /api/workflows` (Workflow speichern/neue Version)
-    - `DELETE /api/workflows/[workflowId]` (deaktivieren)
-    - `GET /api/workflows/[workflowId]/versions`
-    - `POST /api/workflows/[workflowId]/rollback`
 - **Audit-Log für kritische Aktionen**:
   - Neue DB-Tabelle `audit_log`.
   - Neuer Endpunkt `GET /api/audit-log`.
-  - Protokollierung von sicherheits- und betriebsrelevanten Aktionen (z. B. Settings, Workflow-Versionen, Realtime-Mitgliederverwaltung, Upload-Blockierungen).
+  - Protokollierung von sicherheits- und betriebsrelevanten Aktionen (z. B. Settings und Upload-Blockierungen).
 - **Upload Security Hook**:
   - Optionaler Virus-Scan vor Persistenz des Uploads (`UPLOAD_VIRUS_SCAN_*`).
 - **Budget Guardrails (pro Mitglied/Account)**:
   - Neues Setting `member_monthly_budget_limit`.
-  - Guardrail-Prüfung mit Prognose vor KI-Aufrufen in Text-AI, Übersetzung, Workflows und Realtime-Audio-Chunks.
-- **Sketch Summary / Lernskizze (Gemini)**:
-  - Neue Seite `/sketch` zur Bildgenerierung aus Lerntext.
-  - Neuer Endpunkt `POST /api/sketch-summary` (Gemini `gemini-3-pro-image-preview`).
-  - Neue Settings-Unterstützung für `google_api_key` / `google_api_key_encrypted` inkl. UI-Statusanzeige.
-  - Studio-Einstellungen vor Generierung: Layout-Modus, Detailgrad und Fokus.
-  - Mehrstufige Engine:
-    - Semantik-Extraktion (`TEXT` -> Struktur-JSON),
-    - Illustrationsplanung pro Block (`icon` + `motif`),
-    - deterministisches SVG-Rendering mit einheitlicher Typografie/Layoutregeln.
-  - Ausgabe jetzt vektorbasiert (`image/svg+xml`) im festen Querformat (16:9, 1920x1080).
+  - Guardrail-Prüfung mit Prognose vor KI-Aufrufen in Textoptimierung und Übersetzung.
 - **Datentabelle (NotebookLM-ähnlicher Modus)**:
   - Neue Seite `/datentabelle` als separater Aufbereitungsmodus.
   - Unterstützung für alle drei Quellen: Audio, Text und OCR.
   - Neuer Built-in Template-Key `data_table` inkl. eigenem Analyseprompt.
   - Dynamische Tabellen-Normalisierung in `rows + table_schema + analysis_meta` für einheitliche Darstellung in `TableRenderer`.
+
+### Removed
+- Frühere Experimente für Realtime-Sessions, Workflow-Editor,
+  Wissensgraph und Gemini-Sketch wurden vor dem öffentlichen 0.x-Stand
+  wieder entfernt. Der aktuelle API-Stand ist in
+  `docs/api-specification.md` dokumentiert.
 
 ### Changed
 - **Tabellen-Vorlagen Editor V2**:
