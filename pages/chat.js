@@ -7,6 +7,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ChatSidebar from '../components/ChatSidebar';
 import ChatMessage from '../components/ChatMessage';
 import ChatInput from '../components/ChatInput';
+import ChatContextBar from '../components/ChatContextBar';
 import { useTranslations } from '../lib/i18n';
 
 async function fetchJson(url, options = {}) {
@@ -84,6 +85,7 @@ export default function ChatPage() {
   const [msgLoading, setMsgLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [conversation, setConversation] = useState(null);
+  const [contextItems, setContextItems] = useState([]);
   const [error, setError] = useState('');
 
   const scrollRef = useRef(null);
@@ -106,20 +108,55 @@ export default function ChatPage() {
     }
   }, []);
 
+  const loadContext = useCallback(async (convId) => {
+    try {
+      const data = await fetchJson(`/api/chat/context?conversationId=${convId}`);
+      setContextItems(data.items || []);
+    } catch {
+      setContextItems([]);
+    }
+  }, []);
+
   const loadMessages = useCallback(async (convId) => {
     setMsgLoading(true);
     setError('');
+    setContextItems([]);
     try {
       const data = await fetchJson(`/api/chat?conversationId=${convId}`);
       setConversation(data.conversation);
       setMessages(data.messages || []);
+      loadContext(convId);
     } catch (err) {
       setError(err.message || t('loadError'));
       setMessages([]);
     } finally {
       setMsgLoading(false);
     }
-  }, [t]);
+  }, [t, loadContext]);
+
+  const handleAddContext = useCallback(async (documentId) => {
+    if (!activeId) return;
+    try {
+      const data = await fetchJson('/api/chat/context', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: activeId, documentId }),
+      });
+      setContextItems(data.items || []);
+    } catch (err) {
+      setError(err.message || t('sendError'));
+    }
+  }, [activeId, t]);
+
+  const handleRemoveContext = useCallback(async (documentId) => {
+    if (!activeId) return;
+    try {
+      const data = await fetchJson(`/api/chat/context?conversationId=${activeId}&documentId=${documentId}`, { method: 'DELETE' });
+      setContextItems(data.items || []);
+    } catch (err) {
+      setError(err.message || t('sendError'));
+    }
+  }, [activeId, t]);
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -213,6 +250,7 @@ export default function ChatPage() {
       setConversations((prev) => [data.conversation, ...prev]);
       setActiveId(data.conversation.id);
       setMessages([]);
+      setContextItems([]);
       setConversation(data.conversation);
       router.replace('/chat', undefined, { shallow: true });
     } catch {
@@ -331,6 +369,12 @@ export default function ChatPage() {
                   <span>{t('contextBanner', { label: contextLabel, title: conversation.title || '' })}</span>
                 </div>
               )}
+              <ChatContextBar
+                items={contextItems}
+                onAdd={handleAddContext}
+                onRemove={handleRemoveContext}
+                disabled={sending}
+              />
               {error && (
                 <div className="px-4 py-2 bg-danger/10 border-b border-danger/20 text-danger text-xs">{error}</div>
               )}

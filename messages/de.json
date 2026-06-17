@@ -1050,6 +1050,12 @@
     "contextTranslate": "Übersetzung",
     "contextTextopt": "Textoptimierung",
     "sources": "Quellen:",
-    "sourceFallback": "Quelle {index}"
+    "sourceFallback": "Quelle {index}",
+    "contextLabel": "Kontext:",
+    "contextAttach": "Datei",
+    "contextRemove": "Entfernen",
+    "contextSearchPlaceholder": "Dateien durchsuchen…",
+    "contextSearching": "Suche…",
+    "contextNoResults": "Keine Treffer"
   }
 }

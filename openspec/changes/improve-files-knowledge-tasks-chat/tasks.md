@@ -72,15 +72,15 @@
 
 ## 6. Chat RAG and Streaming
 
-- [ ] Add `chat_context_items` migration.
+- [x] Add `chat_context_items` migration. (Document-only for now; knowledge-base attachments are a later item.)
 - [x] Add `chat_messages.metadata` migration.
 - [ ] Implement automatic document context when opening chat from a document.
-- [ ] Implement chat context add/remove APIs.
+- [x] Implement chat context add/remove APIs. (`GET/POST/DELETE /api/chat/context`, access-checked; retrieval unions the conversation's origin doc with attached context items.)
 - [x] Implement `POST /api/chat/stream` SSE endpoint. (Shared `lib/chat-service` with the non-streaming turn; same retrieval/cost-lock/usage/citations; forwards Cortecs tokens as `delta`/`done`/`error` SSE events.)
 - [x] Add non-streaming fallback behavior. (Client falls back to `POST /api/chat` when the stream endpoint is unavailable — network error or 404 — so nothing is double-persisted.)
 - [x] Store citation metadata on assistant messages.
 - [x] Render source chips in `ChatMessage`. (De-duplicated per document, linking to the transcription detail when available.)
-- [ ] Add context chips in chat header.
+- [x] Add context chips in chat header. (`ChatContextBar` shows attached documents with remove + a search-based add picker.)
 - [ ] Add copy/regenerate/edit actions.
 - [ ] Add follow-up prompt generation.
 - [x] Add tests for streaming event shape. (`tests/chat-stream-utils.test.mjs` covers SSE line parsing + request-body shape.)

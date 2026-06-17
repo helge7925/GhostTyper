@@ -34,9 +34,9 @@ Last updated: 2026-06-17
 
 ## Next Steps
 
-1. Implement `chat_context_items` for multiple attached documents/knowledge bases + context chips in the chat header.
-2. Implement Workspace-Wissen tables, APIs, and UI (builds on `retrieveDocumentSources` for knowledge-scoped retrieval).
-3. Implement Aufgaben extraction, member matching, task APIs, and task UI.
+1. Implement Workspace-Wissen tables, APIs, and UI (builds on `retrieveDocumentSources` for knowledge-scoped retrieval).
+2. Implement Aufgaben extraction, member matching, task APIs, and task UI.
+3. Chat polish: copy/regenerate/edit actions, follow-up prompt generation, knowledge-base attachments in the context bar.
 4. Add DB-level retrieval tests for access filtering.
 
 ## Done since last update
@@ -45,6 +45,7 @@ Last updated: 2026-06-17
 - Backfill endpoint for pre-existing documents without a completed index job (`POST /api/admin/documents/backfill-index`).
 - Streaming chat: `POST /api/chat/stream` SSE endpoint sharing `lib/chat-service` with the non-streaming turn, client-side token streaming with non-streaming fallback, and source/citation chips rendered in `ChatMessage`. Streaming-shape unit tests added.
 - Markdown/OCR-aware chunker (`chunkMarkdown`, heading-scoped) wired into `buildDocumentChunks`, and a general access-filtered retrieval endpoint `POST /api/retrieval/query` (refactored shared core `rankDocumentChunks`). Chunker unit tests added.
+- Multi-document chat context: `chat_context_items` table, `GET/POST/DELETE /api/chat/context` (access-checked), retrieval now unions the conversation's origin document with attached context items, and a `ChatContextBar` header UI with remove + search-based add picker.
 
 ## Notes
 
