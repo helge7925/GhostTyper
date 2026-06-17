@@ -26,6 +26,10 @@ services:
       - HTTP_CLIENT_TIMEOUT_MS=30000
       - TRANSCRIPTION_HTTP_TIMEOUT_MS=600000
       - ANALYSIS_HTTP_TIMEOUT_MS=180000
+      - CORTECS_BASE_URL=https://api.cortecs.ai/v1
+      - CORTECS_CHAT_MODEL=deepseek-v4-pro
+      - CORTECS_TRANSCRIPTION_MODEL=whisper-large-v3
+      - CORTECS_PREFERENCE=balanced
       - HEALTH_DETAILS_PUBLIC=true
       - UPLOAD_VIRUS_SCAN_MODE=off
     volumes:

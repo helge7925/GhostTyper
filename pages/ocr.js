@@ -82,7 +82,7 @@ export default function OCR() {
   
   // Template & Model states
   const [template, setTemplate] = useState('generic');
-  const [model, setModel] = useState('mistral-large-latest');
+  const [model, setModel] = useState('deepseek-v4-pro');
   const [customPrompt, setCustomPrompt] = useState('');
   const [analysisFocus, setAnalysisFocus] = useState('');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
@@ -330,7 +330,7 @@ export default function OCR() {
                         <div>
                           <label className="block text-[10px] font-bold text-secondary uppercase mb-1.5 ml-1">Modell</label>
                           <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none">
-                            <option value="mistral-small-latest">Kostengünstig / Schnell</option><option value="mistral-medium-latest">Ausgewogen</option><option value="mistral-large-latest">Qualität</option>
+                            <option value="deepseek-v4-pro">Cortecs · deepseek-v4-pro</option><option value="mistral-small-latest">Kostengünstig / Schnell</option><option value="mistral-medium-latest">Ausgewogen</option><option value="mistral-large-latest">Qualität</option>
                           </select>
                         </div>
                       </div>

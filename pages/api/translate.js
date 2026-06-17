@@ -10,7 +10,7 @@ import {
   withUserCostLock,
 } from '../../lib/usage';
 import { resolveChatModel } from '../../lib/model-policy';
-import { getSettingsRow, resolveMistralApiKey } from '../../lib/settings-service';
+import { getSettingsRow, resolveCortecsConfig } from '../../lib/settings-service';
 import { MAX_TRANSLATE_INPUT_LENGTH } from '../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { logAuditEvent } from '../../lib/audit-log';
@@ -42,11 +42,12 @@ async function handler(req, res) {
 
   try {
     const settingsRow = await getSettingsRow(userId);
-    const apiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveChatModel(requestModel || settingsRow?.preferred_model || 'mistral-large-latest');
+    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
+    const apiKey = cortecs.apiKey;
+    const preferredModel = resolveChatModel(requestModel || cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
 
     if (!apiKey) {
-      return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert' });
+      return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert' });
     }
     if (!preferredModel) {
       return res.status(400).json({ message: 'Ungültiges KI-Modell' });
@@ -69,7 +70,8 @@ async function handler(req, res) {
         targetLanguage,
         sourceLanguage,
         apiKey,
-        preferredModel
+        preferredModel,
+        { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
       );
 
       await logUsage(userId, model, 'translation', usage, orgId);

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Plug, Wallet } from 'lucide-react';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import { Button } from '../../../components/ui/button';
+import CortecsIntegrationPanel from '../../../components/settings/CortecsIntegrationPanel';
 import MistralIntegrationPanel from '../../../components/settings/MistralIntegrationPanel';
 import VexaIntegrationPanel from '../../../components/settings/VexaIntegrationPanel';
 import { useCurrentOrg } from '../../../lib/use-current-org';
@@ -146,6 +147,7 @@ export default function WorkspaceIntegrationsPage() {
             <p className="text-xs text-secondary mt-1 max-w-prose">{t('aiProvidersHint')}</p>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <CortecsIntegrationPanel canEdit={canEditIntegrations} />
             <MistralIntegrationPanel canEdit={canEditIntegrations} />
           </div>
         </section>

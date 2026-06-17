@@ -63,7 +63,7 @@ export default function TabellenTranskription() {
     autoAnalyze: true,
     diarize: false,
     template: `custom-${selectedTemplateId}`,
-    model: 'mistral-large-latest',
+    model: 'deepseek-v4-pro',
     showAdvancedOptions: true,
   }), [selectedTemplateId]);
   const uncategorizedCount = templates.filter((template) => !template.category_id).length;
