@@ -3,7 +3,6 @@ import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-uti
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { hasPermission } from '../../../lib/permissions';
 import { logAuditEvent } from '../../../lib/audit-log';
-import { upsertDocumentForTranscription } from '../../../lib/documents';
 import { addTranscriptionEvent } from '../../../lib/transcription-events';
 import { resolveVexaConfig } from '../../../lib/integrations';
 import { encryptSecret, decryptSecret } from '../../../lib/secrets';
@@ -289,19 +288,6 @@ async function handler(req, res) {
     ],
   );
   const transcription = insertResult.rows[0];
-  await upsertDocumentForTranscription({
-    transcriptionId: transcription.id,
-    organizationId: orgId,
-    ownerUserId: userId,
-    visibility: 'workspace',
-    sourceType: 'meeting',
-    title: meetingUrlForOriginalName,
-    mimeType: null,
-    fileSize: null,
-    status: transcription.status,
-    folderId: Number.isFinite(Number(folderId)) ? Number(folderId) : null,
-    textPreview: null,
-  });
 
   // When translation is enabled at meeting start we mint the public
   // share-token NOW so it's ready by the time the bot joins. The
