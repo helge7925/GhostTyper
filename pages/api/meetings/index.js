@@ -3,6 +3,7 @@ import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-uti
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { hasPermission } from '../../../lib/permissions';
 import { logAuditEvent } from '../../../lib/audit-log';
+import { upsertDocumentForTranscription } from '../../../lib/documents';
 import { addTranscriptionEvent } from '../../../lib/transcription-events';
 import { resolveVexaConfig } from '../../../lib/integrations';
 import { encryptSecret, decryptSecret } from '../../../lib/secrets';
@@ -227,7 +228,7 @@ async function handler(req, res) {
   // the LLM-generated title. We avoid showing the raw join URL in the
   // transcription list — it leaks the meeting credentials and looks
   // ugly. Format: "Remote Meeting · Teams · 04.05.2026 09:42".
-  const platformLabel = { google_meet: 'Google Meet', teams: 'Teams', zoom: 'Zoom' }[platform] || platform;
+  const platformLabel = PLATFORM_LABELS[platform] || platform;
   const meetingUrlForOriginalName = `Remote Meeting · ${platformLabel} · ${new Date().toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
 
   let userInfo;
@@ -288,6 +289,19 @@ async function handler(req, res) {
     ],
   );
   const transcription = insertResult.rows[0];
+  await upsertDocumentForTranscription({
+    transcriptionId: transcription.id,
+    organizationId: orgId,
+    ownerUserId: userId,
+    visibility: 'workspace',
+    sourceType: 'meeting',
+    title: meetingUrlForOriginalName,
+    mimeType: null,
+    fileSize: null,
+    status: transcription.status,
+    folderId: Number.isFinite(Number(folderId)) ? Number(folderId) : null,
+    textPreview: null,
+  });
 
   // When translation is enabled at meeting start we mint the public
   // share-token NOW so it's ready by the time the bot joins. The
