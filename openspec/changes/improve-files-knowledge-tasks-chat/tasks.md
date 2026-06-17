@@ -65,9 +65,9 @@
 - [x] Implement knowledge-base CRUD APIs. (`/api/knowledge` + `/api/knowledge/[id]`; org-scoped, knowledge.read/write/delete.)
 - [x] Implement add/remove document APIs. (`/api/knowledge/[id]/items`; only workspace-visible documents may be added — private docs are rejected.)
 - [x] Implement directory CRUD APIs. (`/api/knowledge/[id]/directories`.)
-- [ ] Add `Workspace Wissen` UI page.
+- [x] Add `Workspace Wissen` UI page. (`/knowledge` master-detail: list/create bases, add/remove documents via search picker, delete base; nav entry gated by `knowledge.read`.)
 - [ ] Add `Zu Workspace-Wissen hinzufügen` action in Dateien.
-- [ ] Add retrieval mode selector per knowledge item. (Backend supports `retrieval_mode` via item PATCH; UI selector still open.)
+- [x] Add retrieval mode selector per knowledge item. (Per-item focused/full_context/off dropdown on the Workspace Wissen page, persisted via item PATCH.)
 - [ ] Add tests for private document restrictions in knowledge bases. (Restriction enforced in `addKnowledgeItem`; DB-level test still open.)
 
 ## 6. Chat RAG and Streaming

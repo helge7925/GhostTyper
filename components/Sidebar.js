@@ -5,6 +5,7 @@ import {
   Building2,
   Files,
   Languages,
+  Library,
   LogOut,
   MessageSquare,
   Mic,
@@ -47,6 +48,12 @@ const REMOTE_MEETING_LINK = {
   href: '/transcriptions?meeting=1',
   labelKey: 'remoteMeeting',
   Icon: Video,
+};
+
+const KNOWLEDGE_NAV_LINK = {
+  href: '/knowledge',
+  labelKey: 'knowledge',
+  Icon: Library,
 };
 
 /**
@@ -123,6 +130,7 @@ function SidebarBody({ collapsed = false, onNavigate }) {
   const tNav = useTranslations('nav');
   const canStartMeeting = usePermission('meeting.start');
   const canManageWorkspace = usePermission('org.settings');
+  const canReadKnowledge = usePermission('knowledge.read');
   const { enabled: vexaEnabled } = useVexaIntegrationEnabled();
   const showRemoteMeeting = canStartMeeting && vexaEnabled;
   if (!session) return null;
@@ -177,6 +185,18 @@ function SidebarBody({ collapsed = false, onNavigate }) {
             onNavigate={onNavigate}
           />
         ))}
+
+        {/* Workspace knowledge hub */}
+        {canReadKnowledge && (
+          <NavRow
+            href={KNOWLEDGE_NAV_LINK.href}
+            label={tNav(KNOWLEDGE_NAV_LINK.labelKey)}
+            Icon={KNOWLEDGE_NAV_LINK.Icon}
+            isActive={router.pathname === KNOWLEDGE_NAV_LINK.href || router.pathname.startsWith(KNOWLEDGE_NAV_LINK.href + '/')}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        )}
 
         {/* Document archive — always last */}
         <NavRow

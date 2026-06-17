@@ -34,7 +34,7 @@ Last updated: 2026-06-17
 
 ## Next Steps
 
-1. Workspace-Wissen UI slice: `Workspace Wissen` page, `Zu Workspace-Wissen hinzufügen` action in Dateien, retrieval-mode selector; then wire knowledge-base scope into chat retrieval.
+1. Wire knowledge-base scope into chat retrieval (focused/full_context/off) + add a `Zu Workspace-Wissen hinzufügen` action in Dateien.
 2. Implement Aufgaben extraction, member matching, task APIs, and task UI.
 3. Chat polish: copy/regenerate/edit actions, follow-up prompt generation, knowledge-base attachments in the context bar.
 4. Add DB-level tests for retrieval access filtering and private-document knowledge restrictions.
@@ -46,7 +46,8 @@ Last updated: 2026-06-17
 - Streaming chat: `POST /api/chat/stream` SSE endpoint sharing `lib/chat-service` with the non-streaming turn, client-side token streaming with non-streaming fallback, and source/citation chips rendered in `ChatMessage`. Streaming-shape unit tests added.
 - Markdown/OCR-aware chunker (`chunkMarkdown`, heading-scoped) wired into `buildDocumentChunks`, and a general access-filtered retrieval endpoint `POST /api/retrieval/query` (refactored shared core `rankDocumentChunks`). Chunker unit tests added.
 - Multi-document chat context: `chat_context_items` table, `GET/POST/DELETE /api/chat/context` (access-checked), retrieval now unions the conversation's origin document with attached context items, and a `ChatContextBar` header UI with remove + search-based add picker.
-- Workspace-Wissen data + APIs (slice 1): `knowledge_bases`/`knowledge_directories`/`knowledge_items` migrations, `lib/knowledge` service, and CRUD endpoints (`/api/knowledge`, `/api/knowledge/[id]`, `.../items`, `.../directories`). Only workspace-visible documents can be added (private docs rejected); items carry a focused/full_context/off retrieval mode. UI is the next slice.
+- Workspace-Wissen data + APIs (slice 1): `knowledge_bases`/`knowledge_directories`/`knowledge_items` migrations, `lib/knowledge` service, and CRUD endpoints (`/api/knowledge`, `/api/knowledge/[id]`, `.../items`, `.../directories`). Only workspace-visible documents can be added (private docs rejected); items carry a focused/full_context/off retrieval mode.
+- Workspace-Wissen UI (slice 2): `/knowledge` master-detail page (create/list/delete bases, add/remove documents via a workspace-only search picker, per-item retrieval-mode selector) and a `knowledge.read`-gated nav entry.
 
 ## Notes
 
