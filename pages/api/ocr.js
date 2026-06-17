@@ -14,7 +14,7 @@ import {
 } from '../../lib/usage';
 import { ACCEPTED_OCR_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE, normalizeAnalysisTemplate } from '../../lib/constants';
 import { resolveChatModel } from '../../lib/model-policy';
-import { getSettingsRow, resolveMistralApiKey } from '../../lib/settings-service';
+import { getSettingsRow, resolveCortecsConfig, resolveMistralApiKey } from '../../lib/settings-service';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { addTranscriptionEvent } from '../../lib/transcription-events';
 import { resolveTemplate } from '../../lib/template-service';
@@ -23,6 +23,8 @@ import { detectOcrMimeType, extensionFromDetectedMime } from '../../lib/file-sig
 import { normalizeDataTableAnalysis } from '../../lib/data-table';
 import { normalizeAndValidateTableAnalysis } from '../../lib/table-analysis';
 import { logAuditEvent } from '../../lib/audit-log';
+import { upsertDocumentForTranscription } from '../../lib/documents';
+import { autoIndexDocument } from '../../lib/document-index';
 
 export const config = {
   api: {
@@ -107,14 +109,21 @@ async function handler(req, res) {
     tempUploadPath = '';
 
     const settingsRow = await getSettingsRow(userId);
-    const apiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveChatModel(settingsRow?.preferred_model || 'mistral-large-latest');
+    const mistralApiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
+    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
+    const preferredModel = resolveChatModel(cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
     const language = settingsRow?.language || 'de';
+    const shouldAnalyze = (fields.analyze?.[0] || fields.analyze) === 'true';
 
-    if (!apiKey) {
+    if (!mistralApiKey) {
       await safeUnlink(persistedFilePath);
       persistedFilePath = '';
-      return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert' });
+      return res.status(400).json({ message: 'Kein Mistral API-Key für OCR konfiguriert' });
+    }
+    if (shouldAnalyze && !cortecs.apiKey) {
+      await safeUnlink(persistedFilePath);
+      persistedFilePath = '';
+      return res.status(400).json({ message: 'Kein Cortecs API-Key für Analyse konfiguriert' });
     }
     if (!preferredModel) {
       await safeUnlink(persistedFilePath);
@@ -122,7 +131,6 @@ async function handler(req, res) {
       return res.status(400).json({ message: 'Ungültiges Standardmodell in den Einstellungen' });
     }
 
-    const shouldAnalyze = (fields.analyze?.[0] || fields.analyze) === 'true';
     const template = normalizeAnalysisTemplate(fields.template?.[0] || fields.template || 'generic');
     const customPrompt = fields.customPrompt?.[0] || fields.customPrompt || '';
     const analysisFocus = fields.analysisFocus?.[0] || fields.analysisFocus || '';
@@ -176,7 +184,7 @@ async function handler(req, res) {
         throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
       }
 
-      const { markdown: markdownValue, usage: ocrUsage, model: ocrModel } = await performOCR(filePath, apiKey, detectedMimeType);
+      const { markdown: markdownValue, usage: ocrUsage, model: ocrModel } = await performOCR(filePath, mistralApiKey, detectedMimeType);
       await logUsage(userId, ocrModel, 'ocr', ocrUsage, orgId);
 
       if (!shouldAnalyze || !markdownValue.trim()) {
@@ -191,10 +199,11 @@ async function handler(req, res) {
       const analysisResult = await analyzeTranscription(
         markdownValue,
         resolvedTemplateForAnalysis,
-        apiKey,
+        cortecs.apiKey,
         effectiveCustomPrompt,
         selectedModelForAnalysis,
-        language
+        language,
+        { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
       );
       await logUsage(userId, analysisResult.model, 'analysis', analysisResult.usage, orgId);
 
@@ -255,6 +264,19 @@ async function handler(req, res) {
     );
 
     const transcriptionId = transcriptionResult.rows[0].id;
+    const ocrDocument = await upsertDocumentForTranscription({
+      transcriptionId,
+      organizationId: orgId,
+      ownerUserId: userId,
+      visibility: 'private',
+      sourceType: 'ocr',
+      title: file.originalFilename,
+      mimeType: detectedMimeType,
+      fileSize: file.size,
+      status: 'completed',
+      textPreview: markdown,
+    });
+    void autoIndexDocument({ documentId: ocrDocument?.id, transcriptionId, organizationId: orgId, userId });
     await addTranscriptionEvent({
       transcriptionId,
       userId,

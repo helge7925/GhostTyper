@@ -88,6 +88,7 @@
     "translation": "Übersetzung",
     "ocr": "OCR",
     "textOptimization": "Textoptimierung",
+    "chat": "Chat",
     "files": "Dateien",
     "history": "Dateien",
     "remoteMeeting": "Remote Meeting",
@@ -104,6 +105,7 @@
     "tables": "Tabellen",
     "translate": "Übersetzen",
     "ocr": "OCR",
+    "chat": "Chat",
     "files": "Dateien",
     "history": "Dateien"
   },
@@ -156,7 +158,8 @@
     "discardConfirm": "Verwerfen",
     "discardKeepEditing": "Weiter bearbeiten",
     "saveShortcut": "Speichern ⌘S",
-    "savedFlash": "Gespeichert!"
+    "savedFlash": "Gespeichert!",
+    "chatWithDocument": "Mit Dokument chatten"
   },
   "organization": {
     "label": "Workspace",
@@ -324,7 +327,7 @@
     "passwordMismatch": "Passwörter stimmen nicht überein."
   },
   "transcriptions": {
-    "title": "Historie",
+    "title": "Dateien",
     "empty": "Noch keine Transkriptionen vorhanden.",
     "newAction": "Neue Transkription",
     "search": "Suchen…",
@@ -526,6 +529,25 @@
       "uploadRecording": "Aufnahme verwenden",
       "rerecord": "Erneut aufnehmen"
     },
+    "systemAudioRecorder": {
+      "start": "Aufnahme starten",
+      "stop": "Aufnahme stoppen",
+      "discard": "Verwerfen",
+      "useRecording": "Aufnahme verwenden",
+      "recording": "Aufnahme",
+      "sourceTab": "Tab-Audio",
+      "sourceSystem": "System-Audio",
+      "recordingTab": "Tab-Audio wird aufgenommen…",
+      "recordingSystem": "System-Audio wird aufgenommen…",
+      "description": "Nach Klick auf Start fragt Ihr Browser nach einem Tab oder Bildschirm zur Freigabe. Aktivieren Sie dabei \"Audio teilen\" im Dialog.",
+      "supportedLabel": "Unterstützt",
+      "tabAudioInfo": "Tab-Audio: Chrome, Edge",
+      "systemAudioInfo": "System-Audio: Nur Windows",
+      "notSupported": "Ihr Browser unterstützt keine Tab-/System-Audio-Aufnahme.",
+      "noAudioTrack": "Kein Audio empfangen. Bitte aktivieren Sie \"Audio teilen\" im Freigabe-Dialog.",
+      "noData": "Aufnahme fehlgeschlagen: Keine Daten empfangen.",
+      "permissionDenied": "Fehler bei der Audio-Freigabe: {error}"
+    },
     "uploadForm": {
       "dragOrClick": "Datei hier ablegen oder klicken",
       "selectFile": "Datei auswählen",
@@ -534,6 +556,7 @@
       "invalidType": "Dateityp wird nicht unterstützt",
       "tabUpload": "Hochladen",
       "tabRecord": "Aufnehmen",
+      "tabSystemAudio": "Tab/System-Audio",
       "tabPaste": "Einfügen",
       "submit": "Verarbeiten",
       "submitting": "Wird verarbeitet…",
@@ -637,11 +660,38 @@
       "account": "Account"
     },
     "integrations": {
+      "cortecs": {
+        "title": "Cortecs",
+        "description": "Primärer Provider für Transkription, Analyse, Übersetzung und Textoptimierung. Standardmodelle: deepseek-v4-pro und whisper-large-v3.",
+        "enableLabel": "Cortecs für KI und Transkription nutzen",
+        "enableHint": "Nach Aktivierung wird Cortecs für alle Workspace-Mitglieder verwendet.",
+        "enableHintWithFallback": "Server-Default ist als Fallback hinterlegt — Workspace-Key überschreibt diesen.",
+        "apiKeyLabel": "API-Key",
+        "apiKeyHint": "Wird verschlüsselt gespeichert (AES-256-GCM) und nie an den Browser zurückgegeben.",
+        "apiKeyPlaceholder": "Cortecs-API-Key einfügen",
+        "baseUrlLabel": "API-Basis-URL",
+        "chatModelLabel": "Chat-/Analysemodell",
+        "transcriptionModelLabel": "Transkriptionsmodell",
+        "preferenceLabel": "Routing-Präferenz",
+        "preferenceBalanced": "Ausgewogen",
+        "preferenceSpeed": "Geschwindigkeit",
+        "preferenceCost": "Kosten",
+        "configured": "gesetzt",
+        "testButton": "Verbindung testen",
+        "connected": "Verbunden",
+        "disconnected": "Verbindung fehlgeschlagen",
+        "saveSuccess": "Cortecs-Konfiguration gespeichert.",
+        "saveError": "Speichern fehlgeschlagen.",
+        "loadError": "Konfiguration konnte nicht geladen werden.",
+        "testSuccess": "Verbindung zu Cortecs erfolgreich.",
+        "testError": "Verbindungstest fehlgeschlagen.",
+        "readOnlyHint": "Nur Workspace-Admins können diese Integration verwalten."
+      },
       "mistral": {
-        "title": "Mistral",
-        "description": "Wird für Transkriptions-Analyse, Zusammenfassungen, OCR und Übersetzungen genutzt. Setze hier einmalig den Org-Key — alle Mitglieder profitieren.",
-        "enableLabel": "Zentralen Key für alle Mitglieder nutzen",
-        "enableHint": "Nach Aktivierung wird der hier hinterlegte Key für alle Workspace-Mitglieder verwendet.",
+        "title": "Mistral OCR & TTS",
+        "description": "Bleibt für OCR und Voxtral-TTS aktiv. Cortecs übernimmt Transkription, Analyse, Übersetzung und Textoptimierung.",
+        "enableLabel": "Mistral für OCR/TTS nutzen",
+        "enableHint": "Nach Aktivierung wird der hier hinterlegte Key für OCR und TTS verwendet.",
         "enableHintWithFallback": "Server-Default ist als Fallback hinterlegt — Workspace-Key überschreibt diesen.",
         "apiKeyLabel": "API-Key",
         "apiKeyHint": "Wird verschlüsselt gespeichert (AES-256-GCM) und nie an den Browser zurückgegeben.",
@@ -738,7 +788,7 @@
   "transcriptionDetailPage": {
     "loading": "Transkription wird geladen…",
     "notFound": "Transkription nicht gefunden.",
-    "backToList": "Zurück zur Historie",
+    "backToList": "Zurück zu Dateien",
     "deleteConfirm": "Transkription wirklich löschen?",
     "deleted": "Transkription gelöscht.",
     "rerun": "Analyse neu durchführen",
@@ -976,5 +1026,28 @@
     "ctaWorkspace": "Workspace öffnen",
     "errorTitle": "Einladung fehlgeschlagen",
     "errorBackHome": "Zur Startseite"
+  },
+  "chatPage": {
+    "title": "Chat",
+    "welcomeTitle": "Willkommen im Chat",
+    "welcomeHint": "Starten Sie einen neuen Chat oder wählen Sie eine bestehende Konversation aus. Sie können auch aus Transkriptionen, OCR-Ergebnissen oder Übersetzungen heraus einen Chat starten.",
+    "startNewChat": "Neuen Chat starten",
+    "newChat": "Neuer Chat",
+    "newChatDefault": "Neuer Chat",
+    "inputPlaceholder": "Nachricht schreiben…",
+    "startConversation": "Stellen Sie eine Frage oder schreiben Sie eine Nachricht.",
+    "empty": "Noch keine Chats.",
+    "untitled": "Unbenannt",
+    "messagesCount": "Nachrichten",
+    "deleteChat": "Chat löschen",
+    "loadError": "Chat konnte nicht geladen werden.",
+    "createError": "Chat konnte nicht erstellt werden.",
+    "deleteError": "Chat konnte nicht gelöscht werden.",
+    "sendError": "Nachricht konnte nicht gesendet werden.",
+    "contextBanner": "Kontext: {label} – {title}",
+    "contextTranscription": "Transkription",
+    "contextOcr": "OCR-Ergebnis",
+    "contextTranslate": "Übersetzung",
+    "contextTextopt": "Textoptimierung"
   }
 }

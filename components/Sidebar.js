@@ -6,6 +6,7 @@ import {
   Files,
   Languages,
   LogOut,
+  MessageSquare,
   Mic,
   PencilLine,
   ScanText,
@@ -25,7 +26,7 @@ import { usePermission } from '../lib/use-permission';
 //   Remote Meeting (when permitted + workspace has Vexa enabled — see
 //   `showRemoteMeeting` below) is rendered as the first nav row.
 //   The other tools follow in the order Transcription → Translation
-//   → OCR → Tables → Text Refinement, and the document archive
+//   → OCR → Tables → Text Refinement → Chat, and the document archive
 //   ("Dateien" / "Files", was "Historie" / "History") is always last.
 const PRIMARY_NAV_LINKS = [
   { href: '/upload', labelKey: 'transcription', Icon: Mic },
@@ -33,6 +34,7 @@ const PRIMARY_NAV_LINKS = [
   { href: '/ocr', labelKey: 'ocr', Icon: ScanText },
   { href: '/tabellen', labelKey: 'tables', Icon: TableIcon },
   { href: '/textoptimierung', labelKey: 'textOptimization', Icon: PencilLine },
+  { href: '/chat', labelKey: 'chat', Icon: MessageSquare },
 ];
 
 const FILES_NAV_LINK = {

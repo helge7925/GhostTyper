@@ -462,6 +462,15 @@ export default function TranscriptionDetail() {
                       </Link>
                     );
                   })()}
+
+                  {transcription.text && (
+                    <Link
+                      href={`/chat?source=transcription&refId=${transcription.id}`}
+                      className="bg-hover-subtle hover:bg-hover-strong text-primary py-2 rounded-xl text-sm font-bold border border-subtle text-center transition-all"
+                    >
+                      Mit Transkript chatten
+                    </Link>
+                  )}
                   {isOfficeDocument && (
                     <a
                       href={`/api/transcriptions/${transcription.id}/download`}

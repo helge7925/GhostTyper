@@ -14,7 +14,7 @@ import {
   checkCostLimit,
   withUserCostLock,
 } from '../../../lib/usage';
-import { getSettingsRow, resolveMistralApiKey } from '../../../lib/settings-service';
+import { getSettingsRow, resolveCortecsConfig, resolveMistralApiKey } from '../../../lib/settings-service';
 import { resolveChatModel } from '../../../lib/model-policy';
 import {
   ACCEPTED_FILE_TRANSLATION_TYPES,
@@ -32,6 +32,7 @@ import { addTranscriptionEvent } from '../../../lib/transcription-events';
 import { buildTranslatedFilename } from '../../../lib/translate-filename';
 import { mdToHtml } from '../../../lib/export-utils';
 import { renderPdfBufferFromHtml } from '../../../lib/pdf-export';
+import { upsertDocumentForTranscription } from '../../../lib/documents';
 
 export const config = {
   api: {
@@ -163,12 +164,14 @@ async function handler(req, res) {
     const inputBuffer = await readFile(tempUploadPath);
 
     const settingsRow = await getSettingsRow(userId);
-    const apiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveChatModel(requestModel || settingsRow?.preferred_model || 'mistral-large-latest');
-    if (!apiKey) {
+    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
+    const cortecsApiKey = cortecs.apiKey;
+    const mistralApiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
+    const preferredModel = resolveChatModel(requestModel || cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
+    if (!cortecsApiKey) {
       await safeUnlink(tempUploadPath);
       tempUploadPath = '';
-      return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert' });
+      return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert' });
     }
     if (!preferredModel) {
       await safeUnlink(tempUploadPath);
@@ -205,7 +208,14 @@ async function handler(req, res) {
 
         const output = await translateOfficeDocumentBuffer(inputBuffer, detectedMimeType, {
           translator: async (segments) => {
-            const result = await translateTextSegments(segments, targetLanguage, sourceLanguage, apiKey, preferredModel);
+            const result = await translateTextSegments(
+              segments,
+              targetLanguage,
+              sourceLanguage,
+              cortecsApiKey,
+              preferredModel,
+              { baseUrl: cortecs.baseUrl, preference: cortecs.preference },
+            );
             totalUsage = addUsage(totalUsage, result.usage);
             return result.translations;
           },
@@ -237,6 +247,18 @@ async function handler(req, res) {
           preferredModel,
         ]
       );
+      await upsertDocumentForTranscription({
+        transcriptionId: historyResult.rows[0].id,
+        organizationId: orgId,
+        ownerUserId: userId,
+        visibility: 'private',
+        sourceType: 'translation',
+        title: downloadName,
+        mimeType: detectedMimeType,
+        fileSize: translated.buffer.length,
+        status: 'completed',
+        textPreview: `Office-Datei wurde nach ${targetLanguage} übersetzt.`,
+      });
       await addTranscriptionEvent({
         transcriptionId: historyResult.rows[0].id,
         userId,
@@ -292,8 +314,12 @@ async function handler(req, res) {
           throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
         }
 
+        if (!mistralApiKey) {
+          throw Object.assign(new Error('Kein Mistral API-Key für OCR konfiguriert'), { code: 'NO_MISTRAL_OCR_KEY' });
+        }
+
         // Step 1: OCR via Mistral — returns Markdown.
-        const ocrResult = await performOCR(tempUploadPath, apiKey, 'application/pdf');
+        const ocrResult = await performOCR(tempUploadPath, mistralApiKey, 'application/pdf');
         const sourceMarkdown = String(ocrResult?.markdown || '').trim();
         if (ocrResult?.usage) {
           totalOcrUsage = addUsage(totalOcrUsage, ocrResult.usage);
@@ -319,7 +345,14 @@ async function handler(req, res) {
         segmentCount = segments.length;
         const translatedSegments = [];
         for (const segment of segments) {
-          const result = await translateText(segment, targetLanguage, sourceLanguage, apiKey, preferredModel);
+          const result = await translateText(
+            segment,
+            targetLanguage,
+            sourceLanguage,
+            cortecsApiKey,
+            preferredModel,
+            { baseUrl: cortecs.baseUrl, preference: cortecs.preference },
+          );
           translatedSegments.push(result?.translatedText || segment);
           if (result?.usage) {
             totalTranslateUsage = addUsage(totalTranslateUsage, result.usage);
@@ -358,6 +391,18 @@ async function handler(req, res) {
           preferredModel,
         ]
       );
+      await upsertDocumentForTranscription({
+        transcriptionId: historyResult.rows[0].id,
+        organizationId: orgId,
+        ownerUserId: userId,
+        visibility: 'private',
+        sourceType: 'translation',
+        title: downloadName,
+        mimeType: 'application/pdf',
+        fileSize: pdfBuffer.length,
+        status: 'completed',
+        textPreview: `PDF wurde nach ${targetLanguage} übersetzt.`,
+      });
       await addTranscriptionEvent({
         transcriptionId: historyResult.rows[0].id,
         userId,
@@ -412,7 +457,7 @@ async function handler(req, res) {
     if (error.code === 'LIMIT_FILE_SIZE' || error.message?.includes('maxFileSize')) {
       return res.status(413).json({ message: 'Datei ist zu groß (max. 50 MB)' });
     }
-    if (error?.code === 'PDF_NO_TEXT' || error?.code === 'PDF_TOO_LARGE') {
+    if (error?.code === 'PDF_NO_TEXT' || error?.code === 'PDF_TOO_LARGE' || error?.code === 'NO_MISTRAL_OCR_KEY') {
       return res.status(400).json({ message: error.message });
     }
     logApiError('File translation error', error);

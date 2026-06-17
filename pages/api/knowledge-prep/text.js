@@ -9,12 +9,14 @@ import {
   withUserCostLock,
 } from '../../../lib/usage';
 import { resolveChatModel } from '../../../lib/model-policy';
-import { getSettingsRow, resolveMistralApiKey } from '../../../lib/settings-service';
+import { getSettingsRow, resolveCortecsConfig } from '../../../lib/settings-service';
 import { MAX_CUSTOM_PROMPT_LENGTH, MAX_DOCUMENT_TEXT_LENGTH } from '../../../lib/constants';
 import { resolveTemplate } from '../../../lib/template-service';
 import { addTranscriptionEvent } from '../../../lib/transcription-events';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { normalizeDataTableAnalysis } from '../../../lib/data-table';
+import { upsertDocumentForTranscription } from '../../../lib/documents';
+import { autoIndexDocument } from '../../../lib/document-index';
 
 const ALLOWED_TEMPLATES = new Set(['data_table']);
 
@@ -58,12 +60,13 @@ async function handler(req, res) {
     }
 
     const settingsRow = await getSettingsRow(userId);
-    const apiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
+    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
+    const apiKey = cortecs.apiKey;
     const language = settingsRow?.language || 'de';
-    const selectedModel = resolveChatModel(requestModel || settingsRow?.preferred_model || 'mistral-large-latest');
+    const selectedModel = resolveChatModel(requestModel || cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
 
     if (!apiKey) {
-      return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert.' });
+      return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert.' });
     }
     if (!selectedModel) {
       return res.status(400).json({ message: 'Ungültiges KI-Modell.' });
@@ -91,7 +94,8 @@ async function handler(req, res) {
         apiKey,
         mergedPrompt,
         selectedModel,
-        language
+        language,
+        { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
       );
       await logUsage(userId, analysisResult.model, 'analysis', analysisResult.usage, orgId);
 
@@ -140,6 +144,19 @@ async function handler(req, res) {
     );
 
     const transcription = result.rows[0];
+    const textDocument = await upsertDocumentForTranscription({
+      transcriptionId: transcription.id,
+      organizationId: orgId,
+      ownerUserId: userId,
+      visibility: 'private',
+      sourceType: analysisType === 'table' ? 'data_table' : 'text',
+      title: transcription.original_name,
+      mimeType: 'text/plain',
+      fileSize: Buffer.byteLength(text, 'utf8'),
+      status: transcription.status,
+      textPreview: text,
+    });
+    void autoIndexDocument({ documentId: textDocument?.id, transcriptionId: transcription.id, organizationId: orgId, userId });
     await addTranscriptionEvent({
       transcriptionId: transcription.id,
       userId,

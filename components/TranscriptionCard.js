@@ -10,9 +10,36 @@ const TEMPLATE_LABELS = {
   aufmass: { de: 'Aufmaß', en: 'Measurements' },
 };
 
-export default function TranscriptionCard({ transcription, folders = [], onMove, onToggleFavorite, onDelete }) {
-  const { id, original_name, filename, status, template, mime_type, folder_id, is_favorite, created_at, createdAt } = transcription;
-  const displayName = original_name || filename;
+export default function TranscriptionCard({
+  transcription,
+  folders = [],
+  onMove,
+  onToggleFavorite,
+  onReindex,
+  reindexing = false,
+  onDelete,
+}) {
+  const {
+    id,
+    transcription_id,
+    title,
+    source_type,
+    visibility,
+    original_name,
+    filename,
+    status,
+    template,
+    mime_type,
+    folder_id,
+    is_favorite,
+    chunk_count,
+    index_job_status,
+    index_job_error,
+    created_at,
+    createdAt,
+  } = transcription;
+  const displayName = title || original_name || filename;
+  const detailHref = transcription_id ? `/transcriptions/${transcription_id}` : `/documents/${id}`;
   const date = created_at || createdAt;
   const tNav = useTranslations('nav');
   const tList = useTranslations('transcriptions');
@@ -20,8 +47,25 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
   const { locale } = useLocale();
   const { dateTime } = useFormatter();
 
-  const isOCR = mime_type?.startsWith('image/') || mime_type === 'application/pdf';
-  const isTranslation = template === 'translation';
+  const isOCR = source_type === 'ocr' || mime_type?.startsWith('image/') || mime_type === 'application/pdf';
+  const isTranslation = source_type === 'translation' || template === 'translation';
+  const isDataTable = source_type === 'data_table';
+  const isMeeting = source_type === 'meeting';
+  const hasChunks = Number(chunk_count || 0) > 0;
+  const effectiveIndexStatus = reindexing ? 'processing' : index_job_status;
+  const indexStatusLabel = effectiveIndexStatus === 'processing' ? 'Index läuft'
+    : effectiveIndexStatus === 'queued' ? 'Index wartet'
+    : effectiveIndexStatus === 'completed' ? `Indexiert${hasChunks ? ` · ${chunk_count}` : ''}`
+    : effectiveIndexStatus === 'error' ? 'Indexfehler'
+    : hasChunks ? `Indexiert · ${chunk_count}`
+    : 'Nicht indexiert';
+  const indexStatusClass = effectiveIndexStatus === 'processing' || effectiveIndexStatus === 'queued'
+    ? 'bg-info/10 text-info border-info/20'
+    : effectiveIndexStatus === 'completed' || hasChunks
+      ? 'bg-success/10 text-success border-success/20'
+      : effectiveIndexStatus === 'error'
+        ? 'bg-danger/10 text-danger border-danger/20'
+        : 'bg-hover-subtle text-secondary border-subtle';
   const templateLabel = TEMPLATE_LABELS[template]
     ? TEMPLATE_LABELS[template][locale] || TEMPLATE_LABELS[template].de
     : template;
@@ -34,7 +78,13 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
   );
   let iconColor = 'bg-accent/10 text-accent';
 
-  if (isOCR) {
+  if (isMeeting) {
+    typeLabel = tNav('remoteMeeting');
+    iconColor = 'bg-purple-500/10 text-purple-400';
+  } else if (isDataTable) {
+    typeLabel = tNav('tables');
+    iconColor = 'bg-cyan-500/10 text-info';
+  } else if (isOCR) {
     typeLabel = tNav('ocr');
     iconColor = 'bg-info/10 text-info';
     Icon = (
@@ -69,7 +119,7 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
             </button>
           )}
 
-          <Link href={`/transcriptions/${id}`} className="flex items-center gap-4 flex-1 min-w-0">
+          <Link href={detailHref} className="flex items-center gap-4 flex-1 min-w-0">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${iconColor}`}>
               {Icon}
             </div>
@@ -79,6 +129,17 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
                 <h3 className="text-sm font-medium text-primary truncate group-hover:text-accent transition-colors">{displayName}</h3>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-hover-subtle text-secondary uppercase tracking-widest font-bold shrink-0">
                   {typeLabel}
+                </span>
+                {visibility && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-hover-subtle text-secondary uppercase tracking-widest font-bold shrink-0">
+                    {visibility === 'private' ? 'Privat' : 'Workspace'}
+                  </span>
+                )}
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded border uppercase tracking-widest font-bold shrink-0 ${indexStatusClass}`}
+                  title={index_job_error || indexStatusLabel}
+                >
+                  {indexStatusLabel}
                 </span>
               </div>
               <p className="text-xs text-secondary mt-1">
@@ -107,6 +168,20 @@ export default function TranscriptionCard({ transcription, folders = [], onMove,
             </select>
           )}
           <StatusBadge status={status} />
+          {onReindex && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onReindex(); }}
+              disabled={reindexing}
+              className="p-2 text-secondary hover:text-accent hover:bg-accent/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-wait"
+              title={reindexing ? 'Index wird erstellt' : 'Index neu erstellen'}
+              aria-label={`${displayName} — ${reindexing ? 'Index wird erstellt' : 'Index neu erstellen'}`}
+            >
+              <svg className={`w-4 h-4 ${reindexing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          )}
           {onDelete && (
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(); }}

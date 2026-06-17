@@ -9,7 +9,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import MeetingStartForm from '../components/MeetingStartForm';
 import { Skeleton } from '../components/ui/skeleton';
 import { Video } from 'lucide-react';
-import { getTranscriptions, getFolders, createFolder, updateFolder, deleteFolder, updateTranscription, deleteTranscription } from '../lib/api';
+import { getDocuments, getFolders, createFolder, updateFolder, deleteFolder, updateDocument, deleteDocument, reindexDocument } from '../lib/api';
 import { useTranslations } from '../lib/i18n';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { usePermission } from '../lib/use-permission';
@@ -76,7 +76,9 @@ export default function Transcriptions() {
   const [editingFolderId, setEditingFolderId] = useState(null);
   const [editFolderName, setEditFolderName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [reindexingIds, setReindexingIds] = useState(() => new Set());
   const searchTimeoutRef = useRef(null);
+  const canReindexDocuments = usePermission('document.write');
   const {
     toast,
     showToast,
@@ -95,7 +97,7 @@ export default function Transcriptions() {
     if (status !== 'authenticated') return;
 
     Promise.all([
-      getTranscriptions('', { limit: PAGE_SIZE, offset: 0 }),
+      getDocuments('', { limit: PAGE_SIZE, offset: 0 }),
       getFolders(),
     ])
       .then(([transcripts, foldersData]) => {
@@ -115,7 +117,7 @@ export default function Transcriptions() {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
-      const next = await getTranscriptions('', {
+      const next = await getDocuments('', {
         limit: PAGE_SIZE,
         offset: transcriptions.length,
       });
@@ -141,7 +143,7 @@ export default function Transcriptions() {
     const query = searchQuery.trim();
     if (query === '') {
       setSearching(true);
-      getTranscriptions('', { limit: PAGE_SIZE, offset: 0 })
+      getDocuments('', { limit: PAGE_SIZE, offset: 0 })
         .then((results) => {
           setTranscriptions(results);
           setHasMore(results.length >= PAGE_SIZE);
@@ -154,7 +156,7 @@ export default function Transcriptions() {
     searchTimeoutRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const results = await getTranscriptions(query, {
+        const results = await getDocuments(query, {
           scope: 'full',
           limit: SEARCH_LIMIT,
           offset: 0,
@@ -219,7 +221,7 @@ export default function Transcriptions() {
 
   const handleMoveToFolder = useCallback(async (transcriptionId, folderId) => {
     try {
-      await updateTranscription(transcriptionId, { folderId });
+      await updateDocument(transcriptionId, { folderId });
       setTranscriptions(prev => prev.map(t => t.id === transcriptionId ? { ...t, folder_id: folderId } : t));
     } catch (err) {
       showToast('Datei konnte nicht verschoben werden', 'error');
@@ -228,7 +230,7 @@ export default function Transcriptions() {
 
   const handleToggleFavorite = useCallback(async (transcriptionId, currentStatus) => {
     try {
-      await updateTranscription(transcriptionId, { isFavorite: !currentStatus });
+      await updateDocument(transcriptionId, { isFavorite: !currentStatus });
       setTranscriptions(prev => prev.map(t => t.id === transcriptionId ? { ...t, is_favorite: !currentStatus } : t));
     } catch (err) {
       showToast('Favoriten-Status konnte nicht geändert werden', 'error');
@@ -244,12 +246,42 @@ export default function Transcriptions() {
     });
     if (!approved) return;
     try {
-      await deleteTranscription(id);
+      await deleteDocument(id);
       setTranscriptions(prev => prev.filter(t => t.id !== id));
     } catch (err) {
       showToast('Fehler beim Löschen: ' + (err.message || 'Unbekannter Fehler'), 'error');
     }
   }, [confirm, showToast]);
+
+  const handleReindexDocument = useCallback(async (id) => {
+    setReindexingIds((prev) => new Set(prev).add(id));
+    setTranscriptions((prev) => prev.map((entry) => entry.id === id
+      ? { ...entry, index_job_status: 'processing', index_job_error: null }
+      : entry));
+    try {
+      const result = await reindexDocument(id);
+      setTranscriptions((prev) => prev.map((entry) => entry.id === id
+        ? {
+            ...entry,
+            chunk_count: result.chunks,
+            index_job_status: 'completed',
+            index_job_error: null,
+          }
+        : entry));
+      showToast(`Index erstellt: ${result.chunks || 0} Chunks, ${result.embeddings || 0} Embeddings`, 'success');
+    } catch (err) {
+      setTranscriptions((prev) => prev.map((entry) => entry.id === id
+        ? { ...entry, index_job_status: 'error', index_job_error: err.message || 'Indexierung fehlgeschlagen' }
+        : entry));
+      showToast('Index konnte nicht erstellt werden: ' + (err.message || 'Unbekannter Fehler'), 'error');
+    } finally {
+      setReindexingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }, [showToast]);
 
   const filteredTranscriptions = useMemo(() => {
     return transcriptions.filter(t => {
@@ -429,6 +461,8 @@ export default function Transcriptions() {
                   folders={folders}
                   onMove={(folderId) => handleMoveToFolder(t.id, folderId)}
                   onToggleFavorite={() => handleToggleFavorite(t.id, t.is_favorite)}
+                  onReindex={canReindexDocuments ? () => handleReindexDocument(t.id) : undefined}
+                  reindexing={reindexingIds.has(t.id)}
                   onDelete={() => handleDeleteTranscription(t.id)}
                 />
               ))}

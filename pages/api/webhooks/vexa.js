@@ -13,6 +13,7 @@ import { ensureGdprNoticePostedToChat } from '../../../lib/gdpr-chat-poster';
 import { ensureOverlayStarted, clearOverlay } from '../../../lib/in-meeting-overlay';
 import { stopInMeetingAudio } from '../../../lib/in-meeting-audio';
 import { logUsage } from '../../../lib/usage';
+import { autoIndexDocument } from '../../../lib/document-index';
 
 function totalAudioSeconds(segments) {
   if (!Array.isArray(segments) || !segments.length) return 0;
@@ -271,13 +272,22 @@ async function handleCompleted(transcription, payload, vexaConfig) {
     meta: { segments: mapped.segments.length, speakers: mapped.speakers.length },
   });
 
-  // Voxtral cost: input_tokens column doubles as audio-seconds (see usage.js
+  // Index the final meeting transcript (text + segments). A later auto-analysis
+  // only adds the analysis field, which isn't part of the index, so indexing here
+  // already captures the indexable content.
+  void autoIndexDocument({
+    transcriptionId: transcription.id,
+    organizationId: transcription.organization_id,
+    userId: transcription.user_id,
+  });
+
+  // STT cost: input_tokens column doubles as audio-seconds (see usage.js
   // MODEL_PRICING comment). Per-user/org attribution flows through usage_log.
   const seconds = totalAudioSeconds(mapped.segments);
   if (seconds > 0) {
     await logUsage(
       transcription.user_id,
-      'voxtral-mini-latest',
+      'whisper-large-v3',
       'meeting_transcription',
       { input_tokens: seconds, output_tokens: 0 },
       transcription.organization_id,
