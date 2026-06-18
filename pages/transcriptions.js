@@ -76,6 +76,12 @@ export default function Transcriptions() {
   const [editingFolderId, setEditingFolderId] = useState(null);
   const [editFolderName, setEditFolderName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [visibilityFilter, setVisibilityFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [favoriteOnly, setFavoriteOnly] = useState(false);
+  const [viewMode, setViewMode] = useState('list');
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [reindexingIds, setReindexingIds] = useState(() => new Set());
   const searchTimeoutRef = useRef(null);
   const canReindexDocuments = usePermission('document.write');
@@ -142,9 +148,17 @@ export default function Transcriptions() {
     }
 
     const query = searchQuery.trim();
+    const baseOptions = {
+      limit: query ? SEARCH_LIMIT : PAGE_SIZE,
+      offset: 0,
+      ...(sourceFilter ? { sourceType: sourceFilter } : {}),
+      ...(visibilityFilter ? { visibility: visibilityFilter } : {}),
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(favoriteOnly ? { favorite: 'true' } : {}),
+    };
     if (query === '') {
       setSearching(true);
-      getDocuments('', { limit: PAGE_SIZE, offset: 0 })
+      getDocuments('', baseOptions)
         .then((results) => {
           setTranscriptions(results);
           setHasMore(results.length >= PAGE_SIZE);
@@ -158,9 +172,8 @@ export default function Transcriptions() {
       setSearching(true);
       try {
         const results = await getDocuments(query, {
+          ...baseOptions,
           scope: 'full',
-          limit: SEARCH_LIMIT,
-          offset: 0,
         });
         setTranscriptions(results);
         setHasMore(false); // search returns top-N matches; no incremental loading
@@ -176,7 +189,7 @@ export default function Transcriptions() {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchQuery]);
+  }, [searchQuery, sourceFilter, visibilityFilter, statusFilter, favoriteOnly]);
 
   const handleCreateFolder = useCallback(async (e) => {
     if (e) e.preventDefault();
@@ -253,6 +266,47 @@ export default function Transcriptions() {
       showToast('Fehler beim Löschen: ' + (err.message || 'Unbekannter Fehler'), 'error');
     }
   }, [confirm, showToast]);
+
+  const handleEditTags = useCallback(async (entry) => {
+    const current = Array.isArray(entry.tags) ? entry.tags.join(', ') : '';
+    const next = window.prompt('Tags kommagetrennt bearbeiten', current);
+    if (next === null) return;
+    const tags = next.split(',').map((tag) => tag.trim()).filter(Boolean);
+    try {
+      const updated = await updateDocument(entry.id, { tags });
+      setTranscriptions((prev) => prev.map((item) => (item.id === entry.id ? { ...item, tags: updated.tags || tags } : item)));
+    } catch (err) {
+      showToast('Tags konnten nicht gespeichert werden', 'error');
+    }
+  }, [showToast]);
+
+  const toggleSelected = useCallback((id, checked) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const handleBulkDelete = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const approved = await confirm({
+      title: 'Dateien löschen',
+      message: `${ids.length} Dateien unwiderruflich löschen?`,
+      confirmLabel: 'Dateien löschen',
+      danger: true,
+    });
+    if (!approved) return;
+    try {
+      await Promise.all(ids.map((id) => deleteDocument(id)));
+      setTranscriptions((prev) => prev.filter((entry) => !selectedIds.has(entry.id)));
+      setSelectedIds(new Set());
+    } catch (err) {
+      showToast('Nicht alle Dateien konnten gelöscht werden', 'error');
+    }
+  }, [confirm, selectedIds, showToast]);
 
   const handleReindexDocument = useCallback(async (id) => {
     setReindexingIds((prev) => new Set(prev).add(id));
@@ -437,6 +491,42 @@ export default function Transcriptions() {
             </div>
           </div>
 
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="bg-surface-elevated border border-subtle rounded-lg px-2 py-1.5 text-xs text-primary">
+              <option value="">Alle Typen</option>
+              <option value="audio_transcription">Transkription</option>
+              <option value="meeting">Meeting</option>
+              <option value="ocr">OCR</option>
+              <option value="translation">Übersetzung</option>
+              <option value="data_table">Datentabelle</option>
+              <option value="text">Text</option>
+            </select>
+            <select value={visibilityFilter} onChange={(e) => setVisibilityFilter(e.target.value)} className="bg-surface-elevated border border-subtle rounded-lg px-2 py-1.5 text-xs text-primary">
+              <option value="">Alle Sichtbarkeiten</option>
+              <option value="workspace">Workspace</option>
+              <option value="private">Privat</option>
+            </select>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-surface-elevated border border-subtle rounded-lg px-2 py-1.5 text-xs text-primary">
+              <option value="">Alle Status</option>
+              <option value="ready">Bereit</option>
+              <option value="completed">Abgeschlossen</option>
+              <option value="transcribed">Transkribiert</option>
+              <option value="processing">Verarbeitung</option>
+              <option value="error">Fehler</option>
+            </select>
+            <button type="button" onClick={() => setFavoriteOnly((value) => !value)} className={`px-3 py-1.5 rounded-lg text-xs border ${favoriteOnly ? 'bg-accent text-white border-accent' : 'border-subtle text-secondary hover:text-primary'}`}>
+              Favoriten
+            </button>
+            <button type="button" onClick={() => setViewMode((value) => value === 'list' ? 'grid' : 'list')} className="px-3 py-1.5 rounded-lg text-xs border border-subtle text-secondary hover:text-primary">
+              {viewMode === 'list' ? 'Grid' : 'Liste'}
+            </button>
+            {selectedIds.size > 0 && (
+              <button type="button" onClick={handleBulkDelete} className="px-3 py-1.5 rounded-lg text-xs bg-danger/10 text-danger border border-danger/30">
+                {selectedIds.size} löschen
+              </button>
+            )}
+          </div>
+
           {loading ? (
             <ListSkeleton />
           ) : filteredTranscriptions.length === 0 ? (
@@ -454,7 +544,7 @@ export default function Transcriptions() {
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className={viewMode === 'grid' ? 'grid grid-cols-1 xl:grid-cols-2 gap-3' : 'space-y-3'}>
               {filteredTranscriptions.map((t) => (
                 <TranscriptionCard
                   key={t.id}
@@ -465,7 +555,12 @@ export default function Transcriptions() {
                   onReindex={canReindexDocuments ? () => handleReindexDocument(t.id) : undefined}
                   reindexing={reindexingIds.has(t.id)}
                   onDelete={() => handleDeleteTranscription(t.id)}
+                  onEditTags={() => handleEditTags(t)}
                   canAddToKnowledge={canAddToKnowledge}
+                  selectable
+                  selected={selectedIds.has(t.id)}
+                  onSelect={(checked) => toggleSelected(t.id, checked)}
+                  viewMode={viewMode}
                 />
               ))}
 

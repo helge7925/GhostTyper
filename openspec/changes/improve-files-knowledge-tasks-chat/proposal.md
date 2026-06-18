@@ -4,7 +4,7 @@
 
 GhostTyper has grown beyond audio transcription. The current `Historie`/`transcriptions` view mixes recordings, meetings, OCR results, translations, table analyses, and chat context without a clear product model. Users need a unified `Dateien` area, private and shared workspace files, document-grounded chat with citations, and task extraction from transcripts.
 
-OpenWebUI provides useful reference patterns: workspace knowledge bases, focused retrieval vs full-context attachments, citations, conversation organization, search, and follow-up prompts. GhostTyper should adopt those patterns in a way that fits its existing transcription/OCR/meeting workflows.
+OpenWebUI provides useful reference patterns: workspace knowledge bases, focused retrieval vs full-context attachments, citations, conversation organization, search, and follow-up prompts. GhostTyper should adopt those patterns in a way that fits its existing transcription/OCR/meeting processing flows.
 
 ## Decisions Captured
 
@@ -21,7 +21,7 @@ OpenWebUI provides useful reference patterns: workspace knowledge bases, focused
 - Add document visibility: `private` and `workspace`.
 - Add workspace knowledge bases with directories, attached documents, retrieval modes, and indexing status.
 - Add chunking/indexing for transcriptions, OCR, translations, and workspace files.
-- Add transcript task extraction with evidence, source links, member assignment, and review workflow.
+- Add transcript task extraction with evidence, source links, member assignment, and review flow.
 - Upgrade chat with streaming responses, citations, multiple context attachments, better message actions, and document-aware prompts.
 
 ## Out Of Scope For MVP

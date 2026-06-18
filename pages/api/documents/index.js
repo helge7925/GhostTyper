@@ -13,6 +13,7 @@ const ALLOWED_SOURCE_TYPES = new Set([
   'text',
   'workspace_file',
 ]);
+const ALLOWED_STATUS = new Set(['pending', 'queued', 'processing', 'transcribed', 'analyzing', 'completed', 'error', 'ready']);
 
 function pickFirst(value) {
   return Array.isArray(value) ? value[0] : value;
@@ -39,6 +40,7 @@ async function handler(req, res) {
     const { search, scope, limit, offset } = parseTranscriptionsListParams(req.query || {});
     const visibility = String(pickFirst(req.query?.visibility) || '').trim();
     const sourceType = String(pickFirst(req.query?.sourceType) || '').trim();
+    const status = String(pickFirst(req.query?.status) || '').trim();
     const favorite = String(pickFirst(req.query?.favorite) || '').trim().toLowerCase();
     const useFullSearch = scope === 'full' && search.length >= 3;
 
@@ -97,6 +99,11 @@ async function handler(req, res) {
     if (ALLOWED_SOURCE_TYPES.has(sourceType)) {
       params.push(sourceType);
       sql += ` AND d.source_type = $${params.length}`;
+    }
+
+    if (ALLOWED_STATUS.has(status)) {
+      params.push(status);
+      sql += ` AND COALESCE(t.status, d.status) = $${params.length}`;
     }
 
     if (favorite === 'true') {

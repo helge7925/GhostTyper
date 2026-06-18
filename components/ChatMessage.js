@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { User, Bot, FileText } from 'lucide-react';
+import { User, Bot, FileText, Copy, RefreshCw, Pencil, Check, X } from 'lucide-react';
 import { useFormatter, useTranslations } from '../lib/i18n';
+import { buildFollowupPrompts } from '../lib/chat-actions-utils';
 
 function parseRetrievalSources(metadata) {
   let meta = metadata;
@@ -31,10 +32,12 @@ function mdToSimpleHtml(md) {
     .replace(/\n/g, '<br>');
 }
 
-export default function ChatMessage({ message }) {
+export default function ChatMessage({ message, onCopy, onRegenerate, onEdit, onFollowup, disabled = false, showFollowups = false }) {
   const formatter = useFormatter();
   const t = useTranslations('chatPage');
   const isUser = message.role === 'user';
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(message.content || '');
   const html = useMemo(() => mdToSimpleHtml(message.content), [message.content]);
   const sources = useMemo(
     () => (isUser ? [] : parseRetrievalSources(message.metadata)),
@@ -44,6 +47,18 @@ export default function ChatMessage({ message }) {
     if (!message.created_at) return '';
     return formatter.dateTime.format(new Date(message.created_at));
   }, [message.created_at, formatter]);
+  const followups = useMemo(() => (showFollowups && !isUser ? buildFollowupPrompts(message) : []), [showFollowups, isUser, message]);
+
+  const saveEdit = () => {
+    const next = draft.trim();
+    if (!next || next === message.content) {
+      setEditing(false);
+      setDraft(message.content || '');
+      return;
+    }
+    onEdit?.(message, next);
+    setEditing(false);
+  };
 
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
@@ -58,8 +73,44 @@ export default function ChatMessage({ message }) {
             ? 'gradient-accent text-white rounded-br-md'
             : 'bg-surface-elevated border border-subtle text-primary rounded-bl-md'
         }`}>
-          <span dangerouslySetInnerHTML={{ __html: html }} />
+          {editing ? (
+            <div className="space-y-2">
+              <textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                rows={3}
+                className="w-full min-w-[260px] bg-white/10 border border-white/30 rounded-lg px-3 py-2 text-sm text-white outline-none resize-y placeholder:text-white/60"
+              />
+              <div className="flex justify-end gap-1">
+                <button type="button" onClick={() => { setEditing(false); setDraft(message.content || ''); }} className="p-1 rounded-md hover:bg-white/10" aria-label={t('cancelEdit')}>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+                <button type="button" onClick={saveEdit} className="p-1 rounded-md hover:bg-white/10" aria-label={t('saveEdit')}>
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span dangerouslySetInnerHTML={{ __html: html }} />
+          )}
         </div>
+        {!message.streaming && !editing && (
+          <div className={`mt-1 flex gap-1 ${isUser ? 'justify-end' : 'justify-start'}`}>
+            <button type="button" disabled={disabled} onClick={() => onCopy?.(message)} className="p-1 rounded-md text-secondary hover:text-primary hover:bg-subtle disabled:opacity-40" aria-label={t('copyMessage')}>
+              <Copy className="w-3.5 h-3.5" />
+            </button>
+            {isUser && (
+              <button type="button" disabled={disabled} onClick={() => setEditing(true)} className="p-1 rounded-md text-secondary hover:text-primary hover:bg-subtle disabled:opacity-40" aria-label={t('editMessage')}>
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {!isUser && (
+              <button type="button" disabled={disabled} onClick={() => onRegenerate?.(message)} className="p-1 rounded-md text-secondary hover:text-primary hover:bg-subtle disabled:opacity-40" aria-label={t('regenerateMessage')}>
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
         {sources.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className="text-[10px] font-medium text-secondary">{t('sources')}</span>
@@ -85,6 +136,21 @@ export default function ChatMessage({ message }) {
         )}
         {time && (
           <p className={`text-[10px] text-secondary mt-1 ${isUser ? 'text-right' : 'text-left'}`}>{time}</p>
+        )}
+        {followups.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {followups.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                disabled={disabled}
+                onClick={() => onFollowup?.(prompt)}
+                className="px-2 py-1 rounded-full border border-subtle bg-surface text-[11px] text-secondary hover:text-accent hover:border-accent/40 disabled:opacity-40"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
         )}
       </div>
     </div>

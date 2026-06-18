@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_RETRIEVAL_MODE, RETRIEVAL_MODES, normalizeRetrievalMode, partitionRetrievalModes, sanitizeName } from '../lib/knowledge-utils.js';
+import { DEFAULT_RETRIEVAL_MODE, RETRIEVAL_MODES, combineRetrievalScopes, normalizeRetrievalMode, partitionRetrievalModes, sanitizeName } from '../lib/knowledge-utils.js';
 
 test('normalizeRetrievalMode keeps valid modes', () => {
   for (const mode of RETRIEVAL_MODES) {
@@ -31,4 +31,15 @@ test('partitionRetrievalModes splits focused/full_context and drops off + invali
   ]);
   assert.deepEqual(focusedDocumentIds, [1, 4]); // bogus → focused default
   assert.deepEqual(fullContextDocumentIds, [2]);
+});
+
+test('combineRetrievalScopes lets full context win over focused duplicates', () => {
+  const scope = combineRetrievalScopes([
+    { focusedDocumentIds: [1, 2, 'x'], fullContextDocumentIds: [] },
+    { focusedDocumentIds: [3], fullContextDocumentIds: [2, 4] },
+  ]);
+
+  assert.deepEqual(scope.focusedDocumentIds, [1, 3]);
+  assert.deepEqual(scope.fullContextDocumentIds, [2, 4]);
+  assert.deepEqual(scope.documentIds, [1, 3, 2, 4]);
 });

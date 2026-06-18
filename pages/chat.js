@@ -134,13 +134,16 @@ export default function ChatPage() {
     }
   }, [t, loadContext]);
 
-  const handleAddContext = useCallback(async (documentId) => {
+  const handleAddContext = useCallback(async (context) => {
     if (!activeId) return;
+    const payload = typeof context === 'object' && context !== null
+      ? { conversationId: activeId, ...context }
+      : { conversationId: activeId, contextType: 'document', documentId: context };
     try {
       const data = await fetchJson('/api/chat/context', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId: activeId, documentId }),
+        body: JSON.stringify(payload),
       });
       setContextItems(data.items || []);
     } catch (err) {
@@ -148,10 +151,18 @@ export default function ChatPage() {
     }
   }, [activeId, t]);
 
-  const handleRemoveContext = useCallback(async (documentId) => {
+  const handleRemoveContext = useCallback(async (context) => {
     if (!activeId) return;
+    const params = new URLSearchParams({ conversationId: String(activeId) });
+    if (context?.context_type === 'knowledge_base') {
+      params.set('contextType', 'knowledge_base');
+      params.set('knowledgeBaseId', String(context.knowledge_base_id));
+    } else {
+      params.set('contextType', 'document');
+      params.set('documentId', String(context?.document_id ?? context));
+    }
     try {
-      const data = await fetchJson(`/api/chat/context?conversationId=${activeId}&documentId=${documentId}`, { method: 'DELETE' });
+      const data = await fetchJson(`/api/chat/context?${params.toString()}`, { method: 'DELETE' });
       setContextItems(data.items || []);
     } catch (err) {
       setError(err.message || t('sendError'));
@@ -337,6 +348,55 @@ export default function ChatPage() {
     }
   };
 
+  const handleCopyMessage = useCallback(async (message) => {
+    try {
+      await navigator.clipboard.writeText(message.content || '');
+    } catch {
+      setError(t('copyError'));
+    }
+  }, [t]);
+
+  const handleRegenerateMessage = useCallback(async (message) => {
+    if (!message?.id || sending) return;
+    setSending(true);
+    setError('');
+    try {
+      const data = await fetchJson('/api/chat/regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId: message.id }),
+      });
+      setMessages((prev) => [...prev.filter((m) => m.id !== message.id), data.message]);
+    } catch (err) {
+      setError(err.message || t('sendError'));
+    } finally {
+      setSending(false);
+    }
+  }, [sending, t]);
+
+  const handleEditMessage = useCallback(async (message, content) => {
+    if (!message?.id || sending) return;
+    setSending(true);
+    setError('');
+    try {
+      const data = await fetchJson(`/api/chat/messages/${message.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      setMessages((prev) => {
+        const index = prev.findIndex((m) => m.id === message.id);
+        const kept = index >= 0 ? prev.slice(0, index) : prev;
+        return [...kept, data.userMessage, data.message];
+      });
+      bumpConversation(activeId);
+    } catch (err) {
+      setError(err.message || t('sendError'));
+    } finally {
+      setSending(false);
+    }
+  }, [activeId, bumpConversation, sending, t]);
+
   if (status === 'loading') return <LoadingSpinner />;
   if (status === 'unauthenticated') return <LoadingSpinner />;
 
@@ -390,8 +450,17 @@ export default function ChatPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {messages.map((msg) => (
-                      <ChatMessage key={msg.id} message={msg} />
+                    {messages.map((msg, index) => (
+                      <ChatMessage
+                        key={msg.id}
+                        message={msg}
+                        disabled={sending}
+                        showFollowups={index === messages.length - 1 && msg.role === 'assistant' && !msg.streaming}
+                        onCopy={handleCopyMessage}
+                        onRegenerate={index === messages.length - 1 ? handleRegenerateMessage : null}
+                        onEdit={handleEditMessage}
+                        onFollowup={handleSend}
+                      />
                     ))}
                     {sending && !messages.some((m) => m.streaming) && (
                       <div className="flex gap-3">

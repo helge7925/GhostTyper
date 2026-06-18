@@ -32,7 +32,7 @@
     "test": "node --no-warnings --test tests/**/*.test.mjs",
     "smoke": "bash scripts/smoke-test.sh",
     "smoke:full": "bash scripts/smoke-test.sh --full --pdf",
-    "lint": "next lint",
+    "lint": "eslint . --ext .js,.mjs --ignore-pattern .next --ignore-pattern node_modules",
     "seed-admin": "node scripts/seed-admin.js",
     "migrate-api-keys": "node scripts/migrate-api-keys.js",
     "reencrypt-secrets": "node scripts/reencrypt-secrets.js",

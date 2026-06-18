@@ -34,10 +34,10 @@
 - [x] Rename navigation label to `Dateien`.
 - [x] Replace transcriptions-list data source with documents API.
 - [x] Add visibility badges and filters.
-- [ ] Add type filters and status filters.
-- [ ] Add tag display and tag editing.
-- [ ] Add bulk actions.
-- [ ] Add list/grid toggle.
+- [x] Add type filters and status filters.
+- [x] Add tag display and tag editing.
+- [x] Add bulk actions.
+- [x] Add list/grid toggle.
 - [ ] Preserve existing links to transcription details.
 
 ## 4. Indexing and Retrieval
@@ -55,7 +55,7 @@
 - [x] Backfill chunks for existing completed documents. (`POST /api/admin/documents/backfill-index`, shared-secret, bounded batches, idempotent — rebuilds chunks via `indexDocument`.)
 - [x] Backfill embeddings for existing indexed chunks. (Same endpoint: `indexDocument` writes chunks + embeddings together, so the backfill covers both; documents without a completed index job are reprocessed.)
 - [x] Implement `POST /api/retrieval/query`. (Access-filtered semantic search over the workspace index via `retrieveDocumentSources`; optional `documentIds` scope can only narrow, never widen, the caller's reach. Optional `knowledgeBaseId` scopes to a knowledge base via `retrieveKnowledgeSources`, honouring per-item focused/full_context/off retrieval modes.)
-- [ ] Add retrieval tests for access filtering and citation metadata. (Citation/heading metadata is covered by `chunkMarkdown` unit tests; access-filtering needs DB-level integration coverage — still open.)
+- [x] Add retrieval tests for access filtering and citation metadata. (Citation/heading metadata is covered by `chunkMarkdown` unit tests; access filtering is covered by DB-level smoke tests in `tests/retrieval-access-db.test.mjs` when `DATABASE_URL` is set.)
 
 ## 5. Workspace Wissen
 
@@ -68,11 +68,11 @@
 - [x] Add `Workspace Wissen` UI page. (`/knowledge` master-detail: list/create bases, add/remove documents via search picker, delete base; nav entry gated by `knowledge.read`.)
 - [x] Add `Zu Workspace-Wissen hinzufügen` action in Dateien. (Per-card `AddToKnowledgeButton` for workspace documents, gated by `knowledge.write`.)
 - [x] Add retrieval mode selector per knowledge item. (Per-item focused/full_context/off dropdown on the Workspace Wissen page, persisted via item PATCH.)
-- [ ] Add tests for private document restrictions in knowledge bases. (Restriction enforced in `addKnowledgeItem`; DB-level test still open.)
+- [x] Add tests for private document restrictions in knowledge bases. (DB-level smoke test covers the workspace-visible document restriction when `DATABASE_URL` is set.)
 
 ## 6. Chat RAG and Streaming
 
-- [x] Add `chat_context_items` migration. (Document-only for now; knowledge-base attachments are a later item.)
+- [x] Add `chat_context_items` migration. (Supports document and knowledge-base attachments.)
 - [x] Add `chat_messages.metadata` migration.
 - [ ] Implement automatic document context when opening chat from a document.
 - [x] Implement chat context add/remove APIs. (`GET/POST/DELETE /api/chat/context`, access-checked; retrieval unions the conversation's origin doc with attached context items.)
@@ -81,23 +81,24 @@
 - [x] Store citation metadata on assistant messages.
 - [x] Render source chips in `ChatMessage`. (De-duplicated per document, linking to the transcription detail when available.)
 - [x] Add context chips in chat header. (`ChatContextBar` shows attached documents with remove + a search-based add picker.)
-- [ ] Add copy/regenerate/edit actions.
-- [ ] Add follow-up prompt generation.
+- [x] Add knowledge-base attachments in chat context. (`chat_context_items` supports document and knowledge_base targets; ChatContextBar can attach/remove knowledge bases; conversation retrieval merges direct documents and knowledge-base scopes while honouring focused/full_context/off.)
+- [x] Add copy/regenerate/edit actions.
+- [x] Add follow-up prompt generation.
 - [x] Add tests for streaming event shape. (`tests/chat-stream-utils.test.mjs` covers SSE line parsing + request-body shape.)
 - [ ] Add tests for citations and source authorization.
 
 ## 7. Aufgabenextraktion
 
-- [ ] Add `tasks` migration.
-- [ ] Implement member matching helper.
-- [ ] Implement task extraction prompt and JSON validation.
-- [ ] Implement `POST /api/transcriptions/[id]/extract-tasks`.
-- [ ] Implement task CRUD APIs.
-- [ ] Add task review UI in transcription detail.
-- [ ] Add global `/tasks` page.
-- [ ] Add source jump links to transcript/document locations.
-- [ ] Add tests for member assignment matching.
-- [ ] Add tests for proposed-task review workflow.
+- [x] Add `tasks` migration.
+- [x] Implement member matching helper.
+- [x] Implement task extraction prompt and JSON validation.
+- [x] Implement `POST /api/transcriptions/[id]/extract-tasks`.
+- [x] Implement task CRUD APIs.
+- [x] Add task review UI in transcription detail.
+- [x] Add global `/tasks` page.
+- [x] Add source jump links to transcript/document locations. (Task source links jump to transcript segment anchors when `source_segment_ids` are present; otherwise to the transcript text section.)
+- [x] Add tests for member assignment matching.
+- [x] Add tests for proposed-task review flow. (Helper-level status transition/default coverage; API/UI-level coverage remains a follow-up.)
 
 ## 8. Verification
 
@@ -105,4 +106,4 @@
 - [x] Run unit tests.
 - [x] Run lint.
 - [x] Add migration smoke test.
-- [ ] Add manual QA checklist for `Dateien`, Knowledge, Chat, and Tasks.
+- [x] Add manual QA checklist for `Dateien`, Knowledge, Chat, and Tasks. (`docs/qa-checklist-files-knowledge-chat-tasks.md`)

@@ -20,6 +20,11 @@ export default function TranscriptionCard({
   reindexing = false,
   onDelete,
   canAddToKnowledge = false,
+  selectable = false,
+  selected = false,
+  onSelect,
+  onEditTags,
+  viewMode = 'list',
 }) {
   const {
     id,
@@ -37,6 +42,7 @@ export default function TranscriptionCard({
     chunk_count,
     index_job_status,
     index_job_error,
+    tags = [],
     created_at,
     createdAt,
   } = transcription;
@@ -105,9 +111,19 @@ export default function TranscriptionCard({
   }
 
   return (
-    <div className="group relative bg-surface border border-subtle rounded-xl p-4 hover:border-emphasis transition-colors">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+    <div className={`group relative bg-surface border border-subtle rounded-xl p-4 hover:border-emphasis transition-colors ${viewMode === 'grid' ? 'h-full' : ''}`}>
+      <div className={`flex ${viewMode === 'grid' ? 'flex-col items-start' : 'flex-col sm:flex-row sm:items-center'} gap-4`}>
         <div className="flex items-center gap-4 flex-1 min-w-0">
+          {selectable && (
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={(e) => onSelect?.(e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+              className="shrink-0 accent-accent"
+              aria-label={`${displayName} auswählen`}
+            />
+          )}
           {onToggleFavorite && (
             <button 
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); }}
@@ -150,6 +166,13 @@ export default function TranscriptionCard({
                   <span className="ml-2 text-secondary/60 italic">&bull; {templateLabel}</span>
                 )}
               </p>
+              {Array.isArray(tags) && tags.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {tags.slice(0, 5).map((tag) => (
+                    <span key={tag} className="px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[10px]">#{tag}</span>
+                  ))}
+                </div>
+              )}
             </div>
           </Link>
         </div>
@@ -185,6 +208,17 @@ export default function TranscriptionCard({
               <svg className={`w-4 h-4 ${reindexing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
+            </button>
+          )}
+          {onEditTags && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditTags(); }}
+              className="p-2 text-secondary hover:text-accent hover:bg-accent/10 rounded-lg transition-all"
+              title="Tags bearbeiten"
+              aria-label={`${displayName} — Tags bearbeiten`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M3 11l8.5 8.5a2.121 2.121 0 003 0L21 13V3h-10L3 11z" /></svg>
             </button>
           )}
           {onDelete && (
