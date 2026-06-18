@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Mic, MonitorSpeaker, Upload } from 'lucide-react';
 import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE, normalizeDefaultTemplate } from '../lib/constants';
 import { uploadAudio, getTemplates, getSettings } from '../lib/api';
 import AudioRecorder from './AudioRecorder';
@@ -177,52 +178,31 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="border-b border-subtle -mx-6 px-6 mb-1">
-        <div className="flex gap-6">
-          <button
-            type="button"
-            onClick={() => setUploadMode('file')}
-            className={`pb-3 text-sm font-medium transition-colors relative ${
-              uploadMode === 'file'
-                ? 'text-accent'
-                : 'text-secondary hover:text-primary'
-            }`}
-          >
-            {tForm('tabUpload')}
-            {uploadMode === 'file' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-info" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => setUploadMode('record')}
-            className={`pb-3 text-sm font-medium transition-colors relative ${
-              uploadMode === 'record'
-                ? 'text-accent'
-                : 'text-secondary hover:text-primary'
-            }`}
-          >
-            {tForm('tabRecord')}
-            {uploadMode === 'record' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-info" />
-            )}
-          </button>
-          {showSystemAudioTab && (
-            <button
-              type="button"
-              onClick={() => setUploadMode('system-audio')}
-              className={`pb-3 text-sm font-medium transition-colors relative ${
-                uploadMode === 'system-audio'
-                  ? 'text-accent'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              {tForm('tabSystemAudio')}
-              {uploadMode === 'system-audio' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-info" />
-              )}
-            </button>
-          )}
+      <div className="mb-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-hover-subtle border border-subtle">
+          {[
+            { mode: 'file', label: tForm('tabUpload'), Icon: Upload, show: true },
+            { mode: 'record', label: tForm('tabRecord'), Icon: Mic, show: true },
+            { mode: 'system-audio', label: tForm('tabSystemAudio'), Icon: MonitorSpeaker, show: showSystemAudioTab },
+          ].filter((tab) => tab.show).map(({ mode, label, Icon }) => {
+            const active = uploadMode === mode;
+            return (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setUploadMode(mode)}
+                aria-pressed={active}
+                className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  active
+                    ? 'gradient-accent text-white shadow-lg shadow-accent/25'
+                    : 'text-secondary hover:text-primary hover:bg-hover'
+                }`}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="truncate">{label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
