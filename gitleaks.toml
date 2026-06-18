@@ -68,3 +68,16 @@ title = "Gitleaks config"
     '''dev-db-init-secret''',
     '''dev-settings-encryption-key''',
   ]
+
+[[allowlists]]
+  description = "Dev-only placeholder secrets in docker-compose and test scripts"
+  regexes = [
+    '''dev-secret-change-in-production''',
+    '''dev-db-init-secret''',
+    '''dev-settings-encryption-key''',
+  ]
+  paths = [
+    '''config/docker-compose\.dev\.yml''',
+    '''scripts/smoke-test\.sh''',
+    '''docs/testing\.md''',
+  ]
