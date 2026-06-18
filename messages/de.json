@@ -211,6 +211,8 @@
       "aiProvidersHint": "Schlüssel werden verschlüsselt gespeichert und automatisch für alle Workspace-Mitglieder verwendet.",
       "meetingBots": "Meeting-Bots",
       "meetingBotsHint": "Konfiguration des Live-Transkriptions-Bots für Google Meet und Microsoft Teams.",
+      "storage": "Speicher & Export",
+      "storageHint": "Ergebnisse in externe Speicher exportieren.",
       "costLimits": "Kostengrenzen",
       "costLimitsHint": "Greifen sofort, wenn das geschätzte Monatsvolumen das Limit übersteigt.",
       "orgLimitLabel": "Workspace-Limit / Monat",
@@ -729,6 +731,31 @@
         "gdprNoticeTextLabel": "Hinweistext",
         "gdprNoticeTextPlaceholder": "Hinweis: Dieses Meeting wird zu Protokollzwecken automatisch transkribiert. Wenn Sie nicht einverstanden sind, melden Sie sich bitte jetzt.",
         "gdprNoticeTextHint": "Maximal 1000 Zeichen. Leer lassen für den Standard-Text."
+      },
+      "nextcloud": {
+        "title": "Nextcloud",
+        "description": "Speichere Transkripte und Analysen per Klick in einen Nextcloud-Ordner (WebDAV).",
+        "enableLabel": "Export nach Nextcloud aktivieren",
+        "enableHint": "Verbindung über WebDAV mit App-Passwort. Gilt für den gesamten Workspace.",
+        "baseUrlLabel": "Nextcloud-URL",
+        "baseUrlPlaceholder": "https://cloud.example.com",
+        "usernameLabel": "Benutzername",
+        "usernamePlaceholder": "z. B. helge",
+        "appPasswordLabel": "App-Passwort",
+        "appPasswordPlaceholder": "In Nextcloud unter Sicherheit erzeugen",
+        "appPasswordHint": "Nicht dein Login-Passwort – ein App-Passwort aus Nextcloud (Einstellungen → Sicherheit).",
+        "targetFolderLabel": "Zielordner",
+        "targetFolderPlaceholder": "GhostTyper",
+        "configured": "Gespeichert",
+        "testButton": "Verbindung testen",
+        "connected": "Verbunden",
+        "disconnected": "Verbindung fehlgeschlagen",
+        "saveSuccess": "Einstellungen gespeichert.",
+        "saveError": "Speichern fehlgeschlagen.",
+        "loadError": "Konfiguration konnte nicht geladen werden.",
+        "testSuccess": "Verbindung erfolgreich.",
+        "testError": "Verbindungstest fehlgeschlagen.",
+        "readOnlyHint": "Nur Workspace-Admins können diese Funktion verwalten."
       }
     },
     "saveAll": "Speichern",
@@ -1064,7 +1091,18 @@
     "contextSearchPlaceholder": "Dateien durchsuchen…",
     "contextSearchKnowledgePlaceholder": "Wissensbasen durchsuchen…",
     "contextSearching": "Suche…",
-    "contextNoResults": "Keine Treffer"
+    "contextNoResults": "Keine Treffer",
+    "sourcesLabel": "Die KI sieht:",
+    "attachSource": "Quelle anhängen",
+    "searchSourcesPlaceholder": "Dateien oder Wissen durchsuchen…",
+    "recentSources": "Zuletzt verwendet",
+    "groupDocuments": "Dateien",
+    "groupKnowledge": "Workspace-Wissen",
+    "uploadFromComputer": "Datei hochladen…",
+    "dropToUpload": "Datei hier ablegen, um sie anzuhängen",
+    "uploadProcessing": "wird verarbeitet…",
+    "uploadIndexing": "wird indexiert…",
+    "uploadFailed": "Upload fehlgeschlagen"
   },
   "knowledgePage": {
     "title": "Workspace Wissen",
@@ -1095,6 +1133,8 @@
     "loadError": "Wissensbasen konnten nicht geladen werden.",
     "saveError": "Aktion fehlgeschlagen.",
     "addTo": "Zu Wissensbasis hinzufügen",
-    "noBasesShort": "Keine Wissensbasen"
+    "noBasesShort": "Keine Wissensbasen",
+    "privateBadge": "Privat",
+    "addShareHint": "Private Dateien werden beim Hinzufügen mit dem Workspace geteilt."
   }
 }

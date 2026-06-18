@@ -211,6 +211,8 @@
       "aiProvidersHint": "Keys are stored encrypted and used automatically for every workspace member.",
       "meetingBots": "Meeting bots",
       "meetingBotsHint": "Configuration for the live transcription bot in Google Meet and Microsoft Teams.",
+      "storage": "Storage & export",
+      "storageHint": "Export results to external storage.",
       "costLimits": "Cost caps",
       "costLimitsHint": "Trip when projected monthly cost exceeds the cap.",
       "orgLimitLabel": "Workspace cap / month",
@@ -729,6 +731,31 @@
         "gdprNoticeTextLabel": "Notice text",
         "gdprNoticeTextPlaceholder": "Notice: This meeting is being transcribed automatically for record-keeping purposes. If you do not consent, please speak up now.",
         "gdprNoticeTextHint": "Up to 1000 characters. Leave blank to use the default text."
+      },
+      "nextcloud": {
+        "title": "Nextcloud",
+        "description": "Save transcripts and analyses to a Nextcloud folder with one click (WebDAV).",
+        "enableLabel": "Enable export to Nextcloud",
+        "enableHint": "Connects via WebDAV using an app password. Applies to the whole workspace.",
+        "baseUrlLabel": "Nextcloud URL",
+        "baseUrlPlaceholder": "https://cloud.example.com",
+        "usernameLabel": "Username",
+        "usernamePlaceholder": "e.g. helge",
+        "appPasswordLabel": "App password",
+        "appPasswordPlaceholder": "Generate under Security in Nextcloud",
+        "appPasswordHint": "Not your login password – an app password from Nextcloud (Settings → Security).",
+        "targetFolderLabel": "Target folder",
+        "targetFolderPlaceholder": "GhostTyper",
+        "configured": "Saved",
+        "testButton": "Test connection",
+        "connected": "Connected",
+        "disconnected": "Connection failed",
+        "saveSuccess": "Settings saved.",
+        "saveError": "Saving failed.",
+        "loadError": "Could not load configuration.",
+        "testSuccess": "Connection successful.",
+        "testError": "Connection test failed.",
+        "readOnlyHint": "Only workspace admins can manage this feature."
       }
     },
     "saveAll": "Save",
@@ -1064,7 +1091,18 @@
     "contextSearchPlaceholder": "Search files…",
     "contextSearchKnowledgePlaceholder": "Search knowledge bases…",
     "contextSearching": "Searching…",
-    "contextNoResults": "No matches"
+    "contextNoResults": "No matches",
+    "sourcesLabel": "The AI sees:",
+    "attachSource": "Attach source",
+    "searchSourcesPlaceholder": "Search files or knowledge…",
+    "recentSources": "Recently used",
+    "groupDocuments": "Files",
+    "groupKnowledge": "Workspace knowledge",
+    "uploadFromComputer": "Upload file…",
+    "dropToUpload": "Drop a file here to attach it",
+    "uploadProcessing": "processing…",
+    "uploadIndexing": "indexing…",
+    "uploadFailed": "Upload failed"
   },
   "knowledgePage": {
     "title": "Workspace Knowledge",
@@ -1095,6 +1133,8 @@
     "loadError": "Knowledge bases could not be loaded.",
     "saveError": "Action failed.",
     "addTo": "Add to knowledge base",
-    "noBasesShort": "No knowledge bases"
+    "noBasesShort": "No knowledge bases",
+    "privateBadge": "Private",
+    "addShareHint": "Private files are shared with the workspace when added."
   }
 }
