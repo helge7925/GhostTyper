@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import { useSession, signOut } from 'next-auth/react';
 import {
   Building2,
-  CheckSquare,
   Files,
   Languages,
   Library,
@@ -36,12 +35,6 @@ const PRIMARY_NAV_LINKS = [
   { href: '/textoptimierung', labelKey: 'textOptimization', Icon: PencilLine },
   { href: '/chat', labelKey: 'chat', Icon: MessageSquare },
 ];
-
-const TASKS_NAV_LINK = {
-  href: '/tasks',
-  labelKey: 'tasks',
-  Icon: CheckSquare,
-};
 
 const FILES_NAV_LINK = {
   href: '/transcriptions',
@@ -159,7 +152,6 @@ function SidebarBody({ collapsed = false, onNavigate }) {
   const canStartMeeting = usePermission('meeting.start');
   const canManageWorkspace = usePermission('org.settings');
   const canReadKnowledge = usePermission('knowledge.read');
-  const canReadTasks = usePermission('task.read');
   const { enabled: vexaEnabled } = useVexaIntegrationEnabled();
   const showRemoteMeeting = canStartMeeting && vexaEnabled;
   if (!session) return null;
@@ -215,16 +207,6 @@ function SidebarBody({ collapsed = false, onNavigate }) {
           />
         ))}
 
-        {canReadTasks && (
-          <NavRow
-            href={TASKS_NAV_LINK.href}
-            label={tNav(TASKS_NAV_LINK.labelKey)}
-            Icon={TASKS_NAV_LINK.Icon}
-            isActive={router.pathname === TASKS_NAV_LINK.href || router.pathname.startsWith(TASKS_NAV_LINK.href + '/')}
-            collapsed={collapsed}
-            onNavigate={onNavigate}
-          />
-        )}
 
         {/* Document archive — always last */}
         <NavRow

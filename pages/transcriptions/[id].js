@@ -82,14 +82,6 @@ function getSegmentSourceId(segment, index) {
   return Number.isFinite(Number(id)) ? Number(id) : index + 1;
 }
 
-function taskSourceHref(task, fallbackTranscriptionId) {
-  const transcriptionId = task.transcription_id || fallbackTranscriptionId;
-  if (!transcriptionId) return null;
-  const segmentIds = Array.isArray(task.source_segment_ids) ? task.source_segment_ids : [];
-  const firstSegment = segmentIds.find((entry) => Number.isFinite(Number(entry)));
-  return firstSegment ? `/transcriptions/${transcriptionId}#segment-${firstSegment}` : `/transcriptions/${transcriptionId}#transcript`;
-}
-
 /**
  * Optimized Speaker Input component to prevent full page re-renders on every keystroke
  */
@@ -126,9 +118,6 @@ export default function TranscriptionDetail() {
   const [savingSpeakers, setSavingSpeakers] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisFocus, setAnalysisFocus] = useState('');
-  const [tasks, setTasks] = useState([]);
-  const [tasksLoading, setTasksLoading] = useState(false);
-  const [extractingTasks, setExtractingTasks] = useState(false);
   const [toast, setToast] = useState(null);
   const [startingProcessing, setStartingProcessing] = useState(false);
   const [processingStartError, setProcessingStartError] = useState('');
@@ -150,27 +139,6 @@ export default function TranscriptionDetail() {
       .catch(() => setTranscription(null))
       .finally(() => setLoading(false));
   }, [id, authStatus, router]);
-
-  const loadTasks = useCallback(async () => {
-    if (!id) return;
-    setTasksLoading(true);
-    try {
-      const res = await fetch(`/api/tasks?transcriptionId=${id}`, { credentials: 'same-origin' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || 'Aufgaben konnten nicht geladen werden.');
-      setTasks(data.tasks || []);
-    } catch {
-      setTasks([]);
-    } finally {
-      setTasksLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    if (authStatus === 'authenticated' && id) {
-      loadTasks();
-    }
-  }, [authStatus, id, loadTasks]);
 
   useEffect(() => {
     if (!router.isReady || !transcription) return;
@@ -315,40 +283,6 @@ export default function TranscriptionDetail() {
     }
   }, [id, router]);
 
-  const handleExtractTasks = useCallback(async () => {
-    setExtractingTasks(true);
-    try {
-      const res = await fetch(`/api/transcriptions/${id}/extract-tasks`, {
-        method: 'POST',
-        credentials: 'same-origin',
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || 'Aufgaben konnten nicht extrahiert werden.');
-      setTasks(data.tasks || []);
-      setToast({ message: `${data.extractedCount || 0} Aufgaben vorgeschlagen.`, type: 'success' });
-    } catch (err) {
-      setToast({ message: err.message || 'Aufgaben konnten nicht extrahiert werden.', type: 'error' });
-    } finally {
-      setExtractingTasks(false);
-    }
-  }, [id]);
-
-  const handleTaskStatus = useCallback(async (taskId, status) => {
-    try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || 'Aufgabe konnte nicht aktualisiert werden.');
-      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, ...data.task } : task)));
-    } catch (err) {
-      setToast({ message: err.message || 'Aufgabe konnte nicht aktualisiert werden.', type: 'error' });
-    }
-  }, []);
-
   // Check if this is a table analysis
   const isTableAnalysis = useMemo(() => {
     return transcription?.analysis_type === 'table' && transcription?.table_schema;
@@ -460,6 +394,7 @@ export default function TranscriptionDetail() {
   const TEMPLATE_DETAIL_LABELS = {
     generic: 'Zusammenfassung',
     meeting: 'Meeting',
+    action_items: 'To-Dos',
     data_table: 'Datentabelle',
     aufmass: 'Aufmaß',
   };
@@ -635,73 +570,6 @@ export default function TranscriptionDetail() {
               {transcription.status === STATUS.ERROR && (
                 <div className="bg-danger/10 border border-danger/25 text-danger rounded-2xl p-4 text-sm">
                   {transcription.error || 'Verarbeitung fehlgeschlagen. Bitte erneut versuchen.'}
-                </div>
-              )}
-
-              {(transcription.text || tasks.length > 0) && (
-                <div className="bg-surface border border-subtle rounded-2xl p-5 shadow-xl">
-                  <div className="flex items-start justify-between gap-3 mb-4">
-                    <div>
-                      <h2 className="text-xs font-bold text-primary uppercase tracking-widest opacity-60">Aufgaben</h2>
-                      <p className="text-xs text-secondary mt-1">Vorschläge aus dem Transkript prüfen und übernehmen.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleExtractTasks}
-                      disabled={extractingTasks || !['transcribed', 'completed'].includes(transcription.status)}
-                      className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:opacity-90 disabled:opacity-40"
-                    >
-                      {extractingTasks ? 'Extrahiert…' : 'Aufgaben extrahieren'}
-                    </button>
-                  </div>
-                  {tasksLoading ? (
-                    <p className="text-xs text-secondary">Aufgaben werden geladen…</p>
-                  ) : tasks.length === 0 ? (
-                    <p className="text-xs text-secondary">Noch keine Aufgaben extrahiert.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {tasks.map((task) => (
-                        <div key={task.id} className="border border-subtle rounded-xl p-3 bg-surface-elevated">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="text-sm font-semibold text-primary">{task.title}</h3>
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-subtle text-secondary">{task.status}</span>
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/10 text-accent">{task.priority}</span>
-                              </div>
-                              {task.description && <p className="text-xs text-secondary mt-1">{task.description}</p>}
-                              <div className="flex flex-wrap gap-2 mt-2 text-[11px] text-secondary">
-                                {(task.assignee_name || task.assignee_text) && <span>Verantwortlich: {task.assignee_name || task.assignee_text}</span>}
-                                {task.due_date && <span>Fällig: {new Date(task.due_date).toLocaleDateString('de-DE')}</span>}
-                                {task.confidence != null && <span>Konfidenz: {Math.round(Number(task.confidence) * 100)}%</span>}
-                              </div>
-                            </div>
-                            <div className="flex shrink-0 gap-1">
-                              {task.status === 'proposed' && (
-                                <button type="button" onClick={() => handleTaskStatus(task.id, 'open')} className="px-2 py-1 rounded-md bg-success/10 text-success text-[11px] font-semibold">Übernehmen</button>
-                              )}
-                              {task.status === 'open' && (
-                                <button type="button" onClick={() => handleTaskStatus(task.id, 'done')} className="px-2 py-1 rounded-md bg-success/10 text-success text-[11px] font-semibold">Erledigt</button>
-                              )}
-                              {task.status !== 'dismissed' && task.status !== 'done' && (
-                                <button type="button" onClick={() => handleTaskStatus(task.id, 'dismissed')} className="px-2 py-1 rounded-md bg-danger/10 text-danger text-[11px] font-semibold">Verwerfen</button>
-                              )}
-                            </div>
-                          </div>
-                          {task.evidence && (
-                            <blockquote className="mt-2 border-l-2 border-accent/30 pl-3 text-xs text-secondary italic">
-                              {task.evidence}
-                            </blockquote>
-                          )}
-                          {taskSourceHref(task, transcription.id) && (
-                            <Link href={taskSourceHref(task, transcription.id)} className="inline-flex mt-2 text-[11px] text-accent hover:text-info font-semibold">
-                              Zur Quelle springen
-                            </Link>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
 
