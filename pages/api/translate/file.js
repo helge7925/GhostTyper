@@ -455,7 +455,7 @@ async function handler(req, res) {
       return res.status(503).json({ message: error.message });
     }
     if (error.code === 'LIMIT_FILE_SIZE' || error.message?.includes('maxFileSize')) {
-      return res.status(413).json({ message: 'Datei ist zu groß (max. 50 MB)' });
+      return res.status(413).json({ message: 'Datei ist zu groß (max. 500 MB)' });
     }
     if (error?.code === 'PDF_NO_TEXT' || error?.code === 'PDF_TOO_LARGE' || error?.code === 'NO_MISTRAL_OCR_KEY') {
       return res.status(400).json({ message: error.message });

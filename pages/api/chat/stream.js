@@ -12,8 +12,10 @@ import {
 } from '../../../lib/usage';
 import {
   CHAT_TIMEOUT_MS,
+  CortecsApiError,
   buildConversationMessages,
   buildCortecsBody,
+  cortecsErrorResponse,
   getConversation,
   parseChatStreamLine,
   storeMessage,
@@ -119,7 +121,7 @@ async function handler(req, res) {
 
       if (!response.ok || !response.body) {
         const errorText = response.ok ? 'Kein Stream-Body' : await response.text();
-        throw new Error(`Cortecs API error: ${response.status} - ${String(errorText).slice(0, 300)}`);
+        throw new CortecsApiError(response.status, errorText);
       }
 
       // From here on we commit to SSE: headers are sent and the client
@@ -183,6 +185,11 @@ async function handler(req, res) {
       }
       if (error instanceof CostLimitCheckUnavailableError || error?.code === 'COST_CHECK_UNAVAILABLE') {
         return res.status(503).json({ message: error.message });
+      }
+      const cortecsError = cortecsErrorResponse(error);
+      if (cortecsError) {
+        logApiError('Chat stream Cortecs failed', error);
+        return res.status(cortecsError.status).json({ message: cortecsError.message });
       }
       logApiError('Chat stream failed', error);
       return serverError(res, 'Chat-Nachricht konnte nicht verarbeitet werden.');

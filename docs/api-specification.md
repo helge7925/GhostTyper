@@ -284,7 +284,7 @@ curl -X POST \
 
 **Fehler**:
 - `400`: Ungültiger Dateityp
-- `413`: Datei zu groß (>50MB)
+- `413`: Datei zu groß (>500MB)
 - `401`: Ungültiger API-Key
 
 ### 4. Transkriptions-Jobs

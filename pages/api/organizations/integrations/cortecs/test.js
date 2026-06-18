@@ -3,6 +3,7 @@ import { withOrgScope } from '../../../../../lib/api/with-org-scope';
 import { hasPermission } from '../../../../../lib/permissions';
 import { logAuditEvent } from '../../../../../lib/audit-log';
 import { resolveCortecsConfig } from '../../../../../lib/settings-service';
+import { buildCortecsBody } from '../../../../../lib/chat-stream-utils';
 
 const PROVIDER = 'cortecs';
 
@@ -32,22 +33,30 @@ async function handler(req, res) {
   }
 
   try {
-    const response = await fetchWithTimeout(`${config.baseUrl}/models`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${config.apiKey}` },
+    const response = await fetchWithTimeout(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify(buildCortecsBody(config, [
+        { role: 'system', content: 'Antworten Sie extrem kurz.' },
+        { role: 'user', content: 'Healthcheck: antworten Sie nur mit OK.' },
+      ])),
     }, 8000);
     if (!response.ok) {
-      throw new Error(`Cortecs antwortete mit HTTP ${response.status}`);
+      const detail = await response.text().catch(() => '');
+      throw new Error(`Cortecs Chat antwortete mit HTTP ${response.status}: ${String(detail).slice(0, 160)}`);
     }
     const data = await response.json().catch(() => ({}));
-    const sample = Array.isArray(data?.data) ? data.data.length : 0;
+    const sample = String(data?.choices?.[0]?.message?.content || '').slice(0, 40);
     await logAuditEvent({
       userId,
       organizationId: orgId,
       action: 'org.integration.cortecs.tested',
       targetType: 'organization_integration',
       targetId: `${orgId}:${PROVIDER}`,
-      metadata: { ok: true, sample },
+      metadata: { ok: true, model: data?.model || config.chatModel },
     });
     return res.status(200).json({ ok: true, sample });
   } catch (error) {

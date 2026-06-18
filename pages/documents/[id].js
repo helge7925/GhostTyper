@@ -85,7 +85,7 @@ export default function DocumentDetailPage() {
   return (
     <>
       <Head><title>{`${title} - GhostTyper`}</title></Head>
-      <div className="max-w-4xl mx-auto animate-fade-in pb-20">
+      <div className="max-w-6xl mx-auto animate-fade-in pb-20">
         <button onClick={() => router.push('/transcriptions')} className="text-secondary hover:text-primary text-xs mb-6">Zurück zu Dateien</button>
         <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl mb-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">

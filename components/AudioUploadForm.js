@@ -10,7 +10,7 @@ import { useTranslations } from '../lib/i18n';
 // remains accepted by the backend (see lib/template-service.js) so legacy
 // DB rows still resolve.
 const BUILTIN_TEMPLATE_VALUES = new Set(['generic', 'meeting', 'data_table', 'aufmass']);
-const ALLOWED_CHAT_MODELS = new Set(['deepseek-v4-pro', 'mistral-small-latest', 'mistral-medium-latest', 'mistral-large-latest']);
+const ALLOWED_CHAT_MODELS = new Set(['deepseek-v4-pro', 'deepseek-v4-flash', 'kimi-2.6']);
 const ALLOWED_UPLOAD_MODES = new Set(['file', 'record', 'system-audio']);
 
 function resolvePresetTemplate(templateValue, templates) {
@@ -109,7 +109,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
       return 'Ungültiger Dateityp. Bitte laden Sie eine Audio-Datei hoch.';
     }
     if (f.size > MAX_FILE_SIZE) {
-      return 'Die Datei ist zu groß. Maximale Größe: 50 MB.';
+      return 'Die Datei ist zu groß. Maximale Größe: 500 MB.';
     }
     return null;
   }
@@ -324,12 +324,11 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
             <div>
               <label htmlFor="upload-model" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">KI-Modell</label>
               <select id="upload-model" value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none">
-                <option value="deepseek-v4-pro">Cortecs · deepseek-v4-pro</option>
-                <option value="mistral-small-latest">Kostengünstig / Schnell</option>
-                <option value="mistral-medium-latest">Ausgewogen</option>
-                <option value="mistral-large-latest">Qualität</option>
+                <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
+                <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
+                <option value="kimi-2.6">Kimi 2.6</option>
               </select>
-              <p className="mt-1 text-[11px] text-secondary">Einfach wählen: Kostengünstig / Schnell, Ausgewogen oder Qualität.</p>
+              <p className="mt-1 text-[11px] text-secondary">DeepSeek V4 Pro ist der Standard; Flash ist für schnellere Antworten gedacht.</p>
             </div>
           </div>
           <div>

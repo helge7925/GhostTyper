@@ -13,7 +13,6 @@ import {
   PencilLine,
   ScanText,
   Settings as SettingsIcon,
-  Table as TableIcon,
   Video,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle } from './ui/sheet';
@@ -28,13 +27,12 @@ import { usePermission } from '../lib/use-permission';
 //   Remote Meeting (when permitted + workspace has Vexa enabled — see
 //   `showRemoteMeeting` below) is rendered as the first nav row.
 //   The other tools follow in the order Transcription → Translation
-//   → OCR → Tables → Text Refinement → Chat, and the document archive
+//   → OCR → Text Refinement → Chat, and the document archive
 //   ("Dateien" / "Files", was "Historie" / "History") is always last.
 const PRIMARY_NAV_LINKS = [
   { href: '/upload', labelKey: 'transcription', Icon: Mic },
   { href: '/translate', labelKey: 'translation', Icon: Languages },
   { href: '/ocr', labelKey: 'ocr', Icon: ScanText },
-  { href: '/tabellen', labelKey: 'tables', Icon: TableIcon },
   { href: '/textoptimierung', labelKey: 'textOptimization', Icon: PencilLine },
   { href: '/chat', labelKey: 'chat', Icon: MessageSquare },
 ];
@@ -92,6 +90,29 @@ function NavRow({ href, label, Icon, isActive, collapsed, onNavigate }) {
       <TooltipTrigger asChild>{link}</TooltipTrigger>
       <TooltipContent side="right">{label}</TooltipContent>
     </Tooltip>
+  );
+}
+
+function SubNavRow({ href, label, Icon, isActive, collapsed, onNavigate }) {
+  if (collapsed) {
+    return <NavRow href={href} label={label} Icon={Icon} isActive={isActive} collapsed={collapsed} onNavigate={onNavigate} />;
+  }
+
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      aria-current={isActive ? 'page' : undefined}
+      className={cn(
+        'ml-8 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors',
+        isActive
+          ? 'bg-accent/10 text-accent'
+          : 'text-secondary hover:text-primary hover:bg-hover-subtle',
+      )}
+    >
+      <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+      <span className="truncate">{label}</span>
+    </Link>
   );
 }
 
@@ -194,18 +215,6 @@ function SidebarBody({ collapsed = false, onNavigate }) {
           />
         ))}
 
-        {/* Workspace knowledge hub */}
-        {canReadKnowledge && (
-          <NavRow
-            href={KNOWLEDGE_NAV_LINK.href}
-            label={tNav(KNOWLEDGE_NAV_LINK.labelKey)}
-            Icon={KNOWLEDGE_NAV_LINK.Icon}
-            isActive={router.pathname === KNOWLEDGE_NAV_LINK.href || router.pathname.startsWith(KNOWLEDGE_NAV_LINK.href + '/')}
-            collapsed={collapsed}
-            onNavigate={onNavigate}
-          />
-        )}
-
         {canReadTasks && (
           <NavRow
             href={TASKS_NAV_LINK.href}
@@ -224,15 +233,25 @@ function SidebarBody({ collapsed = false, onNavigate }) {
           Icon={FILES_NAV_LINK.Icon}
           // `/transcriptions` (no query) is the archive view; the
           // `?meeting=1` deep-link is handled by the Remote-Meeting row
-          // above. Match only the bare path so the two don't both
-          // highlight when a user has the meeting drawer open.
+          // above. Workspace Wissen is visually grouped below Dateien.
           isActive={
-            router.pathname === FILES_NAV_LINK.href
-            && router.asPath.split('?')[0] === FILES_NAV_LINK.href
+            (router.pathname === FILES_NAV_LINK.href && router.asPath.split('?')[0] === FILES_NAV_LINK.href)
+            || router.pathname === KNOWLEDGE_NAV_LINK.href
+            || router.pathname.startsWith(KNOWLEDGE_NAV_LINK.href + '/')
           }
           collapsed={collapsed}
           onNavigate={onNavigate}
         />
+        {canReadKnowledge && (
+          <SubNavRow
+            href={KNOWLEDGE_NAV_LINK.href}
+            label={tNav(KNOWLEDGE_NAV_LINK.labelKey)}
+            Icon={KNOWLEDGE_NAV_LINK.Icon}
+            isActive={router.pathname === KNOWLEDGE_NAV_LINK.href || router.pathname.startsWith(KNOWLEDGE_NAV_LINK.href + '/')}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        )}
       </nav>
 
       {/* Footer: settings, admin, profile, logout */}

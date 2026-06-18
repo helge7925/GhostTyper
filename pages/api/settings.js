@@ -1,10 +1,6 @@
 import pool from '../../lib/db';
 import { withOrgScope } from '../../lib/api/with-org-scope';
-import {
-  getSettingsRow,
-  hasStoredApiKey,
-  serializeApiKeyForStorage,
-} from '../../lib/settings-service';
+import { getSettingsRow } from '../../lib/settings-service';
 import { normalizeDefaultTemplate } from '../../lib/constants';
 import { resolveChatModel, resolveOcrModel } from '../../lib/model-policy';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
@@ -81,7 +77,6 @@ async function handler(req, res) {
 
         if (!settings) {
           return res.status(200).json({
-            apiKeyConfigured: false,
             defaultTemplate: 'generic',
             language: 'de',
             contextBias: '',
@@ -95,11 +90,10 @@ async function handler(req, res) {
         }
 
         return res.status(200).json({
-          apiKeyConfigured: hasStoredApiKey(settings),
           defaultTemplate: normalizeDefaultTemplate(settings.default_template),
           language: settings.language,
           contextBias: normalizeContextBias(settings.context_bias).value || '',
-          preferredModel: settings.preferred_model || 'deepseek-v4-pro',
+          preferredModel: resolveChatModel(settings.preferred_model) || 'deepseek-v4-pro',
           defaultTranslateLanguage: settings.default_translate_language || 'en',
           ocrModel: settings.ocr_model || 'mistral-ocr-latest',
           costLimit: settings.cost_limit,
@@ -112,7 +106,6 @@ async function handler(req, res) {
       case 'POST': {
         const body = req.body || {};
         const {
-          mistralApiKey,
           defaultTemplate,
           language,
           contextBias,
@@ -132,8 +125,6 @@ async function handler(req, res) {
           return res.status(400).json({ message: 'Ungültiges OCR-Modell' });
         }
 
-        const shouldUpdateApiKey = hasOwnValue(body, 'mistralApiKey');
-        const shouldClearApiKey = shouldUpdateApiKey && (mistralApiKey === null || mistralApiKey === '');
         const shouldUpdateDefaultTemplate = hasOwnValue(body, 'defaultTemplate');
         const shouldUpdateLanguage = hasOwnValue(body, 'language');
         const shouldUpdateContextBias = hasOwnValue(body, 'contextBias');
@@ -167,7 +158,6 @@ async function handler(req, res) {
 
         const client = await pool.connect();
         const auditFlags = {
-          apiKeyChanged: shouldUpdateApiKey,
           preferredModelChanged: shouldUpdatePreferredModel,
           costLimitChanged: shouldUpdateCostLimit,
           memberBudgetChanged: shouldUpdateMemberMonthlyBudgetLimit,
@@ -185,14 +175,6 @@ async function handler(req, res) {
 
           const updates = [];
           const values = [];
-
-          if (shouldUpdateApiKey) {
-            const apiKeyPayload = shouldClearApiKey
-              ? { encryptedApiKey: null, plainApiKey: null }
-              : serializeApiKeyForStorage(String(mistralApiKey).trim(), { userId });
-            addUpdate(updates, values, 'mistral_api_key', apiKeyPayload.plainApiKey);
-            addUpdate(updates, values, 'mistral_api_key_encrypted', apiKeyPayload.encryptedApiKey);
-          }
 
           if (shouldUpdateDefaultTemplate) {
             addUpdate(updates, values, 'default_template', normalizeDefaultTemplate(defaultTemplate));

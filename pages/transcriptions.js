@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -8,7 +9,7 @@ import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import MeetingStartForm from '../components/MeetingStartForm';
 import { Skeleton } from '../components/ui/skeleton';
-import { Video } from 'lucide-react';
+import { Library, Video } from 'lucide-react';
 import { getDocuments, getFolders, createFolder, updateFolder, deleteFolder, updateDocument, deleteDocument, reindexDocument } from '../lib/api';
 import { useTranslations } from '../lib/i18n';
 import { useUiFeedback } from '../lib/use-ui-feedback';
@@ -86,6 +87,7 @@ export default function Transcriptions() {
   const searchTimeoutRef = useRef(null);
   const canReindexDocuments = usePermission('document.write');
   const canAddToKnowledge = usePermission('knowledge.write');
+  const canReadKnowledge = usePermission('knowledge.read');
   const {
     toast,
     showToast,
@@ -484,6 +486,15 @@ export default function Transcriptions() {
                   <Video className="w-4 h-4" />
                   <span>{tMeeting('buttonLabel')}</span>
                 </button>
+              )}
+              {canReadKnowledge && (
+                <Link
+                  href="/knowledge"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border border-subtle text-secondary hover:text-primary hover:border-accent/40 transition-colors whitespace-nowrap"
+                >
+                  <Library className="w-4 h-4" />
+                  <span>Workspace Wissen</span>
+                </Link>
               )}
               <div className="text-[10px] text-secondary uppercase tracking-widest font-bold whitespace-nowrap hidden xl:block">
                 {filteredTranscriptions.length} {filteredTranscriptions.length === 1 ? 'Eintrag' : 'Einträge'}

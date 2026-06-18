@@ -471,7 +471,7 @@ export default function TranscriptionDetail() {
       <Head><title>{transcription.original_name} - GhostTyper</title></Head>
 
       {(
-        <div className="max-w-5xl mx-auto animate-fade-in pb-20">
+        <div className="max-w-6xl mx-auto animate-fade-in pb-20">
           <button onClick={() => router.push('/transcriptions')} className="text-secondary hover:text-primary text-xs flex items-center gap-1 mb-6">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></svg>
             Zurück zur Historie

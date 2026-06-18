@@ -200,7 +200,7 @@ async function handler(req, res) {
     await safeUnlink(tempUploadPath);
     await safeUnlink(persistedFilePath);
     if (error.code === 'LIMIT_FILE_SIZE' || error.message?.includes('maxFileSize')) {
-      return res.status(413).json({ message: 'Datei ist zu groß (max. 50 MB)' });
+      return res.status(413).json({ message: 'Datei ist zu groß (max. 500 MB)' });
     }
     return serverError(res, 'Upload fehlgeschlagen');
   }

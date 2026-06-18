@@ -10,7 +10,7 @@ Dieses Dokument beschreibt den Upload- und Verarbeitungsablauf für Audio in Gho
 - Browser-Aufnahme (Desktop/Mobile)
 
 Wichtige Limits:
-- Maximalgröße: `50 MB`
+- Maximalgröße: `500 MB`
 - MIME-/Extension-Prüfung serverseitig
 
 ## 2. API-Endpunkte

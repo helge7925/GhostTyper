@@ -9,7 +9,7 @@ import { useFormatter, useMessageList, useTranslations } from '../lib/i18n';
 // title/description are looked up via i18n at render time.
 const FEATURE_TILES = [
   { href: '/upload', titleKey: 'transcription' },
-  { href: '/tabellen?mode=template', titleKey: 'tables' },
+  { href: '/datentabelle', titleKey: 'tables' },
   { href: '/translate', titleKey: 'translation' },
   { href: '/ocr', titleKey: 'ocr' },
   { href: '/textoptimierung', titleKey: 'textOptimization' },
@@ -43,7 +43,6 @@ function getFirstName(session) {
 export default function Home() {
   const { data: session, status } = useSession();
   const [usage, setUsage] = useState(null);
-  const [settingsInfo, setSettingsInfo] = useState(null);
   const tAuth = useTranslations('auth');
   const tLanding = useTranslations('landing');
   const tNav = useTranslations('nav');
@@ -62,12 +61,6 @@ export default function Home() {
       })
       .catch(() => {});
 
-    fetch('/api/settings')
-      .then((response) => (response.ok ? response.json() : null))
-      .then((settingsData) => {
-        setSettingsInfo(settingsData);
-      })
-      .catch(() => {});
   }, [status]);
 
   useEffect(() => {
@@ -160,12 +153,10 @@ export default function Home() {
               {usage?.totalCost != null ? currency.format(usage.totalCost) : currency.format(0)}
             </p>
           </div>
-          <div className="rounded-2xl border border-subtle bg-surface px-5 py-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-secondary">Mistral API</p>
-            <p className={`text-sm mt-2 ${settingsInfo?.apiKeyConfigured ? 'text-success' : 'text-secondary'}`}>
-              {settingsInfo?.apiKeyConfigured ? '✓' : '—'}
-            </p>
-          </div>
+          <Link href="/settings/organization/integrations" className="rounded-2xl border border-subtle bg-surface px-5 py-4 hover:border-accent/30 transition-colors">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-secondary">KI-Integrationen</p>
+            <p className="text-sm mt-2 text-accent">Workspace API-Keys verwalten</p>
+          </Link>
         </section>
 
         <section className="mt-6 rounded-2xl border border-subtle bg-surface px-5 py-4">

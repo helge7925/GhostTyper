@@ -378,7 +378,7 @@
     "title": "Transkription",
     "subtitle": "Audio hochladen oder direkt aufnehmen.",
     "dropHere": "Datei hier ablegen oder klicken zum Auswählen",
-    "fileFormats": "MP3, WAV, M4A, OGG, FLAC, WebM bis 50 MB",
+    "fileFormats": "MP3, WAV, M4A, OGG, FLAC, WebM bis 500 MB",
     "selectedFile": "Ausgewählte Datei",
     "removeFile": "Entfernen",
     "tabUpload": "Hochladen",
@@ -433,7 +433,7 @@
       "Chinese": "chinesisch"
     },
     "pdf": {
-      "uploadHint": "PDF, DOCX, XLSX oder PPTX bis 50 MB",
+      "uploadHint": "PDF, DOCX, XLSX oder PPTX bis 500 MB",
       "ocrRunning": "Dokument wird gelesen…",
       "translationRunning": "Text wird übersetzt…",
       "renderingPdf": "Neues PDF wird erstellt…",
@@ -443,7 +443,7 @@
   "ocrPage": {
     "title": "OCR",
     "subtitle": "Bilder und PDFs in Text umwandeln.",
-    "uploadHint": "PDF/JPG/PNG/HEIC bis 50 MB",
+    "uploadHint": "PDF/JPG/PNG/HEIC bis 500 MB",
     "extract": "Text extrahieren",
     "extracting": "Wird extrahiert…",
     "withAnalysis": "Mit Analyse",
@@ -472,7 +472,6 @@
   "tablesPage": {
     "title": "Tabellen",
     "fromTranscript": "Tabelle aus Transkript",
-    "fromTemplate": "Tabellenvorlage befüllen",
     "freeTable": "Freie Datentabelle",
     "selectTemplate": "Vorlage wählen",
     "noTemplates": "Keine Vorlagen vorhanden.",
@@ -554,7 +553,7 @@
       "dragOrClick": "Datei hier ablegen oder klicken",
       "selectFile": "Datei auswählen",
       "removeFile": "Entfernen",
-      "tooLarge": "Datei ist zu groß (max. 50 MB)",
+      "tooLarge": "Datei ist zu groß (max. 500 MB)",
       "invalidType": "Dateityp wird nicht unterstützt",
       "tabUpload": "Hochladen",
       "tabRecord": "Aufnehmen",
@@ -654,7 +653,6 @@
     "tabs": {
       "transcription": "Transkription",
       "textTemplates": "Text-Vorlagen",
-      "tableTemplates": "Tabellen-Vorlagen",
       "ocrTranslate": "OCR & Übersetzung",
       "integrations": "Integrationen",
       "aiProviders": "AI-Provider",
@@ -956,7 +954,7 @@
     "tabText": "Text",
     "tabFile": "Datei",
     "inputPlaceholder": "Text hier einfügen…",
-    "fileHint": "PDF, DOCX, TXT oder Bild bis 50 MB",
+    "fileHint": "PDF, DOCX, TXT oder Bild bis 500 MB",
     "submit": "Tabelle extrahieren",
     "submitting": "Wird verarbeitet…",
     "result": "Ergebnis",
@@ -1073,6 +1071,7 @@
     "title": "Workspace Wissen",
     "heading": "Workspace Wissen",
     "hint": "Bündle Workspace-Dokumente in Wissensbasen, die der Chat als Quelle nutzen kann.",
+    "sharedInWorkspace": "Geteilt im Workspace",
     "newBase": "Neue Wissensbasis",
     "namePlaceholder": "Name der Wissensbasis",
     "descPlaceholder": "Beschreibung (optional)",

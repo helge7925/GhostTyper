@@ -11,6 +11,7 @@ import Toast from '../components/Toast';
 import { analysisToHtml } from '../lib/export-utils';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { useMessageList, useTranslations } from '../lib/i18n';
+import { MAX_FILE_SIZE } from '../lib/constants';
 
 const OCR_LOADING_MESSAGES = [
   'Wir lesen Pixel für Pixel, damit kein Wort verloren geht.',
@@ -48,7 +49,7 @@ const OCR_PRESETS = {
     config: {
       analyze: true,
       template: 'meeting',
-      model: 'mistral-medium-latest',
+      model: 'deepseek-v4-pro',
       showAdvancedOptions: true,
     },
   },
@@ -57,7 +58,7 @@ const OCR_PRESETS = {
     config: {
       analyze: true,
       template: 'generic',
-      model: 'mistral-small-latest',
+      model: 'deepseek-v4-flash',
       showAdvancedOptions: true,
     },
   },
@@ -134,8 +135,8 @@ export default function OCR() {
   function handleFile(f) {
     setError('');
     if (!f) return;
-    if (f.size > 50 * 1024 * 1024) {
-      setError('Datei ist zu groß (max. 50 MB)');
+    if (f.size > MAX_FILE_SIZE) {
+      setError('Datei ist zu groß (max. 500 MB)');
       return;
     }
     setFile(f);
@@ -330,7 +331,7 @@ export default function OCR() {
                         <div>
                           <label className="block text-[10px] font-bold text-secondary uppercase mb-1.5 ml-1">Modell</label>
                           <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none">
-                            <option value="deepseek-v4-pro">Cortecs · deepseek-v4-pro</option><option value="mistral-small-latest">Kostengünstig / Schnell</option><option value="mistral-medium-latest">Ausgewogen</option><option value="mistral-large-latest">Qualität</option>
+                            <option value="deepseek-v4-pro">DeepSeek V4 Pro</option><option value="deepseek-v4-flash">DeepSeek V4 Flash</option><option value="kimi-2.6">Kimi 2.6</option>
                           </select>
                         </div>
                       </div>

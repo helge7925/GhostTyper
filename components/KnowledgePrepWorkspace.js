@@ -36,12 +36,11 @@ export default function KnowledgePrepWorkspace({
 
   const MODEL_OPTIONS = useMemo(
     () => [
-      { value: 'deepseek-v4-pro', label: 'Cortecs · deepseek-v4-pro' },
-      { value: 'mistral-small-latest', label: t('models.fast') },
-      { value: 'mistral-medium-latest', label: t('models.balanced') },
-      { value: 'mistral-large-latest', label: t('models.quality') },
+      { value: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
+      { value: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
+      { value: 'kimi-2.6', label: 'Kimi 2.6' },
     ],
-    [t]
+    []
   );
 
   const resolvedHeading = heading || t('defaultHeading');

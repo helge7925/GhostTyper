@@ -1,8 +1,9 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useCallback, useState, useEffect } from 'react';
-import { Mic, FileText, Table as TableIcon, Languages, KeyRound } from 'lucide-react';
+import { Mic, FileText, Languages, KeyRound } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -26,20 +27,16 @@ import {
 } from '../lib/api';
 import { normalizeDefaultTemplate } from '../lib/constants';
 import { DEFAULT_PROMPTS, getPrompt } from '../lib/prompts';
-import TableSchemaBuilder from '../components/TableSchemaBuilder';
-import { validateTableSchema, buildTableExtractionPrompt } from '../lib/table-calculations';
-import { createDefaultTableSchema, normalizeTableSchema } from '../lib/table-schema';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { useTranslations } from '../lib/i18n';
 
 const PRICE_LIST = [
-  { model: 'Mistral Large', input: '2,00 €', output: '6,00 €', note: 'Umfangreich' },
-  { model: 'Mistral Medium', input: '0,75 €', output: '2,25 €', note: 'Ausgewogen' },
-  { model: 'Mistral Small', input: '0,20 €', output: '0,60 €', note: 'Kompakt' },
-  { model: 'Mistral Voxtral Mini', input: '0,01 €', output: '0,01 €', note: 'Transkription' },
+  { model: 'DeepSeek V4 Pro', input: '0,00 €', output: '0,00 €', note: 'Standard' },
+  { model: 'DeepSeek V4 Flash', input: '0,00 €', output: '0,00 €', note: 'Schnell' },
+  { model: 'Kimi 2.6', input: '0,00 €', output: '0,00 €', note: 'Alternative' },
 ];
 
-const SETTINGS_TAB_IDS = ['transcription', 'text-templates', 'table-templates', 'ocr-translate', 'account'];
+const SETTINGS_TAB_IDS = ['transcription', 'text-templates', 'ocr-translate', 'account'];
 // `aufmass` is intentionally absent — removed from the user-facing
 // offering. Legacy DB rows that still reference it remain analysable
 // (see lib/template-service.js), they're just no longer offered as an
@@ -68,10 +65,6 @@ function parseContextTerms(rawValue) {
   return unique;
 }
 
-function tableSchemasEqual(a, b) {
-  return JSON.stringify(normalizeTableSchema(a || createDefaultTableSchema())) === JSON.stringify(normalizeTableSchema(b || createDefaultTableSchema()));
-}
-
 function templateMatchesCategory(template, categoryId) {
   if (!categoryId || categoryId === 'all') return true;
   if (categoryId === 'uncategorized') return !template.category_id;
@@ -84,7 +77,6 @@ export default function Settings() {
   const t = useTranslations('settings');
   const tTabs = useTranslations('settings.tabs');
   const tCommon = useTranslations('common');
-  const [apiKey, setApiKey] = useState('');
   const [defaultTemplate, setDefaultTemplate] = useState('generic');
   const [language, setLanguage] = useState('de');
   const [contextBias, setContextBias] = useState('');
@@ -95,10 +87,7 @@ export default function Settings() {
   const [ocrModel, setOcrModel] = useState('mistral-ocr-latest');
   const [remoteMeetingEnabled, setRemoteMeetingEnabled] = useState(true);
   const [vexaWorkspaceEnabled, setVexaWorkspaceEnabled] = useState(false);
-  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
-  const [mistralOrgManaged, setMistralOrgManaged] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
-  const [isClearingMistralKey, setIsClearingMistralKey] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -110,14 +99,9 @@ export default function Settings() {
   const [activeEditor, setActiveEditor] = useState(null);
   const [templateLoading, setTemplateLoading] = useState(false);
   const [activeTextCategoryId, setActiveTextCategoryId] = useState('all');
-  const [activeTableCategoryId, setActiveTableCategoryId] = useState('all');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
-
-  // Table Template states
-  const [tableTemplateEditor, setTableTemplateEditor] = useState(null);
-  const [tableSchema, setTableSchema] = useState(null);
 
   const [auditEvents, setAuditEvents] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -182,19 +166,6 @@ export default function Settings() {
           getTemplateCategories(),
         ]);
 
-        setApiKeyConfigured(settingsData.apiKeyConfigured);
-
-        // Detect whether the org admin has provisioned a central Mistral key.
-        // The user-level field below is then a no-op fallback and we hide it.
-        try {
-          const mistralRes = await fetch('/api/organizations/integrations/mistral', { credentials: 'same-origin' });
-          if (mistralRes.ok) {
-            const data = await mistralRes.json();
-            setMistralOrgManaged(!!data.enabled && !!data.config?.apiKeyConfigured);
-          }
-        } catch {
-          /* non-fatal */
-        }
         setDefaultTemplate(normalizeDefaultTemplate(settingsData.defaultTemplate));
         setLanguage(settingsData.language || 'de');
         setContextBias(settingsData.contextBias || '');
@@ -259,36 +230,15 @@ export default function Settings() {
         remoteMeetingEnabled,
       };
 
-      if (apiKey !== '') payload.mistralApiKey = apiKey;
-
       await updateSettings(payload);
       invalidateVexaIntegrationCache();
 
       setSaved(true);
-      if (apiKey) {
-        setApiKeyConfigured(true);
-        setApiKey('');
-      }
       setTimeout(() => setSaved(false), 3000);
     } catch {
       setError('Einstellungen konnten nicht gespeichert werden.');
     } finally {
       setIsSavingSettings(false);
-    }
-  }
-
-  async function handleClearMistralApiKey() {
-    if (!apiKeyConfigured && !apiKey.trim()) return;
-    setIsClearingMistralKey(true);
-    try {
-      await updateSettings({ mistralApiKey: '' });
-      setApiKey('');
-      setApiKeyConfigured(false);
-      showToast('Mistral API-Key wurde entfernt.', 'success');
-    } catch {
-      showToast('Mistral API-Key konnte nicht entfernt werden.', 'error');
-    } finally {
-      setIsClearingMistralKey(false);
     }
   }
 
@@ -414,120 +364,6 @@ export default function Settings() {
     }
   }
 
-  // Table Template Handlers
-  const openTableTemplateEditor = (template = null) => {
-    if (template) {
-      setTableSchema(normalizeTableSchema(template.table_schema || {
-        tableName: template.name,
-        description: '',
-        metadata: [],
-        columns: [],
-        rows: [],
-        calculations: []
-      }));
-      setTableTemplateEditor({
-        id: template.id,
-        name: template.name,
-        category_id: template.category_id || '',
-        isEditing: true
-      });
-    } else {
-      setTableSchema(createDefaultTableSchema());
-      setTableTemplateEditor({
-        id: 'new',
-        name: '',
-        category_id: activeTableCategoryId !== 'all' && activeTableCategoryId !== 'uncategorized' ? activeTableCategoryId : '',
-        isEditing: false
-      });
-    }
-  };
-
-  const handleTableSchemaChange = useCallback((nextSchema) => {
-    const normalizedSchema = normalizeTableSchema(nextSchema);
-    const nextTableName = String(normalizedSchema.tableName || '').trim();
-    setTableSchema((prevSchema) => (
-      tableSchemasEqual(prevSchema, normalizedSchema) ? prevSchema : normalizedSchema
-    ));
-    if (nextTableName) {
-      setTableTemplateEditor((prev) => {
-        if (!prev) return prev;
-        const currentName = String(prev.name || '').trim();
-        if (currentName) return prev;
-        return { ...prev, name: nextTableName };
-      });
-    }
-  }, []);
-
-  const handleTableTemplateNameChange = (nextName) => {
-    const previousName = String(tableTemplateEditor?.name || '').trim();
-    setTableTemplateEditor((prev) => (prev ? { ...prev, name: nextName } : prev));
-    setTableSchema((prevSchema) => {
-      const normalizedSchema = normalizeTableSchema(prevSchema || createDefaultTableSchema());
-      const currentTableName = String(normalizedSchema.tableName || '').trim();
-      if (currentTableName && currentTableName !== previousName) return prevSchema;
-      const nextSchema = normalizeTableSchema({
-        ...normalizedSchema,
-        tableName: nextName,
-      });
-      return tableSchemasEqual(prevSchema, nextSchema) ? prevSchema : nextSchema;
-    });
-  };
-
-  const handleSaveTableTemplate = async () => {
-    if (!tableTemplateEditor) return;
-    
-    const schemaDraft = normalizeTableSchema(tableSchema || createDefaultTableSchema());
-    const headerName = String(tableTemplateEditor.name || '').trim();
-    const schemaTableName = String(schemaDraft.tableName || '').trim();
-    const normalizedName = headerName || schemaTableName;
-    if (!normalizedName) {
-      showToast('Bitte einen Namen für die Vorlage eingeben.', 'error');
-      return;
-    }
-    
-    const cleanTableSchema = normalizeTableSchema({
-      ...schemaDraft,
-      tableName: schemaTableName || normalizedName,
-      calculations: [],
-    });
-    const validation = validateTableSchema(cleanTableSchema);
-    if (!validation.isValid) {
-      showToast(`Bitte korrigieren Sie die Fehler im Schema: ${validation.errors.join(' | ')}`, 'error');
-      return;
-    }
-    
-    setTemplateLoading(true);
-    
-    try {
-      const extractionPrompt = buildTableExtractionPrompt(cleanTableSchema, language);
-      
-      const templateData = {
-        name: normalizedName,
-        prompt_text: extractionPrompt,
-        template_type: 'table',
-        table_schema: cleanTableSchema,
-        category_id: tableTemplateEditor.category_id || null
-      };
-      
-      if (tableTemplateEditor.id === 'new') {
-        const created = await createTemplate(templateData);
-        setTemplates([...templates, created]);
-      } else {
-        const updated = await updateTemplate(tableTemplateEditor.id, templateData);
-        setTemplates(templates.map(t => t.id === updated.id ? updated : t));
-      }
-      
-      setTableTemplateEditor(null);
-      setTableSchema(null);
-      showToast('Tabellen-Vorlage gespeichert.', 'success');
-    } catch (err) {
-      console.error('Fehler beim Speichern:', err);
-      showToast('Fehler beim Speichern der Tabellen-Vorlage.', 'error');
-    } finally {
-      setTemplateLoading(false);
-    }
-  };
-
   async function handleDelete(id) {
     const approved = await confirm({
       title: 'Vorlage löschen',
@@ -584,7 +420,6 @@ export default function Settings() {
       setTemplateCategories(prev => prev.filter(c => String(c.id) !== String(id)));
       setTemplates(prev => prev.map(t => String(t.category_id || '') === String(id) ? { ...t, category_id: null } : t));
       if (String(activeTextCategoryId) === String(id)) setActiveTextCategoryId('all');
-      if (String(activeTableCategoryId) === String(id)) setActiveTableCategoryId('all');
       showToast('Kategorie gelöscht.', 'success');
     } catch {
       showToast('Löschen fehlgeschlagen.', 'error');
@@ -621,16 +456,12 @@ export default function Settings() {
   const TABS = [
     { id: 'transcription', label: tTabs('transcription'), Icon: Mic },
     { id: 'text-templates', label: tTabs('textTemplates'), Icon: FileText },
-    { id: 'table-templates', label: tTabs('tableTemplates'), Icon: TableIcon },
     { id: 'ocr-translate', label: tTabs('ocrTranslate'), Icon: Languages },
     { id: 'account', label: tTabs('account'), Icon: KeyRound },
   ];
 
-  // Separate table templates from text templates
   const textTemplates = templates.filter(t => !t.template_type || t.template_type === 'text');
-  const tableTemplates = templates.filter(t => t.template_type === 'table');
   const filteredTextTemplates = textTemplates.filter((template) => templateMatchesCategory(template, activeTextCategoryId));
-  const filteredTableTemplates = tableTemplates.filter((template) => templateMatchesCategory(template, activeTableCategoryId));
   const activeTabMeta = TABS.find((tab) => tab.id === activeTab);
   const getCategoryName = (categoryId) => templateCategories.find((category) => String(category.id) === String(categoryId))?.name || 'Ohne Kategorie';
 
@@ -736,7 +567,7 @@ export default function Settings() {
     <>
       <Head><title>{`${t('title')} – GhostTyper`}</title></Head>
 
-      <div className={(activeEditor || tableTemplateEditor) ? 'hidden' : 'max-w-6xl mx-auto animate-fade-in pb-20'}>
+      <div className={activeEditor ? 'hidden' : 'max-w-6xl mx-auto animate-fade-in pb-20'}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <h1 className="text-2xl font-bold text-primary">{t('title')}</h1>
           {saved && <p className="text-success text-xs animate-pulse bg-success/10 px-3 py-1 rounded-full border border-success/20">Einstellungen gespeichert!</p>}
@@ -982,10 +813,9 @@ export default function Settings() {
                   <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
                     <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">Standard-Modell</h2>
                     <select value={preferredModel} onChange={e => setPreferredModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent">
-                      <option value="mistral-small-latest">Kostengünstig / Schnell</option>
-                      <option value="mistral-medium-latest">Ausgewogen</option>
-                      <option value="deepseek-v4-pro">Cortecs · deepseek-v4-pro</option>
-                      <option value="mistral-large-latest">Qualität</option>
+                      <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
+                      <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
+                      <option value="kimi-2.6">Kimi 2.6</option>
                     </select>
                     <p className="mt-3 text-[10px] text-secondary leading-relaxed italic">
                       Dieses Modell wird standardmäßig für KI-Analyse und Textaufgaben verwendet.
@@ -1024,72 +854,6 @@ export default function Settings() {
                 </div>
               </div>
 
-            </div>
-          )}
-
-          {activeTab === 'table-templates' && (
-            <div className="space-y-8 animate-fade-in">
-              {renderTemplateCategoryPanel({
-                activeCategoryId: activeTableCategoryId,
-                onChange: setActiveTableCategoryId,
-                templatesForCounts: tableTemplates,
-              })}
-
-              {/* Table Templates Section */}
-              <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
-                <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest">Tabellen-Templates</h2>
-                    <p className="text-xs text-secondary mt-1">
-                      Extrahieren Sie strukturierte Daten als Tabelle (z.B. Rechnungen, Listen)
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => openTableTemplateEditor()}
-                    className="gradient-accent text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg"
-                  >
-                    + Neue Tabellen-Vorlage
-                  </button>
-                </div>
-
-                {filteredTableTemplates.length === 0 ? (
-                  <div className="text-center py-8 bg-hover-subtle rounded-xl border border-dashed border-subtle">
-                    <p className="text-secondary text-sm">
-                      Keine Tabellen-Vorlagen in dieser Kategorie.
-                    </p>
-                    <p className="text-secondary/60 text-xs mt-1">
-                      Legen Sie eine Vorlage an oder wählen Sie eine andere Kategorie.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredTableTemplates.map(t => (
-                      <div key={t.id} className="flex items-center justify-between p-4 bg-hover-subtle rounded-xl border border-subtle group hover:border-accent/30 transition-all">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
-                            </svg>
-                          </div>
-                          <div>
-                            <span className="text-sm font-medium text-primary block">{t.name}</span>
-                            <span className="text-[10px] text-secondary">
-                              {getCategoryName(t.category_id)} •{' '}
-                              {t.table_schema?.columns?.length || 0} Spalten
-                              {t.table_schema?.rows?.length > 0 && ` • ${t.table_schema.rows.length} Zeilen`}
-                              {t.table_schema?.metadata?.length > 0 && ` • ${t.table_schema.metadata.length} Metadaten`}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => openTableTemplateEditor(t)} className="text-[10px] font-bold text-accent uppercase">Edit</button>
-                          <button onClick={() => handleDelete(t.id)} className="text-[10px] font-bold text-secondary uppercase hover:text-danger">Löschen</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
           )}
 
@@ -1140,33 +904,16 @@ export default function Settings() {
                 <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
                   <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">API-Konfiguration</h2>
                   <div className="space-y-4">
-                    {mistralOrgManaged ? (
-                      <div className="bg-success/10 border border-success/30 rounded-xl px-4 py-3 text-xs text-primary">
-                        <p className="font-medium mb-1">Mistral wird zentral verwaltet</p>
-                        <p className="text-secondary">
-                          Dein Workspace-Admin hat einen gemeinsamen Mistral-API-Key hinterlegt.
-                          Du musst hier nichts mehr eintragen — KI-Funktionen sind sofort nutzbar.
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="block text-xs font-medium text-secondary mb-1.5">Mistral API-Key</label>
-                        <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={apiKeyConfigured ? '••••••••••••••••' : 'Key eingeben'} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent" />
-                        <div className="mt-2 flex items-center justify-between gap-3">
-                          <span className={`text-[11px] ${apiKeyConfigured ? 'text-success' : 'text-secondary'}`}>
-                            {apiKeyConfigured ? 'API-Key hinterlegt' : 'Kein API-Key hinterlegt'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={handleClearMistralApiKey}
-                            disabled={isClearingMistralKey || isSavingSettings || !apiKeyConfigured}
-                            className="text-[11px] text-danger hover:text-red-300 disabled:opacity-40"
-                          >
-                            {isClearingMistralKey ? 'Entferne...' : 'Key entfernen'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    <div className="bg-hover-subtle border border-subtle rounded-xl px-4 py-3 text-xs text-primary">
+                      <p className="font-medium mb-1">API-Keys werden zentral im Workspace verwaltet</p>
+                      <p className="text-secondary">
+                        Cortecs, Mistral und weitere Anbieter konfigurierst du unter Workspace-Einstellungen → Integrationen.
+                        Persönliche API-Keys werden hier nicht mehr gespeichert.
+                      </p>
+                      <Link href="/settings/organization/integrations" className="inline-flex mt-3 text-accent hover:text-accent/80 font-medium">
+                        Zu den Workspace-Integrationen
+                      </Link>
+                    </div>
                     <div>
                       <label className="block text-xs font-medium text-secondary mb-1.5">Monatliches Kostenlimit (€)</label>
                       <input type="number" value={costLimit} onChange={e => setCostLimit(e.target.value)} placeholder="Kein Limit" className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none" />
@@ -1185,7 +932,7 @@ export default function Settings() {
                 </div>
                 <button
                   onClick={handleSaveSettings}
-                  disabled={isSavingSettings || isClearingMistralKey}
+                  disabled={isSavingSettings}
                   className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-[1.01] disabled:opacity-40"
                 >
                   {isSavingSettings ? 'Speichert...' : 'Speichern'}
@@ -1334,57 +1081,7 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Table Template Editor Overlay */}
-      {tableTemplateEditor && (
-        <div className="fixed inset-0 z-[60] bg-canvas flex flex-col animate-fade-in">
-          <header className="min-h-16 border-b border-subtle bg-surface flex flex-wrap items-center justify-between gap-3 px-6 py-3">
-            <div className="flex items-center gap-4 min-w-0 flex-1">
-              <button onClick={() => { setTableTemplateEditor(null); setTableSchema(null); }} className="p-2 text-secondary hover:text-primary transition-colors" aria-label="Tabellen-Vorlagen-Editor schließen">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <input 
-                type="text" 
-                value={tableTemplateEditor.name} 
-                onChange={e => handleTableTemplateNameChange(e.target.value)}
-                className="bg-transparent border-none text-lg font-semibold text-primary outline-none focus:ring-0 w-full max-w-md min-w-0"
-                placeholder="Name der Tabellen-Vorlage..."
-              />
-            </div>
-            <div className="flex items-center justify-end gap-3 flex-wrap">
-              <span className="text-[10px] bg-accent/20 text-accent px-2 py-1 rounded-full uppercase">Tabellen-Vorlage</span>
-              <select
-                value={tableTemplateEditor.category_id || ''}
-                onChange={e => setTableTemplateEditor({ ...tableTemplateEditor, category_id: e.target.value })}
-                className="bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none"
-                aria-label="Kategorie der Tabellen-Vorlage"
-              >
-                <option value="">Ohne Kategorie</option>
-                {templateCategories.map((category) => (
-                  <option key={category.id} value={category.id}>{category.name}</option>
-                ))}
-              </select>
-              <button 
-                type="button"
-                onClick={handleSaveTableTemplate} 
-                disabled={templateLoading} 
-                className="gradient-accent text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent/20"
-              >
-                {templateLoading ? 'Speichert...' : 'Vorlage speichern'}
-              </button>
-            </div>
-          </header>
-          <main className="flex-1 p-6 md:p-12 overflow-y-auto bg-hover-subtle">
-            <div className="max-w-4xl mx-auto">
-              <TableSchemaBuilder 
-                schema={tableSchema}
-                onChange={handleTableSchemaChange}
-              />
-            </div>
-          </main>
-        </div>
-      )}
+
       {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
       <ConfirmDialog
         open={Boolean(confirmDialog)}

@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from '../lib/i18n';
 import { getSystemAudioCapabilities } from '../lib/audio-utils';
+import { useWakeLock } from '../lib/use-wake-lock';
 
 export default function SystemAudioRecorder({ onRecordingComplete }) {
   const t = useTranslations('components.systemAudioRecorder');
+  const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock();
 
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
@@ -42,7 +44,8 @@ export default function SystemAudioRecorder({ onRecordingComplete }) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-  }, []);
+    releaseWakeLock();
+  }, [releaseWakeLock]);
 
   useEffect(() => {
     return () => {
@@ -140,16 +143,19 @@ export default function SystemAudioRecorder({ onRecordingComplete }) {
 
       mediaRecorder.start(1000);
       setIsRecording(true);
+      requestWakeLock();
 
       timerRef.current = setInterval(() => {
         setDuration(prev => prev + 1);
       }, 1000);
     } catch (err) {
       if (err.name === 'NotAllowedError') {
+        releaseWakeLock();
         return;
       }
       console.error('System audio recording error:', err);
       setError(t('permissionDenied', { error: err.message }));
+      releaseWakeLock();
       cleanup();
     }
   }
@@ -160,6 +166,7 @@ export default function SystemAudioRecorder({ onRecordingComplete }) {
       mediaRecorderRef.current.stop();
     }
     setIsRecording(false);
+    releaseWakeLock();
   }
 
   const handlePreviewLoadedMetadata = () => {

@@ -9,7 +9,7 @@ import {
   checkCostLimit,
   withUserCostLock,
 } from '../../lib/usage';
-import { getSettingsRow, resolveCortecsConfig } from '../../lib/settings-service';
+import { resolveCortecsConfig } from '../../lib/settings-service';
 import { resolveChatModel } from '../../lib/model-policy';
 import { MAX_TEXT_OPTIMIZATION_INPUT_LENGTH, MAX_CUSTOM_PROMPT_LENGTH } from '../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
@@ -44,7 +44,6 @@ async function handler(req, res) {
     text,
     preset = 'clearer',
     customInstruction = '',
-    model: requestModel,
   } = req.body || {};
 
   if (!text || typeof text !== 'string') {
@@ -61,10 +60,9 @@ async function handler(req, res) {
   }
 
   try {
-    const settingsRow = await getSettingsRow(userId);
     const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
     const apiKey = cortecs.apiKey;
-    const preferredModel = resolveChatModel(requestModel || cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
+    const preferredModel = resolveChatModel('deepseek-v4-flash');
 
     if (!apiKey) {
       return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert' });

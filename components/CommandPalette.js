@@ -35,7 +35,7 @@ import { useTranslations } from '../lib/i18n';
 // `tabelle` regardless of UI locale).
 const NAV_ITEMS = [
   { href: '/upload', labelKey: 'transcription', Icon: Mic, keywords: 'audio diktat record record audio dictation' },
-  { href: '/tabellen', labelKey: 'tables', Icon: Table, keywords: 'tabelle table excel csv spreadsheet' },
+  { href: '/datentabelle', labelKey: 'tables', Icon: Table, keywords: 'tabelle table excel csv spreadsheet' },
   { href: '/translate', labelKey: 'translation', Icon: Languages, keywords: 'translate sprache language uebersetzen' },
   { href: '/ocr', labelKey: 'ocr', Icon: ScanText, keywords: 'bild scan dokument text image scanner' },
   { href: '/textoptimierung', labelKey: 'textOptimization', Icon: PencilLine, keywords: 'text edit redaktion refine optimize' },

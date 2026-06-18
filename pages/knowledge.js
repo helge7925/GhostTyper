@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { Library, Plus, Trash2, X, Search, FileText, ArrowRight } from 'lucide-react';
+import { Library, Plus, Trash2, X, Search, FileText, ArrowRight, Users } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useTranslations } from '../lib/i18n';
 import { usePermission } from '../lib/use-permission';
@@ -308,6 +308,9 @@ export default function KnowledgePage() {
                   <div className="min-w-0">
                     <h2 className="text-base font-bold text-primary truncate">{detail.knowledgeBase.name}</h2>
                     {detail.knowledgeBase.description && <p className="text-xs text-secondary truncate">{detail.knowledgeBase.description}</p>}
+                    <span className="inline-flex items-center gap-1 mt-1 text-[10px] text-secondary/80" title={t('sharedInWorkspace')}>
+                      <Users className="w-3 h-3" /> {t('sharedInWorkspace')}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {canWrite && <DocumentPicker excludeIds={excludeIds} onPick={handleAddItem} t={t} />}

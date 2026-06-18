@@ -24,7 +24,6 @@ export default function Textoptimierung() {
   const [text, setText] = useState('');
   const [preset, setPreset] = useState('spelling_grammar');
   const [customInstruction, setCustomInstruction] = useState('');
-  const [model, setModel] = useState('deepseek-v4-pro');
   const [optimizedText, setOptimizedText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -45,7 +44,7 @@ export default function Textoptimierung() {
       const response = await fetch('/api/text-optimization', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, preset, customInstruction, model }),
+        body: JSON.stringify({ text, preset, customInstruction }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -133,36 +132,18 @@ export default function Textoptimierung() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="text-optimization-instruction" className="block text-xs font-bold uppercase tracking-widest text-secondary mb-2">
-                  {t('customInstruction')}
-                </label>
-                <textarea
-                  id="text-optimization-instruction"
-                  value={customInstruction}
-                  onChange={(event) => setCustomInstruction(event.target.value)}
-                  rows={3}
-                  placeholder={t('customInstructionHint')}
-                  className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none focus:ring-1 focus:ring-accent resize-y"
-                />
-              </div>
-              <div>
-                <label htmlFor="text-optimization-model" className="block text-xs font-bold uppercase tracking-widest text-secondary mb-2">
-                  KI-Modell
-                </label>
-                <select
-                  id="text-optimization-model"
-                  value={model}
-                  onChange={(event) => setModel(event.target.value)}
-                  className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none focus:ring-1 focus:ring-accent"
-                >
-                  <option value="mistral-small-latest">Kostengünstig / Schnell</option>
-                  <option value="mistral-medium-latest">Ausgewogen</option>
-                  <option value="deepseek-v4-pro">Cortecs · deepseek-v4-pro</option>
-                  <option value="mistral-large-latest">Qualität</option>
-                </select>
-              </div>
+            <div>
+              <label htmlFor="text-optimization-instruction" className="block text-xs font-bold uppercase tracking-widest text-secondary mb-2">
+                {t('customInstruction')}
+              </label>
+              <textarea
+                id="text-optimization-instruction"
+                value={customInstruction}
+                onChange={(event) => setCustomInstruction(event.target.value)}
+                rows={3}
+                placeholder={t('customInstructionHint')}
+                className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none focus:ring-1 focus:ring-accent resize-y"
+              />
             </div>
           </div>
 

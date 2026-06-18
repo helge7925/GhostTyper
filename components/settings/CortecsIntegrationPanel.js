@@ -5,6 +5,15 @@ import { useUiFeedback } from '../../lib/use-ui-feedback';
 
 const ENDPOINT = '/api/organizations/integrations/cortecs';
 const TEST_ENDPOINT = '/api/organizations/integrations/cortecs/test';
+const CHAT_MODELS = [
+  { value: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
+  { value: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
+  { value: 'kimi-2.6', label: 'Kimi 2.6' },
+];
+
+function normalizeChatModel(value) {
+  return CHAT_MODELS.some((model) => model.value === value) ? value : 'deepseek-v4-pro';
+}
 
 export default function CortecsIntegrationPanel({ canEdit }) {
   const t = useTranslations('settings.integrations.cortecs');
@@ -37,7 +46,7 @@ export default function CortecsIntegrationPanel({ canEdit }) {
       setApiKeyConfigured(!!cfg.apiKeyConfigured);
       setApiKeyInput('');
       setBaseUrl(cfg.baseUrl || defaults.baseUrl || 'https://api.cortecs.ai/v1');
-      setChatModel(cfg.defaultChatModel || defaults.defaultChatModel || 'deepseek-v4-pro');
+      setChatModel(normalizeChatModel(cfg.defaultChatModel || defaults.defaultChatModel || 'deepseek-v4-pro'));
       setTranscriptionModel(cfg.defaultTranscriptionModel || defaults.defaultTranscriptionModel || 'whisper-large-v3');
       setPreference(cfg.preference || defaults.preference || 'balanced');
     } catch {
@@ -161,7 +170,11 @@ export default function CortecsIntegrationPanel({ canEdit }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <label className="block text-xs font-medium text-secondary">
           {t('chatModelLabel')}
-          <input value={chatModel} disabled={!canEdit} onChange={(e) => setChatModel(e.target.value)} className="mt-1.5 w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none disabled:opacity-60" />
+          <select value={chatModel} disabled={!canEdit} onChange={(e) => setChatModel(e.target.value)} className="mt-1.5 w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none disabled:opacity-60">
+            {CHAT_MODELS.map((model) => (
+              <option key={model.value} value={model.value}>{model.label}</option>
+            ))}
+          </select>
         </label>
         <label className="block text-xs font-medium text-secondary">
           {t('transcriptionModelLabel')}

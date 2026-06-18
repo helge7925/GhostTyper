@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from '../lib/i18n';
+import { useWakeLock } from '../lib/use-wake-lock';
 
 export default function AudioRecorder({ onRecordingComplete }) {
   const t = useTranslations('components.audioRecorder');
+  const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock();
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
@@ -65,13 +67,14 @@ export default function AudioRecorder({ onRecordingComplete }) {
       clearInterval(calibrationTimerRef.current);
       calibrationTimerRef.current = null;
     }
+    releaseWakeLock();
     setIsCalibrating(false);
     setInputLevel(0);
     setHasSignal(false);
     latestRawLevelRef.current = 0;
     latestPeakRef.current = 0;
     hasVisualizerStartedRef.current = false;
-  }, []);
+  }, [releaseWakeLock]);
 
   useEffect(() => {
     return () => {
@@ -309,6 +312,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
       mediaRecorder.start(1000);
       setIsRecording(true);
       setIsPaused(false);
+      requestWakeLock();
 
       timerRef.current = setInterval(() => {
         setDuration(prev => prev + 1);
@@ -317,6 +321,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
     } catch (err) {
       console.error('Start recording error:', err);
       setError(t('permissionDenied', { error: err.message }));
+      releaseWakeLock();
       cleanup();
     }
   }
@@ -389,6 +394,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
       }
       setIsRecording(false);
       setIsPaused(false);
+      releaseWakeLock();
     }
   }
 

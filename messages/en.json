@@ -378,7 +378,7 @@
     "title": "Transcription",
     "subtitle": "Upload audio or record directly.",
     "dropHere": "Drop file here or click to choose",
-    "fileFormats": "MP3, WAV, M4A, OGG, FLAC, WebM up to 50 MB",
+    "fileFormats": "MP3, WAV, M4A, OGG, FLAC, WebM up to 500 MB",
     "selectedFile": "Selected file",
     "removeFile": "Remove",
     "tabUpload": "Upload",
@@ -433,7 +433,7 @@
       "Chinese": "chinese"
     },
     "pdf": {
-      "uploadHint": "PDF, DOCX, XLSX or PPTX up to 50 MB",
+      "uploadHint": "PDF, DOCX, XLSX or PPTX up to 500 MB",
       "ocrRunning": "Reading document…",
       "translationRunning": "Translating text…",
       "renderingPdf": "Generating new PDF…",
@@ -443,7 +443,7 @@
   "ocrPage": {
     "title": "OCR",
     "subtitle": "Convert images and PDFs into text.",
-    "uploadHint": "PDF/JPG/PNG/HEIC up to 50 MB",
+    "uploadHint": "PDF/JPG/PNG/HEIC up to 500 MB",
     "extract": "Extract text",
     "extracting": "Extracting…",
     "withAnalysis": "With analysis",
@@ -472,7 +472,6 @@
   "tablesPage": {
     "title": "Tables",
     "fromTranscript": "Table from transcript",
-    "fromTemplate": "Fill table template",
     "freeTable": "Free data table",
     "selectTemplate": "Choose template",
     "noTemplates": "No templates available.",
@@ -554,7 +553,7 @@
       "dragOrClick": "Drop file here or click",
       "selectFile": "Choose file",
       "removeFile": "Remove",
-      "tooLarge": "File is too large (max 50 MB)",
+      "tooLarge": "File is too large (max 500 MB)",
       "invalidType": "Unsupported file type",
       "tabUpload": "Upload",
       "tabRecord": "Record",
@@ -654,7 +653,6 @@
     "tabs": {
       "transcription": "Transcription",
       "textTemplates": "Text templates",
-      "tableTemplates": "Table templates",
       "ocrTranslate": "OCR & Translation",
       "integrations": "Integrations",
       "aiProviders": "AI providers",
@@ -956,7 +954,7 @@
     "tabText": "Text",
     "tabFile": "File",
     "inputPlaceholder": "Paste text here…",
-    "fileHint": "PDF, DOCX, TXT or image up to 50 MB",
+    "fileHint": "PDF, DOCX, TXT or image up to 500 MB",
     "submit": "Extract table",
     "submitting": "Processing…",
     "result": "Result",
@@ -1073,6 +1071,7 @@
     "title": "Workspace Knowledge",
     "heading": "Workspace Knowledge",
     "hint": "Group workspace documents into knowledge bases that chat can use as sources.",
+    "sharedInWorkspace": "Shared in workspace",
     "newBase": "New knowledge base",
     "namePlaceholder": "Knowledge base name",
     "descPlaceholder": "Description (optional)",

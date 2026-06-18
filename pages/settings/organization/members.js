@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { Mail, Trash2, UserPlus, KeyRound, Wallet } from 'lucide-react';
+import { Mail, Trash2, UserPlus, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import ConfirmDialog from '../../../components/ConfirmDialog';
@@ -128,10 +128,6 @@ export default function MembersPage() {
       if (!res.ok) throw new Error((await res.json()).message || 'Fehler');
       toast.success('Mitglieder-Einstellungen gespeichert.');
       await refresh();
-      if (extra.clearMistralKey || extra.includeLimits === false) {
-        // close dialog after explicit single-action calls
-        closeMemberSettings();
-      }
     } catch (err) {
       toast.error(err.message || 'Aktualisierung fehlgeschlagen');
     } finally {
@@ -139,7 +135,6 @@ export default function MembersPage() {
     }
   };
 
-  const handleClearKey = () => submitMemberSettings({ clearMistralKey: true, includeLimits: false });
   const handleSaveLimits = () => submitMemberSettings({});
 
   const handleRemove = async (member) => {
@@ -280,11 +275,6 @@ export default function MembersPage() {
                   </div>
 
                   <div className="hidden md:flex items-center gap-3 text-[11px] text-secondary">
-                    {member.api_key_configured && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 text-warning border border-warning/30">
-                        <KeyRound className="w-3 h-3" /> eigener Key
-                      </span>
-                    )}
                     <span className="inline-flex items-center gap-1 tabular-nums">
                       <Wallet className="w-3 h-3" />
                       {Number(member.month_cost || 0).toFixed(2)} €
@@ -384,23 +374,6 @@ export default function MembersPage() {
           </DialogHeader>
 
           <div className="space-y-5">
-            <div className="bg-hover-subtle border border-subtle rounded-xl px-4 py-3">
-              <p className="text-xs font-medium text-primary mb-1">Persönlicher Mistral-API-Key</p>
-              <p className="text-[11px] text-secondary mb-3">
-                {editingMember?.api_key_configured
-                  ? 'Dieses Mitglied nutzt aktuell einen eigenen Mistral-Key. Entfernen lässt es auf den zentralen Workspace-Key zurückfallen.'
-                  : 'Kein eigener Key gesetzt. Mitglied nutzt den zentralen Workspace-Key (sofern hinterlegt).'}
-              </p>
-              <button
-                type="button"
-                onClick={handleClearKey}
-                disabled={busy || !editingMember?.api_key_configured}
-                className="text-[11px] px-3 py-1.5 rounded-lg border border-danger/40 text-danger hover:bg-danger/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Eigenen Key entfernen
-              </button>
-            </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-primary mb-1.5">Persönliches Kostenlimit / Monat</label>

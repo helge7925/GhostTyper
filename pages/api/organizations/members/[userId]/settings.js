@@ -43,11 +43,6 @@ async function handler(req, res) {
   const values = [];
   const meta = {};
 
-  if (body.clearMistralKey === true) {
-    updates.push('mistral_api_key = NULL', 'mistral_api_key_encrypted = NULL');
-    meta.cleared_mistral_key = true;
-  }
-
   if (Object.prototype.hasOwnProperty.call(body, 'personalCostLimit')) {
     const v = body.personalCostLimit;
     if (v === null || v === '') {

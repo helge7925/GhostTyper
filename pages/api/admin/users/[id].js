@@ -1,7 +1,6 @@
 import { requireAdmin } from '../../../../lib/admin';
 import pool, { query } from '../../../../lib/db';
 import { validatePassword } from '../../../../lib/constants';
-import { serializeApiKeyForStorage } from '../../../../lib/settings-service';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { isValidEmail, normalizeEmail } from '../../../../lib/email';
 import { logAuditEvent, pseudonymizeUserAuditTrail } from '../../../../lib/audit-log';
@@ -32,7 +31,7 @@ export default async function handler(req, res) {
 
   switch (req.method) {
     case 'PUT': {
-      const { email, name, password, role, mistralApiKey, costLimit } = req.body;
+      const { email, name, password, role, costLimit } = req.body;
       const shouldUpdateEmail = email !== undefined;
       const normalizedEmail = shouldUpdateEmail ? normalizeEmail(email) : null;
       if (password) {
@@ -43,8 +42,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'Ungültige E-Mail-Adresse' });
       }
       const shouldUpdateCostLimit = costLimit !== undefined;
-      const shouldUpdateApiKey = mistralApiKey !== undefined;
-      const shouldClearApiKey = shouldUpdateApiKey && (mistralApiKey === null || mistralApiKey === '');
 
       let normalizedCostLimit = null;
       if (shouldUpdateCostLimit && costLimit !== null && costLimit !== '') {
@@ -59,10 +56,6 @@ export default async function handler(req, res) {
 
       try {
         await client.query('BEGIN');
-        const apiKeyPayload = shouldUpdateApiKey && !shouldClearApiKey
-          ? serializeApiKeyForStorage(String(mistralApiKey).trim(), { userId })
-          : { plainApiKey: null, encryptedApiKey: null };
-
         const existing = await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
         if (existing.rows.length === 0) {
           await client.query('ROLLBACK');
@@ -143,40 +136,20 @@ export default async function handler(req, res) {
           );
         }
 
-        if (shouldUpdateApiKey || shouldUpdateCostLimit) {
+        if (shouldUpdateCostLimit) {
           await client.query(
             `INSERT INTO settings (
                user_id,
-               mistral_api_key,
-               mistral_api_key_encrypted,
                cost_limit,
                updated_at
-             )
-             VALUES ($1, $2, $3, $4, NOW())
-             ON CONFLICT (user_id) DO UPDATE SET
-               mistral_api_key = CASE
-                 WHEN $5 THEN NULL
-                 WHEN $6 THEN $2
-                 ELSE settings.mistral_api_key
-               END,
-               mistral_api_key_encrypted = CASE
-                 WHEN $5 THEN NULL
-                 WHEN $6 THEN $3
-                 ELSE settings.mistral_api_key_encrypted
-               END,
-               cost_limit = CASE
-                 WHEN $7 THEN $4
-                 ELSE settings.cost_limit
-               END,
-               updated_at = NOW()`,
+              )
+              VALUES ($1, $2, NOW())
+              ON CONFLICT (user_id) DO UPDATE SET
+                cost_limit = $2,
+                updated_at = NOW()`,
             [
               userId,
-              apiKeyPayload.plainApiKey,
-              apiKeyPayload.encryptedApiKey,
               normalizedCostLimit,
-              shouldClearApiKey,
-              shouldUpdateApiKey,
-              shouldUpdateCostLimit,
             ]
           );
         }
@@ -201,7 +174,6 @@ export default async function handler(req, res) {
           metadata: {
             emailChanged: shouldUpdateEmail,
             roleChanged: role !== undefined,
-            apiKeyChanged: shouldUpdateApiKey,
             costLimitChanged: shouldUpdateCostLimit,
           },
         });

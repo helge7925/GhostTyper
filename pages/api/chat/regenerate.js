@@ -3,7 +3,7 @@ import { enforceRateLimit, fetchWithTimeout, logApiError, serverError } from '..
 import { resolveCortecsConfig } from '../../../lib/settings-service';
 import { hasPermission } from '../../../lib/permissions';
 import { CostLimitCheckUnavailableError, CostLimitExceededError, checkCostLimit, estimateCost, logUsage, withUserCostLock } from '../../../lib/usage';
-import { CHAT_TIMEOUT_MS, buildConversationMessages, buildCortecsBody, deleteMessage, findPreviousUserMessage, getMessageForUser, storeMessage, trimConversation, updateConversationMeta } from '../../../lib/chat-service';
+import { CHAT_TIMEOUT_MS, CortecsApiError, buildConversationMessages, buildCortecsBody, cortecsErrorResponse, deleteMessage, findPreviousUserMessage, getMessageForUser, storeMessage, trimConversation, updateConversationMeta } from '../../../lib/chat-service';
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -34,7 +34,7 @@ async function handler(req, res) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cortecs.apiKey}` },
         body: JSON.stringify(buildCortecsBody(cortecs, apiMessages)),
       }, CHAT_TIMEOUT_MS);
-      if (!response.ok) throw new Error(`Cortecs API error: ${response.status} - ${(await response.text()).slice(0, 300)}`);
+      if (!response.ok) throw new CortecsApiError(response.status, await response.text());
       const result = await response.json();
       const usage = result.usage || {};
       const usedModel = result.model || cortecs.chatModel;
@@ -54,6 +54,11 @@ async function handler(req, res) {
   } catch (error) {
     if (error?.code === 'COST_LIMIT_EXCEEDED' || error?.code === 'BUDGET_GUARDRAIL_EXCEEDED') return res.status(429).json({ message: error.message });
     if (error instanceof CostLimitCheckUnavailableError || error?.code === 'COST_CHECK_UNAVAILABLE') return res.status(503).json({ message: error.message });
+    const cortecsError = cortecsErrorResponse(error);
+    if (cortecsError) {
+      logApiError('Chat regenerate Cortecs failed', error);
+      return res.status(cortecsError.status).json({ message: cortecsError.message });
+    }
     logApiError('Chat regenerate failed', error);
     return serverError(res, 'Antwort konnte nicht neu erzeugt werden.');
   }

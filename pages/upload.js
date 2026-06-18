@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -46,7 +47,7 @@ const UPLOAD_PRESETS = {
       autoAnalyze: true,
       diarize: false,
       template: 'generic',
-      model: 'mistral-small-latest',
+      model: 'deepseek-v4-flash',
       showAdvancedOptions: true,
     },
   },
@@ -57,7 +58,7 @@ const UPLOAD_PRESETS = {
       autoAnalyze: true,
       diarize: false,
       template: 'meeting',
-      model: 'mistral-medium-latest',
+      model: 'deepseek-v4-pro',
       showAdvancedOptions: true,
     },
   },
