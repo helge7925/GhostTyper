@@ -6,6 +6,7 @@ import { useFormatter, useLocale, useTranslations } from '../lib/i18n';
 const TEMPLATE_LABELS = {
   generic: { de: 'Zusammenfassung', en: 'Summary' },
   meeting: { de: 'Meeting', en: 'Meeting' },
+  action_items: { de: 'To-Dos', en: 'To-dos' },
   data_table: { de: 'Datentabelle', en: 'Data table' },
   // Legacy label so cards for pre-existing aufmass rows still render.
   aufmass: { de: 'Aufmaß', en: 'Measurements' },

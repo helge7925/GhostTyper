@@ -44,6 +44,7 @@ const SETTINGS_TAB_IDS = ['transcription', 'text-templates', 'ocr-translate', 'a
 const DEFAULT_TEXT_TEMPLATE_OPTIONS = [
   { key: 'generic', label: 'Zusammenfassung' },
   { key: 'meeting', label: 'Meeting-Protokoll' },
+  { key: 'action_items', label: 'To-Dos extrahieren' },
 ];
 
 function parseContextTerms(rawValue) {
