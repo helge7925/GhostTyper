@@ -42,8 +42,8 @@ function DocumentPicker({ excludeIds, onPick, t }) {
         const params = new URLSearchParams();
         if (term) { params.set('search', term); params.set('scope', 'full'); }
         params.set('limit', '10');
-        // Only workspace-visible docs are addable to shared knowledge.
-        params.set('visibility', 'workspace');
+        // Show all of the user's documents; private ones are promoted to
+        // workspace visibility on add (see lib/knowledge.js addKnowledgeItem).
         const res = await fetch(`/api/documents?${params.toString()}`, { credentials: 'same-origin' });
         const data = await res.json().catch(() => []);
         setResults(Array.isArray(data) ? data : (data.documents || []));
@@ -56,7 +56,7 @@ function DocumentPicker({ excludeIds, onPick, t }) {
     return () => debounceRef.current && clearTimeout(debounceRef.current);
   }, [search, open]);
 
-  const visible = results.filter((d) => !excludeIds.has(d.id) && d.visibility === 'workspace');
+  const visible = results.filter((d) => !excludeIds.has(d.id));
 
   return (
     <div className="relative" ref={boxRef}>
@@ -94,11 +94,15 @@ function DocumentPicker({ excludeIds, onPick, t }) {
                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs text-primary hover:bg-subtle transition-colors"
                 >
                   <FileText className="w-3 h-3 text-secondary shrink-0" />
-                  <span className="truncate" title={doc.title}>{doc.title}</span>
+                  <span className="truncate flex-1" title={doc.title}>{doc.title}</span>
+                  {doc.visibility !== 'workspace' && (
+                    <span className="shrink-0 text-[9px] uppercase tracking-wide text-secondary/70 border border-subtle rounded px-1 py-px">{t('privateBadge')}</span>
+                  )}
                 </button>
               ))
             )}
           </div>
+          <p className="px-2 pt-1.5 mt-1 border-t border-subtle text-[10px] text-secondary/80 italic">{t('addShareHint')}</p>
         </div>
       )}
     </div>

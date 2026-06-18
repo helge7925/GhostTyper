@@ -62,6 +62,7 @@ async function handler(req, res) {
         documentId: docId,
         directoryId: directoryId != null ? Number(directoryId) : null,
         retrievalMode,
+        actingUserId: userId,
       });
       await logAuditEvent({
         userId,
