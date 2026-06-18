@@ -4,12 +4,13 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
-import { Plug, Wallet } from 'lucide-react';
+import { Cloud, Plug, Wallet } from 'lucide-react';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import { Button } from '../../../components/ui/button';
 import CortecsIntegrationPanel from '../../../components/settings/CortecsIntegrationPanel';
 import MistralIntegrationPanel from '../../../components/settings/MistralIntegrationPanel';
 import VexaIntegrationPanel from '../../../components/settings/VexaIntegrationPanel';
+import NextcloudIntegrationPanel from '../../../components/settings/NextcloudIntegrationPanel';
 import { useCurrentOrg } from '../../../lib/use-current-org';
 import { usePermission } from '../../../lib/use-permission';
 import { useTranslations } from '../../../lib/i18n';
@@ -158,6 +159,16 @@ export default function WorkspaceIntegrationsPage() {
             <p className="text-xs text-secondary mt-1 max-w-prose">{t('meetingBotsHint')}</p>
           </div>
           <VexaIntegrationPanel canEdit={canEditIntegrations} />
+        </section>
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest flex items-center gap-2">
+              <Cloud className="w-4 h-4" /> {t('storage')}
+            </h2>
+            <p className="text-xs text-secondary mt-1 max-w-prose">{t('storageHint')}</p>
+          </div>
+          <NextcloudIntegrationPanel canEdit={canEditIntegrations} />
         </section>
 
         <section className="space-y-4">

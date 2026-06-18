@@ -123,6 +123,8 @@ export default function TranscriptionDetail() {
   const [processingStartError, setProcessingStartError] = useState('');
   const statusRef = useRef(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [nextcloudEnabled, setNextcloudEnabled] = useState(false);
+  const [exportingNc, setExportingNc] = useState(false);
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
@@ -241,6 +243,35 @@ export default function TranscriptionDetail() {
       setAnalyzing(false);
     }
   }, [id, speakerNames, analysisFocus]);
+
+  // Surface the "save to Nextcloud" action only when the workspace has the
+  // integration enabled.
+  useEffect(() => {
+    if (authStatus !== 'authenticated') return;
+    let cancelled = false;
+    fetch('/api/organizations/integrations/nextcloud', { credentials: 'same-origin' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (!cancelled && data) setNextcloudEnabled(!!data.enabled); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [authStatus]);
+
+  const handleExportNextcloud = useCallback(async () => {
+    setExportingNc(true);
+    try {
+      const res = await fetch(`/api/transcriptions/${id}/export-nextcloud`, {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.message || 'Export nach Nextcloud fehlgeschlagen.');
+      setToast({ message: `Nach Nextcloud gespeichert: ${data.remotePath}`, type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message || 'Export nach Nextcloud fehlgeschlagen.', type: 'error' });
+    } finally {
+      setExportingNc(false);
+    }
+  }, [id]);
 
   const handleStartProcessing = useCallback(async () => {
     setStartingProcessing(true);
@@ -476,6 +507,16 @@ export default function TranscriptionDetail() {
                     >
                       Mit Transkript chatten
                     </Link>
+                  )}
+                  {nextcloudEnabled && (transcription.text || transcription.analysis) && (
+                    <button
+                      type="button"
+                      onClick={handleExportNextcloud}
+                      disabled={exportingNc}
+                      className="bg-hover-subtle hover:bg-hover-strong text-primary py-2 rounded-xl text-sm font-bold border border-subtle text-center transition-all disabled:opacity-50"
+                    >
+                      {exportingNc ? 'Speichert…' : 'Nach Nextcloud speichern'}
+                    </button>
                   )}
                   {isOfficeDocument && (
                     <a
