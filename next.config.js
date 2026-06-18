@@ -3,6 +3,12 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
   poweredByHeader: false,
+  // Next.js clamps request bodies passing through middleware/proxy to 10 MB by
+  // default. Audio uploads (/api/upload, up to MAX_FILE_SIZE = 500 MB) flow
+  // through the global middleware matcher, so raise the cap to match.
+  experimental: {
+    proxyClientMaxBodySize: '500mb',
+  },
   async headers() {
     return [
       {
