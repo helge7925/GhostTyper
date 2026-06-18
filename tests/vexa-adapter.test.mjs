@@ -39,6 +39,18 @@ test('parseMeetingUrl recognises legacy Nextcloud Talk URLs (index.php)', () => 
   assert.equal(result.nextcloudHost, 'cloud.example.com');
 });
 
+test('parseMeetingUrl recognises scheme-less Nextcloud Talk URLs', () => {
+  const modern = parseMeetingUrl('cloud.example.com/call/abc123def');
+  assert.equal(modern.platform, 'nextcloud_talk');
+  assert.equal(modern.nativeMeetingId, 'abc123def');
+  assert.equal(modern.nextcloudHost, 'cloud.example.com');
+
+  const legacy = parseMeetingUrl('cloud.example.com/index.php/call/Tk2024xyz');
+  assert.equal(legacy.platform, 'nextcloud_talk');
+  assert.equal(legacy.nativeMeetingId, 'Tk2024xyz');
+  assert.equal(legacy.nextcloudHost, 'cloud.example.com');
+});
+
 test('parseMeetingUrl ignores generic /call paths without a token', () => {
   // Path component must be /call/<6+ alphanumeric>; `/call` alone or
   // `/some-call` must NOT trigger the Talk branch.

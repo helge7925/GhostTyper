@@ -1,6 +1,6 @@
 import { query } from '../../../../lib/db';
 import { resolveChatModel } from '../../../../lib/model-policy';
-import { getSettingsRow, resolveMistralApiKey } from '../../../../lib/settings-service';
+import { getSettingsRow, resolveCortecsConfig } from '../../../../lib/settings-service';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { addTranscriptionEvent } from '../../../../lib/transcription-events';
 import { runManualAnalysisJob } from '../../../../lib/manual-analysis';
@@ -49,11 +49,12 @@ async function handler(req, res) {
   }
 
   const settingsRow = await getSettingsRow(userId);
-  const apiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
-  const preferredModelFallback = resolveChatModel(settingsRow?.preferred_model || 'mistral-large-latest');
+  const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
+  const apiKey = cortecs.apiKey;
+  const preferredModelFallback = resolveChatModel(cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
 
   if (!apiKey) {
-    return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert' });
+    return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert' });
   }
   if (!preferredModelFallback) {
     return res.status(400).json({ message: 'Ungültiges Standardmodell in den Einstellungen' });

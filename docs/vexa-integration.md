@@ -84,7 +84,7 @@ SSE /api/transcriptions/                                    OpenAI-kompat.
   stream ◄── vexa-bridge ◄  GET /transcripts/…   ──────►   /v1/audio/transcriptions
 POST /api/webhooks/vexa  ◄── HMAC-Webhook (meeting.completed)
                                   │
-                                  └─► fireworks-bridge (Modell-Rewrite,
+                                  └─► voxtral-bridge (Modell-Rewrite,
                                        MISTRAL_API_KEY-Lookup, context_bias-Injektion,
                                        response_format=verbose_json)
 ```
@@ -135,11 +135,11 @@ diesem Token einloggen.
    in der `.env` auf den Fork-Build aus
    [helge7925/vexa](https://github.com/helge7925/vexa) — siehe dort
    `UPSTREAM-SYNC.md` für die Tag-Konvention.
-2. **Mistral Voxtral**: derselbe API-Key, den GhostTyper bereits für die
-   Batch-Transkription nutzt. Die Bridge schreibt den Modellnamen auf
-   `voxtral-mini-latest`, setzt `response_format=verbose_json` und
-   `timestamp_granularities=word`, falls Vexa-Lite sie nicht selbst
-   sendet, und injiziert die workspace-globale Kontext-Wörter-Liste.
+2. **Cortecs Whisper**: derselbe Cortecs-API-Key, den GhostTyper bereits für
+   Batch-Transkription und Analyse nutzt. Die Bridge schreibt den Modellnamen
+   auf `whisper-large-v3`, setzt `response_format=verbose_json`, falls Vexa-Lite
+   es nicht selbst sendet, und injiziert die workspace-globale Kontext-Wörter-
+   Liste als `prompt`.
 3. **Postgres** für Vexa Lite — im Default-Compose-Stack wird die DB
    `vexa` in derselben Postgres-Instanz angelegt wie die GhostTyper-DB
    (siehe `vexa-db-init`-Service). Externe Postgres (Supabase EU,
@@ -150,15 +150,15 @@ diesem Token einloggen.
 
 ```
 DATABASE_URL=postgresql://…           # Postgres für Vexa
-TRANSCRIPTION_SERVICE_URL=http://fireworks-bridge:8080/v1/audio/transcriptions
+TRANSCRIPTION_SERVICE_URL=http://voxtral-bridge:8080/v1/audio/transcriptions
 TRANSCRIPTION_SERVICE_TOKEN=<beliebiger Token; Bridge tauscht ihn>
 ADMIN_API_TOKEN=<32 zufällige hex bytes — openssl rand -hex 32>
 ```
 
 Der `TRANSCRIPTION_SERVICE_TOKEN` ist nur ein Platzhalter — der Bridge-
-Container ersetzt das Bearer-Token vor dem Forward zu Mistral durch den
-zur Laufzeit aufgelösten `MISTRAL_API_KEY` (Workspace-Override aus der
-GhostTyper-UI bevorzugt vor `MISTRAL_API_KEY`-ENV).
+Container ersetzt das Bearer-Token vor dem Forward zu Cortecs durch den
+zur Laufzeit aufgelösten Cortecs-Key (Workspace-Override aus der
+GhostTyper-UI bevorzugt vor `CORTECS_API_KEY`-ENV).
 
 Health-Check:
 ```bash
@@ -223,10 +223,36 @@ Dieses Setup ist außerhalb des MVP, dokumentiere bei Bedarf separat.
 - GhostTyper erzwingt eine Consent-Checkbox vor jedem Bot-Start. Die
   Bestätigung wird im Audit-Log persistiert
   (`action='meeting.bot.start', metadata.consent=true`).
+- **Auto-Hinweis im Meeting-Chat (optional).** Workspace-Admins können
+  unter *Settings → Integrationen → Vexa Meeting-Bot* den DSGVO-Toggle
+  aktivieren und einen Hinweistext (≤ 1000 Zeichen) hinterlegen. Sobald
+  der Bot dem Meeting beigetreten ist (`meeting.started`-Webhook),
+  postet er diesen Text einmalig als Chat-Nachricht — hilft die
+  Aufklärungspflicht aus Art. 13 DSGVO ohne mündliche Ansage zu
+  erfüllen. Idempotent via `transcriptions.gdpr_notice_posted_at`, also
+  keine Doppel-Posts bei Webhook-Retries. Der Host kann den Toggle pro
+  Meeting im Start-Dialog überschreiben (vorbelegt aus dem Org-Default).
 - Daten-Lokalität: Vexa Lite läuft im EU-Container; Mistral hostet in
   Frankreich (EU). GhostTyper-DB unverändert.
 - Retention: `scripts/apply-retention-policy.js` greift weiterhin —
   Vexa-Transkripte sind reguläre `transcriptions`-Rows mit `source='vexa'`.
+
+### Chat-Auto-Posts pro Plattform
+
+Der DSGVO-Hinweis (und der Companion-Link-Post für Live-Übersetzung)
+geht via `POST /bots/{platform}/{nativeMeetingId}/chat` an Vexa. Welche
+Plattformen das real ins Chat-Fenster schreiben, hängt vom Bot-Image ab:
+
+| Plattform | Vanilla `vexaai/vexa-lite` | `vexa-bot-talk` Fork |
+|---|---|---|
+| Google Meet | ✅ | ✅ |
+| Microsoft Teams | ✅ | ✅ |
+| Zoom | ✅ | ✅ |
+| Nextcloud Talk | ❌ Bot tritt nicht bei | ⚠ tritt bei, **Chat-Sender im Bot muss noch verifiziert werden** (`services/vexa-bot/core/src/services/chat.ts` Talk-Branch + Selectors in `platforms/nextcloudtalk/selectors.ts` — siehe `feat/nextcloud-talk-chat` im Vexa-Fork) |
+
+Bei einer Plattform ohne Chat-Sender im Bot wird der Webapp-seitige
+Call still im Log abgelegt (`gdpr_chat_poster.send_failed`); das
+Meeting läuft weiter, nur die Chat-Nachricht erscheint nicht.
 
 ## Troubleshooting
 

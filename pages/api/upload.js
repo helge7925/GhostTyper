@@ -11,6 +11,7 @@ import { scanFileForViruses } from '../../lib/virus-scan';
 import { logAuditEvent } from '../../lib/audit-log';
 import { detectAudioMimeType, extensionFromDetectedMime } from '../../lib/file-signature';
 import { withOrgScope } from '../../lib/api/with-org-scope';
+import { upsertDocumentForTranscription } from '../../lib/documents';
 
 export const config = {
   api: {
@@ -114,7 +115,7 @@ async function handler(req, res) {
     tempUploadPath = '';
 
     const template = normalizeAnalysisTemplate(fields.template?.[0] || fields.template || 'generic');
-    const requestedModel = fields.model?.[0] || fields.model || 'mistral-large-latest';
+    const requestedModel = fields.model?.[0] || fields.model || 'deepseek-v4-pro';
     const model = resolveChatModel(requestedModel);
     if (!model) {
       await safeUnlink(persistedFilePath);
@@ -153,6 +154,18 @@ async function handler(req, res) {
        RETURNING id, filename, original_name, status, template, model, diarize, auto_analyze, created_at`,
       [userId, orgId, filename, file.originalFilename, filePath, file.size, detectedMimeType, template, model, diarize, combinedPrompt || null, autoAnalyze]
     );
+    await upsertDocumentForTranscription({
+      transcriptionId: result.rows[0].id,
+      organizationId: orgId,
+      ownerUserId: userId,
+      visibility: 'private',
+      sourceType: 'audio_transcription',
+      title: file.originalFilename,
+      mimeType: detectedMimeType,
+      fileSize: file.size,
+      status: result.rows[0].status,
+      textPreview: null,
+    });
 
     await addTranscriptionEvent({
       transcriptionId: result.rows[0].id,

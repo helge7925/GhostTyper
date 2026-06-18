@@ -2,14 +2,16 @@ import { useState, useRef, useEffect } from 'react';
 import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE, normalizeDefaultTemplate } from '../lib/constants';
 import { uploadAudio, getTemplates, getSettings } from '../lib/api';
 import AudioRecorder from './AudioRecorder';
+import SystemAudioRecorder from './SystemAudioRecorder';
+import { getSystemAudioCapabilities } from '../lib/audio-utils';
 import { useTranslations } from '../lib/i18n';
 
 // `aufmass` is intentionally absent from the user-facing offering but
 // remains accepted by the backend (see lib/template-service.js) so legacy
 // DB rows still resolve.
 const BUILTIN_TEMPLATE_VALUES = new Set(['generic', 'meeting', 'data_table', 'aufmass']);
-const ALLOWED_CHAT_MODELS = new Set(['mistral-small-latest', 'mistral-medium-latest', 'mistral-large-latest']);
-const ALLOWED_UPLOAD_MODES = new Set(['file', 'record']);
+const ALLOWED_CHAT_MODELS = new Set(['deepseek-v4-pro', 'mistral-small-latest', 'mistral-medium-latest', 'mistral-large-latest']);
+const ALLOWED_UPLOAD_MODES = new Set(['file', 'record', 'system-audio']);
 
 function resolvePresetTemplate(templateValue, templates) {
   const raw = String(templateValue || '').trim();
@@ -23,10 +25,9 @@ function resolvePresetTemplate(templateValue, templates) {
 export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTemplate = false, templateLabel = '' }) {
   const t = useTranslations('upload');
   const tForm = useTranslations('components.uploadForm');
-  const tCommon = useTranslations('common');
   const [file, setFile] = useState(null);
   const [template, setTemplate] = useState('generic');
-  const [model, setModel] = useState('mistral-large-latest');
+  const [model, setModel] = useState('deepseek-v4-pro');
   const [templates, setTemplates] = useState([]);
   const [diarize, setDiarize] = useState(false);
   const [autoAnalyze, setAutoAnalyze] = useState(true);
@@ -38,8 +39,20 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState(null);
+  const [systemAudioCaps, setSystemAudioCaps] = useState({ tabAudio: false, systemAudio: false });
   const inputRef = useRef(null);
   const textTemplates = templates.filter((entry) => !entry.template_type || entry.template_type === 'text');
+  const showSystemAudioTab = systemAudioCaps.tabAudio;
+
+  useEffect(() => {
+    setSystemAudioCaps(getSystemAudioCapabilities());
+  }, []);
+
+  useEffect(() => {
+    if (uploadMode === 'system-audio' && !showSystemAudioTab) {
+      setUploadMode('record');
+    }
+  }, [uploadMode, showSystemAudioTab]);
 
   useEffect(() => {
     // Load custom templates and default settings
@@ -194,6 +207,22 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-info" />
             )}
           </button>
+          {showSystemAudioTab && (
+            <button
+              type="button"
+              onClick={() => setUploadMode('system-audio')}
+              className={`pb-3 text-sm font-medium transition-colors relative ${
+                uploadMode === 'system-audio'
+                  ? 'text-accent'
+                  : 'text-secondary hover:text-primary'
+              }`}
+            >
+              {tForm('tabSystemAudio')}
+              {uploadMode === 'system-audio' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-info" />
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -237,6 +266,8 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
             </div>
           )}
         </div>
+      ) : uploadMode === 'system-audio' && showSystemAudioTab ? (
+        <SystemAudioRecorder onRecordingComplete={handleRecordingComplete} />
       ) : (
         <AudioRecorder onRecordingComplete={handleRecordingComplete} />
       )}
@@ -293,6 +324,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
             <div>
               <label htmlFor="upload-model" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">KI-Modell</label>
               <select id="upload-model" value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none">
+                <option value="deepseek-v4-pro">Cortecs · deepseek-v4-pro</option>
                 <option value="mistral-small-latest">Kostengünstig / Schnell</option>
                 <option value="mistral-medium-latest">Ausgewogen</option>
                 <option value="mistral-large-latest">Qualität</option>

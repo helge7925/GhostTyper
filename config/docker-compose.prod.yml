@@ -39,12 +39,17 @@ services:
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-https://${DOMAIN}}
       - APP_PUBLIC_URL=${APP_PUBLIC_URL:-http://transkription-webapp:3000}
-      # Operator default for the Mistral Voxtral key used by the live/Vexa
+      # Operator default for the Cortecs key used by the live/Vexa
       # transcription bridge. The admin UI in
       # /settings/organization/integrations can override this — the bridge
       # picks up the override via /api/internal/whisper-config.
-      # Same key the batch-transcription path uses, so a single MISTRAL_API_KEY
+      # Same key the batch-transcription path uses, so a single CORTECS_API_KEY
       # ENV is enough for both paths.
+      - CORTECS_API_KEY=${CORTECS_API_KEY:-${VEXA_TRANSCRIPTION_TOKEN:-}}
+      - CORTECS_BASE_URL=${CORTECS_BASE_URL:-https://api.cortecs.ai/v1}
+      - CORTECS_CHAT_MODEL=${CORTECS_CHAT_MODEL:-deepseek-v4-pro}
+      - CORTECS_TRANSCRIPTION_MODEL=${CORTECS_TRANSCRIPTION_MODEL:-whisper-large-v3}
+      - CORTECS_PREFERENCE=${CORTECS_PREFERENCE:-balanced}
       - MISTRAL_API_KEY=${MISTRAL_API_KEY:-${VEXA_TRANSCRIPTION_TOKEN:-}}
       - BRIDGE_SHARED_SECRET=${BRIDGE_SHARED_SECRET}
       - AUTH_CREDENTIALS_ENABLED=${AUTH_CREDENTIALS_ENABLED:-false}
@@ -132,37 +137,29 @@ services:
           || psql -h transkription-db -U ${DB_USER} -d postgres \
             -c "CREATE DATABASE vexa OWNER ${DB_USER}"
 
-  # Tiny proxy that rewrites Vexa's hardcoded model name (whisper-1 /
-  # large-v3-turbo) to Mistral Voxtral's *realtime* id
-  # (`voxtral-mini-transcribe-realtime-2602`) and forwards to
-  # https://api.mistral.ai/v1/audio/transcriptions. Realtime is a
-  # drop-in replacement for `voxtral-mini-latest` (same endpoint, same
-  # multipart shape, same per-minute price) but is fine-tuned for
-  # low-latency live transcription — pairing it with the live-
-  # translation companion-tab keeps us inside the ≤5 s end-to-end
-  # window. The bridge also injects the workspace-global context_bias
-  # and defaults response_format=verbose_json + timestamp_granularities=word
-  # so Vexa gets segments + speaker_id + words[] regardless of what it
-  # sends.
-  fireworks-bridge:
+  # Tiny proxy that rewrites Vexa's hardcoded model name to the configured
+  # Cortecs/OpenAI-compatible STT model and forwards to Cortecs by default.
+  # The bridge injects workspace-global context terms as prompt and defaults
+  # response_format=verbose_json so providers can return segments where supported.
+  voxtral-bridge:
     build:
-      context: ../services/fireworks-bridge
+      context: ../services/voxtral-bridge
       dockerfile: Dockerfile
-    image: fireworks-bridge:prod
-    container_name: transkription-fireworks-bridge
+    image: voxtral-bridge:prod
+    container_name: transkription-voxtral-bridge
     restart: unless-stopped
     profiles: ["vexa"]
     networks: [internal]
     mem_limit: 256m
     environment:
-      - UPSTREAM_URL=${VEXA_TRANSCRIPTION_URL:-https://api.mistral.ai/v1/audio/transcriptions}
-      - MODEL_OVERRIDE=${VEXA_TRANSCRIPTION_MODEL:-voxtral-mini-transcribe-realtime-2602}
+      - UPSTREAM_URL=${VEXA_TRANSCRIPTION_URL:-https://api.cortecs.ai/v1/audio/transcriptions}
+      - MODEL_OVERRIDE=${VEXA_TRANSCRIPTION_MODEL:-whisper-large-v3}
       - UPSTREAM_TIMEOUT_S=${VEXA_TRANSCRIPTION_TIMEOUT_S:-120}
-      # Webapp callback so the Mistral key set in the admin UI takes
-      # effect at runtime (cached ~60s). Falls back to MISTRAL_API_KEY.
+      # Webapp callback so the Cortecs key/model set in the admin UI takes
+      # effect at runtime (cached ~60s). Falls back to CORTECS_API_KEY.
       - WEBAPP_URL=http://transkription-webapp:3000
       - BRIDGE_SECRET=${BRIDGE_SHARED_SECRET}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-${VEXA_TRANSCRIPTION_TOKEN:-}}
+      - CORTECS_API_KEY=${CORTECS_API_KEY:-${VEXA_TRANSCRIPTION_TOKEN:-}}
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://0.0.0.0:8080/"]
       interval: 30s
@@ -198,7 +195,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@transkription-db:5432/vexa
       - DB_SSL_MODE=disable
-      - TRANSCRIPTION_SERVICE_URL=http://fireworks-bridge:8080/v1/audio/transcriptions
+      - TRANSCRIPTION_SERVICE_URL=http://voxtral-bridge:8080/v1/audio/transcriptions
       - TRANSCRIPTION_SERVICE_TOKEN=${VEXA_TRANSCRIPTION_TOKEN}
       - ADMIN_API_TOKEN=${VEXA_ADMIN_API_TOKEN}
     depends_on:
@@ -206,7 +203,7 @@ services:
         condition: service_healthy
       vexa-db-init:
         condition: service_completed_successfully
-      fireworks-bridge:
+      voxtral-bridge:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://0.0.0.0:8056/docs >/dev/null 2>&1 || exit 1"]

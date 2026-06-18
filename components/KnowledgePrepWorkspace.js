@@ -36,6 +36,7 @@ export default function KnowledgePrepWorkspace({
 
   const MODEL_OPTIONS = useMemo(
     () => [
+      { value: 'deepseek-v4-pro', label: 'Cortecs · deepseek-v4-pro' },
       { value: 'mistral-small-latest', label: t('models.fast') },
       { value: 'mistral-medium-latest', label: t('models.balanced') },
       { value: 'mistral-large-latest', label: t('models.quality') },
@@ -53,13 +54,13 @@ export default function KnowledgePrepWorkspace({
   const [audioStarting, setAudioStarting] = useState(false);
 
   const [textInput, setTextInput] = useState('');
-  const [textModel, setTextModel] = useState('mistral-large-latest');
+  const [textModel, setTextModel] = useState('deepseek-v4-pro');
   const [textPrompt, setTextPrompt] = useState('');
   const [textAnalysisFocus, setTextAnalysisFocus] = useState('');
   const [textSubmitting, setTextSubmitting] = useState(false);
 
   const [documentFile, setDocumentFile] = useState(null);
-  const [documentModel, setDocumentModel] = useState('mistral-large-latest');
+  const [documentModel, setDocumentModel] = useState('deepseek-v4-pro');
   const [documentPrompt, setDocumentPrompt] = useState('');
   const [documentAnalysisFocus, setDocumentAnalysisFocus] = useState('');
   const [documentScope, setDocumentScope] = useState('');
@@ -249,7 +250,7 @@ export default function KnowledgePrepWorkspace({
               autoAnalyze: true,
               diarize: false,
               template: effectiveMode,
-              model: 'mistral-large-latest',
+              model: 'deepseek-v4-pro',
             }}
           />
           {audioStarting && (

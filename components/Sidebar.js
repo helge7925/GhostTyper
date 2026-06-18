@@ -3,9 +3,12 @@ import { useRouter } from 'next/router';
 import { useSession, signOut } from 'next-auth/react';
 import {
   Building2,
+  CheckSquare,
   Files,
   Languages,
+  Library,
   LogOut,
+  MessageSquare,
   Mic,
   PencilLine,
   ScanText,
@@ -21,11 +24,11 @@ import { useTranslations } from '../lib/i18n';
 import { useVexaIntegrationEnabled } from '../lib/use-vexa-integration';
 import { usePermission } from '../lib/use-permission';
 
-// Primary workflow order, top → bottom:
+// Primary tool order, top → bottom:
 //   Remote Meeting (when permitted + workspace has Vexa enabled — see
 //   `showRemoteMeeting` below) is rendered as the first nav row.
 //   The other tools follow in the order Transcription → Translation
-//   → OCR → Tables → Text Refinement, and the document archive
+//   → OCR → Tables → Text Refinement → Chat, and the document archive
 //   ("Dateien" / "Files", was "Historie" / "History") is always last.
 const PRIMARY_NAV_LINKS = [
   { href: '/upload', labelKey: 'transcription', Icon: Mic },
@@ -33,7 +36,14 @@ const PRIMARY_NAV_LINKS = [
   { href: '/ocr', labelKey: 'ocr', Icon: ScanText },
   { href: '/tabellen', labelKey: 'tables', Icon: TableIcon },
   { href: '/textoptimierung', labelKey: 'textOptimization', Icon: PencilLine },
+  { href: '/chat', labelKey: 'chat', Icon: MessageSquare },
 ];
+
+const TASKS_NAV_LINK = {
+  href: '/tasks',
+  labelKey: 'tasks',
+  Icon: CheckSquare,
+};
 
 const FILES_NAV_LINK = {
   href: '/transcriptions',
@@ -45,6 +55,12 @@ const REMOTE_MEETING_LINK = {
   href: '/transcriptions?meeting=1',
   labelKey: 'remoteMeeting',
   Icon: Video,
+};
+
+const KNOWLEDGE_NAV_LINK = {
+  href: '/knowledge',
+  labelKey: 'knowledge',
+  Icon: Library,
 };
 
 /**
@@ -121,6 +137,8 @@ function SidebarBody({ collapsed = false, onNavigate }) {
   const tNav = useTranslations('nav');
   const canStartMeeting = usePermission('meeting.start');
   const canManageWorkspace = usePermission('org.settings');
+  const canReadKnowledge = usePermission('knowledge.read');
+  const canReadTasks = usePermission('task.read');
   const { enabled: vexaEnabled } = useVexaIntegrationEnabled();
   const showRemoteMeeting = canStartMeeting && vexaEnabled;
   if (!session) return null;
@@ -175,6 +193,29 @@ function SidebarBody({ collapsed = false, onNavigate }) {
             onNavigate={onNavigate}
           />
         ))}
+
+        {/* Workspace knowledge hub */}
+        {canReadKnowledge && (
+          <NavRow
+            href={KNOWLEDGE_NAV_LINK.href}
+            label={tNav(KNOWLEDGE_NAV_LINK.labelKey)}
+            Icon={KNOWLEDGE_NAV_LINK.Icon}
+            isActive={router.pathname === KNOWLEDGE_NAV_LINK.href || router.pathname.startsWith(KNOWLEDGE_NAV_LINK.href + '/')}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        )}
+
+        {canReadTasks && (
+          <NavRow
+            href={TASKS_NAV_LINK.href}
+            label={tNav(TASKS_NAV_LINK.labelKey)}
+            Icon={TASKS_NAV_LINK.Icon}
+            isActive={router.pathname === TASKS_NAV_LINK.href || router.pathname.startsWith(TASKS_NAV_LINK.href + '/')}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        )}
 
         {/* Document archive — always last */}
         <NavRow

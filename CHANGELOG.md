@@ -5,7 +5,58 @@ Alle relevanten Änderungen an diesem Projekt werden in dieser Datei dokumentier
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
-## [0.4.0] – 2026-05-07
+## [Unreleased]
+
+### Changed
+- **Service rename: `fireworks-bridge` → `voxtral-bridge`.** Der
+  Transkriptions-Proxy hieß historisch `fireworks-bridge` (als die
+  Upstream-STT noch Fireworks AI war), spricht aber seit der Mistral-
+  Migration ausschließlich Voxtral. Umbenannt: Verzeichnis
+  `services/voxtral-bridge/`, Image-Tag `voxtral-bridge:prod`,
+  Container `transkription-voxtral-bridge`, Compose-Service
+  `voxtral-bridge`, Hostname-Referenzen in `vexa-lite`. Der
+  `FIREWORKS_API_KEY`-Env-Fallback bleibt als Legacy-Alias für ältere
+  Setups.
+- **Per-Sprache Voxtral-TTS-Stimme + Chinesisch.** `lib/tts.js` mappt
+  DE/EN/ZH/FR/IT/ES/PT/NL/AR/HI auf Voxtral-Preset-Stimmen; ZH ohne
+  eigenen Preset fällt auf `casual_male` (englische Stimme) zurück.
+  STT-Dropdown im Dialog + In-Call um ZH/FR/IT erweitert.
+
+### Fixed
+- **Voxtral-TTS-Modell-ID korrigiert.** `voxtral-tts-latest` (existiert
+  nicht) → `voxtral-mini-tts-2603`. Voice-Feld umbenannt `voice_id` →
+  `voice` (live-API verlangt `voice`, OpenAPI-Doku-Bug). Default-Stimme
+  `casual_male` aus der offiziellen Hugging-Face-Code-Beispiel-Doku.
+- **TTS-Resilienz.** `voxtralTts` wiederholt transiente Fehler (429 /
+  5xx / Netzwerk-Abort) mit Exponential-Backoff (Standard 3 Versuche),
+  statt das Audio-Segment beim ersten Hiccup still zu verwerfen.
+  Permanente 4xx (falsches Modell/Voice/Key) scheitern weiterhin sofort.
+  Tunebar via `TTS_MAX_ATTEMPTS` / `TTS_RETRY_BASE_MS`.
+- **Fehlgeschlagene Übersetzung wird nicht mehr als Audio gesprochen.**
+  Wenn Mistral-Translate ausfällt, echot die Bridge zwar den Quelltext
+  für die UI-Konsistenz, markiert ihn aber mit `translationFailed` —
+  der Audio-Inject-Hook überspringt solche Segmente, damit der Bot
+  nicht den unübersetzten Originaltext in der Zielstimme vorliest.
+- **Chat-Post-Fehler sichtbar in der Meeting-Timeline.** DSGVO-Hinweis-
+  und Share-Link-Poster legen bei Sende-Fehler (z.B. Plattform ohne
+  Bot-Chat-Handler wie aktuell Nextcloud Talk) jetzt ein
+  `*_failed`-Transcription-Event an, statt nur ins Server-Log zu
+  schreiben — der Host sieht, dass er manuell ankündigen/teilen muss.
+
+### Security / Ops
+- **`.dockerignore`** schließt jetzt `.env` / `.env.*` aus, damit lokale
+  Secrets nie ins Image gebacken werden.
+- **`.env.example`** dokumentiert die neuen TTS-Variablen
+  (`MISTRAL_TTS_MODEL`, `MISTRAL_TTS_VOICE`, `TTS_HTTP_TIMEOUT_MS`,
+  `TTS_MAX_ATTEMPTS`, `TTS_RETRY_BASE_MS`).
+
+### Tests
+- **Unit-Test-Suite auf 139 Tests aktualisiert**: `tests/permissions.test.mjs` deckt die
+  Rollen→Permission-Matrix + Fail-Closed-Verhalten ab,
+  `tests/secrets.test.mjs` deckt AES-256-GCM Round-Trip, Versions-Prefix,
+  Auth-Tag-Integrität (Tamper → null) und Wrong-Key-Verhalten ab.
+
+## [Unreleased draft] – 2026-05-07
 
 ### Added
 - **Nextcloud Talk als vierte Meeting-Plattform** (via Vexa-Fork). Neuer
@@ -145,55 +196,26 @@ Erstes öffentliches Release auf GitHub. Project switched from internal
 - **Produktivitätsfunktionen (Punkte 1-3)**:
   - Auto-Glossar für Kontextbegriffe aus Historie (`GET /api/glossary/suggestions`).
   - Intelligente Modellauswahl mit Kosten-/Token-Vorschau (`POST /api/model-assistant`).
-  - 1-Klick-Workflows im Text-Assistenten (`GET /api/workflows`, `POST /api/workflows/execute`).
-- **Wissensgraph-Generator**:
-  - Native Integration der Knowledge-Graph Generierung.
-  - Interaktives Rendering von Entitäten und Relationen mittels `vis-network`.
-  - PNG-Export-Funktionalität des generierten Graphen.
-- **Team Realtime**:
-  - Neue Realtime-Seite `/realtime` für Live-Transkript, Live-Dokument und Live-Wissensgraph.
-  - Neue Realtime-API-Endpunkte:
-    - `GET|POST /api/realtime/sessions`
-    - `GET|PATCH /api/realtime/sessions/[id]`
-    - `POST|DELETE /api/realtime/sessions/[id]/members`
-    - `POST /api/realtime/sessions/[id]/ingest`
-    - `GET /api/realtime/sessions/[id]/stream`
-  - Neue DB-Tabellen:
-    - `realtime_sessions`
-    - `realtime_session_members`
-    - `realtime_session_events`
-- **Workflow Editor + Versionierung**:
-  - Eigene Workflows als versionierte Definitionen in der DB.
-  - Rollback auf frühere Versionen.
-  - Neue API-Endpunkte:
-    - `POST /api/workflows` (Workflow speichern/neue Version)
-    - `DELETE /api/workflows/[workflowId]` (deaktivieren)
-    - `GET /api/workflows/[workflowId]/versions`
-    - `POST /api/workflows/[workflowId]/rollback`
 - **Audit-Log für kritische Aktionen**:
   - Neue DB-Tabelle `audit_log`.
   - Neuer Endpunkt `GET /api/audit-log`.
-  - Protokollierung von sicherheits- und betriebsrelevanten Aktionen (z. B. Settings, Workflow-Versionen, Realtime-Mitgliederverwaltung, Upload-Blockierungen).
+  - Protokollierung von sicherheits- und betriebsrelevanten Aktionen (z. B. Settings und Upload-Blockierungen).
 - **Upload Security Hook**:
   - Optionaler Virus-Scan vor Persistenz des Uploads (`UPLOAD_VIRUS_SCAN_*`).
 - **Budget Guardrails (pro Mitglied/Account)**:
   - Neues Setting `member_monthly_budget_limit`.
-  - Guardrail-Prüfung mit Prognose vor KI-Aufrufen in Text-AI, Übersetzung, Workflows und Realtime-Audio-Chunks.
-- **Sketch Summary / Lernskizze (Gemini)**:
-  - Neue Seite `/sketch` zur Bildgenerierung aus Lerntext.
-  - Neuer Endpunkt `POST /api/sketch-summary` (Gemini `gemini-3-pro-image-preview`).
-  - Neue Settings-Unterstützung für `google_api_key` / `google_api_key_encrypted` inkl. UI-Statusanzeige.
-  - Studio-Einstellungen vor Generierung: Layout-Modus, Detailgrad und Fokus.
-  - Mehrstufige Engine:
-    - Semantik-Extraktion (`TEXT` -> Struktur-JSON),
-    - Illustrationsplanung pro Block (`icon` + `motif`),
-    - deterministisches SVG-Rendering mit einheitlicher Typografie/Layoutregeln.
-  - Ausgabe jetzt vektorbasiert (`image/svg+xml`) im festen Querformat (16:9, 1920x1080).
+  - Guardrail-Prüfung mit Prognose vor KI-Aufrufen in Textoptimierung und Übersetzung.
 - **Datentabelle (NotebookLM-ähnlicher Modus)**:
   - Neue Seite `/datentabelle` als separater Aufbereitungsmodus.
   - Unterstützung für alle drei Quellen: Audio, Text und OCR.
   - Neuer Built-in Template-Key `data_table` inkl. eigenem Analyseprompt.
   - Dynamische Tabellen-Normalisierung in `rows + table_schema + analysis_meta` für einheitliche Darstellung in `TableRenderer`.
+
+### Removed
+- Frühere Experimente für Realtime-Sessions, Workflow-Editor,
+  Wissensgraph und Gemini-Sketch wurden vor dem öffentlichen 0.x-Stand
+  wieder entfernt. Der aktuelle API-Stand ist in
+  `docs/api-specification.md` dokumentiert.
 
 ### Changed
 - **Tabellen-Vorlagen Editor V2**:

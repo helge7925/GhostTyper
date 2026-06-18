@@ -11,8 +11,8 @@ function headerValue(raw) {
 
 /**
  * Bridge-only callback. The transcription bridge container POSTs here on
- * each transcription (cached ~60s) to fetch the current effective Mistral
- * Voxtral key plus the workspace-global context bias. This is what makes
+ * each transcription (cached ~60s) to fetch the current effective Cortecs
+ * key/model plus the workspace-global context bias. This is what makes
  * the admin UI key edits actually take effect at runtime — without it,
  * the bridge would still hold whatever key it was started with.
  *
@@ -85,6 +85,8 @@ export default async function handler(req, res) {
     }
     return res.status(200).json({
       apiKey: config.apiKey,
+      provider: config.provider,
+      baseUrl: config.baseUrl,
       model: config.model,
       contextBias: parseContextBias(config.contextBias),
       source: config.source,

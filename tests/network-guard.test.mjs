@@ -188,9 +188,10 @@ test('safeFetch validates every redirect hop', async () => {
   // the per-hop validation works.
   const originalFetch = globalThis.fetch;
   let firstUrl = '';
+  const startUrl = 'https://198.51.100.10/';
   globalThis.fetch = async (url) => {
     if (firstUrl === '') firstUrl = url;
-    if (url === 'https://example.com/') {
+    if (url === startUrl) {
       return new Response(null, {
         status: 302,
         headers: { location: 'http://127.0.0.1:8080/secrets' },
@@ -200,10 +201,10 @@ test('safeFetch validates every redirect hop', async () => {
   };
   try {
     await assert.rejects(
-      () => safeFetch('https://example.com/', {}, { allowLoopback: false }),
+      () => safeFetch(startUrl, {}, { allowLoopback: false }),
       (err) => err.code === 'OUTBOUND_PRIVATE_IP',
     );
-    assert.equal(firstUrl, 'https://example.com/');
+    assert.equal(firstUrl, startUrl);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -216,12 +217,12 @@ test('safeFetch enforces redirect hop limit', async () => {
     calls += 1;
     return new Response(null, {
       status: 302,
-      headers: { location: `https://example.com/hop-${calls}` },
+      headers: { location: `https://198.51.100.10/hop-${calls}` },
     });
   };
   try {
     await assert.rejects(
-      () => safeFetch('https://example.com/start', {}, { allowLoopback: false, maxRedirects: 2 }),
+      () => safeFetch('https://198.51.100.10/start', {}, { allowLoopback: false, maxRedirects: 2 }),
       (err) => err.code === 'OUTBOUND_TOO_MANY_REDIRECTS',
     );
     // 2 hops allowed → 3 actual fetch invocations (start + hop-1 + hop-2),
@@ -235,10 +236,10 @@ test('safeFetch enforces redirect hop limit', async () => {
 test('safeFetch with maxRedirects=0 forbids any redirect', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>
-    new Response(null, { status: 302, headers: { location: 'https://example.com/next' } });
+    new Response(null, { status: 302, headers: { location: 'https://198.51.100.10/next' } });
   try {
     await assert.rejects(
-      () => safeFetch('https://example.com/', {}, { allowLoopback: false, maxRedirects: 0 }),
+      () => safeFetch('https://198.51.100.10/', {}, { allowLoopback: false, maxRedirects: 0 }),
       (err) => err.code === 'OUTBOUND_TOO_MANY_REDIRECTS',
     );
   } finally {

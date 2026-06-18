@@ -90,7 +90,7 @@ export default function Settings() {
   const [contextBias, setContextBias] = useState('');
   const [costLimit, setCostLimit] = useState('');
   const [memberMonthlyBudgetLimit, setMemberMonthlyBudgetLimit] = useState('');
-  const [preferredModel, setPreferredModel] = useState('mistral-large-latest');
+  const [preferredModel, setPreferredModel] = useState('deepseek-v4-pro');
   const [defaultTranslateLanguage, setDefaultTranslateLanguage] = useState('en');
   const [ocrModel, setOcrModel] = useState('mistral-ocr-latest');
   const [remoteMeetingEnabled, setRemoteMeetingEnabled] = useState(true);
@@ -200,7 +200,7 @@ export default function Settings() {
         setContextBias(settingsData.contextBias || '');
         setCostLimit(settingsData.costLimit ?? '');
         setMemberMonthlyBudgetLimit(settingsData.memberMonthlyBudgetLimit ?? '');
-        setPreferredModel(settingsData.preferredModel || 'mistral-large-latest');
+        setPreferredModel(settingsData.preferredModel || 'deepseek-v4-pro');
         setDefaultTranslateLanguage(settingsData.defaultTranslateLanguage || 'en');
         setOcrModel(settingsData.ocrModel || 'mistral-ocr-latest');
         setRemoteMeetingEnabled(settingsData.remoteMeetingEnabled !== false);
@@ -984,6 +984,7 @@ export default function Settings() {
                     <select value={preferredModel} onChange={e => setPreferredModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent">
                       <option value="mistral-small-latest">Kostengünstig / Schnell</option>
                       <option value="mistral-medium-latest">Ausgewogen</option>
+                      <option value="deepseek-v4-pro">Cortecs · deepseek-v4-pro</option>
                       <option value="mistral-large-latest">Qualität</option>
                     </select>
                     <p className="mt-3 text-[10px] text-secondary leading-relaxed italic">

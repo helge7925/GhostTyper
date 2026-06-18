@@ -1,6 +1,6 @@
 # GhostTyper Dokumentation
 
-Stand: 2026-05-07 · Aktuelle Version: siehe [`../CHANGELOG.md`](../CHANGELOG.md)
+Stand: 2026-06-17 · Aktuelle Version: 0.3.0
 
 Quelle der Wahrheit für laufende Releases ist immer der Changelog;
 diese Index-Seite ist eine Navigation, kein Status-Tracker.

@@ -13,6 +13,7 @@ import {
 } from '../../../lib/transcription-stale';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { hasPermission } from '../../../lib/permissions';
+import { autoIndexDocument } from '../../../lib/document-index';
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
@@ -209,6 +210,35 @@ async function handler(req, res) {
           `UPDATE transcriptions SET ${updates.join(', ')} WHERE id = $${paramIndex++} AND organization_id = $${paramIndex}`,
           values
         );
+
+        if (folderId !== undefined || isFavorite !== undefined) {
+          const docUpdates = [];
+          const docValues = [];
+          let docParamIndex = 1;
+          if (folderId !== undefined) {
+            docUpdates.push(`folder_id = $${docParamIndex++}`);
+            docValues.push(folderId === undefined ? null : folderId);
+          }
+          if (isFavorite !== undefined) {
+            docUpdates.push(`is_favorite = $${docParamIndex++}`);
+            docValues.push(Boolean(isFavorite));
+          }
+          if (docUpdates.length > 0) {
+            docUpdates.push('updated_at = NOW()');
+            docValues.push(transId, orgId);
+            await query(
+              `UPDATE documents SET ${docUpdates.join(', ')} WHERE transcription_id = $${docParamIndex++} AND organization_id = $${docParamIndex}`,
+              docValues,
+            );
+          }
+        }
+
+        // Re-index when the indexable content changed: edited transcript text
+        // or completed speaker assignment (diarized audio is only indexed once
+        // speakers are assigned). Best-effort, never blocks the save.
+        if (text !== undefined || speakers !== undefined) {
+          void autoIndexDocument({ transcriptionId: transId, organizationId: orgId, userId });
+        }
 
         return res.status(200).json({ message: 'Gespeichert' });
       } catch (error) {

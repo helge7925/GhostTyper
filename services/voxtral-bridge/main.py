@@ -1,24 +1,21 @@
-"""Bridge between Vexa-Lite and Mistral Voxtral.
+"""Bridge between Vexa-Lite and a Cortecs/OpenAI-compatible STT API.
 
 Vexa-Lite hard-codes a Whisper-style transcription endpoint and a fixed
-model name; Voxtral-Mini lives at a different URL and expects its own
-model identifier. The bridge sits in between to:
+model name. The bridge sits in between to:
 
   * rewrite the `model` form field in flight,
-  * fetch the current effective Mistral key from the GhostTyper webapp
+  * fetch the current effective Cortecs key/model from the GhostTyper webapp
     at request time (cached ~60s) so workspace admins can rotate the key
     via the UI without restarting any container,
-  * inject the workspace-global `context_bias` into the multipart form,
-    so user-defined jargon also benefits live transcriptions,
-  * default `response_format=verbose_json` and
-    `timestamp_granularities=word` when Vexa-Lite does not set them,
-    so the JSON response carries segments, speakers and word timestamps.
+  * inject the workspace-global context terms as the OpenAI-compatible
+    `prompt` field, so user-defined jargon also benefits live transcriptions,
+  * default `response_format=verbose_json` when Vexa-Lite does not set it,
+    so providers can return segments when the selected model supports them.
 
 If the callback to GhostTyper fails (webapp down, secret mismatch), we
-fall back to the MISTRAL_API_KEY env we were started with — so a degraded
+fall back to the CORTECS_API_KEY env we were started with — so a degraded
 webapp does not take down audio transcription. The legacy
-FIREWORKS_API_KEY / VEXA_TRANSCRIPTION_TOKEN env vars are still honoured
-during the migration window for setups that have not yet renamed them.
+VEXA_TRANSCRIPTION_TOKEN env var is still honoured as an operator fallback.
 """
 
 from __future__ import annotations
@@ -33,9 +30,9 @@ from fastapi.responses import JSONResponse, Response
 
 UPSTREAM_URL = os.environ.get(
     "UPSTREAM_URL",
-    "https://api.mistral.ai/v1/audio/transcriptions",
+    "https://api.cortecs.ai/v1/audio/transcriptions",
 )
-DEFAULT_MODEL = os.environ.get("MODEL_OVERRIDE", "voxtral-mini-transcribe-realtime-2602")
+DEFAULT_MODEL = os.environ.get("MODEL_OVERRIDE", "whisper-large-v3")
 TIMEOUT_S = float(os.environ.get("UPSTREAM_TIMEOUT_S", "120"))
 
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "").rstrip("/")
@@ -51,8 +48,7 @@ CACHE_TTL_S = float(os.environ.get("WEBAPP_CACHE_TTL_S", "60"))
 CACHE_MAXSIZE = max(1, int(os.environ.get("WEBAPP_CACHE_MAXSIZE", "1024")))
 
 FALLBACK_API_KEY = (
-    os.environ.get("MISTRAL_API_KEY")
-    or os.environ.get("FIREWORKS_API_KEY")
+    os.environ.get("CORTECS_API_KEY")
     or os.environ.get("VEXA_TRANSCRIPTION_TOKEN")
     or ""
 )
@@ -77,6 +73,7 @@ def _scope_key(org_id: str | None, platform: str | None, native_meeting_id: str 
 def _cache_default() -> dict:
     return {
         "api_key": None,
+        "base_url": None,
         "model": DEFAULT_MODEL,
         "context_bias": [],
         "source": None,
@@ -88,7 +85,7 @@ async def fetch_effective_config(
     platform: str | None = None,
     native_meeting_id: str | None = None,
 ) -> dict:
-    """Pull the live effective Mistral key + context bias from the webapp.
+    """Pull the live effective Cortecs key/model + context bias from the webapp.
 
     Cached ``CACHE_TTL_S`` seconds so we don't hammer the webapp on every
     transcription, but short enough that admin-side key rotations take
@@ -124,6 +121,7 @@ async def fetch_effective_config(
                     fresh = _cache_default()
                     fresh.update(
                         api_key=body.get("apiKey"),
+                        base_url=(body.get("baseUrl") or "").rstrip("/") or None,
                         model=body.get("model") or DEFAULT_MODEL,
                         context_bias=[str(term) for term in bias if term],
                         source=body.get("source"),
@@ -167,6 +165,8 @@ async def proxy(request: Request) -> Response:
         native_meeting_id=native_meeting_id,
     )
     effective_model = config.get("model") or DEFAULT_MODEL
+    upstream_url = config.get("base_url") or None
+    upstream_url = f"{upstream_url.rstrip('/')}/audio/transcriptions" if upstream_url else UPSTREAM_URL
 
     for key, value in form.multi_items():
         if hasattr(value, "read") and hasattr(value, "filename"):
@@ -182,21 +182,16 @@ async def proxy(request: Request) -> Response:
     if "model" not in seen_fields:
         data.append(("model", effective_model))
 
-    # Default to verbose_json/word-level timestamps so Vexa-Lite gets the
-    # segments + speaker_id + words[] it relies on, regardless of what it
-    # sends. Non-destructive: only set if the caller did not.
+    # Default to verbose_json so providers can return segments when the
+    # selected model supports them. Non-destructive: only set if the caller did not.
     if "response_format" not in seen_fields:
         data.append(("response_format", "verbose_json"))
-    if "timestamp_granularities" not in seen_fields:
-        data.append(("timestamp_granularities", "word"))
 
-    # Inject the workspace-global context bias when the caller has not
-    # supplied its own. Vexa-Lite has no notion of org-scoped bias, so this
-    # is the only way to surface user-pinned jargon to the live path.
-    if "context_bias" not in seen_fields and config.get("context_bias"):
+    # Inject workspace-global context terms as OpenAI-compatible prompt.
+    if "prompt" not in seen_fields and config.get("context_bias"):
         bias_terms = [t for t in config["context_bias"] if isinstance(t, str) and t.strip()]
         if bias_terms:
-            data.append(("context_bias", ",".join(bias_terms)))
+            data.append(("prompt", ", ".join(bias_terms)))
 
     api_key = config.get("api_key") or FALLBACK_API_KEY
     if not api_key:
@@ -208,7 +203,7 @@ async def proxy(request: Request) -> Response:
                 status_code=503,
                 content={
                     "error": "no_api_key",
-                    "message": "Mistral API key not configured (workspace UI nor ENV).",
+                    "message": "Cortecs API key not configured (workspace UI nor ENV).",
                 },
             )
         headers = {"Authorization": forwarded}
@@ -229,7 +224,7 @@ async def proxy(request: Request) -> Response:
     timeout = aiohttp.ClientTimeout(total=TIMEOUT_S)
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.post(UPSTREAM_URL, data=form_data, headers=headers) as upstream:
+            async with session.post(upstream_url, data=form_data, headers=headers) as upstream:
                 body = await upstream.read()
                 return Response(
                     content=body,

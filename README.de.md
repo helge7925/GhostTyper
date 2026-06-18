@@ -14,17 +14,17 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.4.0-orange" />
-    <img alt="Stack" src="https://img.shields.io/badge/Next.js-13-black" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-orange" />
+    <img alt="Stack" src="https://img.shields.io/badge/Next.js-15.5.x-black" />
     <img alt="Node" src="https://img.shields.io/badge/Node-18%2B-success" />
     <img alt="Postgres" src="https://img.shields.io/badge/Postgres-16-blue" />
-    <img alt="Tests" src="https://img.shields.io/badge/tests-72%20passing-success" />
+    <img alt="Tests" src="https://img.shields.io/badge/tests-139%20passing-success" />
     <img alt="License" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue" />
   </p>
 </div>
 
 <p align="center">
-  <img src="docs/screenshots/02-dashboard.png" alt="GhostTyper Dashboard nach Login" width="100%" />
+  <img src="docs/screenshots/01-login.png" alt="GhostTyper Login-Seite" width="100%" />
 </p>
 
 GhostTyper bündelt Audio-Transkription, OCR, KI-Zusammenfassungen,
@@ -36,7 +36,8 @@ Audit-Trail sind Teil der Basis.
 <details>
 <summary>Weitere Screenshots</summary>
 
-<p align="center"><img src="docs/screenshots/01-login.png" alt="Login-Seite" width="49%" /> <img src="docs/screenshots/07-remote-meeting.png" alt="Remote-Meeting Modal" width="49%" /></p>
+Aktuell vorhanden: `docs/screenshots/01-login.png`. Dashboard- und
+Remote-Meeting-Screenshots sind TODO / need capture, bevor sie eingebettet werden.
 
 </details>
 
@@ -68,7 +69,7 @@ Audit-Trail sind Teil der Basis.
 
 | Schicht  | Technologie                                                      |
 | -------- | ---------------------------------------------------------------- |
-| Frontend | Next.js 13 (Pages Router), React 18, Tailwind, Radix, Zustand    |
+| Frontend | Next.js 15.5.x (Pages Router), React 18, Tailwind, Radix, Zustand |
 | Backend  | Next.js API Routes, NextAuth, PostgreSQL 16 (`pg`)               |
 | AI       | Mistral (Chat / OCR / Voxtral batch + live), Vexa Lite           |
 | Infra    | Docker Compose, Traefik (optional), AES-256-GCM (`lib/secrets.js`) |
@@ -79,7 +80,7 @@ Audit-Trail sind Teil der Basis.
 ```
 ┌─────────────────────────┐    ┌──────────────────────────┐
 │ GhostTyper Webapp       │    │ Postgres 16              │
-│ Next.js 13 + Worker     │◄──►│ Workspaces · Audit · Logs│
+│ Next.js 15.5.x + Worker │◄──►│ Workspaces · Audit · Logs│
 └──┬──────────────┬───────┘    └──────────────────────────┘
    │              │
    │ REST/SSE     │ Webhook + Bridge
@@ -147,9 +148,9 @@ Traefik auf `https://${DOMAIN}`).
 Vexa Lite und die Transkriptions-Bridge sind als optionales Compose-Profile
 vorbereitet. Standard-Audiopfad ist **Mistral Voxtral (Paris, EU)**, damit
 biometrische Meeting-Audio-Daten (DSGVO Art. 9) den EU-Raum nicht
-verlassen. Der Bridge-Container heißt aus historischen Gründen weiter
-`fireworks-bridge`, routet aber per Default zu Mistral — siehe
-„DSGVO-konformes Setup" unten.
+verlassen. Der Bridge-Service heißt `voxtral-bridge` (proxied zu Mistral
+Voxtral; der alte `FIREWORKS_API_KEY`-Env-Wert bleibt als Fallback
+erhalten) — siehe „DSGVO-konformes Setup" unten.
 
 ```bash
 COMPOSE_PROFILES=vexa
@@ -182,7 +183,7 @@ Vollständige ENV-Referenz: [`.env.example`](.env.example).
 
 | Befehl                   | Zweck                                                |
 | ------------------------ | ---------------------------------------------------- |
-| `npm test`               | 60 Unit-Tests (Tabellenlogik, Vexa-Mapping, Webhooks)|
+| `npm test`               | 139 Unit-Tests (Tabellenlogik, Vexa-Mapping, Webhooks, Satz-Buffering, Permissions, Secrets, …) |
 | `npm run lint`           | ESLint mit Next.js-Regelsatz                         |
 | `npm run smoke`          | Docker/API-Smoke-Test                                |
 | `npm run smoke:full`     | Smoke + Tests + Lint + Build + PDF-Renderer          |

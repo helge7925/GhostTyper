@@ -5,7 +5,7 @@
 - **Letzte Aktualisierung**: 07.05.2026
 - **Status**: Inkrementell gepflegt; Quelle der Wahrheit sind die
   Handler-Files unter `pages/api/`
-- **Version**: 0.3
+- **Version**: 0.3.0
 
 ## Übersicht
 

@@ -141,15 +141,13 @@ Abgedeckt ist aktuell:
 ## 7. Aktueller Testlauf (2026-02-20)
 
 - Laufkette:
-  - `npm test` -> erfolgreich (`7/7`).
+  - `npm test` -> erfolgreich (`139` Tests).
   - `npm run lint` -> erfolgreich.
   - `npm run build` -> erfolgreich.
 - Docker-Stack:
   - `docker compose -f config/docker-compose.dev.yml up -d` -> `transkription-webapp` und `transkription-db` `healthy`.
 - API-Smoke:
   - `GET /api/health` -> `200`.
-  - `GET /api/workflows` ohne Session -> `401` (erwartet).
-  - `POST /api/workflows/execute` ohne Session -> `401` (erwartet).
   - `POST /api/db-init` ohne Secret -> `403` (erwartet).
   - `POST /api/db-init` mit Secret -> `200`.
 - PDF-Renderer-Validierung:

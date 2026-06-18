@@ -244,15 +244,18 @@ export default function MeetingControlBar({
 
   return (
     <div className="bg-surface border border-accent/30 rounded-2xl p-4 shadow-lg space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <div className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" aria-hidden />
           <div>
             <p className="text-sm font-medium text-primary">Bot ist im Meeting</p>
             <p className="text-[11px] text-secondary">Status: {botStatus || 'aktiv'}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        {/* flex-wrap + justify-end so the toggle row stays right-aligned
+            but breaks into a second row instead of overflowing when
+            translation/overlay/audio toggles are all visible. */}
+        <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
           <div className="inline-flex items-center gap-2 bg-hover-subtle border border-subtle rounded-xl px-2 py-1.5">
             <Languages className="w-3.5 h-3.5 text-secondary" />
             <select
@@ -263,6 +266,9 @@ export default function MeetingControlBar({
             >
               <option value="de">Deutsch</option>
               <option value="en">English</option>
+              <option value="zh">中文</option>
+              <option value="fr">Français</option>
+              <option value="it">Italiano</option>
               <option value="auto">Auto</option>
             </select>
             {updatingLanguage && <Loader2 className="w-3.5 h-3.5 animate-spin text-secondary" />}

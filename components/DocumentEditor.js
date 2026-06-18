@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
 } from './ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, MessageSquare } from 'lucide-react';
 import { useTranslations } from '../lib/i18n';
 
 const LANGUAGES = [
@@ -125,6 +125,16 @@ export default function DocumentEditor({
     document.execCommand(command, false, value);
     captureSelection();
   }, [captureSelection, restoreSelection, t]);
+
+  const handleChatWithDocument = useCallback(() => {
+    const currentText = editorRef.current?.innerText || sidebarContent || '';
+    if (currentText.trim()) {
+      sessionStorage.setItem('chat:context:text', String(currentText.trim()).slice(0, 300000));
+      sessionStorage.setItem('chat:context:source', 'textoptimization');
+      sessionStorage.setItem('chat:context:title', String(filename || '').slice(0, 200));
+      window.open('/chat?source=textoptimization', '_blank');
+    }
+  }, [filename, sidebarContent]);
 
   const handleCopy = async () => {
     const currentText = editorRef.current?.innerText || "";
@@ -536,6 +546,14 @@ export default function DocumentEditor({
                 className="inline-flex px-4 py-2 text-xs font-bold rounded-xl transition-all text-primary hover:bg-hover-subtle"
               >
                 {t('focus')}
+              </button>
+
+              <button
+                onClick={handleChatWithDocument}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition-all text-accent hover:bg-accent/10 border border-accent/20"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                {t('chatWithDocument')}
               </button>
             </div>
           </>

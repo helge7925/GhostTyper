@@ -7,7 +7,8 @@ import {
   checkCostLimit,
   withUserCostLock,
 } from '../../../lib/usage';
-import { getSettingsRow, resolveMistralApiKey } from '../../../lib/settings-service';
+import { getSettingsRow, resolveCortecsConfig } from '../../../lib/settings-service';
+import { resolveChatModel } from '../../../lib/model-policy';
 import { MAX_TEMPLATE_GENERATOR_GOAL_LENGTH } from '../../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 
@@ -37,10 +38,12 @@ async function handler(req, res) {
 
   try {
     const settingsRow = await getSettingsRow(userId);
-    const apiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
+    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
+    const apiKey = cortecs.apiKey;
+    const preferredModel = resolveChatModel(cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
 
     if (!apiKey) {
-      return res.status(400).json({ message: 'Kein Mistral API-Key konfiguriert.' });
+      return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert.' });
     }
 
     const promptText = await withUserCostLock(userId, async () => {
@@ -49,7 +52,12 @@ async function handler(req, res) {
         throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
       }
 
-      const { promptText: value, usage, model } = await generateTemplate(goal, apiKey);
+      const { promptText: value, usage, model } = await generateTemplate(
+        goal,
+        apiKey,
+        preferredModel,
+        { baseUrl: cortecs.baseUrl, preference: cortecs.preference },
+      );
       await logUsage(userId, model, 'template_generation', usage, orgId);
       return value;
     });

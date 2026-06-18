@@ -3,44 +3,43 @@
 ## Übersicht
 
 Dieses Dokument beschreibt die AI-Integration für die GhostTyper WebApp.
-- Mistral-Modelle: Transkription, OCR, Analyse, Übersetzung
+- Cortecs-Modelle: Transkription, Analyse, Übersetzung, Textoptimierung
+- Mistral-Modelle: OCR und Voxtral-TTS
 
 ## Architektur
 
 ### AI-Integration-Fluss
 
-1. **Audio-Verarbeitung**: Audio-Aufnahmen werden serverseitig via FFmpeg in MP3 konvertiert, um maximale Kompatibilität mit der Mistral API zu gewährleisten.
-2. **Transkription**: Die Audio-Datei wird mit Mistral Voxtral Mini (`voxtral-mini-latest`) transkribiert.
-3. **Analyse**: Das Transkript wird basierend auf Vorlagen mit Mistral Large, Medium oder Small analysiert.
+1. **Audio-Verarbeitung**: Audio-Aufnahmen werden serverseitig via FFmpeg in MP3 konvertiert, um maximale Kompatibilität mit STT-APIs zu gewährleisten.
+2. **Transkription**: Die Audio-Datei wird standardmäßig über Cortecs mit `whisper-large-v3` transkribiert.
+3. **Analyse**: Das Transkript wird basierend auf Vorlagen über Cortecs mit `deepseek-v4-pro` analysiert.
 4. **OCR**: Dokumente (PDF/Bilder) werden mit Mistral OCR (`mistral-ocr-latest`) verarbeitet.
-5. **Übersetzung**: Texte werden mit Mistral-Modellen in die gewählte Zielsprache übersetzt.
+5. **Übersetzung**: Texte werden über Cortecs in die gewählte Zielsprache übersetzt.
 6. **Speichern**: Alle Ergebnisse werden strukturiert in der PostgreSQL-Datenbank gespeichert.
 
 ## Konfiguration
 
-### Mistral-API
+### Cortecs-API
 
-Die Mistral-API-Logik ist zentral in `lib/ai-service.js` implementiert.
+Die Cortecs-API-Logik für Chat/STT ist zentral in `lib/ai-service.js` implementiert. Mistral-spezifische OCR bleibt im selben Modul isoliert.
 
 **Transkription:**
-Nutzt den `/audio/transcriptions` Endpoint. Unterstützt Diarization (Sprechererkennung) und Context Bias (Fachbegriffe).
+Nutzt den Cortecs `/audio/transcriptions` Endpoint. Workspace-Kontextbegriffe werden als OpenAI-kompatibles `prompt` übergeben.
 
 **Analyse & Chat:**
-Nutzt den `/chat/completions` Endpoint mit JSON-Response-Format für strukturierte Analysen.
+Nutzt den Cortecs `/chat/completions` Endpoint mit JSON-Response-Format für strukturierte Analysen.
 
 ### Unterstützte Modelle
-- **Batch-Transkription** (Datei-Upload): `voxtral-mini-latest` (Voxtral Mini)
-- **Live-Transkription** (Vexa-Pfad): `voxtral-mini-transcribe-realtime-2602`
-  (Realtime-Tuning für ≤5 s End-to-End-Latenz, gleicher Endpoint, gleicher
-  Preis pro Minute)
-- **Analyse / Chat**: `mistral-large-latest` (Standard), wahlweise auch
-  `mistral-medium-latest` oder `mistral-small-latest` für Kosten/Geschwindigkeits-Trade-off
+- **Batch-Transkription** (Datei-Upload): `whisper-large-v3`
+- **Live-Transkription** (Vexa-Pfad): `whisper-large-v3` über die interne Bridge
+- **Analyse / Chat**: `deepseek-v4-pro`
 - **OCR**: `mistral-ocr-latest`
-- **Übersetzung**: Standard `mistral-medium-latest`, wählbar pro Workspace
+- **Übersetzung/Textoptimierung**: `deepseek-v4-pro`, wählbar pro Workspace
 
 ## Umgebung
 
 Die Umgebung wird über die `.env`-Datei konfiguriert:
 
-- **MISTRAL_API_KEY**: Ihr persönlicher Mistral API-Schlüssel.
+- **CORTECS_API_KEY**: API-Schlüssel für Transkription, Analyse, Übersetzung und Textoptimierung.
+- **MISTRAL_API_KEY**: Mistral API-Schlüssel für OCR und TTS.
 - **DATABASE_URL**: Verbindung zur PostgreSQL-Datenbank.

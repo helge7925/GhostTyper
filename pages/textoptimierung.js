@@ -24,7 +24,7 @@ export default function Textoptimierung() {
   const [text, setText] = useState('');
   const [preset, setPreset] = useState('spelling_grammar');
   const [customInstruction, setCustomInstruction] = useState('');
-  const [model, setModel] = useState('mistral-large-latest');
+  const [model, setModel] = useState('deepseek-v4-pro');
   const [optimizedText, setOptimizedText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -159,6 +159,7 @@ export default function Textoptimierung() {
                 >
                   <option value="mistral-small-latest">Kostengünstig / Schnell</option>
                   <option value="mistral-medium-latest">Ausgewogen</option>
+                  <option value="deepseek-v4-pro">Cortecs · deepseek-v4-pro</option>
                   <option value="mistral-large-latest">Qualität</option>
                 </select>
               </div>

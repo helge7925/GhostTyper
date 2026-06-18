@@ -35,7 +35,7 @@ export default function Translate() {
 
   const [text, setText] = useState('');
   const [targetLanguage, setTargetLanguage] = useState('German');
-  const [model, setModel] = useState('mistral-large-latest');
+  const [model, setModel] = useState('deepseek-v4-pro');
   const [translatedText, setTranslatedText] = useState('');
   const [loading, setLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -317,6 +317,7 @@ export default function Translate() {
                 >
                   <option value="mistral-small-latest">Kostengünstig / Schnell</option>
                   <option value="mistral-medium-latest">Ausgewogen</option>
+                  <option value="deepseek-v4-pro">Cortecs · deepseek-v4-pro</option>
                   <option value="mistral-large-latest">Qualität</option>
                 </select>
               </div>
@@ -391,6 +392,7 @@ export default function Translate() {
                 <select value={model} onChange={e => setModel(e.target.value)} className="mt-2 w-full max-w-md bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none">
                   <option value="mistral-small-latest">Kostengünstig / Schnell</option>
                   <option value="mistral-medium-latest">Ausgewogen</option>
+                  <option value="deepseek-v4-pro">Cortecs · deepseek-v4-pro</option>
                   <option value="mistral-large-latest">Qualität</option>
                 </select>
               </div>
@@ -461,14 +463,30 @@ export default function Translate() {
                     {t('resultHeading')}
                   </span>
                   {translatedText && (
-                    <button
-                      type="button"
-                      onClick={() => setEditorOpen(true)}
-                      className="flex items-center gap-1.5 bg-hover-subtle hover:bg-hover-strong text-primary px-3 py-1.5 rounded-xl text-xs font-bold border border-subtle transition-all"
-                    >
-                      <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                      {t('openInEditor')}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setEditorOpen(true)}
+                        className="flex items-center gap-1.5 bg-hover-subtle hover:bg-hover-strong text-primary px-3 py-1.5 rounded-xl text-xs font-bold border border-subtle transition-all"
+                      >
+                        <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        {t('openInEditor')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (translatedText) {
+                            sessionStorage.setItem('chat:context:text', String(translatedText).slice(0, 300000));
+                            sessionStorage.setItem('chat:context:source', 'translate');
+                            sessionStorage.setItem('chat:context:title', (typeof inputText === 'string' ? inputText.slice(0, 80) : 'Übersetzung'));
+                            window.open('/chat?source=translate', '_blank');
+                          }
+                        }}
+                        className="flex items-center gap-1.5 border border-accent/30 text-accent hover:bg-accent/10 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+                      >
+                        Mit Übersetzung chatten
+                      </button>
+                    </>
                   )}
                 </div>
 
