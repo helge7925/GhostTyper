@@ -45,7 +45,7 @@ export default function Layout({ children }) {
               <TopBar />
 
               <main
-                className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-6"
+                className="flex-1 w-full px-4 sm:px-6 py-6"
                 style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 5rem)' }}
               >
                 {children}

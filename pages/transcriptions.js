@@ -455,13 +455,13 @@ export default function Transcriptions() {
 
         {/* Main: Transcription List */}
         <div className="flex-1 min-w-0">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-            <h1 className="text-2xl font-semibold text-primary truncate min-w-0">
+          <div className="flex flex-col gap-4 mb-6 xl:flex-row xl:items-center xl:justify-between">
+            <h1 className="text-2xl font-semibold text-primary truncate min-w-0 shrink-0">
               {activeFolderId === null ? 'Alle Dateien' : folders.find(f => f.id === activeFolderId)?.name}
             </h1>
-            
-            <div className="flex items-center gap-3 w-full lg:w-auto min-w-0">
-              <div className="relative flex-1 lg:flex-initial min-w-0">
+
+            <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto min-w-0">
+              <div className="relative flex-1 xl:flex-initial min-w-0">
                 {searching ? (
                   <div className="w-4 h-4 border-2 border-emphasis border-t-accent rounded-full animate-spin absolute left-3 top-1/2 -translate-y-1/2" />
                 ) : (
@@ -474,7 +474,7 @@ export default function Transcriptions() {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="Dateien durchsuchen..." 
-                  className="bg-surface-elevated border border-subtle rounded-xl pl-9 pr-4 py-2 text-xs text-primary outline-none focus:ring-1 focus:ring-accent w-full lg:w-64"
+                  className="bg-surface-elevated border border-subtle rounded-xl pl-9 pr-4 py-2 text-xs text-primary outline-none focus:ring-1 focus:ring-accent w-full xl:w-64"
                 />
               </div>
               {showMeetingButton && (
