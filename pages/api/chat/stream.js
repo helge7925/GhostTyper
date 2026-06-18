@@ -17,6 +17,7 @@ import {
   buildCortecsBody,
   cortecsErrorResponse,
   getConversation,
+  maybeGenerateConversationTitle,
   parseChatStreamLine,
   storeMessage,
   trimConversation,
@@ -176,7 +177,16 @@ async function handler(req, res) {
     await trimConversation(convId);
     await updateConversationMeta(convId);
 
-    writeSseEvent(res, 'done', { message: stored });
+    // Best-effort: give still-untitled conversations an AI-generated title
+    // based on the first exchange. Never blocks or fails the response.
+    const conversationTitle = await maybeGenerateConversationTitle({
+      convId,
+      cortecs,
+      userMessage,
+      assistantMessage: stored?.content || '',
+    });
+
+    writeSseEvent(res, 'done', { message: stored, conversationTitle });
     res.end();
   } catch (error) {
     if (!sseStarted) {

@@ -42,6 +42,7 @@ async function streamChatRequest(conversationId, message, onDelta) {
   const decoder = new TextDecoder();
   let buffer = '';
   let finalMessage = null;
+  let finalTitle = null;
   let streamError = null;
 
   for (;;) {
@@ -62,14 +63,14 @@ async function streamChatRequest(conversationId, message, onDelta) {
       let payload;
       try { payload = JSON.parse(dataStr); } catch { continue; }
       if (eventName === 'delta') onDelta(payload.content || '');
-      else if (eventName === 'done') finalMessage = payload.message;
+      else if (eventName === 'done') { finalMessage = payload.message; finalTitle = payload.conversationTitle || null; }
       else if (eventName === 'error') streamError = new Error(payload.message || 'stream error');
     }
   }
 
   if (streamError) throw streamError;
   if (!finalMessage) throw new Error('Kein Ergebnis vom Stream');
-  return finalMessage;
+  return { message: finalMessage, title: finalTitle };
 }
 
 export default function ChatPage() {
@@ -289,10 +290,15 @@ export default function ChatPage() {
     }
   };
 
-  const bumpConversation = useCallback((id) => {
+  const bumpConversation = useCallback((id, newTitle = null) => {
     setConversations((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, updated_at: new Date().toISOString(), message_count: (c.message_count || 0) + 2 } : c)),
+      prev.map((c) => (c.id === id
+        ? { ...c, updated_at: new Date().toISOString(), message_count: (c.message_count || 0) + 2, ...(newTitle ? { title: newTitle } : {}) }
+        : c)),
     );
+    if (newTitle) {
+      setConversation((prev) => (prev && prev.id === id ? { ...prev, title: newTitle } : prev));
+    }
   }, []);
 
   const handleSend = async (message) => {
@@ -315,12 +321,12 @@ export default function ChatPage() {
     };
 
     try {
-      const finalMessage = await streamChatRequest(convId, message, appendDelta);
+      const { message: finalMessage, title: newTitle } = await streamChatRequest(convId, message, appendDelta);
       setMessages((prev) => {
         const withoutPlaceholder = prev.filter((m) => m.id !== assistantId);
         return [...withoutPlaceholder, finalMessage];
       });
-      bumpConversation(convId);
+      bumpConversation(convId, newTitle);
     } catch (streamErr) {
       // Fall back to the non-streaming endpoint only when the stream endpoint
       // is unavailable (network error or 404) — nothing was persisted yet in
