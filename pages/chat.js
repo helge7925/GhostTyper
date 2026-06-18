@@ -8,6 +8,7 @@ import ChatSidebar from '../components/ChatSidebar';
 import ChatMessage from '../components/ChatMessage';
 import ChatInput from '../components/ChatInput';
 import ChatContextBar from '../components/ChatContextBar';
+import ChatSourcePicker from '../components/ChatSourcePicker';
 import { useTranslations } from '../lib/i18n';
 
 async function fetchJson(url, options = {}) {
@@ -87,6 +88,7 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [conversation, setConversation] = useState(null);
   const [contextItems, setContextItems] = useState([]);
+  const [pendingUploads, setPendingUploads] = useState([]);
   const [error, setError] = useState('');
 
   const scrollRef = useRef(null);
@@ -169,6 +171,26 @@ export default function ChatPage() {
       setError(err.message || t('sendError'));
     }
   }, [activeId, t]);
+
+  const handleUploadFile = useCallback(async (file) => {
+    if (!activeId || !file) return;
+    const uploadId = `up-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    setPendingUploads((prev) => [...prev, { id: uploadId, name: file.name }]);
+    setError('');
+    try {
+      const form = new FormData();
+      form.append('conversationId', String(activeId));
+      form.append('file', file);
+      const res = await fetch('/api/chat/upload', { method: 'POST', credentials: 'same-origin', body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || t('uploadFailed'));
+      await loadContext(activeId);
+    } catch (err) {
+      setError(err.message || t('uploadFailed'));
+    } finally {
+      setPendingUploads((prev) => prev.filter((u) => u.id !== uploadId));
+    }
+  }, [activeId, loadContext, t]);
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -429,18 +451,6 @@ export default function ChatPage() {
         <div className="flex-1 flex flex-col min-w-0">
           {activeId ? (
             <>
-              {conversation?.context_snapshot && contextLabel && (
-                <div className="px-4 py-2 bg-accent/5 border-b border-subtle text-xs text-secondary flex items-center gap-2">
-                  <Bot className="w-3.5 h-3.5 text-accent" />
-                  <span>{t('contextBanner', { label: contextLabel, title: conversation.title || '' })}</span>
-                </div>
-              )}
-              <ChatContextBar
-                items={contextItems}
-                onAdd={handleAddContext}
-                onRemove={handleRemoveContext}
-                disabled={sending}
-              />
               {error && (
                 <div className="px-4 py-2 bg-danger/10 border-b border-danger/20 text-danger text-xs">{error}</div>
               )}
@@ -485,7 +495,26 @@ export default function ChatPage() {
                   </div>
                 )}
               </div>
-              <ChatInput onSend={handleSend} disabled={sending} />
+              <ChatContextBar
+                items={contextItems}
+                onRemove={handleRemoveContext}
+                snapshot={conversation?.context_snapshot && contextLabel ? { label: contextLabel, title: conversation.title || '' } : null}
+                pending={pendingUploads}
+                disabled={sending}
+              />
+              <ChatInput
+                onSend={handleSend}
+                disabled={sending}
+                onUpload={handleUploadFile}
+                leading={(
+                  <ChatSourcePicker
+                    items={contextItems}
+                    onAdd={handleAddContext}
+                    onUpload={handleUploadFile}
+                    disabled={sending}
+                  />
+                )}
+              />
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
