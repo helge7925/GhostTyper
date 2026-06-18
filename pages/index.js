@@ -1,20 +1,9 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { useFormatter, useMessageList, useTranslations } from '../lib/i18n';
-
-// Locale-independent route metadata for the dashboard tile grid; the
-// title/description are looked up via i18n at render time.
-const FEATURE_TILES = [
-  { href: '/upload', titleKey: 'transcription' },
-  { href: '/datentabelle', titleKey: 'tables' },
-  { href: '/translate', titleKey: 'translation' },
-  { href: '/ocr', titleKey: 'ocr' },
-  { href: '/textoptimierung', titleKey: 'textOptimization' },
-  { href: '/transcriptions', titleKey: 'history' },
-];
+import { useMessageList, useTranslations } from '../lib/i18n';
 
 function pickRandomLine(pool, previousLine) {
   if (!Array.isArray(pool) || pool.length === 0) return previousLine || '';
@@ -42,26 +31,10 @@ function getFirstName(session) {
 
 export default function Home() {
   const { data: session, status } = useSession();
-  const [usage, setUsage] = useState(null);
   const tAuth = useTranslations('auth');
   const tLanding = useTranslations('landing');
-  const tNav = useTranslations('nav');
-  const tUsage = useTranslations('organization.usage');
-  const { currency } = useFormatter();
   const welcomeMessages = useMessageList('loadingMessages.welcome');
   const [welcomeLine, setWelcomeLine] = useState('');
-
-  useEffect(() => {
-    if (status !== 'authenticated') return;
-
-    fetch('/api/usage')
-      .then((response) => (response.ok ? response.json() : null))
-      .then((usageData) => {
-        setUsage(usageData);
-      })
-      .catch(() => {});
-
-  }, [status]);
 
   useEffect(() => {
     if (status !== 'authenticated' || welcomeMessages.length === 0) return undefined;
@@ -71,12 +44,6 @@ export default function Home() {
     }, 12000);
     return () => clearInterval(timer);
   }, [status, welcomeMessages]);
-
-  const topOperations = useMemo(
-    () => (usage?.byOperation || []).slice(0, 3),
-    [usage]
-  );
-  const firstName = useMemo(() => getFirstName(session), [session]);
 
   if (status === 'loading') {
     return <LoadingSpinner />;
@@ -112,67 +79,27 @@ export default function Home() {
     );
   }
 
+  const firstName = getFirstName(session);
+
   return (
     <>
       <Head>
         <title>Dashboard - GhostTyper</title>
       </Head>
 
-      <div className="mx-auto max-w-6xl animate-fade-in pb-20">
-        <section className="rounded-2xl border border-subtle bg-surface p-6 md:p-10">
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.22em] text-secondary">Dashboard</p>
-            <h1 className="mt-2 text-2xl md:text-3xl font-bold text-primary">
-              {tLanding('title')}, {firstName}
-            </h1>
-            <div className="mt-6 rounded-2xl border border-info/20 bg-cyan-500/[0.06] px-5 py-4 md:px-6 md:py-5">
-              <p className="text-[10px] uppercase tracking-[0.22em] text-info/80">{tLanding('decoded')}</p>
-              <p className="mt-2 text-lg md:text-2xl font-semibold leading-snug text-primary">
-                {welcomeLine}
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {FEATURE_TILES.map((tile) => (
-            <Link
-              key={tile.href}
-              href={tile.href}
-              className="rounded-2xl border border-subtle bg-surface px-5 py-4 hover:border-accent/30 transition-colors"
-            >
-              <h2 className="text-sm font-semibold text-primary">{tNav(tile.titleKey)}</h2>
-            </Link>
-          ))}
-        </section>
-
-        <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="rounded-2xl border border-subtle bg-surface px-5 py-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-secondary">{tUsage('totalCost')}</p>
-            <p className="text-xl text-primary mt-2">
-              {usage?.totalCost != null ? currency.format(usage.totalCost) : currency.format(0)}
-            </p>
-          </div>
-          <Link href="/settings/organization/integrations" className="rounded-2xl border border-subtle bg-surface px-5 py-4 hover:border-accent/30 transition-colors">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-secondary">KI-Integrationen</p>
-            <p className="text-sm mt-2 text-accent">Workspace API-Keys verwalten</p>
-          </Link>
-        </section>
-
-        <section className="mt-6 rounded-2xl border border-subtle bg-surface px-5 py-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-secondary mb-3">{tUsage('byOperation')}</p>
-          <div className="space-y-2">
-            {topOperations.map((entry) => (
-              <div key={entry.operation} className="flex items-center justify-between text-xs">
-                <span className="text-primary">{entry.operation}</span>
-                <span className="text-secondary">{currency.format(entry.cost)}</span>
-              </div>
-            ))}
-            {topOperations.length === 0 && (
-              <p className="text-xs text-secondary">{tUsage('noActivity')}</p>
-            )}
-          </div>
-        </section>
+      <div className="min-h-[72vh] flex flex-col items-center justify-center text-center animate-fade-in px-4">
+        <p className="text-[11px] uppercase tracking-[0.32em] text-info/70 mb-5">
+          {tLanding('decoded')}
+        </p>
+        <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-primary">
+          {tLanding('title')}, {firstName}
+        </h1>
+        <p
+          key={welcomeLine}
+          className="mt-7 max-w-2xl text-lg md:text-2xl font-medium leading-snug text-secondary animate-fade-in"
+        >
+          {welcomeLine}
+        </p>
       </div>
     </>
   );
