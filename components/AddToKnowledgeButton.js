@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Library, Check, Plus } from 'lucide-react';
+import { Library, Check, Plus, AlertCircle } from 'lucide-react';
 import { useTranslations } from '../lib/i18n';
 
 /**
@@ -13,6 +13,7 @@ export default function AddToKnowledgeButton({ documentId, displayName = '' }) {
   const [bases, setBases] = useState(null);
   const [addedTo, setAddedTo] = useState(() => new Set());
   const [busyId, setBusyId] = useState(null);
+  const [errorId, setErrorId] = useState(null);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -45,6 +46,7 @@ export default function AddToKnowledgeButton({ documentId, displayName = '' }) {
     e.preventDefault();
     e.stopPropagation();
     setBusyId(kbId);
+    setErrorId(null);
     try {
       const res = await fetch(`/api/knowledge/${kbId}/items`, {
         method: 'POST',
@@ -53,8 +55,9 @@ export default function AddToKnowledgeButton({ documentId, displayName = '' }) {
         body: JSON.stringify({ documentId }),
       });
       if (res.ok) setAddedTo((prev) => new Set(prev).add(kbId));
+      else setErrorId(kbId);
     } catch {
-      /* surfaced via lack of check mark */
+      setErrorId(kbId);
     } finally {
       setBusyId(null);
     }
@@ -89,7 +92,7 @@ export default function AddToKnowledgeButton({ documentId, displayName = '' }) {
                       disabled={busyId === b.id || added}
                       className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs text-primary hover:bg-subtle disabled:opacity-70 transition-colors"
                     >
-                      {added ? <Check className="w-3 h-3 text-accent shrink-0" /> : <Plus className="w-3 h-3 text-secondary shrink-0" />}
+                      {added ? <Check className="w-3 h-3 text-accent shrink-0" /> : errorId === b.id ? <AlertCircle className="w-3 h-3 text-danger shrink-0" /> : <Plus className="w-3 h-3 text-secondary shrink-0" />}
                       <span className="truncate" title={b.name}>{b.name}</span>
                     </button>
                   </li>
