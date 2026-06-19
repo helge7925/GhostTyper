@@ -1,6 +1,6 @@
 # Status: Dateien, Workspace-Wissen, Aufgaben, Chat RAG
 
-Last updated: 2026-06-18
+Last updated: 2026-06-19
 
 ## Current State
 
@@ -20,7 +20,7 @@ Last updated: 2026-06-18
 - Chat context supports attaching Workspace-Wissen knowledge bases as well as individual documents. Attached knowledge bases are included in conversation retrieval and honour per-item focused/full_context/off modes.
 - Aufgabenextraktion exists: `tasks` table, member matching, Cortecs JSON extraction, `POST /api/transcriptions/[id]/extract-tasks`, task CRUD APIs, a global `/tasks` page, transcription-detail review actions, and source links back to transcript segments when segment IDs are available.
 - Chat polish is implemented with copy/edit/regenerate actions and deterministic follow-up prompt chips on the latest assistant response.
-- Dateien polish now includes type/status/visibility/favorite filters, tag display/editing, list/grid toggle, and bulk delete selection.
+- Dateien polish now includes type/status/visibility/favorite filters, tag display/editing, list/grid toggle, and bulk delete **selection UI** (but bulk action functions not yet implemented).
 - Non-transcription documents now have a dedicated `/documents/[id]` detail page with metadata, preview, tags, reindex and delete actions.
 - Retrieval candidate loading now uses a bounded full-text pre-ranking before embedding rerank, which reduces random chunk selection in larger workspaces without requiring pgvector.
 - `npm run lint` uses the ESLint CLI instead of deprecated `next lint`.
@@ -39,13 +39,20 @@ Last updated: 2026-06-18
 
 ## Blocked
 
-- `.env` does not define `DATABASE_URL`; only `.env.example` does.
-- Local smoke commands still need an explicit `DATABASE_URL` environment variable unless `.env` is updated.
+*(None - `DATABASE_URL` is now defined in `.env` as of 2026-06-19.)*
 
 ## Next Steps
 
-1. Run manual QA from `docs/qa-checklist-files-knowledge-chat-tasks.md` on localhost.
-2. Consider pgvector for indexed vector search once workspace data grows beyond the current bounded candidate strategy.
+1. **Implement core missing features:**
+   - Add document audit events for create/update/delete operations.
+   - Implement bulk document actions (delete, move, tag) using existing selection UI.
+   - Add "Open Chat" button on `/documents/[id]` with automatic context attachment.
+2. **Add missing tests:**
+   - Tests for private vs workspace access on `/api/documents` endpoints.
+   - Tests for filter and full-text search functionality.
+   - Tests for citations and source authorization in chat.
+3. Run manual QA from `docs/qa-checklist-files-knowledge-chat-tasks.md` on localhost.
+4. Consider pgvector for indexed vector search once workspace data grows beyond the current bounded candidate strategy.
 
 ## Done since last update
 
