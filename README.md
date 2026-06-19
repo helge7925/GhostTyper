@@ -45,7 +45,9 @@ remote-meeting screenshots are TODO / need capture before they are embedded.
 ## Features
 
 - **Audio transcription** with speaker diarisation; direct browser recording
-  or file upload.
+  or file upload. Large recordings are automatically compressed and split into
+  overlapping chunks, so files of any length transcribe reliably despite the
+  provider's per-file size limit.
 - **Remote-meeting bot** for Google Meet, Microsoft Teams and Zoom via
   [Vexa Lite](https://github.com/Vexa-ai/vexa) — live transcript flows
   into the same editor. A community fork
@@ -53,20 +55,27 @@ remote-meeting screenshots are TODO / need capture before they are embedded.
   `feat/nextcloud-talk-adapter`) adds Nextcloud Talk as a fourth
   platform; swap the image via `VEXA_LITE_IMAGE` to enable.
 - **OCR** for PDFs and images.
-- **AI analysis**: summaries, free-form prompts, templates, translation.
+- **AI analysis**: summaries, meeting minutes, action-item / to-do extraction,
+  free-form prompts, custom templates and translation.
+- **AI chat over your content**: attach documents and knowledge bases as
+  context — or drop / paste / upload a file straight into the chat — and ask
+  questions; conversations are titled automatically.
+- **Workspace knowledge bases**: group documents for retrieval-augmented chat.
 - **Data tables**: structured extraction from audio, text or documents;
   Excel export.
+- **Nextcloud export**: save transcripts and analyses to a Nextcloud folder
+  over WebDAV, configured per workspace with an app password.
 - **Multi-workspace**: org-scoped data, roles `owner`/`admin`/`member`/
   `viewer`/`auditor`, audit log.
 - **Cost tracking**: monthly breakdown per provider, operation and member.
-- **Provider management**: Mistral and Vexa managed centrally per
-  workspace; keys encrypted with AES-256-GCM.
+- **Provider management**: Mistral, Vexa and Nextcloud managed centrally per
+  workspace; secrets encrypted with AES-256-GCM.
 
 ## Tech Stack
 
 | Layer    | Technology                                                       |
 | -------- | ---------------------------------------------------------------- |
-| Frontend | Next.js 15.5.x (Pages Router), React 18, Tailwind, Radix, Zustand |
+| Frontend | Next.js 16.x (Pages Router), React 18, Tailwind, Radix, Zustand |
 | Backend  | Next.js API Routes, NextAuth, PostgreSQL 16 (`pg`)               |
 | AI       | Mistral (Chat / OCR / Voxtral batch + live), Vexa Lite           |
 | Infra    | Docker Compose, Traefik (optional), AES-256-GCM (`lib/secrets.js`) |
