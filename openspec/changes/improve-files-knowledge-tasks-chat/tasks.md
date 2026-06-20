@@ -26,8 +26,8 @@
 - [x] Implement `PATCH /api/documents/[id]`.
 - [x] Implement `DELETE /api/documents/[id]`.
 - [x] Implement bulk document actions. *(Added `POST /api/documents/bulk` endpoint with delete/move/tag actions, UI buttons and dialogs in `/pages/transcriptions.js`.)*
-- [ ] Add tests for private vs workspace access. *(Only DB-level tests exist in `tests/retrieval-access-db.test.mjs`; no API endpoint tests.)*
-- [ ] Add tests for filters and full-text search. *(No tests found for `/api/documents` filter parameters.)*
+- [x] Add tests for private vs workspace access. *(Added comprehensive tests in `tests/documents-access.test.mjs` covering private/workspace visibility, combined filters, and pagination.)*
+- [x] Add tests for filters and full-text search. *(Added tests for visibility, source_type, favorite, search, and combined filters in `tests/documents-access.test.mjs`.)*
 
 ## 3. Dateien UI
 
@@ -85,7 +85,7 @@
 - [x] Add copy/regenerate/edit actions.
 - [x] Add follow-up prompt generation.
 - [x] Add tests for streaming event shape. (`tests/chat-stream-utils.test.mjs` covers SSE line parsing + request-body shape.)
-- [ ] Add tests for citations and source authorization. *(No tests found for citation extraction or source permission checks.)*
+- [x] Add tests for citations and source authorization. *(Added comprehensive tests in `tests/chat-citations.test.mjs` covering citation metadata, deduplication, source authorization, and retrieval filtering.)*
 
 ## 7. Aufgabenextraktion
 
