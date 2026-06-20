@@ -17,7 +17,7 @@
 - [x] Dual-write document rows for OCR uploads.
 - [x] Dual-write document rows for translations.
 - [x] Dual-write document rows for text/table generation.
-- [ ] Add document audit events. *(No `logAuditEvent()` calls for document operations yet.)*
+- [x] Add document audit events. *(Added `logAuditEvent()` calls for GET/PATCH/DELETE in `/api/documents`.)*
 
 ## 2. Dateien API
 
@@ -25,7 +25,7 @@
 - [x] Implement `GET /api/documents/[id]`.
 - [x] Implement `PATCH /api/documents/[id]`.
 - [x] Implement `DELETE /api/documents/[id]`.
-- [ ] Implement bulk document actions. *(Selection UI exists in `/pages/transcriptions.js`, but no backend functions for bulk delete/move/tag.)*
+- [x] Implement bulk document actions. *(Added `POST /api/documents/bulk` endpoint with delete/move/tag actions, UI buttons and dialogs in `/pages/transcriptions.js`.)*
 - [ ] Add tests for private vs workspace access. *(Only DB-level tests exist in `tests/retrieval-access-db.test.mjs`; no API endpoint tests.)*
 - [ ] Add tests for filters and full-text search. *(No tests found for `/api/documents` filter parameters.)*
 
@@ -36,7 +36,7 @@
 - [x] Add visibility badges and filters.
 - [x] Add type filters and status filters.
 - [x] Add tag display and tag editing.
-- [x] Add bulk actions. *(Selection UI implemented, but no bulk action functions yet.)*
+- [x] Add bulk actions. *(Implemented with `POST /api/documents/bulk` endpoint and UI dialogs for delete/move/tag.)*
 - [x] Add list/grid toggle.
 - [ ] Preserve existing links to transcription details. *(Links to `/transcriptions/[id]` work, but `/transcriptions` now shows documents list instead of history; semantic shift needs review.)*
 
@@ -74,7 +74,7 @@
 
 - [x] Add `chat_context_items` migration. (Supports document and knowledge-base attachments.)
 - [x] Add `chat_messages.metadata` migration.
-- [ ] Implement automatic document context when opening chat from a document. *(No "Open Chat" button on `/documents/[id]` page; no automatic context attachment.)*
+- [x] Implement automatic document context when opening chat from a document. *(Added "Open Chat" button on `/documents/[id]` page that creates a new conversation with the document as context and redirects to chat.)*
 - [x] Implement chat context add/remove APIs. (`GET/POST/DELETE /api/chat/context`, access-checked; retrieval unions the conversation's origin doc with attached context items.)
 - [x] Implement `POST /api/chat/stream` SSE endpoint. (Shared `lib/chat-service` with the non-streaming turn; same retrieval/cost-lock/usage/citations; forwards Cortecs tokens as `delta`/`done`/`error` SSE events.)
 - [x] Add non-streaming fallback behavior. (Client falls back to `POST /api/chat` when the stream endpoint is unavailable — network error or 404 — so nothing is double-persisted.)

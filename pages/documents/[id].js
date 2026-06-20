@@ -5,7 +5,8 @@ import { useSession } from 'next-auth/react';
 import { useEffect, useState, useCallback } from 'react';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Toast from '../../components/Toast';
-import { deleteDocument, getDocument, reindexDocument, updateDocument } from '../../lib/api';
+import { deleteDocument, getDocument, reindexDocument, updateDocument, createChatConversation, addChatContextItem } from '../../lib/api';
+import { MessageSquare } from 'lucide-react';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -76,6 +77,36 @@ export default function DocumentDetailPage() {
     }
   };
 
+  const openChat = useCallback(async () => {
+    setBusy(true);
+    try {
+      // Create a new conversation with document context
+      const title = document.title || document.original_name || `Datei ${document.id}`;
+      const conversationResult = await createChatConversation({
+        title: `Chat zu: ${title}`,
+        contextSource: 'document',
+        contextRefId: document.id,
+      });
+
+      const conversationId = conversationResult.conversation?.id;
+      if (!conversationId) {
+        throw new Error('Konversation konnte nicht erstellt werden');
+      }
+
+      // Add the document as a context item
+      await addChatContextItem(conversationId, {
+        contextType: 'document',
+        documentId: document.id,
+      });
+
+      // Redirect to the chat page with the new conversation
+      router.push(`/chat?conversation=${conversationId}`);
+    } catch (error) {
+      setToast({ type: 'error', message: error.message || 'Chat konnte nicht geöffnet werden.' });
+      setBusy(false);
+    }
+  }, [document, router]);
+
   if (status === 'loading' || loading) return <LoadingSpinner />;
   if (!document) return <LoadingSpinner />;
 
@@ -105,6 +136,10 @@ export default function DocumentDetailPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               {document.transcription_id && <Link href={`/transcriptions/${document.transcription_id}`} className="px-3 py-2 rounded-lg bg-accent text-white text-xs font-semibold">Transkript öffnen</Link>}
+              <button type="button" disabled={busy} onClick={openChat} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent/10 text-accent border border-accent/30 text-xs font-semibold disabled:opacity-50">
+                <MessageSquare className="w-3.5 h-3.5" />
+                Chat öffnen
+              </button>
               <button type="button" onClick={editTags} className="px-3 py-2 rounded-lg border border-subtle text-xs text-primary">Tags</button>
               <button type="button" disabled={busy} onClick={runReindex} className="px-3 py-2 rounded-lg border border-subtle text-xs text-primary disabled:opacity-50">Index neu</button>
               <button type="button" disabled={busy} onClick={remove} className="px-3 py-2 rounded-lg bg-danger/10 text-danger text-xs font-semibold disabled:opacity-50">Löschen</button>
