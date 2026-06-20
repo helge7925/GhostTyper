@@ -22,14 +22,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run full smoke suite
-        run: npm run smoke:full
+        run: node --max-old-space-size=4096 --no-warnings npm run smoke:full
 
       - name: Dump docker logs on failure
         if: failure()
