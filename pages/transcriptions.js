@@ -9,8 +9,8 @@ import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import MeetingStartForm from '../components/MeetingStartForm';
 import { Skeleton } from '../components/ui/skeleton';
-import { Library, Video } from 'lucide-react';
-import { getDocuments, getFolders, createFolder, updateFolder, deleteFolder, updateDocument, deleteDocument, reindexDocument } from '../lib/api';
+import { Library, Video, Folder, Tag } from 'lucide-react';
+import { getDocuments, getFolders, createFolder, updateFolder, deleteFolder, updateDocument, deleteDocument, reindexDocument, bulkDocuments } from '../lib/api';
 import { useTranslations } from '../lib/i18n';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { usePermission } from '../lib/use-permission';
@@ -291,6 +291,11 @@ export default function Transcriptions() {
     });
   }, []);
 
+  const [bulkActionDialog, setBulkActionDialog] = useState(null); // { type: 'move' | 'tag', data?: any }
+  const [bulkTagInput, setBulkTagInput] = useState('');
+  const [bulkTagMode, setBulkTagMode] = useState('replace'); // 'replace' | 'add' | 'remove'
+  const [bulkFolderId, setBulkFolderId] = useState(null);
+
   const handleBulkDelete = useCallback(async () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
@@ -302,13 +307,77 @@ export default function Transcriptions() {
     });
     if (!approved) return;
     try {
-      await Promise.all(ids.map((id) => deleteDocument(id)));
-      setTranscriptions((prev) => prev.filter((entry) => !selectedIds.has(entry.id)));
+      const result = await bulkDocuments('delete', ids);
+      setTranscriptions((prev) => prev.filter((entry) => !result.success.includes(entry.id)));
       setSelectedIds(new Set());
+      if (result.failed.length > 0) {
+        showToast(`${result.failed.length} Dateien konnten nicht gelöscht werden`, 'error');
+      } else {
+        showToast(`${result.success.length} Dateien gelöscht`, 'success');
+      }
     } catch (err) {
-      showToast('Nicht alle Dateien konnten gelöscht werden', 'error');
+      showToast('Fehler beim Löschen der Dateien', 'error');
     }
   }, [confirm, selectedIds, showToast]);
+
+  const handleBulkMove = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkActionDialog({ type: 'move' });
+  }, [selectedIds]);
+
+  const handleBulkTag = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkActionDialog({ type: 'tag' });
+    setBulkTagInput('');
+    setBulkTagMode('replace');
+  }, [selectedIds]);
+
+  const confirmBulkMove = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0 || bulkFolderId === undefined) return;
+    setBulkActionDialog(null);
+    try {
+      const result = await bulkDocuments('move', ids, { folderId: bulkFolderId });
+      // Refresh the list to show updated folder assignments
+      await loadDocuments();
+      setSelectedIds(new Set());
+      if (result.failed.length > 0) {
+        showToast(`${result.failed.length} Dateien konnten nicht verschoben werden`, 'error');
+      } else {
+        showToast(`${result.success.length} Dateien verschoben`, 'success');
+      }
+    } catch (err) {
+      showToast('Fehler beim Verschieben der Dateien', 'error');
+    }
+  }, [selectedIds, bulkFolderId, showToast, loadDocuments]);
+
+  const confirmBulkTag = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkActionDialog(null);
+    const tags = bulkTagInput.split(',').map((tag) => tag.trim()).filter(Boolean);
+    try {
+      const result = await bulkDocuments('tag', ids, { tags, tagMode: bulkTagMode });
+      // Refresh the list to show updated tags
+      await loadDocuments();
+      setSelectedIds(new Set());
+      if (result.failed.length > 0) {
+        showToast(`${result.failed.length} Dateien konnten nicht getaggt werden`, 'error');
+      } else {
+        showToast(`${result.success.length} Dateien getaggt`, 'success');
+      }
+    } catch (err) {
+      showToast('Fehler beim Taggen der Dateien', 'error');
+    }
+  }, [selectedIds, bulkTagInput, bulkTagMode, showToast, loadDocuments]);
+
+  const cancelBulkAction = useCallback(() => {
+    setBulkActionDialog(null);
+    setBulkTagInput('');
+    setBulkFolderId(null);
+  }, []);
 
   const handleReindexDocument = useCallback(async (id) => {
     setReindexingIds((prev) => new Set(prev).add(id));
@@ -532,9 +601,19 @@ export default function Transcriptions() {
               {viewMode === 'list' ? 'Grid' : 'Liste'}
             </button>
             {selectedIds.size > 0 && (
-              <button type="button" onClick={handleBulkDelete} className="px-3 py-1.5 rounded-lg text-xs bg-danger/10 text-danger border border-danger/30">
-                {selectedIds.size} löschen
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={handleBulkDelete} className="px-3 py-1.5 rounded-lg text-xs bg-danger/10 text-danger border border-danger/30">
+                  {selectedIds.size} löschen
+                </button>
+                <button type="button" onClick={handleBulkMove} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-accent/10 text-accent border border-accent/30">
+                  <Folder className="w-3.5 h-3.5" />
+                  Verschieben
+                </button>
+                <button type="button" onClick={handleBulkTag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-accent/10 text-accent border border-accent/30">
+                  <Tag className="w-3.5 h-3.5" />
+                  Tags
+                </button>
+              </div>
             )}
           </div>
 
@@ -602,6 +681,97 @@ export default function Transcriptions() {
         onConfirm={acceptConfirm}
         onCancel={closeConfirm}
       />
+      {bulkActionDialog?.type === 'move' && (
+        <ConfirmDialog
+          open={true}
+          title="Dateien verschieben"
+          message={
+            <div className="space-y-4">
+              <p>{selectedIds.size} Dateien in einen Ordner verschieben.</p>
+              <div className="space-y-2">
+                <label className="text-xs text-secondary uppercase tracking-widest font-bold">Zielordner</label>
+                <select
+                  value={bulkFolderId || ''}
+                  onChange={(e) => setBulkFolderId(e.target.value === '' ? null : Number(e.target.value))}
+                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary"
+                >
+                  <option value="">(Kein Ordner / Root)</option>
+                  {folders.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          }
+          confirmLabel="Verschieben"
+          onConfirm={confirmBulkMove}
+          onCancel={cancelBulkAction}
+        />
+      )}
+      {bulkActionDialog?.type === 'tag' && (
+        <ConfirmDialog
+          open={true}
+          title="Dateien taggen"
+          message={
+            <div className="space-y-4">
+              <p>{selectedIds.size} Dateien mit Tags versehen.</p>
+              <div className="space-y-2">
+                <label className="text-xs text-secondary uppercase tracking-widest font-bold">Tags (kommagetrennt)</label>
+                <input
+                  type="text"
+                  value={bulkTagInput}
+                  onChange={(e) => setBulkTagInput(e.target.value)}
+                  placeholder="z.B. wichtig, projekt-x"
+                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-secondary uppercase tracking-widest font-bold">Modus</label>
+                <div className="flex gap-2">
+                  <label className="inline-flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name="bulkTagMode"
+                      value="replace"
+                      checked={bulkTagMode === 'replace'}
+                      onChange={() => setBulkTagMode('replace')}
+                      className="w-3.5 h-3.5"
+                    />
+                    <span className="text-xs text-secondary">Ersetzen</span>
+                  </label>
+                  <label className="inline-flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name="bulkTagMode"
+                      value="add"
+                      checked={bulkTagMode === 'add'}
+                      onChange={() => setBulkTagMode('add')}
+                      className="w-3.5 h-3.5"
+                    />
+                    <span className="text-xs text-secondary">Hinzufügen</span>
+                  </label>
+                  <label className="inline-flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name="bulkTagMode"
+                      value="remove"
+                      checked={bulkTagMode === 'remove'}
+                      onChange={() => setBulkTagMode('remove')}
+                      className="w-3.5 h-3.5"
+                    />
+                    <span className="text-xs text-secondary">Entfernen</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          }
+          confirmLabel="Taggen"
+          onConfirm={confirmBulkTag}
+          onCancel={cancelBulkAction}
+        />
+      )}
       {showMeetingButton && (
         <MeetingStartForm
           open={meetingDialogOpen}

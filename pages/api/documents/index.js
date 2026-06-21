@@ -1,6 +1,7 @@
 import { query } from '../../../lib/db';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
+import { logAuditEvent } from '../../../lib/audit-log';
 import { parseTranscriptionsListParams } from '../../../lib/transcriptions-list';
 
 const ALLOWED_VISIBILITY = new Set(['private', 'workspace']);
@@ -127,6 +128,22 @@ async function handler(req, res) {
     sql += ` ORDER BY d.is_favorite DESC, updated_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
 
     const result = await query(sql, params);
+    await logAuditEvent({
+      userId: req.userId,
+      organizationId: orgId,
+      action: 'documents.list',
+      targetType: 'documents',
+      metadata: {
+        filter: {
+          visibility,
+          sourceType,
+          status,
+          favorite,
+          search,
+        },
+        resultCount: result.rows.length,
+      },
+    });
     return res.status(200).json(result.rows);
   } catch (error) {
     logApiError('Documents list error', error);

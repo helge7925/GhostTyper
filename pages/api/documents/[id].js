@@ -4,6 +4,7 @@ import { query } from '../../../lib/db';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { hasPermission } from '../../../lib/permissions';
+import { logAuditEvent } from '../../../lib/audit-log';
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 const ALLOWED_VISIBILITY = new Set(['private', 'workspace']);
@@ -82,6 +83,17 @@ async function handler(req, res) {
       try {
         const document = await loadDocument(documentId, orgId, userId);
         if (!document) return res.status(404).json({ message: 'Datei nicht gefunden' });
+        await logAuditEvent({
+          userId: req.userId,
+          organizationId: orgId,
+          action: 'document.read',
+          targetType: 'document',
+          targetId: String(documentId),
+          metadata: {
+            sourceType: document.source_type,
+            visibility: document.visibility,
+          },
+        });
         return res.status(200).json(document);
       } catch (error) {
         logApiError('Document GET error', error);
@@ -180,6 +192,23 @@ async function handler(req, res) {
           }
         }
 
+        await logAuditEvent({
+          userId: req.userId,
+          organizationId: orgId,
+          action: 'document.update',
+          targetType: 'document',
+          targetId: String(documentId),
+          metadata: {
+            changes: {
+              title: title !== undefined ? String(title) : undefined,
+              visibility: visibility !== undefined ? visibility : undefined,
+              folderId: folderId !== undefined ? folderId : undefined,
+              isFavorite: isFavorite !== undefined ? isFavorite : undefined,
+              tags: tags !== undefined ? normalizedTags : undefined,
+            },
+          },
+        });
+
         return res.status(200).json(updated.rows[0]);
       } catch (error) {
         logApiError('Document PATCH error', error);
@@ -194,6 +223,19 @@ async function handler(req, res) {
         if (!canDeleteDocument(document, req)) {
           return res.status(403).json({ code: 'FORBIDDEN', message: 'Keine Berechtigung zum Löschen.' });
         }
+
+        await logAuditEvent({
+          userId: req.userId,
+          organizationId: orgId,
+          action: 'document.delete',
+          targetType: 'document',
+          targetId: String(documentId),
+          metadata: {
+            transcriptionId: document.transcription_id,
+            sourceType: document.source_type,
+            filePath: document.file_path,
+          },
+        });
 
         if (document.transcription_id) {
           if (document.file_path && document.file_path !== 'INTERNAL_DOC' && isSafeUploadPath(document.file_path)) {
