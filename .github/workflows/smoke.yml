@@ -2,7 +2,9 @@ name: Smoke CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+    types: [closed]
 
 permissions:
   contents: read
