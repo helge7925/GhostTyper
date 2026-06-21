@@ -26,7 +26,7 @@ jobs:
         run: npm ci
 
       - name: Run unit tests
-        run: node --no-warnings --test tests/**/*.test.mjs
+        run: npm test
         env:
           # Skip DB-dependent tests in PR CI (they require DATABASE_URL)
           DATABASE_URL: ''
