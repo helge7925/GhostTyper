@@ -31,7 +31,9 @@ jobs:
         run: npm ci
 
       - name: Run full smoke suite
-        run: node --max-old-space-size=4096 --no-warnings npm run smoke:full
+        run: npm run smoke:full
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096 --no-warnings
 
       - name: Dump docker logs on failure
         if: failure()

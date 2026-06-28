@@ -38,7 +38,9 @@ jobs:
         run: npm ci
 
       - name: Run npm audit (high)
-        run: node --max-old-space-size=4096 npm audit --audit-level=high --omit=dev
+        run: npm audit --audit-level=high --omit=dev
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
 
   secret-scan:
     name: Secret Scan (Gitleaks)
