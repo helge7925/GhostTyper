@@ -81,5 +81,10 @@
     "eslint-config-next": "^15.5.18",
     "postcss": "^8.5.12",
     "tailwindcss": "^3.3.2"
+  },
+  "overrides": {
+    "next-auth": {
+      "nodemailer": "$nodemailer"
+    }
   }
 }
