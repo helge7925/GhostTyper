@@ -38,7 +38,7 @@
 - [x] Add tag display and tag editing.
 - [x] Add bulk actions. *(Implemented with `POST /api/documents/bulk` endpoint and UI dialogs for delete/move/tag.)*
 - [x] Add list/grid toggle.
-- [ ] Preserve existing links to transcription details. *(Links to `/transcriptions/[id]` work, but `/transcriptions` now shows documents list instead of history; semantic shift needs review.)*
+- [x] Preserve existing links to transcription details. **Reviewed (2026-06-28):** the semantic shift is intentional and accepted. `/transcriptions/[id]` detail routes are preserved (per `project.md`), `/transcriptions` (no query) is the `Dateien` list, and `/documents/[id]` handles non-transcription documents and links back to `/transcriptions` ("Zurück zu Dateien"). No dead links found. The route URL `/transcriptions` is kept as-is rather than renamed to `/documents` to avoid breaking existing bookmarks/share-links; the user-facing label is already `Dateien`.
 
 ## 4. Indexing and Retrieval
 
@@ -87,18 +87,26 @@
 - [x] Add tests for streaming event shape. (`tests/chat-stream-utils.test.mjs` covers SSE line parsing + request-body shape.)
 - [x] Add tests for citations and source authorization. *(Added comprehensive tests in `tests/chat-citations.test.mjs` covering citation metadata, deduplication, source authorization, and retrieval filtering.)*
 
-## 7. Aufgabenextraktion
+## 7. Aufgabenextraktion — REVERTED (2026-06-18)
 
-- [x] Add `tasks` migration.
-- [x] Implement member matching helper.
-- [x] Implement task extraction prompt and JSON validation.
-- [x] Implement `POST /api/transcriptions/[id]/extract-tasks`.
-- [x] Implement task CRUD APIs.
-- [x] Add task review UI in transcription detail.
-- [x] Add global `/tasks` page.
-- [x] Add source jump links to transcript/document locations. (Task source links jump to transcript segment anchors when `source_segment_ids` are present; otherwise to the transcript text section.)
-- [x] Add tests for member assignment matching.
-- [x] Add tests for proposed-task review flow. (Helper-level status transition/default coverage; API/UI-level coverage remains a follow-up.)
+This capability was fully built and then removed in commit `83f09a7`
+("refactor: remove the Aufgaben (tasks) feature"). It is replaced by the
+lighter `action_items` analysis template (commit `ef5ad67`). The `tasks` table,
+`/tasks` page, task CRUD APIs, and `extract-tasks` endpoint no longer exist in
+the codebase. The delta spec `specs/transcript-tasks/spec.md` was removed as
+part of this OpenSpec cleanup. The items below are kept struck through for
+historical traceability only.
+
+- ~~Add `tasks` migration.~~ *(reverted)*
+- ~~Implement member matching helper.~~ *(reverted)*
+- ~~Implement task extraction prompt and JSON validation.~~ *(reverted)*
+- ~~Implement `POST /api/transcriptions/[id]/extract-tasks`.~~ *(reverted)*
+- ~~Implement task CRUD APIs.~~ *(reverted)*
+- ~~Add task review UI in transcription detail.~~ *(reverted)*
+- ~~Add global `/tasks` page.~~ *(reverted)*
+- ~~Add source jump links to transcript/document locations.~~ *(reverted)*
+- ~~Add tests for member assignment matching.~~ *(reverted)*
+- ~~Add tests for proposed-task review flow.~~ *(reverted)*
 
 ## 8. Verification
 

@@ -1,4 +1,10 @@
-# Change: Improve Dateien, Workspace-Wissen, Aufgaben, and Chat RAG
+# Change: Improve Dateien, Workspace-Wissen, and Chat RAG
+
+> **Scope update (2026-06-18):** The transcript task-extraction capability
+> ("Aufgaben") was implemented and then reverted (commit `83f09a7`). It is
+> replaced by the lighter `action_items` analysis template (commit `ef5ad67`).
+> Task-related requirements below are retained for historical context but are
+> **out of scope / reverted**; see `tasks.md` section 7 and the design note.
 
 ## Why
 
@@ -11,7 +17,7 @@ OpenWebUI provides useful reference patterns: workspace knowledge bases, focused
 - The library navigation label SHALL be `Dateien`.
 - GhostTyper SHALL support private files in addition to workspace-shared files.
 - Embeddings SHALL be generated via the Cortecs API and stored in GhostTyper; pgvector SHALL be optional infrastructure for accelerated vector search, not a blocker for the MVP.
-- Extracted transcript tasks SHALL be directly assigned to workspace members when a reliable match is possible.
+- ~~Extracted transcript tasks SHALL be directly assigned to workspace members when a reliable match is possible.~~ *(reverted — see scope update)*
 - Chat context SHALL attach automatically when the user opens chat from a document, while still allowing manual context changes.
 
 ## What Changes
@@ -21,7 +27,7 @@ OpenWebUI provides useful reference patterns: workspace knowledge bases, focused
 - Add document visibility: `private` and `workspace`.
 - Add workspace knowledge bases with directories, attached documents, retrieval modes, and indexing status.
 - Add chunking/indexing for transcriptions, OCR, translations, and workspace files.
-- Add transcript task extraction with evidence, source links, member assignment, and review flow.
+- ~~Add transcript task extraction with evidence, source links, member assignment, and review flow.~~ *(reverted — replaced by the `action_items` analysis template)*
 - Upgrade chat with streaming responses, citations, multiple context attachments, better message actions, and document-aware prompts.
 
 ## Out Of Scope For MVP
@@ -41,4 +47,3 @@ OpenWebUI provides useful reference patterns: workspace knowledge bases, focused
 - Indexed documents have stored embeddings generated through Cortecs.
 - Chat responses over attached documents include clickable citations.
 - Chat responses stream progressively.
-- Transcript tasks can be extracted, reviewed, assigned to workspace members, and linked back to transcript evidence.

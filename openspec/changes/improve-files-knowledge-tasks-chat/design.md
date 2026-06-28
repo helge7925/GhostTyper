@@ -1,4 +1,11 @@
-# Design: Dateien, Workspace-Wissen, Aufgaben, and Chat RAG
+# Design: Dateien, Workspace-Wissen, and Chat RAG
+
+> **Note (2026-06-18):** The task-extraction design below (the `tasks` table,
+> assignment matching, the `Aufgaben erkennen` action, the `/tasks` page, and the
+> `task.*` permissions / `/api/tasks` endpoints) was implemented and then
+> reverted (commit `83f09a7`), replaced by the `action_items` analysis template.
+> Those sections are retained as historical design context only and do not
+> reflect the current codebase.
 
 ## Overview
 

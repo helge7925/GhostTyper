@@ -62,7 +62,7 @@ Chat messages SHALL support copy, regenerate, and edit-from-here actions.
 
 ### Requirement: Follow-Up Prompts
 
-GhostTyper SHOULD generate follow-up prompt suggestions after assistant responses when enabled.
+GhostTyper SHALL generate follow-up prompt suggestions after assistant responses when the follow-up feature is enabled.
 
 #### Scenario: Click follow-up
 

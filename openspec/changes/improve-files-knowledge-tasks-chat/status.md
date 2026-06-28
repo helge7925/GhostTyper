@@ -1,6 +1,11 @@
-# Status: Dateien, Workspace-Wissen, Aufgaben, Chat RAG
+# Status: Dateien, Workspace-Wissen, Chat RAG
 
-Last updated: 2026-06-19
+Last updated: 2026-06-28
+
+> **Scope note:** The Aufgabenextraktion (task) capability was built and then
+> reverted on 2026-06-18 (commit `83f09a7`), replaced by the `action_items`
+> analysis template (commit `ef5ad67`). All task-related references below are
+> historical; the feature is no longer in the codebase.
 
 ## Current State
 
@@ -18,9 +23,10 @@ Last updated: 2026-06-19
 - A backfill endpoint `POST /api/admin/documents/backfill-index` indexes pre-existing documents that have no completed index job yet, in bounded batches (default 25, max 100), optionally scoped to one organization, with a `dryRun` mode. Shared-secret protected via `BACKFILL_API_SECRET` (mirrors the Vexa reconcile endpoint); safe to run repeatedly from a cron. Cortecs config is resolved per (org, owner) and cached per run.
 - Chat now retrieves indexed chunks for the active conversation context, injects source blocks, and stores retrieval metadata on assistant messages.
 - Chat context supports attaching Workspace-Wissen knowledge bases as well as individual documents. Attached knowledge bases are included in conversation retrieval and honour per-item focused/full_context/off modes.
-- Aufgabenextraktion exists: `tasks` table, member matching, Cortecs JSON extraction, `POST /api/transcriptions/[id]/extract-tasks`, task CRUD APIs, a global `/tasks` page, transcription-detail review actions, and source links back to transcript segments when segment IDs are available.
+- ~~Aufgabenextraktion exists~~ **REVERTED** (2026-06-18, commit `83f09a7`): the `tasks` table, member matching, `extract-tasks` endpoint, task CRUD APIs, and `/tasks` page were removed and replaced by the `action_items` analysis template.
 - Chat polish is implemented with copy/edit/regenerate actions and deterministic follow-up prompt chips on the latest assistant response.
-- Dateien polish now includes type/status/visibility/favorite filters, tag display/editing, list/grid toggle, and bulk delete **selection UI** (but bulk action functions not yet implemented).
+- Document operations emit audit events (`document.read/update/delete` and the bulk variants); bulk delete/move/tag are backed by `POST /api/documents/bulk`; `/documents/[id]` has an "Open Chat" action that opens a chat with the document auto-attached as context. (Implemented via PR #15.)
+- Dateien polish now includes type/status/visibility/favorite filters, tag display/editing, list/grid toggle, and bulk delete/move/tag.
 - Non-transcription documents now have a dedicated `/documents/[id]` detail page with metadata, preview, tags, reindex and delete actions.
 - Retrieval candidate loading now uses a bounded full-text pre-ranking before embedding rerank, which reduces random chunk selection in larger workspaces without requiring pgvector.
 - `npm run lint` uses the ESLint CLI instead of deprecated `next lint`.
@@ -41,18 +47,17 @@ Last updated: 2026-06-19
 
 *(None - `DATABASE_URL` is now defined in `.env` as of 2026-06-19.)*
 
-## Next Steps
+## Next Steps (remaining open points)
 
-1. **Implement core missing features:**
-   - Add document audit events for create/update/delete operations.
-   - Implement bulk document actions (delete, move, tag) using existing selection UI.
-   - Add "Open Chat" button on `/documents/[id]` with automatic context attachment.
-2. **Add missing tests:**
-   - Tests for private vs workspace access on `/api/documents` endpoints.
-   - Tests for filter and full-text search functionality.
-   - Tests for citations and source authorization in chat.
-3. Run manual QA from `docs/qa-checklist-files-knowledge-chat-tasks.md` on localhost.
-4. Consider pgvector for indexed vector search once workspace data grows beyond the current bounded candidate strategy.
+All 81 implementation/test/review tasks are complete. The core features
+(audit events, bulk actions, Open-Chat auto-context) and their tests landed via
+PR #15; the OpenSpec cleanup (ui-polish archived, reverted task capability
+removed, validation fixed, semantic-shift review) landed in this change.
+Remaining items are operational, not blockers:
+
+1. Run manual QA from `docs/qa-checklist-files-knowledge-chat-tasks.md` on localhost.
+2. Consider pgvector for indexed vector search once workspace data grows beyond the current bounded candidate strategy.
+3. Archive this change via `openspec archive improve-files-knowledge-tasks-chat` once it ships.
 
 ## Done since last update
 
@@ -65,8 +70,8 @@ Last updated: 2026-06-19
 - Workspace-Wissen UI (slice 2): `/knowledge` master-detail page (create/list/delete bases, add/remove documents via a workspace-only search picker, per-item retrieval-mode selector) and a `knowledge.read`-gated nav entry.
 - Workspace-Wissen retrieval + Dateien action (slice 3): `retrieveKnowledgeSources` scopes retrieval to a knowledge base honouring focused/full_context/off (full_context injects whole documents ahead of chunk-ranked focused ones), exposed via `knowledgeBaseId` on `/api/retrieval/query`; an `AddToKnowledgeButton` adds workspace documents to a base directly from Dateien.
 - Chat knowledge-base context: `chat_context_items` now supports `context_type=document|knowledge_base`; `/api/chat/context` can list/add/remove both types; `ChatContextBar` can search files or knowledge bases; conversation retrieval merges direct documents with attached knowledge-base scopes.
-- DB access tests for Knowledge restrictions and retrieval filtering (`tests/retrieval-access-db.test.mjs`) and pure task helper tests (`tests/task-utils.test.mjs`).
-- Aufgabenextraktion: `tasks` migration, task service, task CRUD APIs, Cortecs-backed extraction endpoint, member matching, transcription-detail review actions, global `/tasks` page, and segment-aware source links.
+- DB access tests for Knowledge restrictions and retrieval filtering (`tests/retrieval-access-db.test.mjs`). *(The task helper tests `tests/task-utils.test.mjs` were removed with the reverted task feature.)*
+- ~~Aufgabenextraktion: `tasks` migration, task service, task CRUD APIs, Cortecs-backed extraction endpoint, member matching, transcription-detail review actions, global `/tasks` page, and segment-aware source links.~~ **Reverted 2026-06-18** — replaced by the `action_items` analysis template.
 - Chat polish: copy, edit, regenerate, and follow-up prompt chips.
 - Dateien polish: type/status/visibility/favorite filters, tags, bulk delete, and list/grid toggle.
 - Manual QA checklist added at `docs/qa-checklist-files-knowledge-chat-tasks.md`.
