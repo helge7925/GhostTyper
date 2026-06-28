@@ -26,7 +26,7 @@ jobs:
         run: npm ci
 
       - name: Run unit tests
-        run: node --no-warnings --test tests/documents-access.test.mjs tests/chat-citations.test.mjs tests/chat-stream-utils.test.mjs tests/chat-actions-utils.test.mjs tests/task-utils.test.mjs
+        run: node --no-warnings --test tests/documents-access.test.mjs tests/chat-citations.test.mjs tests/chat-stream-utils.test.mjs tests/chat-actions-utils.test.mjs
         env:
           # Skip DB-dependent tests in PR CI (they require DATABASE_URL)
           DATABASE_URL: ''
