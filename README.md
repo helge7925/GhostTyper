@@ -57,10 +57,6 @@ remote-meeting screenshots are TODO / need capture before they are embedded.
 - **OCR** for PDFs and images.
 - **AI analysis**: summaries, meeting minutes, action-item / to-do extraction,
   free-form prompts, custom templates and translation.
-- **AI chat over your content**: attach documents and knowledge bases as
-  context — or drop / paste / upload a file straight into the chat — and ask
-  questions; conversations are titled automatically.
-- **Workspace knowledge bases**: group documents for retrieval-augmented chat.
 - **Data tables**: structured extraction from audio, text or documents;
   Excel export.
 - **Nextcloud export**: save transcripts and analyses to a Nextcloud folder

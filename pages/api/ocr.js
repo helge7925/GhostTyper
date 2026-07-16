@@ -22,7 +22,6 @@ import { normalizeDataTableAnalysis } from '../../lib/data-table';
 import { normalizeAndValidateTableAnalysis } from '../../lib/table-analysis';
 import { logAuditEvent } from '../../lib/audit-log';
 import { upsertDocumentForTranscription } from '../../lib/documents';
-import { autoIndexDocument } from '../../lib/document-index';
 
 export const config = {
   api: {
@@ -252,7 +251,7 @@ async function handler(req, res) {
     );
 
     const transcriptionId = transcriptionResult.rows[0].id;
-    const ocrDocument = await upsertDocumentForTranscription({
+    await upsertDocumentForTranscription({
       transcriptionId,
       organizationId: orgId,
       ownerUserId: userId,
@@ -264,7 +263,6 @@ async function handler(req, res) {
       status: 'completed',
       textPreview: markdown,
     });
-    void autoIndexDocument({ documentId: ocrDocument?.id, transcriptionId, organizationId: orgId, userId });
     await addTranscriptionEvent({
       transcriptionId,
       userId,

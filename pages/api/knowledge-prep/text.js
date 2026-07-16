@@ -14,7 +14,6 @@ import { addTranscriptionEvent } from '../../../lib/transcription-events';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { normalizeDataTableAnalysis } from '../../../lib/data-table';
 import { upsertDocumentForTranscription } from '../../../lib/documents';
-import { autoIndexDocument } from '../../../lib/document-index';
 
 const ALLOWED_TEMPLATES = new Set(['data_table']);
 
@@ -137,7 +136,7 @@ async function handler(req, res) {
     );
 
     const transcription = result.rows[0];
-    const textDocument = await upsertDocumentForTranscription({
+    await upsertDocumentForTranscription({
       transcriptionId: transcription.id,
       organizationId: orgId,
       ownerUserId: userId,
@@ -149,7 +148,6 @@ async function handler(req, res) {
       status: transcription.status,
       textPreview: text,
     });
-    void autoIndexDocument({ documentId: textDocument?.id, transcriptionId: transcription.id, organizationId: orgId, userId });
     await addTranscriptionEvent({
       transcriptionId: transcription.id,
       userId,

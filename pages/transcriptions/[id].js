@@ -500,14 +500,6 @@ export default function TranscriptionDetail() {
                     );
                   })()}
 
-                  {transcription.text && (
-                    <Link
-                      href={`/chat?source=transcription&refId=${transcription.id}`}
-                      className="bg-hover-subtle hover:bg-hover-strong text-primary py-2 rounded-xl text-sm font-bold border border-subtle text-center transition-all"
-                    >
-                      Mit Transkript chatten
-                    </Link>
-                  )}
                   {nextcloudEnabled && (transcription.text || transcription.analysis) && (
                     <button
                       type="button"

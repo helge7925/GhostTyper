@@ -3,7 +3,6 @@ import { withOrgScope } from '../../../../../lib/api/with-org-scope';
 import { hasPermission } from '../../../../../lib/permissions';
 import { logAuditEvent } from '../../../../../lib/audit-log';
 import { resolveCortecsConfig } from '../../../../../lib/settings-service';
-import { buildCortecsBody } from '../../../../../lib/chat-stream-utils';
 
 const PROVIDER = 'cortecs';
 
@@ -39,10 +38,14 @@ async function handler(req, res) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${config.apiKey}`,
       },
-      body: JSON.stringify(buildCortecsBody(config, [
-        { role: 'system', content: 'Antworten Sie extrem kurz.' },
-        { role: 'user', content: 'Healthcheck: antworten Sie nur mit OK.' },
-      ])),
+      body: JSON.stringify({
+        model: config.chatModel,
+        preference: config.preference || 'balanced',
+        messages: [
+          { role: 'system', content: 'Antworten Sie extrem kurz.' },
+          { role: 'user', content: 'Healthcheck: antworten Sie nur mit OK.' },
+        ],
+      }),
     }, 8000);
     if (!response.ok) {
       const detail = await response.text().catch(() => '');

@@ -58,10 +58,6 @@ Remote-Meeting-Screenshots sind TODO / need capture, bevor sie eingebettet werde
 - **OCR** für PDFs und Bilder.
 - **KI-Analyse**: Zusammenfassungen, Meeting-Protokolle, To-Do-Extraktion,
   freie Prompts, eigene Vorlagen und Übersetzungen.
-- **KI-Chat über eigene Inhalte**: Dokumente und Wissensbasen als Kontext
-  anhängen — oder eine Datei direkt in den Chat ziehen/einfügen/hochladen —
-  und Fragen stellen; Unterhaltungen werden automatisch betitelt.
-- **Workspace-Wissensbasen**: Dokumente für RAG-gestützten Chat bündeln.
 - **Datentabellen**: Strukturierte Extraktion aus Audio, Text oder
   Dokumenten; Excel-Export.
 - **Nextcloud-Export**: Transkripte und Analysen per WebDAV in einen

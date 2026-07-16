@@ -1,5 +1,4 @@
 import Head from 'next/head';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -9,8 +8,8 @@ import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import MeetingStartForm from '../components/MeetingStartForm';
 import { Skeleton } from '../components/ui/skeleton';
-import { Library, Video, Folder, Tag } from 'lucide-react';
-import { getDocuments, getFolders, createFolder, updateFolder, deleteFolder, updateDocument, deleteDocument, reindexDocument, bulkDocuments } from '../lib/api';
+import { Video, Folder, Tag } from 'lucide-react';
+import { getDocuments, getFolders, createFolder, updateFolder, deleteFolder, updateDocument, deleteDocument, bulkDocuments } from '../lib/api';
 import { useTranslations } from '../lib/i18n';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { usePermission } from '../lib/use-permission';
@@ -83,11 +82,7 @@ export default function Transcriptions() {
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [viewMode, setViewMode] = useState('list');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
-  const [reindexingIds, setReindexingIds] = useState(() => new Set());
   const searchTimeoutRef = useRef(null);
-  const canReindexDocuments = usePermission('document.write');
-  const canAddToKnowledge = usePermission('knowledge.write');
-  const canReadKnowledge = usePermission('knowledge.read');
   const {
     toast,
     showToast,
@@ -379,36 +374,6 @@ export default function Transcriptions() {
     setBulkFolderId(null);
   }, []);
 
-  const handleReindexDocument = useCallback(async (id) => {
-    setReindexingIds((prev) => new Set(prev).add(id));
-    setTranscriptions((prev) => prev.map((entry) => entry.id === id
-      ? { ...entry, index_job_status: 'processing', index_job_error: null }
-      : entry));
-    try {
-      const result = await reindexDocument(id);
-      setTranscriptions((prev) => prev.map((entry) => entry.id === id
-        ? {
-            ...entry,
-            chunk_count: result.chunks,
-            index_job_status: 'completed',
-            index_job_error: null,
-          }
-        : entry));
-      showToast(`Index erstellt: ${result.chunks || 0} Chunks, ${result.embeddings || 0} Embeddings`, 'success');
-    } catch (err) {
-      setTranscriptions((prev) => prev.map((entry) => entry.id === id
-        ? { ...entry, index_job_status: 'error', index_job_error: err.message || 'Indexierung fehlgeschlagen' }
-        : entry));
-      showToast('Index konnte nicht erstellt werden: ' + (err.message || 'Unbekannter Fehler'), 'error');
-    } finally {
-      setReindexingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }
-  }, [showToast]);
-
   const filteredTranscriptions = useMemo(() => {
     return transcriptions.filter(t => {
       return activeFolderId === null || String(t.folder_id || '') === String(activeFolderId);
@@ -556,15 +521,6 @@ export default function Transcriptions() {
                   <span>{tMeeting('buttonLabel')}</span>
                 </button>
               )}
-              {canReadKnowledge && (
-                <Link
-                  href="/knowledge"
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border border-subtle text-secondary hover:text-primary hover:border-accent/40 transition-colors whitespace-nowrap"
-                >
-                  <Library className="w-4 h-4" />
-                  <span>Workspace Wissen</span>
-                </Link>
-              )}
               <div className="text-[10px] text-secondary uppercase tracking-widest font-bold whitespace-nowrap hidden xl:block">
                 {filteredTranscriptions.length} {filteredTranscriptions.length === 1 ? 'Eintrag' : 'Einträge'}
               </div>
@@ -642,11 +598,8 @@ export default function Transcriptions() {
                   folders={folders}
                   onMove={(folderId) => handleMoveToFolder(t.id, folderId)}
                   onToggleFavorite={() => handleToggleFavorite(t.id, t.is_favorite)}
-                  onReindex={canReindexDocuments ? () => handleReindexDocument(t.id) : undefined}
-                  reindexing={reindexingIds.has(t.id)}
                   onDelete={() => handleDeleteTranscription(t.id)}
                   onEditTags={() => handleEditTags(t)}
-                  canAddToKnowledge={canAddToKnowledge}
                   selectable
                   selected={selectedIds.has(t.id)}
                   onSelect={(checked) => toggleSelected(t.id, checked)}

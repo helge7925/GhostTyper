@@ -6,7 +6,6 @@ import { getIntegration, redactConfig, upsertIntegration } from '../../../../lib
 import {
   DEFAULT_CHAT_MODEL,
   DEFAULT_CORTECS_BASE_URL,
-  DEFAULT_EMBEDDING_MODEL,
   DEFAULT_TRANSCRIPTION_MODEL,
 } from '../../../../lib/constants';
 import { resolveChatModel, resolveTranscriptionModel } from '../../../../lib/model-policy';
@@ -54,16 +53,6 @@ function pickConfigUpdate(body) {
       else invalidFields.push('defaultTranscriptionModel');
     }
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'defaultEmbeddingModel')) {
-    const value = body.defaultEmbeddingModel;
-    if (value === null || value === '') {
-      update.defaultEmbeddingModel = null;
-    } else if (typeof value === 'string' && value.trim()) {
-      update.defaultEmbeddingModel = value.trim().slice(0, 120);
-    } else {
-      invalidFields.push('defaultEmbeddingModel');
-    }
-  }
   if (Object.prototype.hasOwnProperty.call(body, 'preference')) {
     const value = body.preference;
     if (value === null || value === '') {
@@ -101,7 +90,6 @@ async function handler(req, res) {
           defaults: {
             baseUrl: process.env.CORTECS_BASE_URL || DEFAULT_CORTECS_BASE_URL,
             defaultChatModel: process.env.CORTECS_CHAT_MODEL || DEFAULT_CHAT_MODEL,
-            defaultEmbeddingModel: process.env.CORTECS_EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL,
             defaultTranscriptionModel: process.env.CORTECS_TRANSCRIPTION_MODEL || DEFAULT_TRANSCRIPTION_MODEL,
             preference: process.env.CORTECS_PREFERENCE || 'balanced',
           },

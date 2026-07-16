@@ -7,6 +7,27 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Removed
+- **Chat, Workspace-Wissen (RAG-Index) und Aufgaben entfernt.**
+  GhostTypers Strategie ist es, ein kleines Set von Kernfunktionen zu
+  perfektionieren (Transkription, Übersetzung, OCR) statt einen
+  allgemeinen Chat-Client nachzubauen — Entscheidung mit dem Product
+  Owner am 2026-07-16, siehe
+  `openspec/changes/remove-chat-knowledge-tasks/`. Entfernt: In-App-Chat
+  (`/chat`, Streaming, Regenerate), Workspace-Wissensbasen (`/knowledge`),
+  der RAG-Dokumentenindex (Chunks, Embeddings, Retrieval) inkl.
+  Auto-Indexierung nach Upload/OCR/Text/Meeting, sowie die zugehörigen
+  API-Routen, Libs, Komponenten, i18n-Keys und Nav-Einträge. Bestehende
+  DB-Tabellen (`chat_*`, `document_chunks`, `document_chunk_embeddings`,
+  `document_index_jobs`, `knowledge_*`, `tasks`) werden NICHT automatisch
+  gelöscht — `scripts/drop-chat-knowledge-tables.js` (dry-run per
+  Default, `--apply` zum Ausführen) ist der operator-gesteuerte
+  Aufräumschritt nach einer Übergangsfrist. Die Dateibibliothek selbst
+  (`/transcriptions`, `/documents/*`) bleibt vollständig erhalten — nur
+  die RAG-Index-Hooks (Reindex-Button, Chunk-Anzeige, Backfill-Endpoint)
+  wurden entfernt. `improve-files-knowledge-tasks-chat` ist durch diese
+  Änderung ersetzt und archiviert.
+
 ### Changed
 - **Service rename: `fireworks-bridge` → `voxtral-bridge`.** Der
   Transkriptions-Proxy hieß historisch `fireworks-bridge` (als die
