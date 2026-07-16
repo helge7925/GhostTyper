@@ -25,15 +25,19 @@ import {
   getGlossarySuggestions,
   getAuditLog,
 } from '../lib/api';
-import { normalizeDefaultTemplate } from '../lib/constants';
+import { CHAT_MODEL_OPTIONS, normalizeDefaultTemplate } from '../lib/constants';
 import { DEFAULT_PROMPTS, getPrompt } from '../lib/prompts';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { useTranslations } from '../lib/i18n';
 
+// Cortecs list prices (cheapest routed provider, cortecs.ai, Stand 07/2026)
+// — keep in sync with MODEL_PRICING in lib/usage.js.
 const PRICE_LIST = [
-  { model: 'DeepSeek V4 Pro', input: '0,00 €', output: '0,00 €', note: 'Standard' },
-  { model: 'DeepSeek V4 Flash', input: '0,00 €', output: '0,00 €', note: 'Schnell' },
-  { model: 'Kimi 2.6', input: '0,00 €', output: '0,00 €', note: 'Alternative' },
+  { model: 'DeepSeek V4 Pro', input: '1,55 €/M', output: '3,11 €/M', note: 'Standard' },
+  { model: 'DeepSeek V4 Flash', input: '0,13 €/M', output: '0,27 €/M', note: 'Schnell' },
+  { model: 'Kimi K2.6', input: '0,69 €/M', output: '3,03 €/M', note: 'Alternative' },
+  { model: 'Kimi K2.7 Code', input: '0,67 €/M', output: '3,14 €/M', note: 'Coding / Agents' },
+  { model: 'MiniMax M3', input: '0,36 €/M', output: '1,78 €/M', note: 'Lange Kontexte' },
 ];
 
 const SETTINGS_TAB_IDS = ['transcription', 'text-templates', 'ocr-translate', 'account'];
@@ -814,9 +818,9 @@ export default function Settings() {
                   <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
                     <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">Standard-Modell</h2>
                     <select value={preferredModel} onChange={e => setPreferredModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent">
-                      <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
-                      <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
-                      <option value="kimi-2.6">Kimi 2.6</option>
+                      {CHAT_MODEL_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
                     </select>
                     <p className="mt-3 text-[10px] text-secondary leading-relaxed italic">
                       Dieses Modell wird standardmäßig für KI-Analyse und Textaufgaben verwendet.

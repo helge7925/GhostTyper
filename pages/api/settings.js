@@ -1,7 +1,7 @@
 import pool from '../../lib/db';
 import { withOrgScope } from '../../lib/api/with-org-scope';
 import { getSettingsRow } from '../../lib/settings-service';
-import { normalizeDefaultTemplate } from '../../lib/constants';
+import { DEFAULT_CHAT_MODEL, normalizeDefaultTemplate } from '../../lib/constants';
 import { resolveChatModel, resolveOcrModel } from '../../lib/model-policy';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { logAuditEvent } from '../../lib/audit-log';
@@ -80,7 +80,7 @@ async function handler(req, res) {
             defaultTemplate: 'generic',
             language: 'de',
             contextBias: '',
-            preferredModel: 'deepseek-v4-pro',
+            preferredModel: DEFAULT_CHAT_MODEL,
             defaultTranslateLanguage: 'en',
             ocrModel: 'mistral-ocr-latest',
             costLimit: null,
@@ -93,7 +93,7 @@ async function handler(req, res) {
           defaultTemplate: normalizeDefaultTemplate(settings.default_template),
           language: settings.language,
           contextBias: normalizeContextBias(settings.context_bias).value || '',
-          preferredModel: resolveChatModel(settings.preferred_model) || 'deepseek-v4-pro',
+          preferredModel: resolveChatModel(settings.preferred_model, null) || DEFAULT_CHAT_MODEL,
           defaultTranslateLanguage: settings.default_translate_language || 'en',
           ocrModel: settings.ocr_model || 'mistral-ocr-latest',
           costLimit: settings.cost_limit,

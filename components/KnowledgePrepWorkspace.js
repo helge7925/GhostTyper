@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import AudioUploadForm from './AudioUploadForm';
 import LoadingSpinner from './LoadingSpinner';
 import { useTranslations } from '../lib/i18n';
+import { CHAT_MODEL_OPTIONS } from '../lib/constants';
 
 export default function KnowledgePrepWorkspace({
   fixedMode = null,
@@ -34,14 +35,7 @@ export default function KnowledgePrepWorkspace({
     [t]
   );
 
-  const MODEL_OPTIONS = useMemo(
-    () => [
-      { value: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
-      { value: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
-      { value: 'kimi-2.6', label: 'Kimi 2.6' },
-    ],
-    []
-  );
+  const MODEL_OPTIONS = CHAT_MODEL_OPTIONS;
 
   const resolvedHeading = heading || t('defaultHeading');
 

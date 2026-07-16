@@ -50,10 +50,9 @@ async function handler(req, res) {
 
   const settingsRow = await getSettingsRow(userId);
   const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-  const apiKey = cortecs.apiKey;
-  const preferredModelFallback = resolveChatModel(cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
+  const preferredModelFallback = resolveChatModel(settingsRow?.preferred_model, null) || cortecs.chatModel;
 
-  if (!apiKey) {
+  if (!cortecs.apiKey) {
     return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert' });
   }
   if (!preferredModelFallback) {

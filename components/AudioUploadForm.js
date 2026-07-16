@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Mic, MonitorSpeaker, Upload } from 'lucide-react';
-import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE, normalizeDefaultTemplate } from '../lib/constants';
+import { CHAT_MODEL_OPTIONS, CHAT_MODELS, ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE, normalizeDefaultTemplate } from '../lib/constants';
 import { uploadAudio, getTemplates, getSettings } from '../lib/api';
 import AudioRecorder from './AudioRecorder';
 import SystemAudioRecorder from './SystemAudioRecorder';
@@ -11,7 +11,7 @@ import { useTranslations } from '../lib/i18n';
 // remains accepted by the backend (see lib/template-service.js) so legacy
 // DB rows still resolve.
 const BUILTIN_TEMPLATE_VALUES = new Set(['generic', 'meeting', 'action_items', 'data_table', 'aufmass']);
-const ALLOWED_CHAT_MODELS = new Set(['deepseek-v4-pro', 'deepseek-v4-flash', 'kimi-2.6']);
+const ALLOWED_CHAT_MODELS = new Set(CHAT_MODELS);
 const ALLOWED_UPLOAD_MODES = new Set(['file', 'record', 'system-audio']);
 
 function resolvePresetTemplate(templateValue, templates) {
@@ -304,11 +304,11 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
             <div>
               <label htmlFor="upload-model" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">KI-Modell</label>
               <select id="upload-model" value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none">
-                <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
-                <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
-                <option value="kimi-2.6">Kimi 2.6</option>
+                {CHAT_MODEL_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
               </select>
-              <p className="mt-1 text-[11px] text-secondary">DeepSeek V4 Pro ist der Standard; Flash ist für schnellere Antworten gedacht.</p>
+              <p className="mt-1 text-[11px] text-secondary">Im Zweifel den Standard lassen — die Kurzbeschreibung hilft bei der Wahl.</p>
             </div>
           </div>
           <div>

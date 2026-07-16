@@ -9,6 +9,7 @@ import ProcessStatusCard from '../components/ProcessStatusCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { saveDocument } from '../lib/api';
 import { useMessageList, useMessageObject, useTranslations } from '../lib/i18n';
+import { CHAT_MODEL_OPTIONS } from '../lib/constants';
 
 const LANGUAGES = [
   { code: 'German', label: 'Deutsch' },
@@ -315,9 +316,9 @@ export default function Translate() {
                   onChange={(event) => setModel(event.target.value)}
                   className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none focus:ring-1 focus:ring-accent"
                 >
-                  <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
-                  <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
-                  <option value="kimi-2.6">Kimi 2.6</option>
+                  {CHAT_MODEL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -389,9 +390,9 @@ export default function Translate() {
               <div className="bg-surface border border-subtle rounded-2xl px-4 py-3 shadow">
                 <label className="text-[10px] font-bold text-secondary uppercase tracking-widest opacity-60">Modell</label>
                 <select value={model} onChange={e => setModel(e.target.value)} className="mt-2 w-full max-w-md bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none">
-                  <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
-                  <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
-                  <option value="kimi-2.6">Kimi 2.6</option>
+                  {CHAT_MODEL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
               </div>
             )}

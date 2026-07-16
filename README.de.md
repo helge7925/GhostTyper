@@ -120,7 +120,8 @@ spürbar langsamer.
 
 ## Schnellstart
 
-Voraussetzungen: Docker + Docker Compose v2, ein Mistral-API-Key.
+Voraussetzungen: Docker + Docker Compose v2, ein Cortecs-API-Key (plus
+ein Mistral-API-Key, falls OCR oder Voxtral TTS genutzt wird).
 
 ```bash
 git clone https://github.com/helge7925/transkription_webapp.git

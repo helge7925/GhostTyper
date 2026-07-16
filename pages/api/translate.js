@@ -2,12 +2,9 @@ import { translateText } from '../../lib/ai-service';
 import { withOrgScope } from '../../lib/api/with-org-scope';
 import {
   CostLimitCheckUnavailableError,
-  CostLimitExceededError,
-  enforceProjectedBudgetGuardrail,
+  assertBudgetWithinLimits,
   estimateTextTransformCost,
   logUsage,
-  checkCostLimit,
-  withUserCostLock,
 } from '../../lib/usage';
 import { resolveChatModel } from '../../lib/model-policy';
 import { getSettingsRow, resolveCortecsConfig } from '../../lib/settings-service';
@@ -44,7 +41,9 @@ async function handler(req, res) {
     const settingsRow = await getSettingsRow(userId);
     const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
     const apiKey = cortecs.apiKey;
-    const preferredModel = resolveChatModel(requestModel || cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
+    const preferredModel = resolveChatModel(requestModel, null)
+      || resolveChatModel(settingsRow?.preferred_model, null)
+      || cortecs.chatModel;
 
     if (!apiKey) {
       return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert' });
@@ -53,30 +52,24 @@ async function handler(req, res) {
       return res.status(400).json({ message: 'Ungültiges KI-Modell' });
     }
 
-    const translatedText = await withUserCostLock(userId, async () => {
-      const costCheck = await checkCostLimit(userId, orgId);
-      if (!costCheck.allowed) {
-        throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
-      }
-      const estimatedCost = estimateTextTransformCost(preferredModel, text, {
-        inputBufferTokens: 90,
-        outputMultiplier: 1.1,
-        outputBufferTokens: 90,
-      });
-      await enforceProjectedBudgetGuardrail(userId, estimatedCost, orgId);
-
-      const { translatedText: value, usage, model } = await translateText(
-        text,
-        targetLanguage,
-        sourceLanguage,
-        apiKey,
-        preferredModel,
-        { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
-      );
-
-      await logUsage(userId, model, 'translation', usage, orgId);
-      return value;
+    // Budget gate first (short advisory-lock hold), then the chat call
+    // outside the lock so it doesn't pin a pool connection.
+    const estimatedCost = estimateTextTransformCost(preferredModel, text, {
+      inputBufferTokens: 90,
+      outputMultiplier: 1.1,
+      outputBufferTokens: 90,
     });
+    await assertBudgetWithinLimits(userId, orgId, estimatedCost);
+
+    const { translatedText, usage, model } = await translateText(
+      text,
+      targetLanguage,
+      sourceLanguage,
+      apiKey,
+      preferredModel,
+      { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
+    );
+    await logUsage(userId, model, 'translation', usage, orgId);
 
     await logAuditEvent({
       userId,

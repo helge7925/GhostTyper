@@ -12,6 +12,7 @@ import { analysisToHtml } from '../lib/export-utils';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { useMessageList, useTranslations } from '../lib/i18n';
 import { MAX_FILE_SIZE } from '../lib/constants';
+import { CHAT_MODEL_OPTIONS } from '../lib/constants';
 
 const OCR_LOADING_MESSAGES = [
   'Wir lesen Pixel für Pixel, damit kein Wort verloren geht.',
@@ -331,7 +332,7 @@ export default function OCR() {
                         <div>
                           <label className="block text-[10px] font-bold text-secondary uppercase mb-1.5 ml-1">Modell</label>
                           <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none">
-                            <option value="deepseek-v4-pro">DeepSeek V4 Pro</option><option value="deepseek-v4-flash">DeepSeek V4 Flash</option><option value="kimi-2.6">Kimi 2.6</option>
+                            {CHAT_MODEL_OPTIONS.map((option) => (<option key={option.value} value={option.value}>{option.label}</option>))}
                           </select>
                         </div>
                       </div>

@@ -2,12 +2,9 @@ import { optimizeText } from '../../lib/ai-service';
 import { withOrgScope } from '../../lib/api/with-org-scope';
 import {
   CostLimitCheckUnavailableError,
-  CostLimitExceededError,
-  enforceProjectedBudgetGuardrail,
+  assertBudgetWithinLimits,
   estimateTextTransformCost,
   logUsage,
-  checkCostLimit,
-  withUserCostLock,
 } from '../../lib/usage';
 import { resolveCortecsConfig } from '../../lib/settings-service';
 import { resolveChatModel } from '../../lib/model-policy';
@@ -71,29 +68,25 @@ async function handler(req, res) {
       return res.status(400).json({ message: 'Ungültiges KI-Modell' });
     }
 
-    const optimizedText = await withUserCostLock(userId, async () => {
-      const costCheck = await checkCostLimit(userId, orgId);
-      if (!costCheck.allowed) {
-        throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
-      }
-      const estimatedCost = estimateTextTransformCost(preferredModel, text, {
-        inputBufferTokens: 120,
-        outputMultiplier: 0.9,
-        outputBufferTokens: 120,
-      });
-      await enforceProjectedBudgetGuardrail(userId, estimatedCost, orgId);
-
-      const result = await optimizeText(
-        text,
-        preset,
-        typeof customInstruction === 'string' ? customInstruction.trim() : '',
-        apiKey,
-        preferredModel,
-        { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
-      );
-      await logUsage(userId, result.model, 'text_optimization', result.usage, orgId);
-      return result.optimizedText;
+    // Budget gate first (short advisory-lock hold), then the chat call
+    // outside the lock so it doesn't pin a pool connection.
+    const estimatedCost = estimateTextTransformCost(preferredModel, text, {
+      inputBufferTokens: 120,
+      outputMultiplier: 0.9,
+      outputBufferTokens: 120,
     });
+    await assertBudgetWithinLimits(userId, orgId, estimatedCost);
+
+    const result = await optimizeText(
+      text,
+      preset,
+      typeof customInstruction === 'string' ? customInstruction.trim() : '',
+      apiKey,
+      preferredModel,
+      { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
+    );
+    await logUsage(userId, result.model, 'text_optimization', result.usage, orgId);
+    const optimizedText = result.optimizedText;
 
     await logAuditEvent({
       userId,

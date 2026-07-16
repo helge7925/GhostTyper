@@ -2,10 +2,8 @@ import { generateTemplate } from '../../../lib/ai-service';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import {
   CostLimitCheckUnavailableError,
-  CostLimitExceededError,
+  assertBudgetWithinLimits,
   logUsage,
-  checkCostLimit,
-  withUserCostLock,
 } from '../../../lib/usage';
 import { getSettingsRow, resolveCortecsConfig } from '../../../lib/settings-service';
 import { resolveChatModel } from '../../../lib/model-policy';
@@ -40,27 +38,22 @@ async function handler(req, res) {
     const settingsRow = await getSettingsRow(userId);
     const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
     const apiKey = cortecs.apiKey;
-    const preferredModel = resolveChatModel(cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
+    const preferredModel = resolveChatModel(settingsRow?.preferred_model, null) || cortecs.chatModel;
 
     if (!apiKey) {
       return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert.' });
     }
 
-    const promptText = await withUserCostLock(userId, async () => {
-      const costCheck = await checkCostLimit(userId, orgId);
-      if (!costCheck.allowed) {
-        throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
-      }
-
-      const { promptText: value, usage, model } = await generateTemplate(
-        goal,
-        apiKey,
-        preferredModel,
-        { baseUrl: cortecs.baseUrl, preference: cortecs.preference },
-      );
-      await logUsage(userId, model, 'template_generation', usage, orgId);
-      return value;
-    });
+    // Budget gate first (short advisory-lock hold), then the chat call
+    // outside the lock so it doesn't pin a pool connection.
+    await assertBudgetWithinLimits(userId, orgId);
+    const { promptText, usage, model } = await generateTemplate(
+      goal,
+      apiKey,
+      preferredModel,
+      { baseUrl: cortecs.baseUrl, preference: cortecs.preference },
+    );
+    await logUsage(userId, model, 'template_generation', usage, orgId);
 
     return res.status(200).json({ promptText });
   } catch (error) {

@@ -3,10 +3,8 @@ import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { analyzeTranscription } from '../../../lib/ai-service';
 import {
   CostLimitCheckUnavailableError,
-  CostLimitExceededError,
-  checkCostLimit,
+  assertBudgetWithinLimits,
   logUsage,
-  withUserCostLock,
 } from '../../../lib/usage';
 import { resolveChatModel } from '../../../lib/model-policy';
 import { getSettingsRow, resolveCortecsConfig } from '../../../lib/settings-service';
@@ -63,7 +61,9 @@ async function handler(req, res) {
     const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
     const apiKey = cortecs.apiKey;
     const language = settingsRow?.language || 'de';
-    const selectedModel = resolveChatModel(requestModel || cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
+    const selectedModel = resolveChatModel(requestModel, null)
+      || resolveChatModel(settingsRow?.preferred_model, null)
+      || cortecs.chatModel;
 
     if (!apiKey) {
       return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert.' });
@@ -81,29 +81,22 @@ async function handler(req, res) {
       return res.status(400).json({ message: `Kombinierter Analysekontext ist zu lang (max. ${MAX_CUSTOM_PROMPT_LENGTH} Zeichen).` });
     }
 
-    const { analysis, usedModel } = await withUserCostLock(userId, async () => {
-      const costCheck = await checkCostLimit(userId, orgId);
-      if (!costCheck.allowed) {
-        throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
-      }
-
-      const resolvedTemplate = await resolveTemplate(template, userId);
-      const analysisResult = await analyzeTranscription(
-        text,
-        resolvedTemplate,
-        apiKey,
-        mergedPrompt,
-        selectedModel,
-        language,
-        { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
-      );
-      await logUsage(userId, analysisResult.model, 'analysis', analysisResult.usage, orgId);
-
-      return {
-        analysis: analysisResult.analysis,
-        usedModel: analysisResult.model,
-      };
-    });
+    // Budget gate first (short advisory-lock hold), then the chat call
+    // outside the lock so it doesn't pin a pool connection.
+    await assertBudgetWithinLimits(userId, orgId);
+    const resolvedTemplate = await resolveTemplate(template, userId);
+    const analysisResult = await analyzeTranscription(
+      text,
+      resolvedTemplate,
+      apiKey,
+      mergedPrompt,
+      selectedModel,
+      language,
+      { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
+    );
+    await logUsage(userId, analysisResult.model, 'analysis', analysisResult.usage, orgId);
+    const analysis = analysisResult.analysis;
+    const usedModel = analysisResult.model;
 
     const titlePrefix = 'Datentabelle';
 

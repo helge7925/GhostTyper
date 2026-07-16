@@ -7,10 +7,8 @@ import { withOrgScope } from '../../lib/api/with-org-scope';
 import { performOCR, analyzeTranscription } from '../../lib/ai-service';
 import {
   CostLimitCheckUnavailableError,
-  CostLimitExceededError,
+  assertBudgetWithinLimits,
   logUsage,
-  checkCostLimit,
-  withUserCostLock,
 } from '../../lib/usage';
 import { ACCEPTED_OCR_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE, normalizeAnalysisTemplate } from '../../lib/constants';
 import { resolveChatModel } from '../../lib/model-policy';
@@ -111,7 +109,7 @@ async function handler(req, res) {
     const settingsRow = await getSettingsRow(userId);
     const mistralApiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
     const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveChatModel(cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
+    const preferredModel = resolveChatModel(settingsRow?.preferred_model, null) || cortecs.chatModel;
     const language = settingsRow?.language || 'de';
     const shouldAnalyze = (fields.analyze?.[0] || fields.analyze) === 'true';
 
@@ -169,7 +167,7 @@ async function handler(req, res) {
     }
     const requestModel = fields.model?.[0] || fields.model;
     const selectedModelForAnalysis = shouldAnalyze
-      ? resolveChatModel(requestModel || preferredModel)
+      ? (resolveChatModel(requestModel, null) || preferredModel)
       : preferredModel;
     if (shouldAnalyze && !selectedModelForAnalysis) {
       await safeUnlink(persistedFilePath);
@@ -178,26 +176,20 @@ async function handler(req, res) {
     }
 
     let resolvedTemplateForAnalysis = null;
-    const { markdown, analysis, selectedModelForSave } = await withUserCostLock(userId, async () => {
-      const costCheck = await checkCostLimit(userId, orgId);
-      if (!costCheck.allowed) {
-        throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
-      }
+    // Budget gate first (short advisory-lock hold), then OCR + analysis
+    // outside the lock so the long provider calls don't pin a pool
+    // connection.
+    await assertBudgetWithinLimits(userId, orgId);
 
-      const { markdown: markdownValue, usage: ocrUsage, model: ocrModel } = await performOCR(filePath, mistralApiKey, detectedMimeType);
-      await logUsage(userId, ocrModel, 'ocr', ocrUsage, orgId);
+    const { markdown, usage: ocrUsage, model: ocrModel } = await performOCR(filePath, mistralApiKey, detectedMimeType);
+    await logUsage(userId, ocrModel, 'ocr', ocrUsage, orgId);
 
-      if (!shouldAnalyze || !markdownValue.trim()) {
-        return {
-          markdown: markdownValue,
-          analysis: null,
-          selectedModelForSave: 'mistral-ocr-latest',
-        };
-      }
-
+    let analysis = null;
+    let selectedModelForSave = 'mistral-ocr-latest';
+    if (shouldAnalyze && markdown.trim()) {
       resolvedTemplateForAnalysis = await resolveTemplate(template, userId);
       const analysisResult = await analyzeTranscription(
-        markdownValue,
+        markdown,
         resolvedTemplateForAnalysis,
         cortecs.apiKey,
         effectiveCustomPrompt,
@@ -206,13 +198,9 @@ async function handler(req, res) {
         { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
       );
       await logUsage(userId, analysisResult.model, 'analysis', analysisResult.usage, orgId);
-
-      return {
-        markdown: markdownValue,
-        analysis: analysisResult.analysis,
-        selectedModelForSave: selectedModelForAnalysis,
-      };
-    });
+      analysis = analysisResult.analysis;
+      selectedModelForSave = selectedModelForAnalysis;
+    }
 
     let analysisType = 'text';
     let analysisPayload = analysis;

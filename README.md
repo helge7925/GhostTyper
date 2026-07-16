@@ -117,7 +117,8 @@ on Apple Silicon it runs under emulation and is noticeably slower.
 
 ## Quickstart
 
-Prerequisites: Docker + Docker Compose v2, a Mistral API key.
+Prerequisites: Docker + Docker Compose v2, a Cortecs API key (plus a
+Mistral API key if you use OCR or Voxtral TTS).
 
 ```bash
 git clone https://github.com/helge7925/transkription_webapp.git

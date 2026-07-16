@@ -7,12 +7,9 @@ import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { performOCR, translateText, translateTextSegments } from '../../../lib/ai-service';
 import {
   CostLimitCheckUnavailableError,
-  CostLimitExceededError,
-  enforceProjectedBudgetGuardrail,
+  assertBudgetWithinLimits,
   estimateTextTransformCost,
   logUsage,
-  checkCostLimit,
-  withUserCostLock,
 } from '../../../lib/usage';
 import { getSettingsRow, resolveCortecsConfig, resolveMistralApiKey } from '../../../lib/settings-service';
 import { resolveChatModel } from '../../../lib/model-policy';
@@ -167,7 +164,9 @@ async function handler(req, res) {
     const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
     const cortecsApiKey = cortecs.apiKey;
     const mistralApiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveChatModel(requestModel || cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
+    const preferredModel = resolveChatModel(requestModel, null)
+      || resolveChatModel(settingsRow?.preferred_model, null)
+      || cortecs.chatModel;
     if (!cortecsApiKey) {
       await safeUnlink(tempUploadPath);
       tempUploadPath = '';
@@ -194,36 +193,31 @@ async function handler(req, res) {
       }
 
       let totalUsage = {};
-      const translated = await withUserCostLock(userId, async () => {
-        const costCheck = await checkCostLimit(userId, orgId);
-        if (!costCheck.allowed) {
-          throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
-        }
-        const estimatedCost = estimateTextTransformCost(preferredModel, inspection.text, {
-          inputBufferTokens: inspection.segmentCount * 8,
-          outputMultiplier: 1.15,
-          outputBufferTokens: inspection.segmentCount * 8,
-        });
-        await enforceProjectedBudgetGuardrail(userId, estimatedCost, orgId);
-
-        const output = await translateOfficeDocumentBuffer(inputBuffer, detectedMimeType, {
-          translator: async (segments) => {
-            const result = await translateTextSegments(
-              segments,
-              targetLanguage,
-              sourceLanguage,
-              cortecsApiKey,
-              preferredModel,
-              { baseUrl: cortecs.baseUrl, preference: cortecs.preference },
-            );
-            totalUsage = addUsage(totalUsage, result.usage);
-            return result.translations;
-          },
-        });
-
-        await logUsage(userId, preferredModel, 'office_translation', totalUsage, orgId);
-        return output;
+      // Budget gate first (short advisory-lock hold), then the translation
+      // outside the lock so it doesn't pin a pool connection.
+      const estimatedCost = estimateTextTransformCost(preferredModel, inspection.text, {
+        inputBufferTokens: inspection.segmentCount * 8,
+        outputMultiplier: 1.15,
+        outputBufferTokens: inspection.segmentCount * 8,
       });
+      await assertBudgetWithinLimits(userId, orgId, estimatedCost);
+
+      const translated = await translateOfficeDocumentBuffer(inputBuffer, detectedMimeType, {
+        translator: async (segments) => {
+          const result = await translateTextSegments(
+            segments,
+            targetLanguage,
+            sourceLanguage,
+            cortecsApiKey,
+            preferredModel,
+            { baseUrl: cortecs.baseUrl, preference: cortecs.preference },
+          );
+          totalUsage = addUsage(totalUsage, result.usage);
+          return result.translations;
+        },
+      });
+
+      await logUsage(userId, preferredModel, 'office_translation', totalUsage, orgId);
 
       const extension = extensionFromDetectedMime(detectedMimeType);
       const outputFilename = `${randomUUID()}${extension}`;
@@ -308,12 +302,11 @@ async function handler(req, res) {
       let segmentCount = 0;
       let pdfBuffer;
 
-      pdfBuffer = await withUserCostLock(userId, async () => {
-        const costCheck = await checkCostLimit(userId, orgId);
-        if (!costCheck.allowed) {
-          throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
-        }
-
+      // Budget gate first (short advisory-lock hold); OCR + translation run
+      // outside the lock so the long provider calls don't pin a pool
+      // connection.
+      await assertBudgetWithinLimits(userId, orgId);
+      pdfBuffer = await (async () => {
         if (!mistralApiKey) {
           throw Object.assign(new Error('Kein Mistral API-Key für OCR konfiguriert'), { code: 'NO_MISTRAL_OCR_KEY' });
         }
@@ -334,11 +327,13 @@ async function handler(req, res) {
           );
         }
 
-        // Project the LLM cost for the translation step.
-        const estimatedCost = estimateTextTransformCost(preferredModel, sourceMarkdown, {
+        // Project the LLM cost for the translation step now that the OCR
+        // text size is known (second short gate, again without holding the
+        // lock through the translation itself).
+        const pdfEstimatedCost = estimateTextTransformCost(preferredModel, sourceMarkdown, {
           outputMultiplier: 1.15,
         });
-        await enforceProjectedBudgetGuardrail(userId, estimatedCost, orgId);
+        await assertBudgetWithinLimits(userId, orgId, pdfEstimatedCost);
 
         // Step 2: Translate Markdown chunk-by-chunk to keep token windows safe.
         const segments = splitMarkdownIntoSegments(sourceMarkdown, 6000);
@@ -367,7 +362,7 @@ async function handler(req, res) {
         await logUsage(userId, 'mistral-ocr-latest', 'ocr', totalOcrUsage, orgId);
         await logUsage(userId, preferredModel, 'translation', totalTranslateUsage, orgId);
         return buffer;
-      });
+      })();
 
       const extension = '.pdf';
       const outputFilename = `${randomUUID()}${extension}`;
