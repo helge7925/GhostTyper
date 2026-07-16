@@ -59,10 +59,14 @@ const EVENT_STAGE_LABELS = {
   analyzing: 'KI-Analyse',
   completed: 'Fertig',
   error: 'Fehler',
+  // Vexa bridge health events (backoff / stale detector).
+  vexa_degraded: 'Verbindung gestört',
+  vexa_stale: 'Keine Wortmeldungen',
+  vexa_recovered: 'Verbindung wiederhergestellt',
 };
 
 function eventDotClass(stage) {
-  if (stage === 'completed') return 'bg-success';
+  if (stage === 'completed' || stage === 'vexa_recovered') return 'bg-success';
   if (stage === 'error') return 'bg-danger';
   if (stage === 'analyzing') return 'bg-accent';
   if (stage === 'speaker_assignment') return 'bg-info';
@@ -110,6 +114,7 @@ export default function TranscriptionDetail() {
   const { data: session, status: authStatus } = useSession();
   const t = useTranslations('transcriptionDetailPage');
   const tCommon = useTranslations('common');
+  const tMeeting = useTranslations('meeting');
   const transcriptionMessages = useMessageList('loadingMessages.transcription');
   const [transcription, setTranscription] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -601,8 +606,16 @@ export default function TranscriptionDetail() {
               )}
 
               {transcription.status === STATUS.ERROR && (
-                <div className="bg-danger/10 border border-danger/25 text-danger rounded-2xl p-4 text-sm">
-                  {transcription.error || 'Verarbeitung fehlgeschlagen. Bitte erneut versuchen.'}
+                <div className="bg-danger/10 border border-danger/25 text-danger rounded-2xl p-4 text-sm space-y-3">
+                  <p>{transcription.error || 'Verarbeitung fehlgeschlagen. Bitte erneut versuchen.'}</p>
+                  {transcription.bot_status === 'rejected' && (
+                    <Link
+                      href="/upload?preset=meet-tab-audio"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border border-danger/40 hover:bg-danger/10 transition-colors"
+                    >
+                      {tMeeting('start.meetBlocked.cta')}
+                    </Link>
+                  )}
                 </div>
               )}
 

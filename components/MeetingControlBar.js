@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Square, Languages, ArrowLeftRight, Share2, Copy, Check, Tv, Volume2 } from 'lucide-react';
 import { useUiFeedback } from '../lib/use-ui-feedback';
+import { useTranslations } from '../lib/i18n';
+
+// bot_status values with a friendly, localized label. Anything not listed
+// (e.g. a raw Vexa status we don't map yet) falls through to the raw value.
+const KNOWN_BOT_STATUSES = ['requested', 'joining', 'awaiting_admission', 'active', 'completed', 'failed', 'rejected'];
 
 export default function MeetingControlBar({
   transcriptionId,
@@ -16,6 +21,11 @@ export default function MeetingControlBar({
   // never resolve and the Stop button would silently hang. We use the browser
   // native confirm here; it also lets us spell out the Whisper-chunk caveat.
   const { showToast } = useUiFeedback();
+  const t = useTranslations('meeting');
+  const rawBotStatus = String(botStatus || '').toLowerCase();
+  const botStatusLabel = KNOWN_BOT_STATUSES.includes(rawBotStatus)
+    ? t(`botStatus.${rawBotStatus}`)
+    : (botStatus || t('botStatus.active'));
   const [language, setLanguage] = useState(currentLanguage || 'de');
   const [updatingLanguage, setUpdatingLanguage] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -249,7 +259,7 @@ export default function MeetingControlBar({
           <div className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" aria-hidden />
           <div>
             <p className="text-sm font-medium text-primary">Bot ist im Meeting</p>
-            <p className="text-[11px] text-secondary">Status: {botStatus || 'aktiv'}</p>
+            <p className="text-[11px] text-secondary">Status: {botStatusLabel}</p>
           </div>
         </div>
         {/* flex-wrap + justify-end so the toggle row stays right-aligned

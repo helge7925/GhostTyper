@@ -77,6 +77,15 @@
         "languageBadge": "{lang}",
         "noSegmentsYet": "No segments yet."
       }
+    },
+    "botStatus": {
+      "requested": "Join requested",
+      "joining": "Joining …",
+      "awaiting_admission": "Waiting to be admitted",
+      "active": "Active in meeting",
+      "completed": "Completed",
+      "failed": "Failed",
+      "rejected": "Not admitted"
     }
   },
   "errors": {

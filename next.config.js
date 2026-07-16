@@ -3,6 +3,12 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
   poweredByHeader: false,
+  // Keep native / dynamic-require packages out of the server bundle. API
+  // routes already auto-externalize these; declaring them here also covers
+  // the instrumentation.js bundle, which transitively imports lib/ai-service
+  // (fluent-ffmpeg + @ffmpeg-installer do a runtime require the tracer can't
+  // resolve). They stay as plain node_modules requires at runtime.
+  serverExternalPackages: ['@ffmpeg-installer/ffmpeg', 'fluent-ffmpeg'],
   // Next.js clamps request bodies passing through middleware/proxy to 10 MB by
   // default. Audio uploads (/api/upload, up to MAX_FILE_SIZE = 500 MB) flow
   // through the global middleware matcher, so raise the cap to match.

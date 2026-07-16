@@ -8,6 +8,12 @@ import { decryptSecret, SECRET_CONTEXTS } from '../../../../lib/secrets';
 import { getTranscript, mapVexaTranscriptToGhostTyper } from '../../../../lib/api/vexa';
 import { runManualAnalysisJob } from '../../../../lib/manual-analysis';
 import { logUsage } from '../../../../lib/usage';
+import {
+  startBridgeForTranscription,
+  stopBridgeForTranscription,
+  isBridgeActive,
+} from '../../../../lib/vexa-bridge';
+import { decideJoinTimeout, vexaReportsActive } from '../../../../lib/vexa-bridge-utils';
 
 // Bridge keeps `updated_at` fresh while polling Vexa every 2 s, so a
 // row only goes stale once the in-process bridge stops (Vexa says
@@ -16,6 +22,10 @@ import { logUsage } from '../../../../lib/usage';
 const STALE_MINUTES = 1;
 const HARD_TIMEOUT_HOURS = 6;
 const PER_RUN_LIMIT = 25;
+// Join window: a bot still stuck in an early lifecycle state this long
+// after the row was created, with no segments and no "active" signal from
+// Vexa, is treated as never-admitted (→ rejected). Env-tunable.
+const JOIN_TIMEOUT_MS = Number(process.env.VEXA_JOIN_TIMEOUT_MS) || 120_000;
 
 function checkSecret(req) {
   const expected = process.env.RECONCILE_API_SECRET;
@@ -33,7 +43,9 @@ async function loadOpenMeetings() {
   const result = await query(
     `SELECT id, user_id, organization_id, status, bot_status, auto_analyze,
             meeting_platform, native_meeting_id, external_meeting_id,
-            updated_at, created_at
+            updated_at, created_at,
+            CASE WHEN jsonb_typeof(segments) = 'array'
+                 THEN jsonb_array_length(segments) ELSE 0 END AS segment_count
        FROM transcriptions
       WHERE source = 'vexa'
         AND status IN ('pending', 'processing')
@@ -54,6 +66,48 @@ async function loadUserToken(userId, orgId) {
   return decryptSecret(result.rows[0].api_key_encrypted, {
     field: SECRET_CONTEXTS.vexaUserToken,
     bindingId: orgId,
+  });
+}
+
+// Never-admitted bot: the join window elapsed with no segments and no
+// "active" signal. Flip the row to a clear rejected error state, drop the
+// live bridge, and leave a transcription event that points at tab-audio
+// capture as the fallback. Guarded on status so we never clobber a row a
+// concurrent webhook/finalize already moved on.
+async function rejectNeverAdmitted(row) {
+  const errorMessage = 'Der Bot wurde nicht ins Meeting eingelassen — keine Freigabe, kein Ton nach '
+    + `${Math.round(JOIN_TIMEOUT_MS / 1000)} s. Prüfe die Lobby-/Freigabe-Einstellungen des Meetings `
+    + 'oder nutze stattdessen die Tab-/System-Audio-Aufnahme.';
+  const locked = await query(
+    `UPDATE transcriptions SET status = 'error', bot_status = 'rejected',
+                               error = $1, updated_at = NOW()
+      WHERE id = $2 AND status IN ('pending','processing')
+      RETURNING id`,
+    [errorMessage.slice(0, 500), row.id],
+  );
+  if (locked.rowCount === 0) return { id: row.id, action: 'race_lost' };
+  await addTranscriptionEvent({
+    transcriptionId: row.id,
+    userId: row.user_id,
+    organizationId: row.organization_id,
+    stage: 'error',
+    message: 'Bot nicht ins Meeting eingelassen. Tipp: Tab-/System-Audio-Aufnahme als Alternative nutzen.',
+    meta: { reason: 'join_timeout', botStatus: row.bot_status },
+  });
+  stopBridgeForTranscription(row.id, 'rejected');
+  return { id: row.id, action: 'rejected_join_timeout' };
+}
+
+// Shared join-timeout gate — pure decision fed by the row + optional Vexa
+// meeting status. `vexaActive` defaults false (e.g. Vexa 404 / unreachable).
+function shouldRejectForJoinTimeout(row, { meetingStatus = null, extraSegments = 0 } = {}) {
+  return decideJoinTimeout({
+    botStatus: row.bot_status,
+    createdAtMs: new Date(row.created_at).getTime(),
+    nowMs: Date.now(),
+    hasSegments: Number(row.segment_count) > 0 || extraSegments > 0,
+    vexaActive: vexaReportsActive(meetingStatus),
+    joinTimeoutMs: JOIN_TIMEOUT_MS,
   });
 }
 
@@ -92,6 +146,11 @@ async function reconcileOne(row) {
     );
   } catch (error) {
     if (error.response?.status === 404) {
+      // Bot not in Vexa at all. If it never got past an early state within
+      // the join window and produced nothing, it was never admitted.
+      if (shouldRejectForJoinTimeout(row)) {
+        return rejectNeverAdmitted(row);
+      }
       return { id: row.id, action: 'skipped_not_in_vexa' };
     }
     logApiError(`Reconcile getTranscript failed for ${row.id}`, error);
@@ -106,6 +165,11 @@ async function reconcileOne(row) {
   // do NOT finalize. Finalization is only legitimate when Vexa itself
   // says the meeting is over.
   if (meetingStatus !== 'completed' && meetingStatus !== 'failed') {
+    // Join-timeout: bot still in an early state past the window, nothing
+    // produced anywhere, and Vexa doesn't report it active → never admitted.
+    if (shouldRejectForJoinTimeout(row, { meetingStatus, extraSegments: segments.length })) {
+      return rejectNeverAdmitted(row);
+    }
     if (segments.length > 0) {
       const mappedLive = mapVexaTranscriptToGhostTyper(transcript);
       await query(
@@ -117,6 +181,12 @@ async function reconcileOne(row) {
           WHERE id = $4 AND status IN ('pending','processing')`,
         [JSON.stringify(mappedLive.segments), JSON.stringify(mappedLive.speakers), mappedLive.text, row.id],
       );
+    }
+    // Bridge recovery: this row is genuinely still running, so if the
+    // in-process bridge died (deploy/restart mid-meeting) re-attach it.
+    // Idempotent — isBridgeActive guards a live bridge on the same instance.
+    if (!isBridgeActive(row.id)) {
+      startBridgeForTranscription(row.id);
     }
     return { id: row.id, action: 'still_running' };
   }
