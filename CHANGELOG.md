@@ -27,6 +27,19 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
   die RAG-Index-Hooks (Reindex-Button, Chunk-Anzeige, Backfill-Endpoint)
   wurden entfernt. `improve-files-knowledge-tasks-chat` ist durch diese
   Änderung ersetzt und archiviert.
+- **Google Meet aus dem Meeting-Bot-Pfad entfernt.** Google blockiert
+  Meeting-Bots auf Meet hart (operator-verifiziert Juli 2026: dedizierte
+  Sperr-Seite statt CAPTCHA) — ein Bot-Start gegen Meet ist ein
+  garantierter Fehlschlag. `google_meet` ist raus aus der
+  URL-Erkennung (`components/MeetingStartForm.js`), der
+  Outbound-Plattform-Zuordnung (`lib/api/vexa.js`
+  `MEETING_URL_PATTERNS`) und dem Bot-Start-Gate
+  (`pages/api/meetings/index.js` `SUPPORTED_PLATFORMS`). Ein
+  eingefügter Meet-Link zeigt stattdessen einen Hinweis mit Deep-Link
+  zur Tab-/System-Audio-Aufnahme (`/upload?preset=meet-tab-audio`).
+  Historische Transkriptionen mit `meeting_platform='google_meet'`
+  bleiben unverändert lesbar — nur der Outbound-Pfad für neue Bot-Starts
+  ist betroffen. Teams, Zoom und Nextcloud Talk sind unverändert.
 
 ### Changed
 - **Service rename: `fireworks-bridge` → `voxtral-bridge`.** Der

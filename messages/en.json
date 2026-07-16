@@ -26,12 +26,16 @@
       "title": "Transcribe a remote meeting",
       "description": "A bot joins the meeting as a participant and streams the transcript live.",
       "urlLabel": "Meeting link",
-      "urlHint": "Google Meet, Microsoft Teams, Zoom or Nextcloud Talk.",
+      "urlHint": "Microsoft Teams, Zoom or Nextcloud Talk.",
       "platform": {
-        "google_meet": "Google Meet detected.",
         "teams": "Microsoft Teams detected.",
         "zoom": "Zoom detected.",
         "nextcloud_talk": "Nextcloud Talk detected."
+      },
+      "meetBlocked": {
+        "title": "Google Meet is not supported.",
+        "hint": "Google blocks meeting bots on Meet (a dedicated rejection page, not a CAPTCHA). Use tab-/system-audio capture instead — it works for any browser-based meeting, including Meet.",
+        "cta": "Go to tab-audio capture"
       },
       "botNameLabel": "Bot display name in the meeting",
       "languageLabel": "Language",
@@ -206,7 +210,7 @@
       "aiProviders": "AI providers",
       "aiProvidersHint": "Keys are stored encrypted and used automatically for every workspace member.",
       "meetingBots": "Meeting bots",
-      "meetingBotsHint": "Configuration for the live transcription bot in Google Meet and Microsoft Teams.",
+      "meetingBotsHint": "Configuration for the live transcription bot in Microsoft Teams, Zoom and Nextcloud Talk. Google Meet blocks meeting bots — use tab-audio capture for Meet instead.",
       "storage": "Storage & export",
       "storageHint": "Export results to external storage.",
       "costLimits": "Cost caps",
@@ -706,7 +710,7 @@
       },
       "vexa": {
         "title": "Remote meeting bot",
-        "description": "A bot joins Google Meet and Microsoft Teams meetings and streams live transcripts straight into the GhostTyper workflow.",
+        "description": "A bot joins Microsoft Teams, Zoom and Nextcloud Talk meetings and streams live transcripts straight into the GhostTyper workflow. Google Meet blocks meeting bots — tab-audio capture covers Meet instead.",
         "enableLabel": "Enable feature",
         "enableHintSimple": "The Vexa bot ships as part of the local install — just toggle on or off here.",
         "defaultBotNameLabel": "Bot display name in the meeting",

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { Loader2, Video } from 'lucide-react';
 import {
   Dialog,
@@ -12,6 +13,11 @@ import {
 import { useTranslations } from '../lib/i18n';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 
+// Google hard-blocks meeting bots on Meet (operator-verified, July 2026: the
+// Vexa bot lands on a dedicated rejection page, not a CAPTCHA). Meet is no
+// longer a bot-startable platform — this regex now only exists to detect a
+// pasted Meet link so we can redirect the user to tab-audio capture instead
+// of letting them start a bot that's guaranteed to fail.
 const MEET_REGEX = /(?:meet\.google\.com\/)([a-z]{3}-[a-z]{4}-[a-z]{3})/i;
 const ZOOM_REGEX = /zoom\.us\/j\/(\d+)/i;
 const TEAMS_REGEX = /teams\.(?:microsoft|live)\.com\/[^\s]+meeting/i;
@@ -21,11 +27,14 @@ const NEXTCLOUD_TALK_REGEX = /^https?:\/\/[^/\s]+\/(?:index\.php\/)?call\/[A-Za-
 
 function detectPlatform(url) {
   if (!url) return null;
-  if (MEET_REGEX.test(url)) return 'google_meet';
   if (TEAMS_REGEX.test(url)) return 'teams';
   if (ZOOM_REGEX.test(url)) return 'zoom';
   if (NEXTCLOUD_TALK_REGEX.test(url)) return 'nextcloud_talk';
   return null;
+}
+
+function isMeetUrl(url) {
+  return !!url && MEET_REGEX.test(url);
 }
 
 export default function MeetingStartForm({ open, onOpenChange, defaultBotName, defaultLanguage, gdprChatNoticeDefault = false }) {
@@ -91,6 +100,7 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
   }, [translationEnabled, translationLangA, translationLangB, audioInjectionLang]);
 
   const platform = useMemo(() => detectPlatform(url), [url]);
+  const meetBlocked = useMemo(() => isMeetUrl(url), [url]);
   const translationLanguagesValid = !translationEnabled || translationLangA !== translationLangB;
   const valid = !!platform && consent && !submitting && translationLanguagesValid;
 
@@ -148,18 +158,33 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
               type="url"
               required
               autoFocus
-              placeholder="https://meet.google.com/abc-defg-hij"
+              placeholder="https://teams.microsoft.com/l/meetup-join/…"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent"
             />
-            <p className="mt-1 text-[10px] text-secondary">
-              {platform ? t(`platform.${platform}`) : t('urlHint')}
-            </p>
+            {!meetBlocked && (
+              <p className="mt-1 text-[10px] text-secondary">
+                {platform ? t(`platform.${platform}`) : t('urlHint')}
+              </p>
+            )}
             {platform === 'nextcloud_talk' && (
               <p className="mt-1.5 text-[10px] text-warning">
                 {t('nextcloudTalkLobbyHint')}
               </p>
+            )}
+            {meetBlocked && (
+              <div className="mt-1.5 text-[10px] text-warning bg-warning/10 border border-warning/30 rounded-lg px-2.5 py-2 leading-snug">
+                <p className="font-medium text-primary">{t('meetBlocked.title')}</p>
+                <p className="mt-0.5">{t('meetBlocked.hint')}</p>
+                <Link
+                  href="/upload?preset=meet-tab-audio"
+                  onClick={() => onOpenChange(false)}
+                  className="inline-block mt-1.5 underline text-accent hover:no-underline"
+                >
+                  {t('meetBlocked.cta')}
+                </Link>
+              </div>
             )}
           </div>
 

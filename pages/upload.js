@@ -62,6 +62,19 @@ const UPLOAD_PRESETS = {
       showAdvancedOptions: true,
     },
   },
+  // Deep-link target from the Meet-blocked hint in MeetingStartForm — Google
+  // blocks meeting bots on Meet, so we route users into tab-/system-audio
+  // capture instead, preselected for a meeting-style transcript.
+  'meet-tab-audio': {
+    label: 'Tab-Audio -> Meeting-Protokoll',
+    config: {
+      uploadMode: 'system-audio',
+      autoAnalyze: true,
+      diarize: true,
+      template: 'meeting',
+      showAdvancedOptions: true,
+    },
+  },
 };
 
 export default function Upload() {

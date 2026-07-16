@@ -1,8 +1,18 @@
 # Vexa Remote-Meeting-Integration — Operator-Guide
 
-GhostTyper kann Live-Meetings (Google Meet, Microsoft Teams, Zoom) automatisch
-mitschneiden und transkribieren, indem ein Vexa-Lite-Bot dem Meeting beitritt
-und das Transkript an GhostTyper zurückliefert.
+GhostTyper kann Live-Meetings (Microsoft Teams, Zoom, Nextcloud Talk)
+automatisch mitschneiden und transkribieren, indem ein Vexa-Lite-Bot dem
+Meeting beitritt und das Transkript an GhostTyper zurückliefert.
+
+> **Google Meet ist kein Bot-Ziel mehr.** Google blockiert Meeting-Bots auf
+> Meet hart — operator-verifiziert im Juli 2026 landet der Vexa-Bot auf
+> einer dedizierten Sperr-Seite, nicht auf einem CAPTCHA. Meet wurde deshalb
+> vollständig aus dem Bot-Pfad entfernt (`lib/api/vexa.js` `MEETING_URL_PATTERNS`,
+> `pages/api/meetings/index.js` `SUPPORTED_PLATFORMS`,
+> `components/MeetingStartForm.js`). Ein Meet-Link im Start-Dialog zeigt
+> stattdessen einen Hinweis mit Deep-Link zur Tab-/System-Audio-Aufnahme
+> (`/upload?preset=meet-tab-audio`). Historische Transkriptionen mit
+> `meeting_platform='google_meet'` bleiben unverändert lesbar.
 
 ## Zwei-Stufen-Opt-in
 
@@ -245,10 +255,13 @@ Plattformen das real ins Chat-Fenster schreiben, hängt vom Bot-Image ab:
 
 | Plattform | Vanilla `vexaai/vexa-lite` | `vexa-bot-talk` Fork |
 |---|---|---|
-| Google Meet | ✅ | ✅ |
 | Microsoft Teams | ✅ | ✅ |
 | Zoom | ✅ | ✅ |
 | Nextcloud Talk | ❌ Bot tritt nicht bei | ⚠ tritt bei, **Chat-Sender im Bot muss noch verifiziert werden** (`services/vexa-bot/core/src/services/chat.ts` Talk-Branch + Selectors in `platforms/nextcloudtalk/selectors.ts` — siehe `feat/nextcloud-talk-chat` im Vexa-Fork) |
+
+Google Meet fehlt hier bewusst — der Bot startet für Meet gar nicht erst
+(siehe Hinweis oben), also gibt es auch keinen Chat-Auto-Post für diese
+Plattform mehr.
 
 Bei einer Plattform ohne Chat-Sender im Bot wird der Webapp-seitige
 Call still im Log abgelegt (`gdpr_chat_poster.send_failed`); das
@@ -284,6 +297,7 @@ Meeting läuft weiter, nur die Chat-Nachricht erscheint nicht.
 npm test  # Adapter, URL-Parser, HMAC-Verifikation
 ```
 
-Ein End-to-End-Test gegen einen echten Vexa-Lite + ein Sandbox-Google-Meet
-ist manuell zu fahren — siehe `docs/code-review-priorities-*` für das
-Test-Protokoll.
+Ein End-to-End-Test gegen einen echten Vexa-Lite + ein Sandbox-Teams- oder
+Zoom-Meeting ist manuell zu fahren — siehe `docs/code-review-priorities-*`
+für das Test-Protokoll. Google Meet gehört NICHT mehr in dieses
+Test-Protokoll (siehe Hinweis oben).

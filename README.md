@@ -48,12 +48,15 @@ remote-meeting screenshots are TODO / need capture before they are embedded.
   or file upload. Large recordings are automatically compressed and split into
   overlapping chunks, so files of any length transcribe reliably despite the
   provider's per-file size limit.
-- **Remote-meeting bot** for Google Meet, Microsoft Teams and Zoom via
+- **Remote-meeting bot** for Microsoft Teams and Zoom via
   [Vexa Lite](https://github.com/Vexa-ai/vexa) — live transcript flows
   into the same editor. A community fork
   ([helge7925/vexa](https://github.com/helge7925/vexa), branch
   `feat/nextcloud-talk-adapter`) adds Nextcloud Talk as a fourth
-  platform; swap the image via `VEXA_LITE_IMAGE` to enable.
+  platform; swap the image via `VEXA_LITE_IMAGE` to enable. Google Meet
+  is not in the bot picker: Google hard-blocks meeting bots on Meet (a
+  dedicated rejection page, not a CAPTCHA), so Meet meetings are covered
+  by tab/system audio capture instead.
 - **OCR** for PDFs and images.
 - **AI analysis**: summaries, meeting minutes, action-item / to-do extraction,
   free-form prompts, custom templates and translation.

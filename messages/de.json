@@ -26,12 +26,16 @@
       "title": "Remote-Meeting transkribieren",
       "description": "Ein Bot tritt als Teilnehmer dem Meeting bei und liefert das Transkript live.",
       "urlLabel": "Meeting-Link",
-      "urlHint": "Google Meet, Microsoft Teams, Zoom oder Nextcloud Talk.",
+      "urlHint": "Microsoft Teams, Zoom oder Nextcloud Talk.",
       "platform": {
-        "google_meet": "Google Meet erkannt.",
         "teams": "Microsoft Teams erkannt.",
         "zoom": "Zoom erkannt.",
         "nextcloud_talk": "Nextcloud Talk erkannt."
+      },
+      "meetBlocked": {
+        "title": "Google Meet wird nicht unterstützt.",
+        "hint": "Google blockiert Meeting-Bots in Meet (eigene Sperr-Seite statt CAPTCHA). Nutzen Sie stattdessen die Tab-/System-Audio-Aufnahme — sie funktioniert für jedes Browser-Meeting, auch für Meet.",
+        "cta": "Zur Tab-Audio-Aufnahme"
       },
       "botNameLabel": "Anzeigename des Bots im Meeting",
       "languageLabel": "Sprache",
@@ -206,7 +210,7 @@
       "aiProviders": "KI-Provider",
       "aiProvidersHint": "Schlüssel werden verschlüsselt gespeichert und automatisch für alle Workspace-Mitglieder verwendet.",
       "meetingBots": "Meeting-Bots",
-      "meetingBotsHint": "Konfiguration des Live-Transkriptions-Bots für Google Meet und Microsoft Teams.",
+      "meetingBotsHint": "Konfiguration des Live-Transkriptions-Bots für Microsoft Teams, Zoom und Nextcloud Talk. Google Meet blockiert Meeting-Bots — dafür Tab-Audio-Aufnahme nutzen.",
       "storage": "Speicher & Export",
       "storageHint": "Ergebnisse in externe Speicher exportieren.",
       "costLimits": "Kostengrenzen",
@@ -706,7 +710,7 @@
       },
       "vexa": {
         "title": "Remote Meeting-Bot",
-        "description": "Ein Bot tritt Google-Meet- und Microsoft-Teams-Meetings bei und liefert Live-Transkripte direkt in den GhostTyper-Workflow.",
+        "description": "Ein Bot tritt Microsoft-Teams-, Zoom- und Nextcloud-Talk-Meetings bei und liefert Live-Transkripte direkt in den GhostTyper-Workflow. Google Meet blockiert Meeting-Bots — dafür steht die Tab-Audio-Aufnahme bereit.",
         "enableLabel": "Funktion aktivieren",
         "enableHintSimple": "Der Vexa-Bot läuft als Teil der lokalen Installation. Hier nur ein-/ausschalten.",
         "defaultBotNameLabel": "Anzeigename des Bots im Meeting",

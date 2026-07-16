@@ -19,9 +19,13 @@ import { ensureShareTokenForRow } from '../../../lib/share-chat-poster';
 import { logError } from '../../../lib/observability';
 
 const PROVIDER = 'vexa';
-const SUPPORTED_PLATFORMS = new Set(['google_meet', 'teams', 'zoom', 'nextcloud_talk']);
+// Google Meet is intentionally excluded — Google hard-blocks meeting bots on
+// Meet (dedicated rejection page, not a CAPTCHA), so starting a bot against
+// a Meet URL/platform is a guaranteed failure. This is the outbound gate for
+// *new* bot-start requests only; historic transcription rows with
+// meeting_platform='google_meet' are untouched and keep rendering normally.
+const SUPPORTED_PLATFORMS = new Set(['teams', 'zoom', 'nextcloud_talk']);
 const PLATFORM_LABELS = {
-  google_meet: 'Google Meet',
   teams: 'Microsoft Teams',
   zoom: 'Zoom',
   nextcloud_talk: 'Nextcloud Talk',
