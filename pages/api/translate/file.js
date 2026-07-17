@@ -31,6 +31,13 @@ import { mdToHtml } from '../../../lib/export-utils';
 import { renderPdfBufferFromHtml } from '../../../lib/pdf-export';
 import { upsertDocumentForTranscription } from '../../../lib/documents';
 import {
+  detectTextLayer,
+  extractRuns,
+  segmentRuns,
+  rewritePdf,
+  findNonEncodableTranslations,
+} from '../../../lib/pdf-inplace';
+import {
   aggregateSegmentMetadata,
   describeGlossaryApplication,
   getGlossaryForPair,
@@ -96,6 +103,27 @@ function splitMarkdownIntoSegments(markdown, maxChars = 6000) {
   }
   if (current) chunks.push(current);
   return chunks;
+}
+
+// Phase-1 in-place PDF translation renders with pdf-lib StandardFonts (WinAnsi),
+// which only cover latin-script targets. Non-latin targets are routed to the OCR
+// fallback up front so we never spend a translation call we can't render. This
+// is a coarse gate by language name/code; the encodability net after translation
+// (findNonEncodableTranslations) still catches stragglers.
+const NON_LATIN_TARGETS = new Set([
+  'chinese', 'mandarin', 'cantonese', 'zh', 'zh-cn', 'zh-tw',
+  'japanese', 'ja', 'korean', 'ko',
+  'russian', 'ru', 'ukrainian', 'uk', 'bulgarian', 'bg', 'serbian', 'sr',
+  'macedonian', 'mk', 'belarusian', 'be',
+  'greek', 'el', 'arabic', 'ar', 'hebrew', 'he', 'persian', 'farsi', 'fa',
+  'urdu', 'ur', 'thai', 'th', 'hindi', 'hi', 'bengali', 'bn',
+  'tamil', 'ta', 'telugu', 'te', 'georgian', 'ka', 'armenian', 'hy',
+]);
+
+function isLatinScriptTarget(language) {
+  const normalized = String(language || '').trim().toLowerCase().replace(/_/g, '-');
+  if (!normalized) return true;
+  return !NON_LATIN_TARGETS.has(normalized);
 }
 
 function addUsage(total, usage = {}) {
@@ -463,9 +491,181 @@ async function handler(req, res) {
       return res.status(200).send(translated.buffer);
     }
 
-    // ====== PDF PATH (best-effort: OCR → translate → render new PDF) ======
+    // ====== PDF PATH ======
+    // Digital PDFs (embedded text layer, latin-script target) are translated
+    // IN PLACE: extract positioned runs, translate segment-wise via the same
+    // glossary/TM machinery as the office path, and redraw the translation over
+    // the original layout. Scans, non-latin targets, and non-encodable results
+    // fall through to the existing OCR → re-render path (flagged approximated).
     if (isPdf) {
       const glossary = await loadTranslationGlossary(orgId, sourceLanguage, targetLanguage, userId);
+
+      // ---- In-place attempt (digital + latin target) --------------------
+      let pdfFallbackReason = null;
+      let detection = null;
+      try {
+        detection = await detectTextLayer(inputBuffer);
+      } catch (error) {
+        logApiError('PDF text-layer detection error', error);
+      }
+      if (detection && detection.digital && !isLatinScriptTarget(targetLanguage)) {
+        pdfFallbackReason = 'non-latin-target';
+      }
+      if (detection && detection.digital && isLatinScriptTarget(targetLanguage)) {
+        try {
+          const extraction = await extractRuns(inputBuffer);
+          const segments = segmentRuns(extraction.runs, extraction.pages);
+          const joined = segments.map((s) => s.text).join('\n\n');
+          if (segments.length === 0 || !joined.trim()) {
+            pdfFallbackReason = 'no-extractable-segments';
+          } else if (joined.length > MAX_TRANSLATE_INPUT_LENGTH) {
+            throw Object.assign(
+              new Error(`PDF enthält zu viel Text (max. ${MAX_TRANSLATE_INPUT_LENGTH} Zeichen)`),
+              { code: 'PDF_TOO_LARGE' },
+            );
+          } else {
+            // Budget gate mirrors the office path: estimate over the joined
+            // segment text before any provider call (short advisory-lock hold).
+            const estimatedCost = estimateTextTransformCost(preferredModel, joined, {
+              inputBufferTokens: segments.length * 8,
+              outputMultiplier: 1.15,
+              outputBufferTokens: segments.length * 8,
+            });
+            await assertBudgetWithinLimits(userId, orgId, estimatedCost);
+
+            const result = await translateSegmentsWithGlossary({
+              segments: segments.map((s) => s.text),
+              orgId,
+              sourceLanguage,
+              targetLanguage,
+              apiKey: cortecs.apiKey,
+              model: preferredModel,
+              glossary,
+              providerOptions: { baseUrl: cortecs.baseUrl, preference: cortecs.preference },
+            });
+
+            // Safety net: if the target text needs glyphs a WinAnsi standard
+            // font can't render, reroute to OCR (renders full Unicode via HTML).
+            const nonEncodable = findNonEncodableTranslations(result.translations);
+            if (nonEncodable.length > 0) {
+              pdfFallbackReason = 'non-encodable-target';
+            } else {
+              const { buffer: rewritten, report } = await rewritePdf(inputBuffer, segments, result.translations);
+              const outBuffer = Buffer.from(rewritten);
+              await logUsage(userId, preferredModel, 'translation', result.usage || {}, orgId);
+
+              const inPlaceMeta = aggregateSegmentMetadata(result.perSegment || []);
+              const extension = '.pdf';
+              const outputFilename = `${randomUUID()}${extension}`;
+              outputPath = path.join(UPLOAD_DIR, outputFilename);
+              await writeFile(outputPath, outBuffer);
+
+              const downloadName = safeDownloadName(file.originalFilename, extension, languageLabelRaw, fallbackLabelRaw);
+              const historyResult = await query(
+                `INSERT INTO transcriptions (user_id, organization_id, filename, original_name, file_path, file_size, mime_type, status, template, text, model)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', 'translation', $8, $9)
+                 RETURNING id`,
+                [
+                  userId,
+                  orgId,
+                  outputFilename,
+                  downloadName,
+                  outputPath,
+                  outBuffer.length,
+                  'application/pdf',
+                  `PDF wurde layouterhaltend nach ${targetLanguage} übersetzt (In-Place). ${report.translated}/${report.segments} Segmente ersetzt; ${report.overflows} Überläufe.`,
+                  preferredModel,
+                ]
+              );
+              await upsertDocumentForTranscription({
+                transcriptionId: historyResult.rows[0].id,
+                organizationId: orgId,
+                ownerUserId: userId,
+                visibility: 'private',
+                sourceType: 'translation',
+                title: downloadName,
+                mimeType: 'application/pdf',
+                fileSize: outBuffer.length,
+                status: 'completed',
+                textPreview: `PDF wurde layouterhaltend nach ${targetLanguage} übersetzt.`,
+              });
+              await addTranscriptionEvent({
+                transcriptionId: historyResult.rows[0].id,
+                userId,
+                organizationId: orgId,
+                stage: 'completed',
+                message: 'PDF-Dateiübersetzung abgeschlossen (Layout erhalten).',
+                meta: {
+                  segmentCount: report.segments,
+                  overflows: report.overflows,
+                  fontFallbacks: report.fontFallbacks,
+                },
+              });
+              await logAuditEvent({
+                userId,
+                organizationId: orgId,
+                action: 'pdf_translation.completed',
+                targetType: 'transcription',
+                targetId: String(historyResult.rows[0].id),
+                metadata: {
+                  originalName: file.originalFilename || null,
+                  outputName: downloadName,
+                  mimeType: 'application/pdf',
+                  targetLanguage,
+                  sourceLanguage,
+                  languageLabel: languageLabelRaw || null,
+                  model: preferredModel,
+                  layoutMode: 'in-place',
+                  segmentCount: report.segments,
+                  overflows: report.overflows,
+                  fontFallbacks: report.fontFallbacks,
+                  glossaryApplied: inPlaceMeta.applied.length,
+                  dntMasked: inPlaceMeta.masked.length,
+                  dntViolations: inPlaceMeta.dntViolations.length,
+                  tmHits: result.tmHits || 0,
+                },
+              });
+
+              await safeUnlink(tempUploadPath);
+              tempUploadPath = '';
+              outputPath = '';
+
+              res.setHeader('Content-Type', 'application/pdf');
+              res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+              res.setHeader('X-GhostTyper-History-Id', String(historyResult.rows[0].id));
+              res.setHeader('X-GhostTyper-PDF-Layout-Mode', 'in-place');
+              res.setHeader('X-GhostTyper-Layout', encodeURIComponent(JSON.stringify(report)));
+              res.setHeader('X-GhostTyper-Glossary', glossaryMetadataHeader({
+                ...inPlaceMeta,
+                tmHits: result.tmHits || 0,
+                segments: result.perSegment || [],
+                sourceLang: sourceLanguage,
+                targetLang: targetLanguage,
+              }));
+              return res.status(200).send(outBuffer);
+            }
+          }
+        } catch (error) {
+          // Budget / size errors are real — let them reach the handler catch.
+          // Anything else means the in-place path couldn't cope; fall back.
+          if (
+            error?.code === 'PDF_TOO_LARGE'
+            || error?.code === 'COST_LIMIT_EXCEEDED'
+            || error?.code === 'BUDGET_GUARDRAIL_EXCEEDED'
+            || error?.code === 'COST_CHECK_UNAVAILABLE'
+            || error instanceof CostLimitCheckUnavailableError
+          ) {
+            throw error;
+          }
+          logApiError('PDF in-place translation failed; falling back to OCR', error);
+          pdfFallbackReason = pdfFallbackReason || 'in-place-error';
+        }
+      }
+      if (!pdfFallbackReason) {
+        pdfFallbackReason = detection && detection.digital ? 'in-place-unavailable' : 'scanned-no-text-layer';
+      }
+
+      // ---- OCR fallback (scan / non-latin / non-encodable) --------------
       let totalOcrUsage = {};
       let totalTranslateUsage = {};
       let segmentCount = 0;
@@ -620,8 +820,8 @@ async function handler(req, res) {
         userId,
         organizationId: orgId,
         stage: 'completed',
-        message: 'PDF-Dateiübersetzung abgeschlossen (Best-Effort-Layout).',
-        meta: { segmentCount },
+        message: 'PDF-Dateiübersetzung abgeschlossen (Layout approximiert).',
+        meta: { segmentCount, layoutMode: 'approximated', reason: pdfFallbackReason },
       });
 
       await logAuditEvent({
@@ -638,6 +838,8 @@ async function handler(req, res) {
           sourceLanguage,
           languageLabel: languageLabelRaw || null,
           model: preferredModel,
+          layoutMode: 'approximated',
+          fallbackReason: pdfFallbackReason,
           segmentCount,
           glossaryApplied: pdfGlossaryMeta.applied.length,
           dntMasked: pdfGlossaryMeta.masked.length,
@@ -653,7 +855,17 @@ async function handler(req, res) {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
       res.setHeader('X-GhostTyper-History-Id', String(historyResult.rows[0].id));
-      res.setHeader('X-GhostTyper-PDF-Layout-Mode', 'best-effort');
+      res.setHeader('X-GhostTyper-PDF-Layout-Mode', 'approximated');
+      res.setHeader('X-GhostTyper-Layout', encodeURIComponent(JSON.stringify({
+        pages: detection?.pages || 0,
+        segments: segmentCount,
+        translated: segmentCount,
+        overflows: 0,
+        fontFallbacks: 0,
+        nonEncodable: 0,
+        mode: 'approximated',
+        reason: pdfFallbackReason,
+      })));
       res.setHeader('X-GhostTyper-Glossary', glossaryMetadataHeader({
         ...pdfGlossaryMeta,
         tmHits: pdfTmHits,
