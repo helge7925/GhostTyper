@@ -10,6 +10,8 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { saveDocument } from '../lib/api';
 import { useMessageList, useMessageObject, useTranslations } from '../lib/i18n';
 import { CHAT_MODEL_OPTIONS } from '../lib/constants';
+import { usePermission } from '../lib/use-permission';
+import TranslationTermPanel from '../components/TranslationTermPanel';
 
 const LANGUAGES = [
   { code: 'German', label: 'Deutsch' },
@@ -33,11 +35,15 @@ export default function Translate() {
   const translationMessages = useMessageList('loadingMessages.translation');
   const translateOcrMessages = useMessageList('loadingMessages.ocr');
   const outputLanguageLabels = useMessageObject('translatePage.outputLanguageLabel');
+  const canManageWorkspace = usePermission('org.settings');
 
   const [text, setText] = useState('');
   const [targetLanguage, setTargetLanguage] = useState('German');
   const [model, setModel] = useState('deepseek-v4-pro');
   const [translatedText, setTranslatedText] = useState('');
+  const [glossaryMeta, setGlossaryMeta] = useState(null);
+  const [translatedSource, setTranslatedSource] = useState('');
+  const [officeGlossaryMeta, setOfficeGlossaryMeta] = useState(null);
   const [loading, setLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [loadingStartedAt, setLoadingStartedAt] = useState(null);
@@ -118,6 +124,8 @@ export default function Translate() {
       if (!res.ok) throw new Error(data.message || 'Übersetzung fehlgeschlagen');
 
       setTranslatedText(data.translatedText);
+      setGlossaryMeta(data.glossary || null);
+      setTranslatedSource(text);
       setMobileTab('result');
     } catch (err) {
       setError(err.message);
@@ -142,6 +150,7 @@ export default function Translate() {
     setOfficeLoading(true);
     setLoadingStartedAt(new Date().toISOString());
     setOfficeResult(null);
+    setOfficeGlossaryMeta(null);
     setError('');
 
     const formData = new FormData();
@@ -179,6 +188,14 @@ export default function Translate() {
         warningCount: Number(response.headers.get('x-ghosttyper-layout-warnings') || 0),
         isPdf: isPdfOutput,
       });
+      const glossaryHeader = response.headers.get('x-ghosttyper-glossary');
+      if (glossaryHeader) {
+        try {
+          setOfficeGlossaryMeta(JSON.parse(decodeURIComponent(glossaryHeader)));
+        } catch {
+          setOfficeGlossaryMeta(null);
+        }
+      }
     } catch (err) {
       setError(err.message || 'Datei-Übersetzung fehlgeschlagen');
     } finally {
@@ -342,6 +359,14 @@ export default function Translate() {
                 {officeResult.warningCount > 0 ? ` (${officeResult.warningCount} mögliche Layout-Hinweise wegen längerer Übersetzungen)` : ''}
                 {officeResult.isPdf ? ' — Layout wurde aus dem Originaltext neu aufgebaut.' : ''}
               </div>
+            )}
+
+            {officeGlossaryMeta && (
+              <TranslationTermPanel
+                meta={officeGlossaryMeta}
+                canManageWorkspace={canManageWorkspace}
+                onError={(message) => setError(message)}
+              />
             )}
 
             <button
@@ -516,6 +541,15 @@ export default function Translate() {
                 </div>
               </div>
             </div>
+
+            {translatedText && !loading && glossaryMeta && (
+              <TranslationTermPanel
+                meta={glossaryMeta}
+                sourceText={translatedSource}
+                canManageWorkspace={canManageWorkspace}
+                onError={(message) => setError(message)}
+              />
+            )}
 
             {(ocrLoading || loading) && (
               <ProcessStatusCard

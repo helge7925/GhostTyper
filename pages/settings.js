@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useCallback, useState, useEffect } from 'react';
-import { Mic, FileText, Languages, KeyRound } from 'lucide-react';
+import { Mic, FileText, Languages, KeyRound, BookMarked } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -29,6 +29,7 @@ import { CHAT_MODEL_OPTIONS, normalizeDefaultTemplate } from '../lib/constants';
 import { DEFAULT_PROMPTS, getPrompt } from '../lib/prompts';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { useTranslations } from '../lib/i18n';
+import GlossaryPanel from '../components/settings/GlossaryPanel';
 
 // Cortecs list prices (cheapest routed provider, cortecs.ai, Stand 07/2026)
 // — keep in sync with MODEL_PRICING in lib/usage.js.
@@ -40,7 +41,7 @@ const PRICE_LIST = [
   { model: 'MiniMax M3', input: '0,36 €/M', output: '1,78 €/M', note: 'Lange Kontexte' },
 ];
 
-const SETTINGS_TAB_IDS = ['transcription', 'text-templates', 'ocr-translate', 'account'];
+const SETTINGS_TAB_IDS = ['transcription', 'text-templates', 'ocr-translate', 'glossary', 'account'];
 // `aufmass` is intentionally absent — removed from the user-facing
 // offering. Legacy DB rows that still reference it remain analysable
 // (see lib/template-service.js), they're just no longer offered as an
@@ -462,6 +463,7 @@ export default function Settings() {
     { id: 'transcription', label: tTabs('transcription'), Icon: Mic },
     { id: 'text-templates', label: tTabs('textTemplates'), Icon: FileText },
     { id: 'ocr-translate', label: tTabs('ocrTranslate'), Icon: Languages },
+    { id: 'glossary', label: tTabs('glossary'), Icon: BookMarked },
     { id: 'account', label: tTabs('account'), Icon: KeyRound },
   ];
 
@@ -901,6 +903,14 @@ export default function Settings() {
                 </div>
               </div>
             </div>
+          )}
+
+          {activeTab === 'glossary' && (
+            <GlossaryPanel
+              showToast={showToast}
+              confirm={confirm}
+              defaultTranslateLanguage={defaultTranslateLanguage}
+            />
           )}
 
           {activeTab === 'account' && (
