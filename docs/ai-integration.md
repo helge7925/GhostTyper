@@ -17,6 +17,39 @@ Dieses Dokument beschreibt die AI-Integration für die GhostTyper WebApp.
 5. **Übersetzung**: Texte werden über Cortecs in die gewählte Zielsprache übersetzt.
 6. **Speichern**: Alle Ergebnisse werden strukturiert in der PostgreSQL-Datenbank gespeichert.
 
+## PDF-Übersetzung: digital vs. Scan
+
+Die Datei-Übersetzung (`pages/api/translate/file.js`) wählt für PDFs den Pfad
+anhand des eingebetteten Text-Layers (`lib/pdf-inplace.js`,
+`detectTextLayer`):
+
+- **Digitale PDFs** (eingebetteter Text, lateinische Zielsprache) werden
+  **layouterhaltend in-place** übersetzt. Positionierte Text-Runs werden mit
+  `pdfjs-dist` (Legacy-Node-Build ohne Worker) extrahiert, in Absätze
+  segmentiert (Spalten-/Lese-Reihenfolge-Heuristik), segmentweise über
+  dieselbe Glossar-/TM-Maschinerie wie der Office-Pfad übersetzt und mit
+  `pdf-lib` über das Originallayout gezeichnet (White-Out der Original-Runs +
+  Redraw). Antwort-Header: `X-GhostTyper-PDF-Layout-Mode: in-place`.
+- **Scans / PDFs ohne Text-Layer**, **nicht-lateinische Zielsprachen** und
+  **nicht-WinAnsi-kodierbare Zieltexte** fallen auf den bestehenden
+  OCR→Markdown→HTML→PDF-Pfad (`mistral-ocr-latest` + Chromium-Renderer)
+  zurück. Antwort-Header: `X-GhostTyper-PDF-Layout-Mode: approximated`.
+
+**Layout-Report.** Beide Pfade liefern einen URI-kodierten JSON-Report im
+Header `X-GhostTyper-Layout`:
+`{ pages, segments, translated, overflows, fontFallbacks, nonEncodable, mode }`
+(der Fallback-Pfad ergänzt `reason`). Er wird auch in der History/Audit-Zeile
+protokolliert, damit nachvollziehbar ist, was verändert wurde.
+
+**Phase-1-Scope.** Lateinische Zielschrift; Ersatzschriften sind pdf-lib
+StandardFonts (Helvetica/Times/Courier, WinAnsi-Kodierung inkl. ä/ö/ü/ß/€).
+Überlauf-Strategie: Schriftgröße bis −20 % verkleinern, dann Umbruch innerhalb
+der Absatz-Bbox; nie stilles Abschneiden — Überläufe werden gezählt.
+Nicht-kodierbare Zeichen führen zum OCR-Fallback statt zu `?`-Ersetzung. Der
+Original-Text bleibt unter dem White-Out im Stream erhalten (Vertraulichkeits-
+Hinweis; das Entfernen der Original-Objekte ist Phase 2). CJK/RTL, Font-
+Matching/-Embedding und AcroForm-Felder sind ebenfalls Phase 2.
+
 ## Konfiguration
 
 ### Cortecs-API
