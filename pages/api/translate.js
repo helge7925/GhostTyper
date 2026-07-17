@@ -11,6 +11,14 @@ import { getSettingsRow, resolveCortecsConfig } from '../../lib/settings-service
 import { MAX_TRANSLATE_INPUT_LENGTH } from '../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { logAuditEvent } from '../../lib/audit-log';
+import {
+  describeGlossaryApplication,
+  getGlossaryForPair,
+  lookupTM,
+  shouldSkipTMForText,
+  storeTM,
+  translateTextWithGlossaryGuard,
+} from '../../lib/translation-glossary';
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -52,6 +60,46 @@ async function handler(req, res) {
       return res.status(400).json({ message: 'Ungültiges KI-Modell' });
     }
 
+    let glossary = { entries: [], doNotTranslate: [] };
+    try {
+      glossary = await getGlossaryForPair(orgId, sourceLanguage, targetLanguage, { userId });
+    } catch (error) {
+      logApiError('Translation glossary lookup error', error);
+    }
+
+    try {
+      const cachedTranslation = await lookupTM(orgId, sourceLanguage, targetLanguage, text);
+      if (cachedTranslation) {
+        await logAuditEvent({
+          userId,
+          organizationId: orgId,
+          action: 'translation.completed',
+          targetType: 'translation',
+          metadata: {
+            targetLanguage,
+            sourceLanguage,
+            model: preferredModel,
+            inputChars: text.length,
+            translationMemory: true,
+          },
+        });
+        const cachedMeta = describeGlossaryApplication(glossary, text);
+        return res.status(200).json({
+          translatedText: cachedTranslation,
+          fromTranslationMemory: true,
+          glossary: {
+            applied: cachedMeta.applied,
+            masked: cachedMeta.masked,
+            dntViolations: [],
+            tmHits: 1,
+            retried: false,
+          },
+        });
+      }
+    } catch (error) {
+      logApiError('Translation memory lookup error', error);
+    }
+
     // Budget gate first (short advisory-lock hold), then the chat call
     // outside the lock so it doesn't pin a pool connection.
     const estimatedCost = estimateTextTransformCost(preferredModel, text, {
@@ -61,15 +109,33 @@ async function handler(req, res) {
     });
     await assertBudgetWithinLimits(userId, orgId, estimatedCost);
 
-    const { translatedText, usage, model } = await translateText(
+    const guard = await translateTextWithGlossaryGuard({
       text,
-      targetLanguage,
-      sourceLanguage,
-      apiKey,
-      preferredModel,
-      { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
-    );
-    await logUsage(userId, model, 'translation', usage, orgId);
+      glossary,
+      translate: async (maskedText, { glossaryBlock, strict }) => {
+        const result = await translateText(
+          maskedText,
+          targetLanguage,
+          sourceLanguage,
+          apiKey,
+          preferredModel,
+          { glossaryBlock, strictPlaceholders: strict, baseUrl: cortecs.baseUrl, preference: cortecs.preference }
+        );
+        return { translatedText: result.translatedText, usage: result.usage, model: result.model };
+      },
+    });
+    const translatedText = guard.translatedText;
+
+    await logUsage(userId, guard.model || preferredModel, 'translation', guard.usage, orgId);
+    // TM leak guard: never cache a translation shaped by a personal glossary
+    // entry into the org-wide translation memory.
+    if (!shouldSkipTMForText(glossary, text)) {
+      try {
+        await storeTM(orgId, sourceLanguage, targetLanguage, text, translatedText);
+      } catch (error) {
+        logApiError('Translation memory store error', error);
+      }
+    }
 
     await logAuditEvent({
       userId,
@@ -81,10 +147,23 @@ async function handler(req, res) {
         sourceLanguage,
         model: preferredModel,
         inputChars: text.length,
+        glossaryApplied: guard.applied.length,
+        dntMasked: guard.masked.length,
+        dntViolations: guard.dntViolations.length,
+        retried: guard.retried,
       },
     });
 
-    return res.status(200).json({ translatedText });
+    return res.status(200).json({
+      translatedText,
+      glossary: {
+        applied: guard.applied,
+        masked: guard.masked,
+        dntViolations: guard.dntViolations,
+        tmHits: 0,
+        retried: guard.retried,
+      },
+    });
   } catch (error) {
     if (error?.code === 'COST_LIMIT_EXCEEDED' || error?.code === 'BUDGET_GUARDRAIL_EXCEEDED') {
       return res.status(429).json({ message: error.message });

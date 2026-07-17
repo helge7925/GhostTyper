@@ -30,6 +30,16 @@ import { buildTranslatedFilename } from '../../../lib/translate-filename';
 import { mdToHtml } from '../../../lib/export-utils';
 import { renderPdfBufferFromHtml } from '../../../lib/pdf-export';
 import { upsertDocumentForTranscription } from '../../../lib/documents';
+import {
+  aggregateSegmentMetadata,
+  describeGlossaryApplication,
+  getGlossaryForPair,
+  lookupTM,
+  shouldSkipTMForText,
+  storeTM,
+  translateSegmentsWithGlossaryGuard,
+  translateTextWithGlossaryGuard,
+} from '../../../lib/translation-glossary';
 
 export const config = {
   api: {
@@ -93,6 +103,143 @@ function addUsage(total, usage = {}) {
     prompt_tokens: (total.prompt_tokens || 0) + (usage.prompt_tokens || usage.input_tokens || 0),
     completion_tokens: (total.completion_tokens || 0) + (usage.completion_tokens || usage.output_tokens || 0),
   };
+}
+
+async function loadTranslationGlossary(orgId, sourceLanguage, targetLanguage, userId) {
+  try {
+    return await getGlossaryForPair(orgId, sourceLanguage, targetLanguage, { userId });
+  } catch (error) {
+    logApiError('File translation glossary lookup error', error);
+    return { entries: [], doNotTranslate: [], personalTerms: [] };
+  }
+}
+
+async function translateSegmentsWithGlossary({
+  segments,
+  orgId,
+  sourceLanguage,
+  targetLanguage,
+  apiKey,
+  model,
+  glossary,
+  providerOptions = {},
+}) {
+  try {
+    const translations = new Array(segments.length).fill(null);
+    const perSegment = new Array(segments.length).fill(null);
+    const misses = [];
+    let tmHits = 0;
+    for (let i = 0; i < segments.length; i += 1) {
+      let cachedTranslation = null;
+      try {
+        cachedTranslation = await lookupTM(orgId, sourceLanguage, targetLanguage, segments[i]);
+      } catch (error) {
+        logApiError('File translation memory lookup error', error);
+      }
+      if (cachedTranslation) {
+        translations[i] = cachedTranslation;
+        tmHits += 1;
+        const meta = describeGlossaryApplication(glossary, segments[i]);
+        perSegment[i] = {
+          source: segments[i],
+          target: cachedTranslation,
+          applied: meta.applied,
+          masked: meta.masked,
+          dntViolations: [],
+          retried: false,
+          fromTM: true,
+        };
+      } else {
+        misses.push({ index: i, text: segments[i] });
+      }
+    }
+
+    let usage = {};
+    let usedModel = model;
+    if (misses.length > 0) {
+      const guard = await translateSegmentsWithGlossaryGuard({
+        texts: misses.map((entry) => entry.text),
+        glossary,
+        translateSegments: (maskedSegments, { glossaryBlock, strict }) => translateTextSegments(
+          maskedSegments,
+          targetLanguage,
+          sourceLanguage,
+          apiKey,
+          model,
+          { glossaryBlock, strictPlaceholders: strict, ...providerOptions },
+        ),
+      });
+      usage = guard.usage || {};
+      usedModel = guard.model || model;
+      for (let i = 0; i < misses.length; i += 1) {
+        const restored = guard.translations[i];
+        translations[misses[i].index] = restored;
+        perSegment[misses[i].index] = { ...guard.perSegment[i], fromTM: false };
+        // TM leak guard: skip caching segments shaped by a personal glossary.
+        if (!shouldSkipTMForText(glossary, misses[i].text)) {
+          try {
+            await storeTM(orgId, sourceLanguage, targetLanguage, misses[i].text, restored);
+          } catch (error) {
+            logApiError('File translation memory store error', error);
+          }
+        }
+      }
+    }
+
+    return { translations, usage, model: usedModel, tmHits, perSegment };
+  } catch (error) {
+    logApiError('File translation glossary/TM error', error);
+    const fallback = await translateTextSegments(segments, targetLanguage, sourceLanguage, apiKey, model, providerOptions);
+    return { ...fallback, tmHits: 0, perSegment: [] };
+  }
+}
+
+// Per-segment review data rides along in the header only when it stays small
+// (≤ 40 segments AND ≤ 6 KB encoded); otherwise the client shows the aggregate
+// coverage panel alone. Trade-off documented in the change's status.md: the
+// binary file is the response body, so streaming the full segment list would
+// need a second round-trip — not worth it for large documents.
+const SEGMENT_HEADER_MAX_COUNT = 40;
+const SEGMENT_HEADER_MAX_BYTES = 6 * 1024;
+
+function buildReviewSegments(segments = []) {
+  return segments
+    .filter(Boolean)
+    .map((segment) => ({
+      s: String(segment.source ?? ''),
+      t: String(segment.target ?? ''),
+      a: (segment.applied || []).map((entry) => entry.source),
+      m: (segment.masked || []).map((entry) => entry.term),
+    }));
+}
+
+// Glossary metadata rides on a response header (the body is the translated
+// file). Kept compact and URI-encoded; arrays are capped so the header stays
+// well under server limits even for large terminology sets.
+function glossaryMetadataHeader({
+  applied = [], masked = [], dntViolations = [], tmHits = 0, retriedSegments = 0,
+  segments = null, sourceLang = null, targetLang = null,
+}) {
+  const cap = (list) => list.slice(0, 50);
+  const meta = {
+    applied: cap(applied),
+    masked: cap(masked),
+    dntViolations: cap(dntViolations),
+    tmHits,
+    retriedSegments,
+  };
+  if (sourceLang) meta.sourceLang = sourceLang;
+  if (targetLang) meta.targetLang = targetLang;
+
+  if (Array.isArray(segments) && segments.length > 0) {
+    const reviewSegments = buildReviewSegments(segments);
+    const encoded = encodeURIComponent(JSON.stringify(reviewSegments));
+    if (reviewSegments.length <= SEGMENT_HEADER_MAX_COUNT && encoded.length <= SEGMENT_HEADER_MAX_BYTES) {
+      meta.segments = reviewSegments;
+    }
+  }
+
+  return encodeURIComponent(JSON.stringify(meta));
 }
 
 async function handler(req, res) {
@@ -162,12 +309,11 @@ async function handler(req, res) {
 
     const settingsRow = await getSettingsRow(userId);
     const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const cortecsApiKey = cortecs.apiKey;
     const mistralApiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
     const preferredModel = resolveChatModel(requestModel, null)
       || resolveChatModel(settingsRow?.preferred_model, null)
       || cortecs.chatModel;
-    if (!cortecsApiKey) {
+    if (!cortecs.apiKey) {
       await safeUnlink(tempUploadPath);
       tempUploadPath = '';
       return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert' });
@@ -192,7 +338,10 @@ async function handler(req, res) {
         return res.status(400).json({ message: `Office-Datei enthält zu viel Text (max. ${MAX_TRANSLATE_INPUT_LENGTH} Zeichen)` });
       }
 
+      const glossary = await loadTranslationGlossary(orgId, sourceLanguage, targetLanguage, userId);
       let totalUsage = {};
+      let tmHitTotal = 0;
+      const reviewSegments = [];
       // Budget gate first (short advisory-lock hold), then the translation
       // outside the lock so it doesn't pin a pool connection.
       const estimatedCost = estimateTextTransformCost(preferredModel, inspection.text, {
@@ -204,18 +353,26 @@ async function handler(req, res) {
 
       const translated = await translateOfficeDocumentBuffer(inputBuffer, detectedMimeType, {
         translator: async (segments) => {
-          const result = await translateTextSegments(
+          const result = await translateSegmentsWithGlossary({
             segments,
-            targetLanguage,
+            orgId,
             sourceLanguage,
-            cortecsApiKey,
-            preferredModel,
-            { baseUrl: cortecs.baseUrl, preference: cortecs.preference },
-          );
+            targetLanguage,
+            apiKey: cortecs.apiKey,
+            model: preferredModel,
+            glossary,
+            providerOptions: { baseUrl: cortecs.baseUrl, preference: cortecs.preference },
+          });
           totalUsage = addUsage(totalUsage, result.usage);
+          tmHitTotal += result.tmHits || 0;
+          for (const segment of result.perSegment || []) {
+            if (segment) reviewSegments.push(segment);
+          }
           return result.translations;
         },
       });
+
+      const glossaryMeta = aggregateSegmentMetadata(reviewSegments);
 
       await logUsage(userId, preferredModel, 'office_translation', totalUsage, orgId);
 
@@ -281,6 +438,10 @@ async function handler(req, res) {
           model: preferredModel,
           segmentCount: translated.stats.segmentCount,
           warningCount: translated.stats.warningCount,
+          glossaryApplied: glossaryMeta.applied.length,
+          dntMasked: glossaryMeta.masked.length,
+          dntViolations: glossaryMeta.dntViolations.length,
+          tmHits: tmHitTotal,
         },
       });
 
@@ -292,14 +453,24 @@ async function handler(req, res) {
       res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
       res.setHeader('X-GhostTyper-History-Id', String(historyResult.rows[0].id));
       res.setHeader('X-GhostTyper-Layout-Warnings', String(translated.stats.warningCount || 0));
+      res.setHeader('X-GhostTyper-Glossary', glossaryMetadataHeader({
+        ...glossaryMeta,
+        tmHits: tmHitTotal,
+        segments: reviewSegments,
+        sourceLang: sourceLanguage,
+        targetLang: targetLanguage,
+      }));
       return res.status(200).send(translated.buffer);
     }
 
     // ====== PDF PATH (best-effort: OCR → translate → render new PDF) ======
     if (isPdf) {
+      const glossary = await loadTranslationGlossary(orgId, sourceLanguage, targetLanguage, userId);
       let totalOcrUsage = {};
       let totalTranslateUsage = {};
       let segmentCount = 0;
+      let pdfTmHits = 0;
+      const pdfReviewSegments = [];
       let pdfBuffer;
 
       // Budget gate first (short advisory-lock hold); OCR + translation run
@@ -307,11 +478,10 @@ async function handler(req, res) {
       // connection.
       await assertBudgetWithinLimits(userId, orgId);
       pdfBuffer = await (async () => {
-        if (!mistralApiKey) {
-          throw Object.assign(new Error('Kein Mistral API-Key für OCR konfiguriert'), { code: 'NO_MISTRAL_OCR_KEY' });
-        }
-
         // Step 1: OCR via Mistral — returns Markdown.
+        if (!mistralApiKey) {
+          throw Object.assign(new Error('Kein Mistral API-Key für PDF-OCR konfiguriert.'), { code: 'NO_MISTRAL_OCR_KEY' });
+        }
         const ocrResult = await performOCR(tempUploadPath, mistralApiKey, 'application/pdf');
         const sourceMarkdown = String(ocrResult?.markdown || '').trim();
         if (ocrResult?.usage) {
@@ -330,27 +500,72 @@ async function handler(req, res) {
         // Project the LLM cost for the translation step now that the OCR
         // text size is known (second short gate, again without holding the
         // lock through the translation itself).
-        const pdfEstimatedCost = estimateTextTransformCost(preferredModel, sourceMarkdown, {
+        const estimatedCost = estimateTextTransformCost(preferredModel, sourceMarkdown, {
           outputMultiplier: 1.15,
         });
-        await assertBudgetWithinLimits(userId, orgId, pdfEstimatedCost);
+        await assertBudgetWithinLimits(userId, orgId, estimatedCost);
 
         // Step 2: Translate Markdown chunk-by-chunk to keep token windows safe.
         const segments = splitMarkdownIntoSegments(sourceMarkdown, 6000);
         segmentCount = segments.length;
         const translatedSegments = [];
         for (const segment of segments) {
-          const result = await translateText(
-            segment,
-            targetLanguage,
-            sourceLanguage,
-            cortecsApiKey,
-            preferredModel,
-            { baseUrl: cortecs.baseUrl, preference: cortecs.preference },
-          );
-          translatedSegments.push(result?.translatedText || segment);
-          if (result?.usage) {
-            totalTranslateUsage = addUsage(totalTranslateUsage, result.usage);
+          let cachedTranslation = null;
+          try {
+            cachedTranslation = await lookupTM(orgId, sourceLanguage, targetLanguage, segment);
+          } catch (error) {
+            logApiError('PDF translation memory lookup error', error);
+          }
+          if (cachedTranslation) {
+            translatedSegments.push(cachedTranslation);
+            pdfTmHits += 1;
+            const meta = describeGlossaryApplication(glossary, segment);
+            pdfReviewSegments.push({
+              source: segment,
+              target: cachedTranslation,
+              applied: meta.applied,
+              masked: meta.masked,
+              dntViolations: [],
+              retried: false,
+              fromTM: true,
+            });
+            continue;
+          }
+
+          const guard = await translateTextWithGlossaryGuard({
+            text: segment,
+            glossary,
+            translate: async (maskedText, { glossaryBlock, strict }) => {
+              const result = await translateText(
+                maskedText,
+                targetLanguage,
+                sourceLanguage,
+                cortecs.apiKey,
+                preferredModel,
+                { glossaryBlock, strictPlaceholders: strict, baseUrl: cortecs.baseUrl, preference: cortecs.preference }
+              );
+              return { translatedText: result?.translatedText, usage: result?.usage, model: result?.model };
+            },
+          });
+          const restored = guard.translatedText || segment;
+          translatedSegments.push(restored);
+          totalTranslateUsage = addUsage(totalTranslateUsage, guard.usage);
+          pdfReviewSegments.push({
+            source: segment,
+            target: restored,
+            applied: guard.applied,
+            masked: guard.masked,
+            dntViolations: guard.dntViolations,
+            retried: guard.retried,
+            fromTM: false,
+          });
+          // TM leak guard: skip caching chunks shaped by a personal glossary.
+          if (!shouldSkipTMForText(glossary, segment)) {
+            try {
+              await storeTM(orgId, sourceLanguage, targetLanguage, segment, restored);
+            } catch (error) {
+              logApiError('PDF translation memory store error', error);
+            }
           }
         }
         const translatedMarkdown = translatedSegments.join('\n\n');
@@ -363,6 +578,8 @@ async function handler(req, res) {
         await logUsage(userId, preferredModel, 'translation', totalTranslateUsage, orgId);
         return buffer;
       })();
+
+      const pdfGlossaryMeta = aggregateSegmentMetadata(pdfReviewSegments);
 
       const extension = '.pdf';
       const outputFilename = `${randomUUID()}${extension}`;
@@ -422,6 +639,10 @@ async function handler(req, res) {
           languageLabel: languageLabelRaw || null,
           model: preferredModel,
           segmentCount,
+          glossaryApplied: pdfGlossaryMeta.applied.length,
+          dntMasked: pdfGlossaryMeta.masked.length,
+          dntViolations: pdfGlossaryMeta.dntViolations.length,
+          tmHits: pdfTmHits,
         },
       });
 
@@ -433,6 +654,13 @@ async function handler(req, res) {
       res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
       res.setHeader('X-GhostTyper-History-Id', String(historyResult.rows[0].id));
       res.setHeader('X-GhostTyper-PDF-Layout-Mode', 'best-effort');
+      res.setHeader('X-GhostTyper-Glossary', glossaryMetadataHeader({
+        ...pdfGlossaryMeta,
+        tmHits: pdfTmHits,
+        segments: pdfReviewSegments,
+        sourceLang: sourceLanguage,
+        targetLang: targetLanguage,
+      }));
       return res.status(200).send(pdfBuffer);
     }
 
