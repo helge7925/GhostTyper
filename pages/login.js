@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import { getProviders, signIn } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { useTranslations } from '../lib/i18n';
+import { Button } from '../components/ui/button';
+import { Field, FieldInput } from '../components/ui/field';
 
 export default function Login() {
   const router = useRouter();
@@ -58,58 +60,48 @@ export default function Login() {
           </div>
           <div className="bg-surface border border-subtle rounded-2xl p-8 shadow-2xl">
             {providers?.oidc && (
-              <button
+              <Button
                 type="button"
+                variant="primary"
+                size="lg"
                 onClick={() => signIn('oidc', { callbackUrl: '/' })}
-                className="w-full gradient-accent text-white py-2.5 rounded-full text-sm font-medium transition-colors mb-5"
+                className="w-full rounded-full mb-5"
               >
                 {t('ssoButton')}
-              </button>
+              </Button>
             )}
 
             {providers?.credentials && (
             <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-secondary mb-1.5">
-                  {t('email')}
-                </label>
-                <input
+              <Field label={t('email')} htmlFor="email">
+                <FieldInput
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoFocus
-                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-shadow"
                   placeholder={t('emailPlaceholder')}
                 />
-              </div>
+              </Field>
 
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-secondary mb-1.5">
-                  {t('password')}
-                </label>
-                <input
+              <Field label={t('password')} htmlFor="password">
+                <FieldInput
                   id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-shadow"
                 />
-              </div>
+              </Field>
 
               {error && (
                 <p className="text-sm text-danger">{error}</p>
               )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full gradient-accent text-white py-2.5 rounded-full text-sm font-medium disabled:opacity-50 transition-colors"
-              >
+              <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full rounded-full">
                 {loading ? t('submitLoading') : t('submit')}
-              </button>
+              </Button>
             </form>
             )}
 

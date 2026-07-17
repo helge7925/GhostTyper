@@ -221,6 +221,11 @@ export default function DocumentEditor({
     }
 
     fallbackWindow.document.open();
+    // This writes a *separate* document (own window, own DOM) via
+    // document.write — it has no access to the parent page's
+    // globals.css custom properties, so accent colors below are
+    // literal hex kept in sync with --accent/--accent-strong by hand
+    // (ui-sprezzatura-refresh phase 1: #FF5917 → #E84E0F family).
     fallbackWindow.document.write(`<!doctype html>
 <html>
   <head>
@@ -251,9 +256,9 @@ export default function DocumentEditor({
         font-size: 0.83rem;
       }
       .action {
-        border: 1px solid rgba(255, 89, 23, 0.45);
-        background: rgba(255, 89, 23, 0.2);
-        color: #ff8b63;
+        border: 1px solid rgba(232, 78, 15, 0.45);
+        background: rgba(232, 78, 15, 0.2);
+        color: #ef8357;
         border-radius: 10px;
         padding: 0.45rem 0.7rem;
         font-weight: 700;
@@ -807,7 +812,7 @@ export default function DocumentEditor({
         
         /* Prose Editor Styles */
         .prose h1.main-title { font-size: 2.25rem !important; color: white !important; margin-bottom: 2rem !important; }
-        .prose h2 { color: #ff5917 !important; font-size: 1.5rem !important; border: none !important; margin-top: 2.5rem !important; margin-bottom: 1rem !important; }
+        .prose h2 { color: rgb(var(--accent)) !important; font-size: 1.5rem !important; border: none !important; margin-top: 2.5rem !important; margin-bottom: 1rem !important; }
         .prose h3 { color: white !important; font-size: 1.25rem !important; font-weight: 500 !important; margin-top: 1.5rem !important; }
         .prose p { color: #c7cbd8 !important; line-height: 1.8 !important; margin-bottom: 1.25rem !important; }
         .prose strong { color: white !important; font-weight: 700 !important; }

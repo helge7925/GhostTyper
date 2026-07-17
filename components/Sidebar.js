@@ -58,11 +58,14 @@ function NavRow({ href, label, Icon, isActive, collapsed, onNavigate }) {
         'flex items-center gap-3 rounded-xl text-sm font-medium transition-colors',
         collapsed ? 'h-11 w-11 justify-center mx-auto' : 'px-4 py-3',
         isActive
-          ? 'bg-accent/10 text-accent'
+          ? 'bg-accent/10 text-primary'
           : 'text-secondary hover:text-primary hover:bg-hover-subtle',
       )}
     >
-      <Icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+      {/* Icon carries the accent tint directly (3:1 UI-component floor);
+          the label stays on --primary so 14px text keeps the 4.5:1 floor
+          — see docs/ui/phase1-tokens.md. */}
+      <Icon className={cn('w-5 h-5 shrink-0', isActive && 'text-accent')} aria-hidden="true" />
       {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
