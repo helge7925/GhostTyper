@@ -14,8 +14,24 @@ import {
   AlertDialogTitle,
 } from './ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
-import { MoreHorizontal } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Copy,
+  Download,
+  FileText,
+  Focus,
+  IndentDecrease,
+  IndentIncrease,
+  List,
+  ListOrdered,
+  MoreHorizontal,
+  Save,
+} from 'lucide-react';
 import { useTranslations } from '../lib/i18n';
+import { Button } from './ui/button';
+import { cn } from '../lib/utils';
 
 const LANGUAGES = [
   { code: 'German', label: 'Deutsch' },
@@ -447,101 +463,102 @@ export default function DocumentEditor({
             }`}>
               <button
                 onClick={() => setFocusPreset('paper')}
-                className={`px-2.5 py-1 text-[10px] font-bold rounded-md border transition-colors ${
+                className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
                   focusPreset === 'paper'
-                    ? 'bg-accent text-white border-accent shadow-sm'
-                    : 'bg-transparent text-white/75 border-transparent hover:text-white hover:bg-hover-strong'
+                    ? 'bg-surface text-primary border-subtle'
+                    : 'bg-transparent text-secondary border-transparent hover:text-primary hover:bg-hover-subtle'
                 }`}
               >
                 {t('focusPaperLabel')}
               </button>
               <button
                 onClick={() => setFocusPreset('ink')}
-                className={`px-2.5 py-1 text-[10px] font-bold rounded-md border transition-colors ${
+                className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
                   focusPreset === 'ink'
-                    ? 'bg-accent text-white border-accent shadow-sm'
-                    : 'bg-transparent text-primary border-transparent hover:text-black hover:bg-hover-subtle'
+                    ? 'bg-surface text-primary border-subtle'
+                    : 'bg-transparent text-secondary border-transparent hover:text-primary hover:bg-hover-subtle'
                 }`}
               >
                 {t('focusInkLabel')}
               </button>
             </div>
-            <button
+            <Button
               onClick={() => setFocusMode(false)}
-              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
-                focusPreset === 'paper'
-                  ? 'bg-hover-subtle text-black border border-emphasis'
-                  : 'bg-accent/20 text-accent border border-accent/30'
-              }`}
+              variant="outline"
+              size="sm"
             >
               {t('focusOff')}
-            </button>
+            </Button>
           </div>
         ) : (
           <>
             <div className="flex items-center gap-3 md:gap-4 min-w-0">
-              <button onClick={requestCancel} className="p-2 rounded-full transition-all text-secondary hover:text-accent bg-hover-subtle">
+              <Button type="button" onClick={requestCancel} variant="ghost" size="icon" aria-label={t('closeEditor')}>
                 <span className="sr-only">{t('closeEditor')}</span>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-              </button>
+                <ArrowLeft className="w-5 h-5" aria-hidden="true" />
+              </Button>
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-accent uppercase tracking-widest leading-none">{t('editor')}</span>
+                <span className="text-xs font-medium text-secondary leading-none">{t('editor')}</span>
                 <span className="text-sm font-medium text-primary truncate max-w-[200px]">{filename}</span>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
-              <button onClick={handleSave} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
-                saveFeedback
-                  ? 'bg-success/20 text-success'
-                  : 'text-primary hover:bg-hover-subtle'
-              }`}>
+              <Button onClick={handleSave} variant="primary" size="sm">
+                {saveFeedback ? <Check className="w-4 h-4" aria-hidden="true" /> : <Save className="w-4 h-4" aria-hidden="true" />}
                 {saveFeedback ? t('saved') : t('save')}
-              </button>
+              </Button>
 
-              <button
+              <Button
                 onClick={handleExportPdf}
                 disabled={isExportingPdf}
-                className="gradient-accent text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg active:scale-95 disabled:opacity-50"
+                variant="outline"
+                size="sm"
               >
+                <Download className="w-4 h-4" aria-hidden="true" />
                 {isExportingPdf ? t('exportPdfBusy') : t('exportPdf')}
-              </button>
+              </Button>
 
-              <button
+              <Button
                 onClick={handleExportDoc}
-                className="px-4 py-2 text-xs font-bold rounded-xl border transition-colors bg-hover-subtle hover:bg-hover-strong border-subtle text-primary"
+                variant="outline"
+                size="sm"
               >
+                <FileText className="w-4 h-4" aria-hidden="true" />
                 {t('exportDocx')}
-              </button>
+              </Button>
 
               <div className="flex items-center gap-2 bg-hover-subtle rounded-xl px-2 py-1 border border-subtle">
                 <select value={targetLang} onChange={e => setTargetLang(e.target.value)} className="bg-transparent text-[10px] text-primary outline-none cursor-pointer">
                   {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
                 </select>
-                <button
+                <Button
                   onClick={handleTranslateAction}
                   disabled={isTranslating}
                   aria-label={t('translateTo')}
-                  className="text-[10px] font-bold text-accent hover:text-white transition-colors uppercase tracking-wider px-2"
+                  variant="ghost"
+                  size="sm"
                 >
                   {isTranslating ? t('translating') : t('translateTo')}
-                </button>
+                </Button>
               </div>
-              <button
+              <Button
                 onClick={handleCopy}
-                className={`px-3 py-2 text-xs font-bold rounded-xl transition-all ${
-                  copyFeedback ? 'bg-success/20 text-success' : 'text-primary hover:bg-hover-subtle border border-transparent'
-                }`}
+                variant="ghost"
+                size="sm"
               >
+                {copyFeedback ? <Check className="w-4 h-4" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
                 {copyFeedback ? t('copied') : t('copy')}
-              </button>
+              </Button>
 
-              <button
+              <Button
                 onClick={() => setFocusMode(true)}
-                className="inline-flex px-4 py-2 text-xs font-bold rounded-xl transition-all text-primary hover:bg-hover-subtle"
+                variant="ghost"
+                size="sm"
               >
+                <Focus className="w-4 h-4" aria-hidden="true" />
                 {t('focus')}
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -564,17 +581,17 @@ export default function DocumentEditor({
           {/* Mobile compact pill (< md) */}
           <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 md:hidden no-print ${focusMode ? 'hidden' : ''}`}>
             <div
-              className="bg-surface/90 backdrop-blur-2xl border border-subtle rounded-2xl p-1.5 shadow-2xl flex items-center gap-1"
+              className="bg-surface/95 backdrop-blur-xl border border-subtle rounded-xl p-1.5 shadow-lg flex items-center gap-1"
               style={{ paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}
             >
-              <button type="button" onClick={() => execCommand('bold')} className="p-3 min-w-[44px] min-h-[44px] text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl font-bold" aria-label={t('toolbarBold')}>B</button>
-              <button type="button" onClick={() => execCommand('italic')} className="p-3 min-w-[44px] min-h-[44px] text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl italic" aria-label={t('toolbarItalic')}>I</button>
-              <button type="button" onClick={() => execCommand('underline')} className="p-3 min-w-[44px] min-h-[44px] text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl underline" aria-label={t('toolbarUnderline')}>U</button>
+              <button type="button" onClick={() => execCommand('bold')} className="p-3 min-w-[44px] min-h-[44px] text-secondary hover:text-accent-ink hover:bg-hover-subtle rounded-xl font-bold" aria-label={t('toolbarBold')}>B</button>
+              <button type="button" onClick={() => execCommand('italic')} className="p-3 min-w-[44px] min-h-[44px] text-secondary hover:text-accent-ink hover:bg-hover-subtle rounded-xl italic" aria-label={t('toolbarItalic')}>I</button>
+              <button type="button" onClick={() => execCommand('underline')} className="p-3 min-w-[44px] min-h-[44px] text-secondary hover:text-accent-ink hover:bg-hover-subtle rounded-xl underline" aria-label={t('toolbarUnderline')}>U</button>
               <div className="w-px h-5 bg-hover-strong mx-1" />
               <button
                 type="button"
                 onClick={() => setExtrasOpen(true)}
-                className="p-3 min-w-[44px] min-h-[44px] text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl flex items-center justify-center"
+                className="p-3 min-w-[44px] min-h-[44px] text-secondary hover:text-accent-ink hover:bg-hover-subtle rounded-xl flex items-center justify-center"
                 aria-label={t('moreActions')}
               >
                 <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
@@ -584,7 +601,7 @@ export default function DocumentEditor({
 
           {/* Mobile bottom-sheet for the secondary format actions */}
           <Sheet open={extrasOpen} onOpenChange={setExtrasOpen}>
-            <SheetContent side="bottom" className="md:hidden h-auto pb-6 rounded-t-2xl">
+            <SheetContent side="bottom" className="md:hidden h-auto pb-6 rounded-t-xl">
               <SheetHeader>
                 <SheetTitle>{t('formatSheetTitle')}</SheetTitle>
               </SheetHeader>
@@ -617,27 +634,27 @@ export default function DocumentEditor({
 
           {/* Desktop / tablet full toolbar (md+) */}
           <div className={`hidden md:block sticky top-6 mb-4 no-print ${focusMode ? 'md:hidden' : ''}`}>
-            <div className="bg-surface/90 backdrop-blur-2xl border border-subtle rounded-2xl p-1.5 shadow-2xl flex items-center gap-0.5 max-w-[95vw] overflow-x-auto no-scrollbar">
-              <button type="button" onClick={() => execCommand('bold')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl font-bold" aria-label={t('toolbarBold')}>B</button>
-              <button type="button" onClick={() => execCommand('italic')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl italic" aria-label={t('toolbarItalic')}>I</button>
-              <button type="button" onClick={() => execCommand('underline')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl underline" aria-label={t('toolbarUnderline')}>U</button>
+            <div className="bg-surface/95 backdrop-blur-xl border border-subtle rounded-xl p-1.5 shadow-lg flex items-center gap-0.5 max-w-[95vw] overflow-x-auto no-scrollbar">
+              <button type="button" onClick={() => execCommand('bold')} className="p-2.5 text-secondary hover:text-accent-ink hover:bg-hover-subtle rounded-xl font-bold" aria-label={t('toolbarBold')}>B</button>
+              <button type="button" onClick={() => execCommand('italic')} className="p-2.5 text-secondary hover:text-accent-ink hover:bg-hover-subtle rounded-xl italic" aria-label={t('toolbarItalic')}>I</button>
+              <button type="button" onClick={() => execCommand('underline')} className="p-2.5 text-secondary hover:text-accent-ink hover:bg-hover-subtle rounded-xl underline" aria-label={t('toolbarUnderline')}>U</button>
               <div className="w-px h-4 bg-hover-strong mx-1.5" />
-              <button type="button" onClick={() => execCommand('formatBlock', 'h2')} className="p-2 text-secondary hover:text-accent rounded-xl text-xs font-bold" aria-label={t('toolbarH2')}>H2</button>
-              <button type="button" onClick={() => execCommand('formatBlock', 'h3')} className="p-2 text-secondary hover:text-accent rounded-xl text-[10px] font-bold" aria-label={t('toolbarH3')}>H3</button>
-              <button type="button" onClick={() => execCommand('formatBlock', 'p')} className="p-2 text-secondary hover:text-accent rounded-xl text-[10px] font-bold" aria-label={t('toolbarP')}>P</button>
+              <button type="button" onClick={() => execCommand('formatBlock', 'h2')} className="p-2 text-secondary hover:text-accent-ink rounded-xl text-xs font-bold" aria-label={t('toolbarH2')}>H2</button>
+              <button type="button" onClick={() => execCommand('formatBlock', 'h3')} className="p-2 text-secondary hover:text-accent-ink rounded-xl text-[10px] font-bold" aria-label={t('toolbarH3')}>H3</button>
+              <button type="button" onClick={() => execCommand('formatBlock', 'p')} className="p-2 text-secondary hover:text-accent-ink rounded-xl text-[10px] font-bold" aria-label={t('toolbarP')}>P</button>
               <div className="w-px h-4 bg-hover-strong mx-1.5" />
-              <button type="button" onClick={() => execCommand('insertUnorderedList')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" aria-label={t('toolbarUL')}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+              <button type="button" onClick={() => execCommand('insertUnorderedList')} className="p-2.5 text-secondary hover:text-accent-ink hover:bg-hover-subtle rounded-xl" aria-label={t('toolbarUL')}>
+                <List className="w-4 h-4" aria-hidden="true" />
               </button>
-              <button type="button" onClick={() => execCommand('insertOrderedList')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" aria-label={t('toolbarOL')}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h10M7 16h10M4 8h.01M4 12h.01M4 16h.01" /></svg>
+              <button type="button" onClick={() => execCommand('insertOrderedList')} className="p-2.5 text-secondary hover:text-accent-ink hover:bg-hover-subtle rounded-xl" aria-label={t('toolbarOL')}>
+                <ListOrdered className="w-4 h-4" aria-hidden="true" />
               </button>
               <div className="w-px h-4 bg-hover-strong mx-1.5" />
-              <button type="button" onClick={() => execCommand('indent')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" title={t('toolbarIndent')} aria-label={t('toolbarIndent')}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16M13 9l3 3-3 3" /></svg>
+              <button type="button" onClick={() => execCommand('indent')} className="p-2.5 text-secondary hover:text-accent-ink hover:bg-hover-subtle rounded-xl" title={t('toolbarIndent')} aria-label={t('toolbarIndent')}>
+                <IndentIncrease className="w-4 h-4" aria-hidden="true" />
               </button>
-              <button type="button" onClick={() => execCommand('outdent')} className="p-2.5 text-secondary hover:text-accent hover:bg-hover-subtle rounded-xl" title={t('toolbarOutdent')} aria-label={t('toolbarOutdent')}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16M11 9l-3 3 3 3" /></svg>
+              <button type="button" onClick={() => execCommand('outdent')} className="p-2.5 text-secondary hover:text-accent-ink hover:bg-hover-subtle rounded-xl" title={t('toolbarOutdent')} aria-label={t('toolbarOutdent')}>
+                <IndentDecrease className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -651,7 +668,7 @@ export default function DocumentEditor({
                   ? focusPreset === 'paper'
                     ? 'bg-[#f8f7f4] border border-black/[0.08] py-14 px-8 md:px-24 rounded-2xl shadow-none'
                     : 'bg-surface border border-subtle py-14 px-8 md:px-24 rounded-2xl shadow-none'
-                  : 'bg-surface border border-subtle py-10 px-6 md:px-20 rounded-3xl shadow-2xl'
+                  : 'bg-surface border border-subtle py-10 px-6 md:px-20 rounded-xl shadow-none'
               } ${isTranslating ? 'opacity-50 pointer-events-none' : ''}`}
               contentEditable 
               ref={editorRef} 
@@ -662,7 +679,7 @@ export default function DocumentEditor({
             />
 
             {sidebarContent && !focusMode && (
-              <section className="mt-4 no-print bg-surface border border-subtle rounded-2xl overflow-hidden">
+              <section className="mt-4 no-print bg-surface border border-subtle rounded-xl overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setShowSourceContent((prev) => !prev)}
@@ -670,14 +687,10 @@ export default function DocumentEditor({
                   aria-expanded={showSourceContent}
                 >
                   <span>{showSourceContent ? `${sourceLabel} ausblenden` : `${sourceLabel} anzeigen`}</span>
-                  <svg
-                    className={`w-4 h-4 text-secondary transition-transform ${showSourceContent ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <ChevronDown
+                    className={cn('w-4 h-4 text-secondary transition-transform', showSourceContent && 'rotate-180')}
+                    aria-hidden="true"
+                  />
                 </button>
                 {showSourceContent && (
                   <div className="border-t border-subtle px-4 py-4 text-xs text-secondary whitespace-pre-wrap leading-relaxed max-h-[320px] overflow-y-auto custom-scrollbar font-mono">
@@ -811,19 +824,19 @@ export default function DocumentEditor({
         }
         
         /* Prose Editor Styles */
-        .prose h1.main-title { font-size: 2.25rem !important; color: white !important; margin-bottom: 2rem !important; }
-        .prose h2 { color: rgb(var(--accent)) !important; font-size: 1.5rem !important; border: none !important; margin-top: 2.5rem !important; margin-bottom: 1rem !important; }
-        .prose h3 { color: white !important; font-size: 1.25rem !important; font-weight: 500 !important; margin-top: 1.5rem !important; }
-        .prose p { color: #c7cbd8 !important; line-height: 1.8 !important; margin-bottom: 1.25rem !important; }
-        .prose strong { color: white !important; font-weight: 700 !important; }
+        .prose h1.main-title { font-size: 2.25rem !important; color: rgb(var(--primary)) !important; margin-bottom: 2rem !important; }
+        .prose h2 { color: rgb(var(--primary)) !important; font-size: 1.5rem !important; border: none !important; margin-top: 2.5rem !important; margin-bottom: 1rem !important; }
+        .prose h3 { color: rgb(var(--primary)) !important; font-size: 1.25rem !important; font-weight: 500 !important; margin-top: 1.5rem !important; }
+        .prose p { color: rgb(var(--secondary)) !important; line-height: 1.8 !important; margin-bottom: 1.25rem !important; }
+        .prose strong { color: rgb(var(--primary)) !important; font-weight: 700 !important; }
         .prose ul { list-style-type: disc !important; padding-left: 1.5rem !important; margin-bottom: 1.5rem !important; }
         .prose ol { list-style-type: decimal !important; padding-left: 1.5rem !important; margin-bottom: 1.5rem !important; }
-        .prose li { color: #c7cbd8 !important; margin-bottom: 0.5rem !important; }
+        .prose li { color: rgb(var(--secondary)) !important; margin-bottom: 0.5rem !important; }
 
         /* Focus mode typography tuning: Ink */
         .focus-theme-ink #editor-content-to-print p,
         .focus-theme-ink #editor-content-to-print li {
-          color: #d4d9e5 !important;
+          color: rgb(var(--secondary)) !important;
           line-height: 1.9 !important;
         }
 

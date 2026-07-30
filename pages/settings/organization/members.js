@@ -432,7 +432,7 @@ export default function MembersPage() {
               type="button"
               onClick={handleSaveLimits}
               disabled={busy}
-              className="px-4 py-2 rounded-xl text-sm bg-accent text-white hover:bg-accent/90 disabled:opacity-50"
+              className="px-4 py-2 rounded-xl text-sm bg-accent-strong text-white hover:bg-accent/90 disabled:opacity-50"
             >
               Limits speichern
             </button>

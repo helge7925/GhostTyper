@@ -15,7 +15,7 @@ export function Toaster(props) {
           toast:
             'group toast bg-surface text-primary border border-subtle shadow-lg rounded-xl',
           description: 'text-secondary text-xs',
-          actionButton: 'bg-accent text-white',
+          actionButton: 'bg-accent-strong text-white',
           cancelButton: 'bg-hover-subtle text-secondary',
         },
       }}

@@ -48,6 +48,7 @@ export default function Login() {
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
+            <h1 className="sr-only">{t('loginTitle')}</h1>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo-text.png"
@@ -58,14 +59,14 @@ export default function Login() {
             />
             <p className="text-sm text-secondary">{t('tagline')}</p>
           </div>
-          <div className="bg-surface border border-subtle rounded-2xl p-8 shadow-2xl">
+          <div className="bg-surface border border-subtle rounded-xl p-8">
             {providers?.oidc && (
               <Button
                 type="button"
                 variant="primary"
                 size="lg"
                 onClick={() => signIn('oidc', { callbackUrl: '/' })}
-                className="w-full rounded-full mb-5"
+                className="w-full mb-5"
               >
                 {t('ssoButton')}
               </Button>
@@ -99,7 +100,7 @@ export default function Login() {
                 <p className="text-sm text-danger">{error}</p>
               )}
 
-              <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full rounded-full">
+              <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full">
                 {loading ? t('submitLoading') : t('submit')}
               </Button>
             </form>

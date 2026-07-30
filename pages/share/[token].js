@@ -141,7 +141,7 @@ export default function PublicSharePage() {
       <main className="min-h-screen bg-canvas text-primary">
         <header className="border-b border-subtle px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Languages className="w-5 h-5 text-accent" />
+            <Languages className="w-5 h-5 text-accent-ink" />
             <div>
               <p className="text-xs uppercase tracking-widest text-secondary font-bold">Live-Übersetzung</p>
               <p className="text-sm text-primary font-medium">{langA} ↔ {langB}</p>
@@ -200,7 +200,7 @@ export default function PublicSharePage() {
                 setAudioActive(true);
                 setTimeout(() => audioRef.current?.play().catch(() => {}), 50);
               }}
-              className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs border border-accent/40 text-accent hover:bg-accent/10"
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs border border-accent/40 text-accent-ink hover:bg-accent/10"
             >
               <Volume2 className="w-3.5 h-3.5" /> Audio aktivieren
             </button>
@@ -225,7 +225,7 @@ export default function PublicSharePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 max-w-6xl mx-auto">
           <Column title="Original" segments={segments} fallbackLang={langA} accent="text-secondary" />
-          <Column title="Übersetzung" segments={translated} fallbackLang={langB} accent="text-accent" />
+          <Column title="Übersetzung" segments={translated} fallbackLang={langB} accent="text-accent-ink" />
         </div>
       </main>
     </>

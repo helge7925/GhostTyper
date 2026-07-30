@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import AudioUploadForm from '../components/AudioUploadForm';
 import ProcessStatusCard from '../components/ProcessStatusCard';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { Button } from '../components/ui/button';
+import { Card, CardBody } from '../components/ui/card';
 import { STATUS } from '../lib/constants';
 import { useMessageList, useTranslations } from '../lib/i18n';
 
@@ -48,7 +50,6 @@ const UPLOAD_PRESETS = {
       diarize: false,
       template: 'generic',
       model: 'deepseek-v4-flash',
-      showAdvancedOptions: true,
     },
   },
   'audio-meeting': {
@@ -59,7 +60,6 @@ const UPLOAD_PRESETS = {
       diarize: false,
       template: 'meeting',
       model: 'deepseek-v4-pro',
-      showAdvancedOptions: true,
     },
   },
   // Deep-link target from the Meet-blocked hint in MeetingStartForm — Google
@@ -72,7 +72,6 @@ const UPLOAD_PRESETS = {
       autoAnalyze: true,
       diarize: true,
       template: 'meeting',
-      showAdvancedOptions: true,
     },
   },
 };
@@ -232,21 +231,29 @@ export default function Upload() {
         <title>{`${tUpload('title')} – GhostTyper`}</title>
       </Head>
 
-      <div className="max-w-xl mx-auto">
-        <h1 className="text-2xl font-semibold text-primary mb-2">
-          {tUpload('title')}
-        </h1>
-        <p className="text-sm text-secondary mb-6">
-          {tUpload('subtitle')}
-        </p>
-        {activePreset && (
-          <p className="text-xs text-info bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 mb-6">
-            Preset aktiv: {activePreset.label}
+      <div className="max-w-2xl mx-auto">
+        <header className="mb-7">
+          <p className="text-xs font-medium text-secondary mb-2">{tUpload('eyebrow')}</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-primary">
+            {tUpload('title')}
+          </h1>
+          <p className="text-sm leading-6 text-secondary mt-2 max-w-xl">
+            {tUpload('subtitle')}
           </p>
+        </header>
+        {activePreset && (
+          <div className="flex items-start gap-3 text-sm bg-surface-elevated border border-subtle rounded-xl px-4 py-3 mb-5">
+            <span className="mt-1 h-2 w-2 rounded-full bg-info shrink-0" aria-hidden="true" />
+            <div>
+              <p className="font-medium text-primary">{tUpload('presetActive')}</p>
+              <p className="text-secondary mt-0.5">{activePreset.label}</p>
+            </div>
+          </div>
         )}
 
         {result ? (
-          <div className="bg-surface border border-subtle rounded-xl p-6 text-center">
+          <Card>
+            <CardBody className="p-6 text-center">
             <div className="mb-5">
               <ProcessStatusCard
                 title={
@@ -282,20 +289,20 @@ export default function Upload() {
             </div>
 
             <div className="flex gap-3 justify-center">
-              <button
+              <Button
                 onClick={() => router.push(`/transcriptions/${result.id}`)}
-                className="gradient-accent text-white px-5 py-2 rounded-full text-sm font-medium transition-colors"
+                variant="primary"
               >
-                Status öffnen
-              </button>
+                {tUpload('openStatus')}
+              </Button>
               {startError && (
-                <button
+                <Button
                   onClick={() => triggerProcessingStart(result.id)}
                   disabled={startingProcess}
-                  className="bg-hover-strong hover:bg-hover-strong text-primary px-5 py-2 rounded-full text-sm font-medium border border-subtle disabled:opacity-50"
+                  variant="outline"
                 >
-                  {startingProcess ? 'Startet…' : 'Erneut starten'}
-                </button>
+                  {startingProcess ? tUpload('restarting') : tUpload('restart')}
+                </Button>
               )}
             </div>
 
@@ -326,11 +333,14 @@ export default function Upload() {
                 Editor nach Zusammenfassung automatisch öffnen
               </label>
             )}
-          </div>
+            </CardBody>
+          </Card>
         ) : (
-          <div className="bg-surface border border-subtle rounded-xl p-6">
-            <AudioUploadForm onSuccess={handleSuccess} presetConfig={activePreset?.config || null} />
-          </div>
+          <Card>
+            <CardBody className="p-5 sm:p-6">
+              <AudioUploadForm onSuccess={handleSuccess} presetConfig={activePreset?.config || null} />
+            </CardBody>
+          </Card>
         )}
       </div>
     </>

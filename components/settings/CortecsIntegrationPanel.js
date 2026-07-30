@@ -207,7 +207,7 @@ export default function CortecsIntegrationPanel({ canEdit }) {
           {testing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           {t('testButton')}
         </button>
-        <button type="button" disabled={!canEdit || saving} onClick={() => handleSave()} className="px-4 py-2 rounded-xl text-sm bg-accent text-white hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2">
+        <button type="button" disabled={!canEdit || saving} onClick={() => handleSave()} className="px-4 py-2 rounded-xl text-sm bg-accent-strong text-white hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2">
           {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           {tCommon('save')}
         </button>

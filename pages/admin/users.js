@@ -361,9 +361,9 @@ export default function AdminUsers() {
                 <p className="text-xs text-secondary leading-relaxed">
                   💡 <strong className="text-primary">Mistral-API-Key</strong> und <strong className="text-primary">Kostenlimits</strong> werden jetzt
                   pro Workspace verwaltet. Wechsle zu{' '}
-                  <Link href="/settings/organization/members" className="text-accent hover:underline">Workspace verwalten → Mitglieder</Link>{' '}
+                  <Link href="/settings/organization/members" className="text-accent-ink hover:underline">Workspace verwalten → Mitglieder</Link>{' '}
                   oder{' '}
-                  <Link href="/settings/organization/integrations" className="text-accent hover:underline">API-Keys & Integrationen</Link>.
+                  <Link href="/settings/organization/integrations" className="text-accent-ink hover:underline">API-Keys & Integrationen</Link>.
                 </p>
               </div>
             )}
@@ -401,7 +401,7 @@ export default function AdminUsers() {
                   {user.name || user.email}
                 </span>
                 {user.role === 'admin' && (
-                  <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-accent/20 text-accent-ink px-2 py-0.5 rounded-full">
                     Admin
                   </span>
                 )}

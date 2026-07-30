@@ -26,6 +26,7 @@
       "title": "Transcribe a remote meeting",
       "description": "A bot joins the meeting as a participant and streams the transcript live.",
       "urlLabel": "Meeting link",
+      "options": "Bot settings",
       "urlHint": "Microsoft Teams, Zoom or Nextcloud Talk.",
       "platform": {
         "teams": "Microsoft Teams detected.",
@@ -154,6 +155,7 @@
     }
   },
   "layout": {
+    "skipToContent": "Skip to main content",
     "footerTagline": "Your thoughts, decoded and distilled.",
     "footerCredit": "Ghost Typer 2026 · Developed by Helge Roos"
   },
@@ -385,8 +387,13 @@
     "moveToFolder": "Move to folder"
   },
   "upload": {
+    "eyebrow": "New transcription",
     "title": "Transcription",
-    "subtitle": "Upload audio or record directly.",
+    "subtitle": "Choose an audio source. GhostTyper transcribes it and can immediately create a structured analysis.",
+    "presetActive": "Suitable settings have already been selected",
+    "openStatus": "Open status",
+    "restart": "Try again",
+    "restarting": "Starting…",
     "dropHere": "Drop file here or click to choose",
     "fileFormats": "MP3, WAV, M4A, OGG, FLAC, WebM up to 500 MB",
     "selectedFile": "Selected file",
@@ -406,8 +413,21 @@
     "submitting": "Uploading…"
   },
   "translatePage": {
+    "eyebrow": "Translate",
     "title": "Translation",
-    "subtitle": "Translate text, image or Office document.",
+    "subtitle": "Translate text directly or transfer complete documents into another language.",
+    "details": "Details",
+    "modelLabel": "AI model",
+    "modelHint": "The default offers the best balance of quality and speed for most texts.",
+    "targetLanguage": "Target language",
+    "targetLanguageHint": "The source language is detected automatically.",
+    "fileLabel": "PDF, DOCX, XLSX, or PPTX",
+    "fileTranslate": "Translate file",
+    "fileTranslating": "Translating file…",
+    "uploadDocument": "Upload a document for text recognition",
+    "takePhoto": "Take a photo and recognize text",
+    "clearInput": "Clear source text",
+    "extractingText": "Recognizing text…",
     "tabText": "Text",
     "tabFile": "File",
     "input": "Source text",
@@ -486,14 +506,19 @@
     "noResult": "No result yet."
   },
   "textOptPage": {
+    "eyebrow": "Edit text",
     "title": "Text refinement",
     "subtitle": "Correct, shorten or rephrase text.",
     "input": "Input",
+    "inputHelp": "Paste the text you want to improve.",
+    "inputPlaceholder": "Paste text here…",
     "output": "Refined text",
     "submit": "Refine",
     "submitting": "Refining…",
     "preset": "Style",
+    "presetHelp": "Choose the most important change. Add any other requests below.",
     "customInstruction": "Custom instruction",
+    "instructionHelp": "Optional: tone, audience, or specific wording preferences.",
     "customInstructionHint": "Custom instruction for the AI (optional).",
     "presets": {
       "spelling_grammar": "Spelling & grammar",
@@ -592,7 +617,20 @@
       "invalidType": "Unsupported file type",
       "tabUpload": "Upload",
       "tabRecord": "Record",
-      "tabSystemAudio": "Tab/System Audio",
+    "tabSystemAudio": "Tab/System Audio",
+    "sourceLabel": "Audio source",
+    "outputLabel": "Result",
+    "dragHint": "or drag audio here",
+    "replaceFile": "Click to replace",
+    "diarizeHint": "Assigns the text to different voices.",
+    "autoAnalyzeHint": "Creates a summary after transcription.",
+    "advancedOptions": "Details and preferences",
+    "analysisMode": "Type of analysis",
+    "analysisModeHint": "Determines the structure of the result.",
+    "modelLabel": "AI model",
+    "modelHint": "The default works for most recordings.",
+    "contextHelp": "Helps with specialist terms, names, and abbreviations.",
+    "focusHelp": "Describe only what matters most in the analysis.",
       "tabPaste": "Paste",
       "submit": "Process",
       "submitting": "Processing…",
@@ -684,7 +722,9 @@
     ]
   },
   "settings": {
+    "eyebrow": "Personal preferences",
     "title": "Settings",
+    "subtitle": "Set sensible defaults. Technical details are available within each section.",
     "tabs": {
       "transcription": "Transcription",
       "textTemplates": "Text templates",

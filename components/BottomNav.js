@@ -50,7 +50,7 @@ export default function BottomNav() {
               >
                 {/* Icon carries the accent tint (3:1 floor); label stays on
                     --primary since 10px text needs the 4.5:1 floor. */}
-                <Icon className={cn('w-5 h-5', isActive && 'text-accent')} aria-hidden="true" />
+                <Icon className={cn('w-5 h-5', isActive && 'text-accent-ink')} aria-hidden="true" />
                 <span>{t(labelKey)}</span>
               </Link>
             </li>

@@ -220,7 +220,7 @@ export default function TableRenderer({
                 onClick={() => setEditMode((prev) => !prev)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   editMode
-                    ? 'bg-accent text-white'
+                    ? 'bg-accent-strong text-white'
                     : 'bg-hover-subtle text-secondary hover:text-primary'
                 }`}
               >

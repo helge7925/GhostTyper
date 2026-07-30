@@ -110,7 +110,7 @@ export default function AdminWorkspacesPage() {
             <button
               type="button"
               onClick={() => setShowCreate((v) => !v)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm bg-accent text-white hover:bg-accent/90 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm bg-accent-strong text-white hover:bg-accent/90 transition-colors"
             >
               <Plus className="w-4 h-4" /> Neuer Workspace
             </button>
@@ -172,7 +172,7 @@ export default function AdminWorkspacesPage() {
               <button
                 type="submit"
                 disabled={creating || !name.trim()}
-                className="px-4 py-2 rounded-xl text-sm bg-accent text-white hover:bg-accent/90 disabled:opacity-50"
+                className="px-4 py-2 rounded-xl text-sm bg-accent-strong text-white hover:bg-accent/90 disabled:opacity-50"
               >
                 {creating ? 'Lege an...' : 'Workspace anlegen'}
               </button>

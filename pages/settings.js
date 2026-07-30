@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useCallback, useState, useEffect } from 'react';
-import { Mic, FileText, Languages, KeyRound, BookMarked } from 'lucide-react';
+import { ArrowLeft, BookMarked, FileText, KeyRound, Languages, Mic, Plus, Save, Sparkles } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -30,6 +30,7 @@ import { DEFAULT_PROMPTS, getPrompt } from '../lib/prompts';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { useTranslations } from '../lib/i18n';
 import GlossaryPanel from '../components/settings/GlossaryPanel';
+import { Button } from '../components/ui/button';
 
 // Cortecs list prices (cheapest routed provider, cortecs.ai, Stand 07/2026)
 // — keep in sync with MODEL_PRICING in lib/usage.js.
@@ -475,10 +476,10 @@ export default function Settings() {
   const renderTemplateCategoryPanel = ({ activeCategoryId, onChange, templatesForCounts }) => {
     const uncategorizedCount = templatesForCounts.filter((template) => !template.category_id).length;
     return (
-      <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
+      <div className="bg-surface border border-subtle rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest">Kategorien</h2>
+            <h2 className="text-sm font-semibold text-primary">Kategorien</h2>
             <p className="text-xs text-secondary mt-1">Organisieren und filtern Sie Ihre Vorlagen.</p>
           </div>
         </div>
@@ -486,10 +487,10 @@ export default function Settings() {
           <button
             type="button"
             onClick={() => onChange('all')}
-            className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
               activeCategoryId === 'all'
-                ? 'bg-accent text-white border-accent'
-                : 'bg-hover-subtle border-subtle text-primary hover:border-accent/40'
+                ? 'bg-surface-elevated text-primary border-emphasis'
+                : 'bg-transparent border-subtle text-secondary hover:text-primary hover:bg-hover-subtle'
             }`}
           >
             Alle ({templatesForCounts.length})
@@ -497,10 +498,10 @@ export default function Settings() {
           <button
             type="button"
             onClick={() => onChange('uncategorized')}
-            className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
               activeCategoryId === 'uncategorized'
-                ? 'bg-accent text-white border-accent'
-                : 'bg-hover-subtle border-subtle text-primary hover:border-accent/40'
+                ? 'bg-surface-elevated text-primary border-emphasis'
+                : 'bg-transparent border-subtle text-secondary hover:text-primary hover:bg-hover-subtle'
             }`}
           >
             Ohne Kategorie ({uncategorizedCount})
@@ -508,7 +509,7 @@ export default function Settings() {
           {templateCategories.map((cat) => {
             const count = templatesForCounts.filter((template) => String(template.category_id || '') === String(cat.id)).length;
             return (
-              <div key={cat.id} className="group flex items-center gap-2 bg-hover-subtle border border-subtle rounded-full px-3 py-1.5">
+              <div key={cat.id} className="group flex items-center gap-2 bg-hover-subtle border border-subtle rounded-lg px-3 py-1.5">
                 {editingCategoryId === cat.id ? (
                   <input
                     autoFocus
@@ -524,7 +525,7 @@ export default function Settings() {
                     type="button"
                     onClick={() => onChange(String(cat.id))}
                     className={`flex items-center gap-2 text-xs transition-colors ${
-                      String(activeCategoryId) === String(cat.id) ? 'text-accent' : 'text-primary hover:text-accent'
+                      String(activeCategoryId) === String(cat.id) ? 'text-accent-ink' : 'text-primary hover:text-accent-ink'
                     }`}
                   >
                     <span className="w-2 h-2 rounded-full bg-accent" />
@@ -536,10 +537,10 @@ export default function Settings() {
                   <button
                     type="button"
                     onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}
-                    className="text-secondary hover:text-white"
+                    className="text-secondary hover:text-primary"
                     aria-label={`Kategorie ${cat.name} bearbeiten`}
                   >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    <svg aria-hidden="true" className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                   </button>
                   <button
                     type="button"
@@ -547,7 +548,7 @@ export default function Settings() {
                     className="text-secondary hover:text-danger"
                     aria-label={`Kategorie ${cat.name} löschen`}
                   >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    <svg aria-hidden="true" className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
               </div>
@@ -561,8 +562,8 @@ export default function Settings() {
               placeholder="Neue Kategorie..."
               className="bg-surface-elevated border border-subtle rounded-full px-3 py-1.5 text-xs text-primary outline-none w-32"
             />
-            <button type="submit" disabled={!newCategoryName.trim()} className="text-accent hover:text-accent/80 disabled:opacity-30" aria-label="Kategorie erstellen">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            <button type="submit" disabled={!newCategoryName.trim()} className="text-accent-ink hover:text-accent-ink/80 disabled:opacity-30" aria-label="Kategorie erstellen">
+              <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             </button>
           </form>
         </div>
@@ -575,15 +576,19 @@ export default function Settings() {
       <Head><title>{`${t('title')} – GhostTyper`}</title></Head>
 
       <div className={activeEditor ? 'hidden' : 'max-w-6xl mx-auto animate-fade-in pb-20'}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-bold text-primary">{t('title')}</h1>
-          {saved && <p className="text-success text-xs animate-pulse bg-success/10 px-3 py-1 rounded-full border border-success/20">Einstellungen gespeichert!</p>}
-        </div>
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-7">
+          <div>
+            <p className="text-xs font-medium text-secondary mb-2">{t('eyebrow')}</p>
+            <h1 className="text-3xl font-semibold tracking-tight text-primary">{t('title')}</h1>
+            <p className="text-sm text-secondary mt-2">{t('subtitle')}</p>
+          </div>
+          {saved && <p role="status" className="text-success text-xs px-3 py-2 rounded-lg border border-success/30">Einstellungen gespeichert</p>}
+        </header>
 
         <div className="lg:grid lg:grid-cols-[240px_1fr] lg:gap-8">
           {/* Mobile (<md): native select dropdown */}
           <div className="md:hidden mb-6">
-            <label htmlFor="settings-section" className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5">
+            <label htmlFor="settings-section" className="block text-xs font-medium text-secondary mb-1.5">
               Bereich
             </label>
             <select
@@ -600,7 +605,7 @@ export default function Settings() {
 
           {/* Tablet (md..lg): horizontal tab bar */}
           <div
-            className="hidden md:flex lg:hidden items-center gap-1 bg-hover-subtle p-1 rounded-2xl mb-6 overflow-x-auto no-scrollbar border border-subtle"
+            className="hidden md:flex lg:hidden items-center gap-1 bg-surface-elevated p-1 rounded-xl mb-6 overflow-x-auto no-scrollbar border border-subtle"
             role="tablist"
             aria-label="Einstellungen-Bereiche"
           >
@@ -616,10 +621,10 @@ export default function Settings() {
                   aria-controls={`settings-panel-${tab.id}`}
                   tabIndex={activeTab === tab.id ? 0 : -1}
                   className={cn(
-                    'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                    'flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors whitespace-nowrap',
                     activeTab === tab.id
-                      ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                      : 'text-secondary hover:text-primary hover:bg-hover-subtle',
+                      ? 'bg-surface text-primary border-subtle'
+                      : 'border-transparent text-secondary hover:text-primary hover:bg-hover-subtle',
                   )}
                 >
                   <Icon className="w-4 h-4" aria-hidden="true" />
@@ -647,9 +652,9 @@ export default function Settings() {
                   aria-controls={`settings-panel-${tab.id}`}
                   tabIndex={activeTab === tab.id ? 0 : -1}
                   className={cn(
-                    'flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors text-left',
+                    'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors text-left',
                     activeTab === tab.id
-                      ? 'bg-accent/10 text-accent'
+                      ? 'bg-surface-elevated text-primary'
                       : 'text-secondary hover:text-primary hover:bg-hover-subtle',
                   )}
                   aria-current={activeTab === tab.id ? 'page' : undefined}
@@ -670,8 +675,8 @@ export default function Settings() {
         >
           {activeTab === 'transcription' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
-              <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
-                <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">Transkription</h2>
+              <div className="bg-surface border border-subtle rounded-xl p-6">
+                <h2 className="text-sm font-semibold text-primary mb-6">Transkription</h2>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-medium text-secondary mb-1.5">Standardsprache</label>
@@ -690,12 +695,12 @@ export default function Settings() {
 
                     <div className="mt-4 space-y-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-[10px] font-bold text-secondary uppercase tracking-wider">Aktive Begriffe</p>
+                        <p className="text-xs font-medium text-secondary">Aktive Begriffe</p>
                         <button
                           type="button"
                           onClick={handleLoadGlossarySuggestions}
                           disabled={glossaryLoading}
-                          className="text-[10px] text-accent hover:text-info disabled:opacity-40"
+                          className="text-[10px] text-accent-ink hover:text-info disabled:opacity-40"
                         >
                           {glossaryLoading ? 'Lädt...' : 'Auto-Glossar laden'}
                         </button>
@@ -729,7 +734,7 @@ export default function Settings() {
                                 key={entry.term}
                                 type="button"
                                 onClick={() => handleAddContextTerm(entry.term)}
-                                className="px-2.5 py-1 rounded-full text-[11px] border border-accent/30 bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+                                className="px-2.5 py-1 rounded-full text-[11px] border border-accent/30 bg-accent/10 text-accent-ink hover:bg-accent/20 transition-colors"
                                 title={`${entry.count} Treffer`}
                               >
                                 + {entry.term}
@@ -743,19 +748,22 @@ export default function Settings() {
                 </div>
               </div>
               <div className="space-y-6">
-                <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl opacity-60">
-                  <h3 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-4">Modell-Info</h3>
+                <div className="bg-surface border border-subtle rounded-xl p-6">
+                  <h3 className="text-sm font-semibold text-primary mb-4">Verwendetes Sprachmodell</h3>
                   <p className="text-xs text-secondary leading-relaxed">
                     Für die Transkription wird standardmäßig <strong>Mistral Voxtral Mini</strong> verwendet.
                   </p>
                 </div>
-                <button
+                <Button
                   onClick={handleSaveSettings}
                   disabled={isSavingSettings}
-                  className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-[1.01] disabled:opacity-40"
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
                 >
+                  <Save className="w-4 h-4" aria-hidden="true" />
                   {isSavingSettings ? 'Speichert...' : 'Speichern'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -770,13 +778,13 @@ export default function Settings() {
 
               {/* Text Templates Section */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
+                <div className="lg:col-span-2 bg-surface border border-subtle rounded-xl p-6">
                   <div className="flex items-center justify-between mb-8">
                     <div>
-                      <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest">Text-Verarbeitung</h2>
+                      <h2 className="text-sm font-semibold text-primary">Text-Verarbeitung</h2>
                       <p className="text-xs text-secondary mt-1">Standard- und eigene Textvorlagen</p>
                     </div>
-                    <button
+                    <Button
                       onClick={() => setActiveEditor({
                         id: 'new',
                         name: '',
@@ -784,10 +792,12 @@ export default function Settings() {
                         category_id: activeTextCategoryId !== 'all' && activeTextCategoryId !== 'uncategorized' ? activeTextCategoryId : '',
                         isDefault: false
                       })}
-                      className="gradient-accent text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg"
+                      variant="primary"
+                      size="sm"
                     >
-                      + Neue Text-Vorlage
-                    </button>
+                      <Plus className="w-4 h-4" aria-hidden="true" />
+                      Neue Text-Vorlage
+                    </Button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -797,7 +807,7 @@ export default function Settings() {
                         <span className="text-sm font-medium text-primary capitalize">
                           {label}
                         </span>
-                        <button onClick={() => openDefaultEditor(key)} className="text-[10px] font-bold text-accent uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">Edit</button>
+                        <button onClick={() => openDefaultEditor(key)} className="text-xs font-medium text-secondary hover:text-primary">Bearbeiten</button>
                       </div>
                     ))}
                     {/* Custom Text Templates */}
@@ -807,9 +817,9 @@ export default function Settings() {
                           <span className="text-sm font-medium text-primary truncate block">{t.name}</span>
                           <span className="text-[10px] text-secondary">{getCategoryName(t.category_id)}</span>
                         </div>
-                        <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => setActiveEditor({...t, isDefault: false})} className="text-[10px] font-bold text-accent uppercase">Edit</button>
-                          <button onClick={() => handleDelete(t.id)} className="text-[10px] font-bold text-secondary uppercase hover:text-danger">Löschen</button>
+                        <div className="flex gap-3">
+                          <button onClick={() => setActiveEditor({...t, isDefault: false})} className="text-xs font-medium text-secondary hover:text-primary">Bearbeiten</button>
+                          <button onClick={() => handleDelete(t.id)} className="text-xs font-medium text-secondary hover:text-danger">Löschen</button>
                         </div>
                       </div>
                     ))}
@@ -817,8 +827,8 @@ export default function Settings() {
                 </div>
 
                 <div className="space-y-6">
-                  <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
-                    <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">Standard-Modell</h2>
+                  <div className="bg-surface border border-subtle rounded-xl p-6">
+                    <h2 className="text-sm font-semibold text-primary mb-6">Standard-Modell</h2>
                     <select value={preferredModel} onChange={e => setPreferredModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent">
                       {CHAT_MODEL_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>{option.label}</option>
@@ -830,13 +840,13 @@ export default function Settings() {
                   </div>
 
                   {vexaWorkspaceEnabled && (
-                    <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
-                      <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-3">Remote-Meeting</h2>
+                    <div className="bg-surface border border-subtle rounded-xl p-6">
+                      <h2 className="text-sm font-semibold text-primary mb-3">Remote-Meeting</h2>
                       <label className="flex items-start justify-between gap-4 cursor-pointer">
                         <div>
                           <p className="text-sm text-primary font-medium">Funktion für mich aktivieren</p>
                           <p className="text-xs text-secondary mt-0.5 max-w-prose">
-                            Wenn aktiviert, erscheint &quot;Remote Meeting&quot; in deiner Sidebar und du kannst Bots zu Google-Meet- oder Teams-Calls schicken.
+                            Wenn aktiviert, erscheint &quot;Remote Meeting&quot; in deiner Sidebar und du kannst Bots zu Teams-, Zoom- oder Nextcloud-Talk-Terminen schicken.
                             Workspace-Admins steuern die Funktion zusätzlich global.
                           </p>
                         </div>
@@ -851,13 +861,16 @@ export default function Settings() {
                     </div>
                   )}
 
-                  <button
+                  <Button
                     onClick={handleSaveSettings}
                     disabled={isSavingSettings}
-                    className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-[1.01] disabled:opacity-40"
+                    variant="primary"
+                    size="lg"
+                    className="w-full"
                   >
+                    <Save className="w-4 h-4" aria-hidden="true" />
                     {isSavingSettings ? 'Speichert...' : 'Speichern'}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -866,8 +879,8 @@ export default function Settings() {
 
           {activeTab === 'ocr-translate' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
-              <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
-                <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">OCR (Texterkennung)</h2>
+              <div className="bg-surface border border-subtle rounded-xl p-6">
+                <h2 className="text-sm font-semibold text-primary mb-6">OCR (Texterkennung)</h2>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-medium text-secondary mb-1.5">OCR-Modell</label>
@@ -880,8 +893,8 @@ export default function Settings() {
                   </p>
                 </div>
               </div>
-              <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
-                <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">Übersetzung</h2>
+              <div className="bg-surface border border-subtle rounded-xl p-6">
+                <h2 className="text-sm font-semibold text-primary mb-6">Übersetzung</h2>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-medium text-secondary mb-1.5">Standard-Zielsprache</label>
@@ -893,13 +906,16 @@ export default function Settings() {
                       <option value="it">Italienisch</option>
                     </select>
                   </div>
-                  <button
+                  <Button
                     onClick={handleSaveSettings}
                     disabled={isSavingSettings}
-                    className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-[1.01] disabled:opacity-40"
+                    variant="primary"
+                    size="lg"
+                    className="w-full"
                   >
+                    <Save className="w-4 h-4" aria-hidden="true" />
                     {isSavingSettings ? 'Speichert...' : 'Speichern'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -916,8 +932,8 @@ export default function Settings() {
           {activeTab === 'account' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
               <div className="space-y-6">
-                <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
-                  <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">API-Konfiguration</h2>
+                <div className="bg-surface border border-subtle rounded-xl p-6">
+                  <h2 className="text-sm font-semibold text-primary mb-6">Kosten und Integrationen</h2>
                   <div className="space-y-4">
                     <div className="bg-hover-subtle border border-subtle rounded-xl px-4 py-3 text-xs text-primary">
                       <p className="font-medium mb-1">API-Keys werden zentral im Workspace verwaltet</p>
@@ -925,7 +941,7 @@ export default function Settings() {
                         Cortecs, Mistral und weitere Anbieter konfigurierst du unter Workspace-Einstellungen → Integrationen.
                         Persönliche API-Keys werden hier nicht mehr gespeichert.
                       </p>
-                      <Link href="/settings/organization/integrations" className="inline-flex mt-3 text-accent hover:text-accent/80 font-medium">
+                      <Link href="/settings/organization/integrations" className="inline-flex mt-3 text-accent-ink hover:text-accent-ink/80 font-medium">
                         Zu den Workspace-Integrationen
                       </Link>
                     </div>
@@ -945,35 +961,38 @@ export default function Settings() {
                     </div>
                   </div>
                 </div>
-                <button
+                <Button
                   onClick={handleSaveSettings}
                   disabled={isSavingSettings}
-                  className="w-full gradient-accent text-white py-3.5 rounded-2xl font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-[1.01] disabled:opacity-40"
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
                 >
+                  <Save className="w-4 h-4" aria-hidden="true" />
                   {isSavingSettings ? 'Speichert...' : 'Speichern'}
-                </button>
+                </Button>
               </div>
 
               <div className="space-y-6">
                 {usage && (
-                  <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                    <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">Verbrauch aktuell</h2>
+                  <div className="bg-surface border border-subtle rounded-xl p-6 relative overflow-hidden">
+                    <h2 className="text-sm font-semibold text-primary mb-6">Verbrauch aktuell</h2>
                     <div className="grid grid-cols-2 gap-4 mb-6">
                       <div className="bg-hover-subtle rounded-xl p-4 border border-subtle">
-                        <p className="text-xs text-secondary uppercase font-bold tracking-wider mb-1">Kosten</p>
-                        <p className="text-2xl font-bold text-accent">{usage.totalCost?.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</p>
+                        <p className="text-xs text-secondary font-medium mb-1">Kosten</p>
+                        <p className="text-2xl font-semibold tabular-nums text-primary">{usage.totalCost?.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</p>
                       </div>
                       <div className="bg-hover-subtle rounded-xl p-4 border border-subtle">
-                        <p className="text-xs text-secondary uppercase font-bold tracking-wider mb-1">Anfragen</p>
-                        <p className="text-2xl font-bold text-primary">{usage.totalRequests}</p>
+                        <p className="text-xs text-secondary font-medium mb-1">Anfragen</p>
+                        <p className="text-2xl font-semibold tabular-nums text-primary">{usage.totalRequests}</p>
                       </div>
                     </div>
                     <div className="space-y-2 border-t border-subtle pt-4">
-                      <h3 className="text-xs font-bold text-secondary uppercase mb-2 opacity-70">Preisliste (pro 1M Tokens)</h3>
+                      <h3 className="text-xs font-medium text-secondary mb-2">Preisliste pro 1 Mio. Tokens</h3>
                       {PRICE_LIST.map(p => (
                         <div key={p.model} className="flex items-center justify-between text-xs">
                           <span className="text-primary">{p.model}</span>
-                          <span className="text-secondary">In: {p.input} | Out: {p.output}</span>
+                          <span className="text-secondary tabular-nums">In: {p.input} · Out: {p.output}</span>
                         </div>
                       ))}
                     </div>
@@ -981,13 +1000,13 @@ export default function Settings() {
                 )}
 
                 {canReadAudit && (
-                <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
+                <div className="bg-surface border border-subtle rounded-xl p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest">Audit-Log</h2>
+                    <h2 className="text-sm font-semibold text-primary">Audit-Log</h2>
                     <button
                       onClick={handleReloadAudit}
                       disabled={auditLoading}
-                      className="text-[11px] text-accent hover:text-info disabled:opacity-40"
+                      className="text-[11px] text-accent-ink hover:text-info disabled:opacity-40"
                     >
                       {auditLoading ? 'Lädt...' : 'Neu laden'}
                     </button>
@@ -1019,7 +1038,9 @@ export default function Settings() {
         <div className="fixed inset-0 z-[60] bg-canvas flex flex-col animate-fade-in">
           <header className="min-h-16 border-b border-subtle bg-surface flex flex-wrap items-center justify-between gap-3 px-6 py-3">
             <div className="flex items-center gap-4 min-w-0 flex-1">
-              <button onClick={() => setActiveEditor(null)} className="p-2 text-secondary hover:text-primary transition-colors" aria-label="Vorlagen-Editor schließen"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
+              <Button type="button" onClick={() => setActiveEditor(null)} variant="ghost" size="icon" aria-label="Vorlagen-Editor schließen">
+                <ArrowLeft className="w-5 h-5" aria-hidden="true" />
+              </Button>
               <input 
                 type="text" 
                 value={activeEditor.name} 
@@ -1030,7 +1051,7 @@ export default function Settings() {
               />
             </div>
             <div className="flex items-center justify-end gap-3 flex-wrap">
-              {activeEditor.isDefault && DEFAULT_TEXT_TEMPLATE_OPTIONS.some((entry) => entry.key === activeEditor.id) && <span className="text-[10px] bg-accent/20 text-accent px-2 py-1 rounded-full uppercase">Standard-Vorlage</span>}
+              {activeEditor.isDefault && DEFAULT_TEXT_TEMPLATE_OPTIONS.some((entry) => entry.key === activeEditor.id) && <span className="text-[10px] bg-accent/20 text-accent-ink px-2 py-1 rounded-full uppercase">Standard-Vorlage</span>}
               <select
                 value={activeEditor.category_id || ''}
                 onChange={e => setActiveEditor({ ...activeEditor, category_id: e.target.value })}
@@ -1042,18 +1063,19 @@ export default function Settings() {
                   <option key={category.id} value={category.id}>{category.name}</option>
                 ))}
               </select>
-              <button onClick={handleSaveTemplate} disabled={templateLoading} className="gradient-accent text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent/20">
+              <Button onClick={handleSaveTemplate} disabled={templateLoading} variant="primary">
+                <Save className="w-4 h-4" aria-hidden="true" />
                 {templateLoading ? 'Speichert...' : 'Vorlage speichern'}
-              </button>
+              </Button>
             </div>
           </header>
           <main className="flex-1 p-6 md:p-12 overflow-y-auto bg-hover-subtle">
             <div className="max-w-4xl mx-auto h-full flex flex-col">
               {/* KI Generator Section */}
-              <div className="mb-8 bg-surface border border-accent/20 rounded-2xl p-6 shadow-2xl shadow-accent/5">
+              <div className="mb-8 bg-surface border border-subtle rounded-xl p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />
-                  <h3 className="text-[10px] font-bold text-accent uppercase tracking-[0.2em]">Vorlagen-Generator</h3>
+                  <h3 className="text-sm font-semibold text-primary">Vorlagen-Generator</h3>
                 </div>
                 <div className="flex gap-3 items-start">
                   <textarea 
@@ -1063,30 +1085,32 @@ export default function Settings() {
                     rows={3}
                     className="flex-1 bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent resize-none"
                   />
-                  <button 
+                  <Button
                     onClick={handleGenerateAI}
                     disabled={isGenerating || !generatorGoal.trim()}
-                    className="gradient-accent text-white px-6 py-3 rounded-xl text-xs font-bold shadow-lg disabled:opacity-50 transition-all flex items-center gap-2 shrink-0 h-[46px]"
+                    variant="outline"
+                    className="shrink-0 h-[46px]"
                   >
+                    <Sparkles className="w-4 h-4" aria-hidden="true" />
                     {isGenerating ? (
                       <>
                         <div className="w-3 h-3 border-2 border-emphasis border-t-white rounded-full animate-spin" />
                         Generiere...
                       </>
                     ) : 'Erstellen'}
-                  </button>
+                  </Button>
                 </div>
                 <p className="mt-3 text-[10px] text-secondary opacity-60">
                   Aus Ihrer Beschreibung wird eine System-Anweisung mit JSON-Struktur erstellt.
                 </p>
               </div>
 
-              <label className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-4">System-Anweisungen (Prompt)</label>
+              <label className="text-xs font-medium text-secondary mb-2">System-Anweisungen</label>
               <textarea 
                 value={activeEditor.prompt_text} 
                 onChange={e => setActiveEditor({...activeEditor, prompt_text: e.target.value})}
                 placeholder="Geben Sie hier die Anweisungen für das Sprachmodell ein..."
-                className="flex-1 bg-surface border border-subtle rounded-2xl p-8 text-sm text-primary outline-none focus:border-accent/30 shadow-2xl resize-none font-mono leading-relaxed"
+                className="flex-1 bg-surface border border-subtle rounded-xl p-6 text-sm text-primary outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 resize-none font-mono leading-relaxed"
               />
               <p className="mt-4 text-[10px] text-secondary italic">
                 Tipp: Beschreiben Sie exakt, wie das Ergebnis strukturiert sein soll (z.B. als JSON oder Fließtext).

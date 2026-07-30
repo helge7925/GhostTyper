@@ -100,10 +100,10 @@ export default function ProcessStatusCard({
     <div className="bg-surface border border-subtle rounded-2xl p-5 shadow-xl animate-fade-in">
       <div className="flex items-start gap-3 mb-4">
         <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-          done ? 'bg-success/20 text-success' : 'bg-accent/20 text-accent'
+          done ? 'bg-success/20 text-success' : 'bg-accent/20 text-accent-ink'
         }`}>
           {done ? (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           ) : (
@@ -138,7 +138,7 @@ export default function ProcessStatusCard({
       )}
 
       {etaText && (
-        <p className="mt-3 text-sm text-accent font-medium">
+        <p className="mt-3 text-sm text-accent-ink font-medium">
           {etaText}
         </p>
       )}

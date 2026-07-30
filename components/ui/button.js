@@ -38,7 +38,7 @@ const buttonVariants = cva(
         ghost: 'bg-transparent text-secondary hover:text-primary hover:bg-hover-subtle',
         destructive: 'bg-danger/15 text-danger border border-danger/30 hover:bg-danger/25',
         'destructive-solid': 'bg-danger text-white hover:bg-danger/90',
-        link: 'text-accent underline-offset-4 hover:underline bg-transparent',
+        link: 'text-accent-ink underline-offset-4 hover:underline bg-transparent',
       },
       size: {
         xs: 'h-7 px-2.5 text-[10px] rounded-md tracking-wide uppercase',

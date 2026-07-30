@@ -21,7 +21,7 @@ export default function Layout({ children }) {
         <meta name="description" content="Audio-Transkription und KI-Analyse" />
         <meta
           name="theme-color"
-          content={resolvedTheme === 'dark' ? '#0a0a0f' : '#fafafa'}
+          content={resolvedTheme === 'dark' ? '#1e1e21' : '#f7f6f4'}
         />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
@@ -32,6 +32,12 @@ export default function Layout({ children }) {
       </Head>
 
       <div className="min-h-screen bg-canvas">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only fixed left-4 top-4 z-[100] rounded-lg bg-surface px-4 py-2 text-sm font-semibold text-primary border border-emphasis shadow-lg"
+        >
+          {tFooter('skipToContent')}
+        </a>
         {session ? (
           <>
             <Sidebar />
@@ -45,6 +51,8 @@ export default function Layout({ children }) {
               <TopBar />
 
               <main
+                id="main-content"
+                tabIndex={-1}
                 className="flex-1 w-full px-4 sm:px-6 py-6"
                 style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 5rem)' }}
               >
@@ -66,7 +74,7 @@ export default function Layout({ children }) {
         ) : (
           <div className="flex flex-col min-h-screen">
             <TopBar />
-            <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-8">
+            <main id="main-content" tabIndex={-1} className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-8">
               {children}
             </main>
             <footer className="py-12 text-center space-y-2">

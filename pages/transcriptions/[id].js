@@ -14,6 +14,10 @@ import TranslationCompanionPanel from '../../components/TranslationCompanionPane
 import { getTranscription, deleteTranscription, updateSpeakers, startAnalysis } from '../../lib/api';
 import { STATUS } from '../../lib/constants';
 import { useMessageList, useTranslations } from '../../lib/i18n';
+import { Button } from '../../components/ui/button';
+import { Card, CardBody } from '../../components/ui/card';
+import { Field } from '../../components/ui/field';
+import { ArrowLeft, CloudUpload, Download, Pencil, Play, Trash2 } from 'lucide-react';
 
 const TRANSCRIPTION_LOADING_MESSAGES = [
   'Wir lauschen tief konzentriert und schreiben fleißig mit.',
@@ -443,108 +447,136 @@ export default function TranscriptionDetail() {
 
       {(
         <div className="max-w-6xl mx-auto animate-fade-in pb-20">
-          <button onClick={() => router.push('/transcriptions')} className="text-secondary hover:text-primary text-xs flex items-center gap-1 mb-6">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></svg>
-            Zurück zur Historie
-          </button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/transcriptions')}
+            className="-ml-3 mb-5"
+          >
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+            Zurück zu Dateien
+          </Button>
+
+          <header className="mb-7">
+            <div className="flex flex-wrap items-center gap-3 mb-3">
+              <StatusBadge status={transcription.status} />
+              <span className="text-xs text-secondary">
+                {new Date(transcription.created_at).toLocaleDateString('de-DE')} · {typeLabel}
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-primary break-words">
+              {transcription.original_name}
+            </h1>
+          </header>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left: Info & Actions */}
-            <div className="lg:col-span-1 space-y-6">
-              <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
-                <StatusBadge status={transcription.status} />
-                <h1 className="text-lg font-semibold text-primary mt-3 truncate">{transcription.original_name}</h1>
-                <p className="text-[10px] text-secondary uppercase tracking-widest mt-1">
-                  {new Date(transcription.created_at).toLocaleDateString('de-DE')} &bull; {typeLabel}
-                </p>
-
+            <aside className="lg:col-span-1 space-y-5">
+              <Card>
+                <CardBody className="p-5">
                 {/* Context & Settings */}
-                <div className="mt-6 pt-6 border-t border-subtle space-y-4">
+                <div className="space-y-4">
                   <div>
-                    <label className="text-[10px] font-bold text-secondary uppercase opacity-50">Analyse-Modus</label>
-                    <p className="text-sm text-primary capitalize">{templateLabel || '-'}</p>
+                    <p className="text-xs font-medium text-secondary">Auswertung</p>
+                    <p className="text-sm text-primary mt-1 capitalize">{templateLabel || 'Keine'}</p>
                     {transcription.analysis_type === 'table' && (
-                      <p className="text-[10px] text-accent mt-2">
+                      <p className="text-xs text-secondary mt-1">
                         {transcription.template === 'data_table' ? 'Datentabellen-Extraktion' : 'Tabellen-Extraktion'}
                       </p>
                     )}
                   </div>
                   {transcription.custom_prompt && (
                     <div>
-                      <label className="text-[10px] font-bold text-secondary uppercase opacity-50">Anweisung</label>
-                      <p className="text-xs text-secondary italic">&quot;{transcription.custom_prompt}&quot;</p>
+                      <p className="text-xs font-medium text-secondary">Zusätzliche Anweisung</p>
+                      <p className="text-xs leading-5 text-primary mt-1">&quot;{transcription.custom_prompt}&quot;</p>
                     </div>
                   )}
                 </div>
 
-                <div className="mt-8 flex flex-col gap-2">
+                <div className="mt-5 pt-5 border-t border-subtle flex flex-col gap-2">
                   {transcription.status === STATUS.PENDING && (
-                    <button
+                    <Button
                       onClick={handleStartProcessing}
                       disabled={startingProcessing}
-                      className="bg-hover-subtle hover:bg-hover-strong text-primary py-2 rounded-xl text-sm font-bold border border-subtle transition-all disabled:opacity-50"
+                      variant="primary"
+                      className="w-full"
                     >
+                      <Play className="w-4 h-4" aria-hidden="true" />
                       {startingProcessing ? 'Startet…' : 'Verarbeitung starten'}
-                    </button>
+                    </Button>
                   )}
                   {(() => {
                     const canOpen = !isOfficeDocument && (transcription.text || transcription.analysis);
-                    const className = 'gradient-accent text-white py-2 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 transition-all hover:scale-[1.02] active:scale-100 text-center';
                     const label = isTableAnalysis ? 'Tabelle im Editor öffnen' : 'Im Editor öffnen';
                     if (!canOpen || !editorHref) {
                       return (
-                        <button disabled className={`${className} opacity-30 cursor-not-allowed`}>
+                        <Button disabled variant="primary" className="w-full">
+                          <Pencil className="w-4 h-4" aria-hidden="true" />
                           {label}
-                        </button>
+                        </Button>
                       );
                     }
                     return (
-                      <Link href={editorHref} className={className}>
-                        {label}
-                      </Link>
+                      <Button asChild variant="primary" className="w-full">
+                        <Link href={editorHref}>
+                          <Pencil className="w-4 h-4" aria-hidden="true" />
+                          {label}
+                        </Link>
+                      </Button>
                     );
                   })()}
 
                   {nextcloudEnabled && (transcription.text || transcription.analysis) && (
-                    <button
+                    <Button
                       type="button"
                       onClick={handleExportNextcloud}
                       disabled={exportingNc}
-                      className="bg-hover-subtle hover:bg-hover-strong text-primary py-2 rounded-xl text-sm font-bold border border-subtle text-center transition-all disabled:opacity-50"
+                      variant="outline"
+                      className="w-full"
                     >
+                      <CloudUpload className="w-4 h-4" aria-hidden="true" />
                       {exportingNc ? 'Speichert…' : 'Nach Nextcloud speichern'}
-                    </button>
+                    </Button>
                   )}
                   {isOfficeDocument && (
-                    <a
-                      href={`/api/transcriptions/${transcription.id}/download`}
-                      className="bg-hover-subtle hover:bg-hover-strong text-primary py-2 rounded-xl text-sm font-bold border border-subtle text-center transition-all"
-                    >
-                      Übersetzte Datei herunterladen
-                    </a>
+                    <Button asChild variant="primary" className="w-full">
+                      <a href={`/api/transcriptions/${transcription.id}/download`}>
+                        <Download className="w-4 h-4" aria-hidden="true" />
+                        Übersetzte Datei herunterladen
+                      </a>
+                    </Button>
                   )}
-                  <div className="mt-3 pt-3 border-t border-danger/20">
-                    <p className="text-[10px] font-bold text-danger/70 uppercase tracking-widest mb-2">Danger Zone</p>
-                    <button
+                  <details className="mt-3 pt-3 border-t border-subtle group">
+                    <summary className="text-xs text-secondary cursor-pointer select-none hover:text-primary">
+                      Weitere Aktionen
+                    </summary>
+                    <Button
                       onClick={() => setConfirmDialogOpen(true)}
-                      className="w-full text-danger hover:text-red-300 bg-danger/10 border border-danger/30 py-2 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50"
+                      variant="destructive"
+                      size="sm"
+                      className="w-full mt-3"
                       disabled={deleting}
                     >
+                      <Trash2 className="w-4 h-4" aria-hidden="true" />
                       {deleting ? `${typeLabel} wird gelöscht...` : `${typeLabel} löschen`}
-                    </button>
-                  </div>
+                    </Button>
+                  </details>
                 </div>
                 {processingStartError && (
-                  <div className="mt-3 bg-danger/10 border border-danger/25 text-danger rounded-xl p-3 text-xs">
+                  <div role="alert" className="mt-3 border border-danger/30 text-danger rounded-lg p-3 text-xs">
                     {processingStartError}
                   </div>
                 )}
-              </div>
+                </CardBody>
+              </Card>
 
               {/* Speaker Assignment */}
               {transcription.status === STATUS.TRANSCRIBED && speakerIds.length > 0 && !isOCR && (
-                <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
-                  <h3 className="text-xs font-bold text-primary uppercase mb-4">{t('speakerHeading')}</h3>
+                <Card>
+                  <CardBody className="p-5">
+                  <h3 className="text-sm font-semibold text-primary mb-1">{t('speakerHeading')}</h3>
+                  <p className="text-xs text-secondary mb-4">Prüfe die Namen, bevor die Auswertung startet.</p>
                   <div className="space-y-3">
                     {speakerIds.map(sid => (
                       <SpeakerInput
@@ -555,10 +587,11 @@ export default function TranscriptionDetail() {
                       />
                     ))}
                   </div>
-                  <div className="mt-4">
-                    <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5">
-                      Fokus der Analyse
-                    </label>
+                  <Field
+                    label="Fokus der Analyse"
+                    help="Optional: Was soll in der Auswertung besonders berücksichtigt werden?"
+                    className="mt-4"
+                  >
                     <textarea
                       value={analysisFocus}
                       onChange={(event) => setAnalysisFocus(event.target.value)}
@@ -566,13 +599,14 @@ export default function TranscriptionDetail() {
                       placeholder="Worauf soll sich das KI-Modell bei der Analyse konzentrieren?"
                       className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary outline-none focus:ring-1 focus:ring-accent resize-y"
                     />
-                  </div>
-                  <button onClick={handleStartAnalysis} disabled={analyzing} className="w-full mt-4 bg-hover-subtle hover:bg-hover-strong text-primary py-2 rounded-xl text-xs font-bold border border-subtle transition-all">
+                  </Field>
+                  <Button onClick={handleStartAnalysis} disabled={analyzing} variant="primary" className="w-full mt-4">
                     {analyzing ? 'Analyse läuft...' : 'Analyse starten'}
-                  </button>
-                </div>
+                  </Button>
+                  </CardBody>
+                </Card>
               )}
-            </div>
+            </aside>
 
             {/* Right: Preview Area */}
             <div className="lg:col-span-2 space-y-6">
@@ -606,12 +640,12 @@ export default function TranscriptionDetail() {
               )}
 
               {transcription.status === STATUS.ERROR && (
-                <div className="bg-danger/10 border border-danger/25 text-danger rounded-2xl p-4 text-sm space-y-3">
+                <div role="alert" className="border border-danger/30 text-danger rounded-xl p-4 text-sm space-y-3">
                   <p>{transcription.error || 'Verarbeitung fehlgeschlagen. Bitte erneut versuchen.'}</p>
                   {transcription.bot_status === 'rejected' && (
                     <Link
                       href="/upload?preset=meet-tab-audio"
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border border-danger/40 hover:bg-danger/10 transition-colors"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-danger/40 hover:bg-danger/10 transition-colors"
                     >
                       {tMeeting('start.meetBlocked.cta')}
                     </Link>
@@ -620,8 +654,9 @@ export default function TranscriptionDetail() {
               )}
 
               {timelineEvents.length > 0 && (
-                <div className="bg-surface border border-subtle rounded-2xl p-5 shadow-xl">
-                  <h2 className="text-xs font-bold text-primary uppercase tracking-widest opacity-60 mb-4">Verlauf</h2>
+                <Card>
+                  <CardBody className="p-5">
+                  <h2 className="text-sm font-semibold text-primary mb-4">Verlauf</h2>
                   <div className="space-y-3">
                     {timelineEvents.map((event) => (
                       <div key={event.id} className="flex items-start gap-3">
@@ -640,13 +675,15 @@ export default function TranscriptionDetail() {
                       </div>
                     ))}
                   </div>
-                </div>
+                  </CardBody>
+                </Card>
               )}
 
               {/* Table Analysis */}
               {isTableAnalysis && transcription.analysis && (
-                <div className="bg-surface border border-accent/20 rounded-2xl p-6 shadow-2xl shadow-accent/5">
-                  <h2 className="text-xs font-bold text-accent uppercase tracking-widest mb-4">
+                <Card>
+                  <CardBody className="p-6">
+                  <h2 className="text-sm font-semibold text-primary mb-4">
                     {transcription.template === 'data_table' ? 'Datentabelle' : 'Tabellen-Ergebnis'}
                   </h2>
                   <TableRenderer
@@ -655,13 +692,15 @@ export default function TranscriptionDetail() {
                     filename={transcription.original_name.replace(/\.[^/.]+$/, '')}
                     editable={false}
                   />
-                </div>
+                  </CardBody>
+                </Card>
               )}
 
               {/* Text Analysis Preview */}
               {transcription.analysis && !isTableAnalysis && (
-                <div className="bg-surface border border-accent/20 rounded-2xl p-6 shadow-2xl shadow-accent/5">
-                  <h2 className="text-xs font-bold text-accent uppercase tracking-widest mb-4">Ergebnis</h2>
+                <Card>
+                  <CardBody className="p-6">
+                  <h2 className="text-sm font-semibold text-primary mb-4">Ergebnis</h2>
                   <div className="space-y-4">
                     {transcription.analysis.zusammenfassung && (
                       <p className="text-sm text-primary leading-relaxed italic border-l-2 border-accent/30 pl-4">
@@ -671,21 +710,23 @@ export default function TranscriptionDetail() {
                     {editorHref && (
                       <Link
                         href={editorHref}
-                        className="text-xs text-accent hover:text-info transition-colors font-bold flex items-center gap-1"
+                        className="text-xs text-secondary hover:text-primary transition-colors font-medium flex items-center gap-1"
                       >
                         Vollständige Analyse im Editor bearbeiten &rarr;
                       </Link>
                     )}
                   </div>
-                </div>
+                  </CardBody>
+                </Card>
               )}
 
               {/* Raw Text */}
-              <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
+              <Card>
+                <CardBody className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 id="transcript" className="text-xs font-bold text-primary uppercase tracking-widest opacity-50">{rawTextLabel}</h2>
+                  <h2 id="transcript" className="text-sm font-semibold text-primary">{rawTextLabel}</h2>
                 </div>
-                <div className="text-sm text-secondary leading-relaxed max-h-[400px] overflow-y-auto pr-2 custom-scrollbar font-mono opacity-80 scroll-smooth">
+                <div className="text-sm text-secondary leading-6 max-h-[440px] overflow-y-auto pr-2 custom-scrollbar scroll-smooth">
                   {Array.isArray(transcription.segments) && transcription.segments.length > 0 ? (
                     <div className="space-y-2">
                       {transcription.segments.map((segment, index) => {
@@ -693,7 +734,7 @@ export default function TranscriptionDetail() {
                         const speaker = segment.speaker || segment.speaker_label || segment.speaker_id;
                         return (
                           <div key={`${sourceId}-${index}`} id={`segment-${sourceId}`} className="scroll-mt-24 rounded-lg px-2 py-1 hover:bg-accent/5">
-                            {speaker && <span className="text-accent font-semibold mr-2">{speaker}:</span>}
+                            {speaker && <span className="text-accent-ink font-semibold mr-2">{speaker}:</span>}
                             <span>{segment.text}</span>
                           </div>
                         );
@@ -707,7 +748,8 @@ export default function TranscriptionDetail() {
                       : 'Transkription läuft...'
                   )}
                 </div>
-              </div>
+                </CardBody>
+              </Card>
             </div>
           </div>
         </div>

@@ -26,6 +26,7 @@
       "title": "Remote-Meeting transkribieren",
       "description": "Ein Bot tritt als Teilnehmer dem Meeting bei und liefert das Transkript live.",
       "urlLabel": "Meeting-Link",
+      "options": "Einstellungen für den Bot",
       "urlHint": "Microsoft Teams, Zoom oder Nextcloud Talk.",
       "platform": {
         "teams": "Microsoft Teams erkannt.",
@@ -154,6 +155,7 @@
     }
   },
   "layout": {
+    "skipToContent": "Zum Hauptinhalt",
     "footerTagline": "Your thoughts, decoded and distilled.",
     "footerCredit": "Ghost Typer 2026 · Developed by Helge Roos"
   },
@@ -385,8 +387,13 @@
     "moveToFolder": "In Ordner verschieben"
   },
   "upload": {
+    "eyebrow": "Neue Transkription",
     "title": "Transkription",
-    "subtitle": "Audio hochladen oder direkt aufnehmen.",
+    "subtitle": "Wähle eine Audioquelle. GhostTyper transkribiert sie und erstellt auf Wunsch direkt eine strukturierte Auswertung.",
+    "presetActive": "Passende Einstellungen sind bereits gewählt",
+    "openStatus": "Status öffnen",
+    "restart": "Erneut starten",
+    "restarting": "Startet…",
     "dropHere": "Datei hier ablegen oder klicken zum Auswählen",
     "fileFormats": "MP3, WAV, M4A, OGG, FLAC, WebM bis 500 MB",
     "selectedFile": "Ausgewählte Datei",
@@ -406,8 +413,21 @@
     "submitting": "Wird hochgeladen…"
   },
   "translatePage": {
+    "eyebrow": "Übersetzen",
     "title": "Übersetzung",
-    "subtitle": "Text, Bild oder Office-Dokument übersetzen.",
+    "subtitle": "Übersetze Text direkt oder übertrage vollständige Dokumente in eine andere Sprache.",
+    "details": "Details",
+    "modelLabel": "KI-Modell",
+    "modelHint": "Der Standard liefert für die meisten Texte das beste Verhältnis aus Qualität und Geschwindigkeit.",
+    "targetLanguage": "Zielsprache",
+    "targetLanguageHint": "Die Ausgangssprache wird automatisch erkannt.",
+    "fileLabel": "PDF, DOCX, XLSX oder PPTX",
+    "fileTranslate": "Datei übersetzen",
+    "fileTranslating": "Datei wird übersetzt…",
+    "uploadDocument": "Dokument für Texterkennung hochladen",
+    "takePhoto": "Foto aufnehmen und Text erkennen",
+    "clearInput": "Eingabetext leeren",
+    "extractingText": "Text wird erkannt…",
     "tabText": "Text",
     "tabFile": "Datei",
     "input": "Quelltext",
@@ -486,14 +506,19 @@
     "noResult": "Noch kein Ergebnis."
   },
   "textOptPage": {
+    "eyebrow": "Text bearbeiten",
     "title": "Textoptimierung",
     "subtitle": "Text korrigieren, kürzen oder umformulieren.",
     "input": "Eingabe",
+    "inputHelp": "Füge den Text ein, den du verbessern möchtest.",
+    "inputPlaceholder": "Text hier einfügen…",
     "output": "Optimierter Text",
     "submit": "Optimieren",
     "submitting": "Wird optimiert…",
     "preset": "Stil",
+    "presetHelp": "Wähle die wichtigste Änderung. Weitere Wünsche kannst du darunter ergänzen.",
     "customInstruction": "Anpassung",
+    "instructionHelp": "Optional: Ton, Zielgruppe oder besondere Formulierungswünsche.",
     "customInstructionHint": "Eigene Anweisung für die KI (optional).",
     "presets": {
       "spelling_grammar": "Rechtschreibung & Grammatik",
@@ -592,7 +617,20 @@
       "invalidType": "Dateityp wird nicht unterstützt",
       "tabUpload": "Hochladen",
       "tabRecord": "Aufnehmen",
-      "tabSystemAudio": "Tab/System-Audio",
+    "tabSystemAudio": "Tab/System-Audio",
+    "sourceLabel": "Audioquelle",
+    "outputLabel": "Ergebnis",
+    "dragHint": "oder Audio hierher ziehen",
+    "replaceFile": "Klicken zum Ersetzen",
+    "diarizeHint": "Ordnet Text verschiedenen Stimmen zu.",
+    "autoAnalyzeHint": "Erstellt nach dem Transkript eine Zusammenfassung.",
+    "advancedOptions": "Details und Vorgaben",
+    "analysisMode": "Art der Auswertung",
+    "analysisModeHint": "Bestimmt die Struktur des Ergebnisses.",
+    "modelLabel": "KI-Modell",
+    "modelHint": "Der Standard passt für die meisten Aufnahmen.",
+    "contextHelp": "Hilft bei Fachbegriffen, Namen und Abkürzungen.",
+    "focusHelp": "Beschreibe nur, was in der Auswertung besonders wichtig ist.",
       "tabPaste": "Einfügen",
       "submit": "Verarbeiten",
       "submitting": "Wird verarbeitet…",
@@ -684,7 +722,9 @@
     ]
   },
   "settings": {
+    "eyebrow": "Persönliche Vorgaben",
     "title": "Einstellungen",
+    "subtitle": "Lege sinnvolle Standards fest. Technische Details findest du im jeweiligen Bereich.",
     "tabs": {
       "transcription": "Transkription",
       "textTemplates": "Text-Vorlagen",

@@ -18,25 +18,49 @@
 
 ## 2. Screen passes (each: declutter, defaults, one primary action,
       microcopy)
-- [ ] Nav/sidebar + top bar — phase 1 gave this a *primitives-only*
-      pass (icon buttons → `Button`, tokens, glow removed); the
-      declutter/defaults/microcopy pass is still pending.
-- [ ] Upload (incl. tab-audio recorder)
-- [ ] Transcription detail / editor
-- [ ] Translate (text + file) — flagship screen
-- [ ] OCR, Textoptimierung
-- [ ] Settings (progressive disclosure of advanced options)
-- [ ] Meeting form (post retire-google-meet-bot)
+- [x] Nav/sidebar + top bar — removed the duplicate profile/logout
+      block from the sidebar; account actions now have one home in the
+      top-bar menu. Navigation retains the quiet active state and the
+      existing responsive/collapsed behavior.
+- [x] Upload (incl. microphone + tab-audio recorders) — source choice is
+      neutral instead of CTA-colored, file selection has a clear state,
+      output choices explain their consequences, presets keep their
+      defaults folded, and the shared `Button`/`Card`/`Field` primitives
+      replace bespoke gradients, shadows and scale motion.
+- [x] Transcription detail / editor — title/status hierarchy moved out
+      of the action rail; editor/save are the primary actions; exports,
+      history, source text and deletion are visually subordinate.
+      Editor typography now follows theme tokens instead of hardcoded
+      dark colors.
+- [x] Translate (text + file) — flagship screen. One primary translate
+      action per mode; language stays visible, model choice folds under
+      Details; source/result panels and file flow use quiet cards,
+      hairlines, shared primitives and plain-language microcopy.
+- [x] OCR, Textoptimierung — both use the same quiet input → choice →
+      primary-action structure, neutral selectors and shared primitives;
+      OCR analysis details remain folded until requested.
+- [x] Settings — neutral responsive section navigation, quiet cards and
+      tabular usage figures; technical choices remain separated by area,
+      and template-generation/edit actions use the shared action hierarchy.
+- [x] Meeting form (post retire-google-meet-bot) — meeting URL and consent
+      stay visible; bot identity, analysis, GDPR notice and live-translation
+      controls fold into one optional details section with sensible defaults.
 
 ## 3. Quality gates
 - [x] WCAG AA contrast check on both themes; focus-ring audit —
-      phase 1 scope (tokens + nav/shell + login), computed results in
-      `docs/ui/phase1-tokens.md`. Full-app audit still pending phase 3.
-- [ ] Screenshot gallery before/after per screen (docs/ui/) — phase 1
-      substituted `docs/ui/phase1-tokens.md` (a token table) since a
-      headless screenshot gallery isn't feasible here; a real
-      before/after gallery is still owed once screen passes exist.
-- [x] Lint/tests green; no API changes — phase 1 scope, see commit.
+      full-app phase-3 token and source audit complete. All text tokens
+      clear 4.5:1 on canvas/surface/elevated in both themes; focus rings
+      clear 3:1. Automated regression coverage lives in
+      `tests/ui-accessibility.test.mjs`; results and browser matrix in
+      `docs/ui/phase3-audit.md`.
+- [x] Screenshot gallery before/after (docs/ui/) — desktop light/dark
+      and mobile comparison rendered from clean `HEAD` versus the phase-3
+      working tree. Authenticated screens use the same audited primitives
+      and tokens; the local visual run had no seeded authenticated session.
+- [x] Lint/tests green; no API changes — phase 1 and the completed phase-2
+      passes. Phase 2 verification: 221 pass / 10 skipped / 0 fail,
+      lint 0 errors (2 pre-existing hook warnings), production build
+      compiles.
 
 ## 4. Port
 - [ ] Open mirror change in romaco-scriptor once phases 1–3 land.

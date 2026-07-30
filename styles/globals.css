@@ -29,17 +29,19 @@
     /* Text */
     --primary: 28 28 30;
     --secondary: 85 85 90;
-    --muted: 145 143 139;
+    --muted: 110 108 104;
 
     /* Accent (brand) — quieter orange, candidate for the #FF5917 A/B */
     --accent: 232 78 15;
     --accent-strong: 201 69 9;
+    /* Text-safe brand color: >= 4.5:1 on every light surface. */
+    --accent-ink: 190 60 5;
 
     /* Semantic states (unchanged in phase 1 — out of scope, see docs) */
-    --success: 5 150 105;
-    --warning: 202 138 4;
-    --danger: 220 38 38;
-    --info: 8 145 178;
+    --success: 4 120 87;
+    --warning: 146 64 14;
+    --danger: 185 28 28;
+    --info: 14 116 144;
 
     /* Opaque outline, not literal 40% alpha — see docs/ui/phase1-tokens.md */
     --focus-ring: 201 69 9;
@@ -61,18 +63,19 @@
 
     --primary: 232 231 228;
     --secondary: 158 156 152;
-    --muted: 122 120 117;
+    --muted: 166 163 158;
 
     /* Accent unchanged from light theme — AA holds on anthracite */
     --accent: 232 78 15;
     --accent-strong: 201 69 9;
+    --accent-ink: 255 145 97;
 
-    --success: 0 184 148;
+    --success: 52 211 153;
     --warning: 253 203 110;
-    --danger: 255 107 107;
-    --info: 0 206 201;
+    --danger: 255 118 118;
+    --info: 34 211 238;
 
-    --focus-ring: 201 69 9;
+    --focus-ring: 255 145 97;
 
     --hover-subtle: rgba(255, 255, 255, 0.04);
     --hover: rgba(255, 255, 255, 0.06);
@@ -86,14 +89,29 @@
     @apply text-primary bg-canvas antialiased;
   }
 
+  :root {
+    color-scheme: light;
+  }
+
+  [data-theme='dark'] {
+    color-scheme: dark;
+  }
+
   button:focus-visible,
   a:focus-visible,
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible,
-  [role='button']:focus-visible {
+  summary:focus-visible,
+  [role='button']:focus-visible,
+  [contenteditable='true']:focus-visible {
     outline: 2px solid rgb(var(--focus-ring));
     outline-offset: 2px;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.25);
+    color: rgb(var(--primary));
   }
 }
 
@@ -106,7 +124,7 @@
    * as a darkening companion.
    */
   .gradient-accent {
-    background: rgb(var(--accent));
+    background: rgb(var(--accent-strong));
   }
   .gradient-accent-hover {
     background: rgb(var(--accent-strong));

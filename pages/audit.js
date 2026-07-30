@@ -106,7 +106,7 @@ export default function AuditPage() {
         </p>
         <Link
           href="/settings"
-          className="mt-4 inline-block text-xs text-accent hover:underline"
+          className="mt-4 inline-block text-xs text-accent-ink hover:underline"
         >
           ← {tNav('settings')}
         </Link>
@@ -124,7 +124,7 @@ export default function AuditPage() {
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-secondary">{t('title')}</p>
             <h1 className="text-2xl font-bold text-primary mt-1 flex items-center gap-2">
-              <ShieldCheck className="w-6 h-6 text-accent" aria-hidden="true" />
+              <ShieldCheck className="w-6 h-6 text-accent-ink" aria-hidden="true" />
               {t('title')}
             </h1>
             <p className="text-sm text-secondary mt-1">{t('subtitle')}</p>

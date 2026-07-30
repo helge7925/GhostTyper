@@ -86,7 +86,7 @@ export default function TranslationCompanionPanel({ transcription }) {
                 // Tiny delay so the <audio src> binds before play()
                 setTimeout(() => audioRef.current?.play().catch(() => {}), 50);
               }}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs border border-accent/40 text-accent hover:bg-accent/10"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs border border-accent/40 text-accent-ink hover:bg-accent/10"
             >
               <Volume2 className="w-3.5 h-3.5" />
               <span>{t('audioStartHint').split('—')[0].trim()}</span>
@@ -138,7 +138,7 @@ export default function TranslationCompanionPanel({ transcription }) {
                   key={`t-${idx}-${seg.start}`}
                   className="text-sm text-primary leading-relaxed"
                 >
-                  <span className="text-[10px] uppercase text-accent mr-2">{seg.language || langB}</span>
+                  <span className="text-[10px] uppercase text-accent-ink mr-2">{seg.language || langB}</span>
                   {seg.text}
                 </p>
               ))

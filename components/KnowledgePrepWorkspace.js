@@ -218,7 +218,7 @@ export default function KnowledgePrepWorkspace({
             onClick={() => setSource(option.value)}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
               source === option.value
-                ? 'bg-accent/20 text-accent border border-accent/30'
+                ? 'bg-accent/20 text-accent-ink border border-accent/30'
                 : 'text-secondary hover:text-primary'
             }`}
           >

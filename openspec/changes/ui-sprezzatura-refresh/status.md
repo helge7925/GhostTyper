@@ -1,6 +1,6 @@
 # Status: UI Sprezzatura Refresh
 
-Last updated: 2026-07-17
+Last updated: 2026-07-25
 
 ## Current State
 
@@ -27,7 +27,32 @@ Last updated: 2026-07-17
   branch before phase 2 screen passes lock the palette in.
   Screen-by-screen redesign passes (upload, translate, transcription
   detail, settings, OCR/Textoptimierung, meeting form) are explicitly
-  **pending with the product owner** — phase 1 deliberately did not
-  touch them beyond automatic token inheritance.
+  sequenced after the primitives.
+- **Phase 2 implemented, 2026-07-25:** the navigation declutter pass,
+  upload flow (including microphone and tab/system-audio recorders), and
+  the text/file translation flagship pass are implemented. Account
+  actions now live only in the top-bar profile menu; upload presets use
+  sensible folded defaults; non-action mode selectors are neutral; model
+  choices and other technical controls use progressive disclosure; heavy
+  shadows, pill CTAs, scale motion and remaining gradient call sites were
+  removed from the touched screens. New microcopy is localized de/en.
+  Verification: `npm test` 221 pass / 10 skipped / 0 fail; lint 0 errors
+  with the same 2 pre-existing hook warnings; `npm run build` compiles.
+  Transcription detail/editor, OCR/Textoptimierung, Settings and the
+  meeting form now follow the same hierarchy. Editor prose colors use
+  theme tokens; advanced OCR and meeting-bot controls use progressive
+  disclosure; usage figures use tabular numerals. All phase-2 screen
+  passes are complete.
+- **Phase 3 implemented, 2026-07-25:** full-app light/dark semantic
+  colors now meet AA on every core surface; orange text has a dedicated
+  `accent-ink` token, semantic status colors and muted copy were raised,
+  and the dark theme has a dedicated focus-ring color. The shell exposes
+  a localized skip link, loading state is announced, decorative SVGs are
+  hidden from assistive technology, and remaining raw accent text/control
+  combinations were removed across `pages/` and `components/`. Public
+  routes were browser-checked in both themes and at 390 × 844 with zero
+  unnamed controls, computed contrast failures or horizontal overflow.
+  Automated gates and the clean-HEAD before/after gallery are documented
+  in `docs/ui/phase3-audit.md`. Phases 1–3 are complete.
 - Ordered after `remove-chat-knowledge-tasks`.
 - Ports to romaco-scriptor after upstream phases 1–3.

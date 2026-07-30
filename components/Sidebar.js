@@ -1,11 +1,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import {
   Building2,
   Files,
   Languages,
-  LogOut,
   Mic,
   PencilLine,
   ScanText,
@@ -65,7 +64,7 @@ function NavRow({ href, label, Icon, isActive, collapsed, onNavigate }) {
       {/* Icon carries the accent tint directly (3:1 UI-component floor);
           the label stays on --primary so 14px text keeps the 4.5:1 floor
           — see docs/ui/phase1-tokens.md. */}
-      <Icon className={cn('w-5 h-5 shrink-0', isActive && 'text-accent')} aria-hidden="true" />
+      <Icon className={cn('w-5 h-5 shrink-0', isActive && 'text-accent-ink')} aria-hidden="true" />
       {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
@@ -75,38 +74,6 @@ function NavRow({ href, label, Icon, isActive, collapsed, onNavigate }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>{link}</TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
-    </Tooltip>
-  );
-}
-
-/**
- * Footer button (Logout, Theme), optionally tooltip-wrapped.
- */
-function FooterButton({ label, Icon, onClick, danger = false, collapsed }) {
-  const button = (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'flex items-center gap-3 rounded-xl text-sm font-medium transition-colors',
-        collapsed ? 'h-11 w-11 justify-center mx-auto' : 'w-full px-4 py-3',
-        danger
-          ? 'text-secondary hover:text-danger hover:bg-danger/10'
-          : 'text-secondary hover:text-primary hover:bg-hover-subtle',
-      )}
-      aria-label={label}
-    >
-      <Icon className="w-5 h-5 shrink-0" aria-hidden="true" />
-      {!collapsed && <span>{label}</span>}
-    </button>
-  );
-
-  if (!collapsed) return button;
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{button}</TooltipTrigger>
       <TooltipContent side="right">{label}</TooltipContent>
     </Tooltip>
   );
@@ -191,7 +158,8 @@ function SidebarBody({ collapsed = false, onNavigate }) {
         />
       </nav>
 
-      {/* Footer: settings, admin, profile, logout */}
+      {/* Account actions live in the TopBar profile menu. Keeping only
+          destination links here avoids two competing account menus. */}
       <div
         className={cn(
           'mt-auto border-t border-subtle space-y-1',
@@ -222,41 +190,6 @@ function SidebarBody({ collapsed = false, onNavigate }) {
             (workspace creation) and via the Workspace-Admin pages — no need
             for a dedicated sidebar slot anymore. */}
 
-        {/* Profile compact card (only when expanded) */}
-        {!collapsed && (
-          <Link
-            href="/profile"
-            onClick={onNavigate}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-hover-subtle transition-colors group"
-          >
-            {session.user.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={session.user.avatar_url}
-                alt=""
-                className="w-8 h-8 rounded-full object-cover border border-subtle shrink-0"
-              />
-            ) : (
-              <span className="w-8 h-8 rounded-full gradient-accent flex items-center justify-center text-xs font-bold text-white shrink-0">
-                {session.user.email?.substring(0, 2)?.toUpperCase()}
-              </span>
-            )}
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-medium text-primary truncate group-hover:text-accent transition-colors">
-                {session.user.name || tNav('profile')}
-              </span>
-              <span className="text-[10px] text-secondary truncate">{session.user.email}</span>
-            </div>
-          </Link>
-        )}
-
-        <FooterButton
-          label={tNav('logout')}
-          Icon={LogOut}
-          onClick={() => signOut({ callbackUrl: '/login' })}
-          danger
-          collapsed={collapsed}
-        />
       </div>
     </div>
   );
