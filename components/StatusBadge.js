@@ -8,6 +8,7 @@ const BADGE_STYLES = {
   [STATUS.TRANSCRIBED]: 'bg-info/20 text-info',
   [STATUS.ANALYZING]: 'bg-accent/20 text-accent-ink',
   [STATUS.COMPLETED]: 'bg-success/20 text-success',
+  [STATUS.BUDGET_STOPPED]: 'bg-danger/20 text-danger',
   [STATUS.ERROR]: 'bg-danger/20 text-danger',
 };
 

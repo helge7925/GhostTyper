@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Toast from '../../components/Toast';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import EmptyState from '../../components/EmptyState';
 import { useUiFeedback } from '../../lib/use-ui-feedback';
 import { useTranslations } from '../../lib/i18n';
 
@@ -13,6 +14,7 @@ export default function AdminUsers() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const t = useTranslations('admin');
+  const tEmpty = useTranslations('emptyState.users');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -435,9 +437,7 @@ export default function AdminUsers() {
       </div>
 
       {users.length === 0 && !loading && (
-        <div className="bg-surface border border-subtle rounded-xl p-12 text-center">
-          <p className="text-secondary text-sm">Keine User vorhanden.</p>
-        </div>
+        <EmptyState title={tEmpty('title')} description={tEmpty('description')} />
       )}
       {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
       <ConfirmDialog

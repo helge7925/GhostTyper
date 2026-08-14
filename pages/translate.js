@@ -17,6 +17,7 @@ import { Card, CardBody } from '../components/ui/card';
 import { Field } from '../components/ui/field';
 import { Camera, Check, ChevronDown, Copy, FileText, Pencil, Trash2, Upload } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { alignBilingualText } from '../lib/bilingual-export';
 
 const LANGUAGES = [
   { code: 'German', label: 'Deutsch' },
@@ -61,6 +62,7 @@ export default function Translate() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState('source');
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [bilingualExportLoading, setBilingualExportLoading] = useState('');
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -226,6 +228,42 @@ export default function Translate() {
       ta.select();
       try { document.execCommand('copy'); setCopyFeedback(true); window.setTimeout(() => setCopyFeedback(false), 2000); } catch {/* no-op */}
       document.body.removeChild(ta);
+    }
+  }
+
+  async function handleBilingualExport(format) {
+    if (!translatedSource || !translatedText || bilingualExportLoading) return;
+    setBilingualExportLoading(format);
+    setError('');
+    try {
+      const response = await fetch('/api/translate/file-bilingual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pairs: alignBilingualText(translatedSource, translatedText),
+          format,
+          title: t('bilingualTitle'),
+          sourceLabel: t('sourceHeading'),
+          targetLabel: t('resultHeading'),
+        }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || t('bilingualExportError'));
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `bilingual-translation.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      setError(err.message || t('bilingualExportError'));
+    } finally {
+      setBilingualExportLoading('');
     }
   }
 
@@ -509,7 +547,25 @@ export default function Translate() {
                     {t('resultHeading')}
                   </span>
                   {translatedText && (
-                    <>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!!bilingualExportLoading}
+                        onClick={() => handleBilingualExport('html')}
+                      >
+                        {bilingualExportLoading === 'html' ? '…' : t('bilingualHtml')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!!bilingualExportLoading}
+                        onClick={() => handleBilingualExport('pdf')}
+                      >
+                        {bilingualExportLoading === 'pdf' ? '…' : t('bilingualPdf')}
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -519,7 +575,7 @@ export default function Translate() {
                         <Pencil className="w-4 h-4" aria-hidden="true" />
                         {t('openInEditor')}
                       </Button>
-                    </>
+                    </div>
                   )}
                 </div>
 

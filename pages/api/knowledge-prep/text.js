@@ -1,11 +1,7 @@
 import { query } from '../../../lib/db';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { analyzeTranscription } from '../../../lib/ai-service';
-import {
-  CostLimitCheckUnavailableError,
-  assertBudgetWithinLimits,
-  logUsage,
-} from '../../../lib/usage';
+import { composeAbortSignals, executeReservedSpend, estimateTextUsage, requestBudgetScope } from '../../../lib/budget-runtime';
 import { resolveChatModel } from '../../../lib/model-policy';
 import { getSettingsRow, resolveCortecsConfig } from '../../../lib/settings-service';
 import { MAX_CUSTOM_PROMPT_LENGTH, MAX_DOCUMENT_TEXT_LENGTH } from '../../../lib/constants';
@@ -58,13 +54,12 @@ async function handler(req, res) {
 
     const settingsRow = await getSettingsRow(userId);
     const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const apiKey = cortecs.apiKey;
     const language = settingsRow?.language || 'de';
     const selectedModel = resolveChatModel(requestModel, null)
       || resolveChatModel(settingsRow?.preferred_model, null)
       || cortecs.chatModel;
 
-    if (!apiKey) {
+    if (!cortecs.apiKey) {
       return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert.' });
     }
     if (!selectedModel) {
@@ -80,20 +75,31 @@ async function handler(req, res) {
       return res.status(400).json({ message: `Kombinierter Analysekontext ist zu lang (max. ${MAX_CUSTOM_PROMPT_LENGTH} Zeichen).` });
     }
 
-    // Budget gate first (short advisory-lock hold), then the chat call
-    // outside the lock so it doesn't pin a pool connection.
-    await assertBudgetWithinLimits(userId, orgId);
     const resolvedTemplate = await resolveTemplate(template, userId);
-    const analysisResult = await analyzeTranscription(
-      text,
-      resolvedTemplate,
-      apiKey,
-      mergedPrompt,
-      selectedModel,
-      language,
-      { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
+    const analysisResult = await executeReservedSpend(
+      {
+        idempotencyKey: requestBudgetScope(req, 'knowledge-prep', { text, template, mergedPrompt, selectedModel }),
+        organizationId: orgId,
+        userId,
+        operation: 'knowledge_prep',
+        provider: 'cortecs',
+        model: selectedModel,
+        estimatedUsage: estimateTextUsage(`${text}\n${mergedPrompt}`, {
+          inputBufferTokens: 1200,
+          outputMultiplier: 1,
+          outputBufferTokens: 3000,
+        }),
+      },
+      (_reservation, budgetSignal) => analyzeTranscription(
+        text,
+        resolvedTemplate,
+        cortecs.apiKey,
+        mergedPrompt,
+        selectedModel,
+        language,
+        { baseUrl: cortecs.baseUrl, preference: cortecs.preference, signal: composeAbortSignals(budgetSignal) },
+      ),
     );
-    await logUsage(userId, analysisResult.model, 'analysis', analysisResult.usage, orgId);
     const analysis = analysisResult.analysis;
     const usedModel = analysisResult.model;
 
@@ -141,7 +147,7 @@ async function handler(req, res) {
       organizationId: orgId,
       ownerUserId: userId,
       visibility: 'private',
-      sourceType: analysisType === 'table' ? 'data_table' : 'text',
+      sourceType: 'data_table',
       title: transcription.original_name,
       mimeType: 'text/plain',
       fileSize: Buffer.byteLength(text, 'utf8'),
@@ -158,10 +164,10 @@ async function handler(req, res) {
 
     return res.status(200).json(transcription);
   } catch (error) {
-    if (error?.code === 'COST_LIMIT_EXCEEDED') {
+    if (error?.code === 'BUDGET_EXCEEDED') {
       return res.status(429).json({ message: error.message });
     }
-    if (error instanceof CostLimitCheckUnavailableError || error?.code === 'COST_CHECK_UNAVAILABLE') {
+    if (error?.code === 'BUDGET_ACCOUNTING_UNAVAILABLE' || error?.code === 'PRICING_CONFIGURATION_MISSING') {
       return res.status(503).json({ message: error.message });
     }
     logApiError('Knowledge prep text error', error);
@@ -169,4 +175,4 @@ async function handler(req, res) {
   }
 }
 
-export default withOrgScope({ permission: 'transcription.write' }, handler);
+export default withOrgScope({ permission: 'paid.execute' }, handler);

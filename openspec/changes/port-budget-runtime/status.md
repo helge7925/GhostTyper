@@ -1,23 +1,22 @@
 # Status: Port Budget Runtime And Pricing Engine
 
-Last updated: 2026-07-30
+Last updated: 2026-08-11
 
 ## Current State
 
-- **Proposed — not started.**
-- Upstream today has `lib/budget-guardrails.js` (pre-flight check) and
-  `lib/usage.js` (after-the-fact recording) but no enforcement,
-  reservations, versioned pricing, or stop worker.
+- **Implemented locally; PostgreSQL concurrency smoke remains.**
+- Added versioned provider pricing, organization overrides, member/workspace
+  budgets, reservations, durable stop outbox with backoff/escalation, live
+  usage/progress APIs, enforcement across paid provider paths and admin UI.
 
 ## Verified
 
-- Not applicable yet (no implementation).
+- Budget/pricing/runtime/live-progress tests pass.
+- Full suite: 368 tests, 356 passed, 12 environment-dependent skips, 0 failed.
+- `npm run lint` and `npm run build` pass.
 
-## Notes
+## Outstanding
 
-- Largest item of the downstream port set (~2,500 LOC + 6 tables).
-- `lib/budget-core.js` has no customer-specific references downstream.
-- Port the *fixed* stop-worker behaviour (backoff + escalation), not the
-  original looping version.
-- Conflicts with `port-audit-chain` and `port-mobile-field-mode` on
-  `lib/db-init.js`.
+- Real row-lock, expiry and lifecycle tests are present under `tests/db/` but
+  skip safely because `TEST_DATABASE_URL` is unset. Docker is not running
+  locally, so no disposable PostgreSQL instance could be started.

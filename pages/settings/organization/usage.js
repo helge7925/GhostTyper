@@ -6,8 +6,10 @@ import { useSession } from 'next-auth/react';
 import { CircleAlert, CircleCheck, CircleDot } from 'lucide-react';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import { useCurrentOrg } from '../../../lib/use-current-org';
+import { usePermission } from '../../../lib/use-permission';
+import { microsToEuros } from '../../../lib/billing-ui';
 import { cn } from '../../../lib/utils';
-import { useFormatter, useLocale, useTranslations } from '../../../lib/i18n';
+import { useFormatter, useTranslations } from '../../../lib/i18n';
 
 function formatPercent(ratio) {
   if (ratio === null || ratio === undefined || Number.isNaN(ratio)) return '—';
@@ -55,7 +57,7 @@ export default function OrgUsagePage() {
   const router = useRouter();
   const { status: authStatus } = useSession();
   const { org, isLoading: orgLoading } = useCurrentOrg();
-  const { locale } = useLocale();
+  const canReadOrgUsage = usePermission('budget.read.org');
   const { currency, number } = useFormatter();
   const t = useTranslations('organization.usage');
   const tCommon = useTranslations('common');
@@ -84,11 +86,13 @@ export default function OrgUsagePage() {
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
       router.replace('/login?next=/settings/organization/usage');
+    } else if (authStatus === 'authenticated' && !orgLoading && org && !canReadOrgUsage) {
+      router.replace('/');
     }
-  }, [authStatus, router]);
+  }, [authStatus, orgLoading, org, canReadOrgUsage, router]);
 
   useEffect(() => {
-    if (!org) return;
+    if (!org || !canReadOrgUsage) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -119,9 +123,9 @@ export default function OrgUsagePage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [org]);
+  }, [org, canReadOrgUsage]);
 
-  if (authStatus === 'loading' || orgLoading || loading) {
+  if (authStatus === 'loading' || orgLoading || (org && !canReadOrgUsage) || (org && loading)) {
     return <LoadingSpinner />;
   }
   if (!org) {
@@ -132,7 +136,12 @@ export default function OrgUsagePage() {
     );
   }
 
-  const tl = data?.trafficLight;
+  const level = data?.level || 'green';
+  const workspaceLimit = microsToEuros(data?.workspaceLimitMicros);
+  const totalCost = microsToEuros(data?.totalCostMicros) || 0;
+  const budgetRatio = data?.workspaceLimitMicros
+    ? (Number(data.totalCostMicros || 0) + Number(data.totalReservedMicros || 0)) / data.workspaceLimitMicros
+    : null;
 
   return (
     <>
@@ -167,10 +176,10 @@ export default function OrgUsagePage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatTile
             label={t('totalCost')}
-            value={formatEuros(data?.totalCost ?? 0)}
+            value={formatEuros(totalCost)}
             hint={
-              data?.effectiveLimit != null
-                ? t('totalCostLimitHint', { limit: formatEuros(data.effectiveLimit) })
+              workspaceLimit != null
+                ? t('totalCostLimitHint', { limit: formatEuros(workspaceLimit) })
                 : t('totalCostNoLimit')
             }
           />
@@ -185,24 +194,24 @@ export default function OrgUsagePage() {
           <StatTile
             label={t('status')}
             value={
-              <span className={cn('flex items-center gap-2', trafficColor(tl?.level))}>
-                <TrafficIcon level={tl?.level} className="w-5 h-5" />
-                {tl?.label || '—'}
+              <span className={cn('flex items-center gap-2', trafficColor(level))}>
+                <TrafficIcon level={level} className="w-5 h-5" />
+                {t(`levels.${level}`)}
               </span>
             }
-            hint={tl?.message}
+            hint={t('statusHint')}
           />
         </div>
 
-        {tl?.limit != null && (
+        {workspaceLimit != null && (
           <div className="bg-surface border border-subtle rounded-2xl p-5 space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-secondary">{t('budgetUsage')}</span>
-              <span className={cn('font-semibold', trafficColor(tl.level))}>
-                {formatEuros(tl.currentCost)} / {formatEuros(tl.limit)} ({formatPercent(tl.usageRatio)})
+              <span className={cn('font-semibold', trafficColor(level))}>
+                {formatEuros(totalCost)} / {formatEuros(workspaceLimit)} ({formatPercent(budgetRatio)})
               </span>
             </div>
-            <ProgressBar value={tl.usageRatio} level={tl.level} />
+            <ProgressBar value={budgetRatio} level={level} />
             <p className="text-xs text-secondary">{t('budgetSourceHint')}</p>
           </div>
         )}
@@ -217,7 +226,7 @@ export default function OrgUsagePage() {
               <p className="px-5 py-6 text-sm text-secondary">{t('noActivity')}</p>
             ) : (
               (data?.byOperation || []).map((row) => (
-                <div key={row.operation} className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-5 py-3">
+                <div key={row.operation} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] items-start sm:items-center gap-2 sm:gap-4 px-5 py-3">
                   <div>
                     <p className="text-sm font-medium text-primary">{operationLabel(row.operation)}</p>
                     <p className="text-[11px] text-secondary">
@@ -242,7 +251,7 @@ export default function OrgUsagePage() {
               <p className="px-5 py-6 text-sm text-secondary">{t('noMembers')}</p>
             ) : (
               (data?.byMember || []).map((row) => (
-                <div key={row.userId} className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-5 py-3">
+                <div key={row.userId} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] items-start sm:items-center gap-2 sm:gap-4 px-5 py-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-primary truncate">
                       {row.name || row.email}

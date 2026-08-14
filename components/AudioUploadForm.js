@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { Check, ChevronDown, FileAudio, Mic, MonitorSpeaker, Upload, X } from 'lucide-react';
 import { CHAT_MODEL_OPTIONS, CHAT_MODELS, ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE, normalizeDefaultTemplate } from '../lib/constants';
 import { uploadAudio, getTemplates, getSettings } from '../lib/api';
@@ -9,6 +10,7 @@ import { useTranslations } from '../lib/i18n';
 import { Button } from './ui/button';
 import { Field } from './ui/field';
 import { cn } from '../lib/utils';
+import { createCaptureId, enqueueCapture, isRetryableResponse } from '../lib/offline-queue';
 
 // `aufmass` is intentionally absent from the user-facing offering but
 // remains accepted by the backend (see lib/template-service.js) so legacy
@@ -27,6 +29,7 @@ function resolvePresetTemplate(templateValue, templates) {
 }
 
 export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTemplate = false, templateLabel = '' }) {
+  const { data: session } = useSession();
   const t = useTranslations('upload');
   const tForm = useTranslations('components.uploadForm');
   const [file, setFile] = useState(null);
@@ -43,6 +46,8 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState(null);
+  const [offlineSaved, setOfflineSaved] = useState(false);
+  const [fileCaptureId, setFileCaptureId] = useState(null);
   const [systemAudioCaps, setSystemAudioCaps] = useState({ tabAudio: false, systemAudio: false });
   const inputRef = useRef(null);
   const textTemplates = templates.filter((entry) => !entry.template_type || entry.template_type === 'text');
@@ -126,6 +131,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
       return;
     }
     setFile(f);
+    setFileCaptureId(createCaptureId());
   }
 
   function handleDrop(e) {
@@ -149,7 +155,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
                       blob.type.includes('ogg') ? 'ogg' : 'webm';
     
     const recordedFile = new File([blob], `aufnahme-${Date.now()}.${extension}`, { type: blob.type });
-    setFile(recordedFile);
+    handleFile(recordedFile);
     setUploadMode('file');
   }
 
@@ -159,21 +165,63 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
 
     setUploading(true);
     setError(null);
+    setOfflineSaved(false);
     setProgress(0);
 
+    const userId = session?.user?.id;
+    const organizationId = session?.user?.currentOrganizationId;
+    const clientCaptureId = fileCaptureId || createCaptureId();
+    if (!fileCaptureId) setFileCaptureId(clientCaptureId);
+    const uploadOptions = {
+      template, model, diarize, customPrompt, analysisFocus, autoAnalyze,
+      clientCaptureId,
+      clientCaptureUserId: userId,
+      clientCaptureOrganizationId: organizationId,
+    };
+
+    const saveOffline = async () => {
+      if (!userId || !organizationId) throw new Error(tForm('offlineScopeMissing'));
+      await enqueueCapture({
+        id: clientCaptureId,
+        kind: 'audio',
+        userId,
+        organizationId,
+        blob: file,
+        filename: file.name,
+        fields: { template, model, diarize, customPrompt, analysisFocus, autoAnalyze },
+      });
+      setFile(null);
+      setFileCaptureId(null);
+      setProgress(0);
+      setOfflineSaved(true);
+    };
+
     try {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        await saveOffline();
+        return;
+      }
       const progressInterval = setInterval(() => {
         setProgress((prev) => Math.min(prev + 10, 90));
       }, 200);
 
-      const result = await uploadAudio(file, { template, model, diarize, customPrompt, analysisFocus, autoAnalyze });
-
-      clearInterval(progressInterval);
+      let result;
+      try {
+        result = await uploadAudio(file, uploadOptions);
+      } catch (uploadError) {
+        const networkFailure = uploadError?.status === undefined;
+        if (!networkFailure && !isRetryableResponse(uploadError.status)) throw uploadError;
+        await saveOffline();
+        return;
+      } finally {
+        clearInterval(progressInterval);
+      }
       setProgress(100);
       setFile(null);
+      setFileCaptureId(null);
       if (onSuccess) onSuccess(result);
     } catch (err) {
-      setError(err.message || 'Fehler beim Hochladen.');
+      setError(err.message || tForm('offlineStoreFailed'));
     } finally {
       setUploading(false);
     }
@@ -260,6 +308,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
                 onClick={(event) => {
                   event.stopPropagation();
                   setFile(null);
+                  setFileCaptureId(null);
                   if (inputRef.current) inputRef.current.value = '';
                 }}
                 className="h-9 w-9 rounded-lg text-secondary hover:text-danger hover:bg-danger/10 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -361,6 +410,11 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
       )}
 
       {error && <div role="alert" className="border border-danger/30 text-danger px-4 py-3 rounded-lg text-sm">{error}</div>}
+      {offlineSaved && (
+        <div role="status" className="border border-success/30 bg-success/10 text-success px-4 py-3 rounded-lg text-sm">
+          {tForm('savedOffline')}
+        </div>
+      )}
 
       {uploading && (
         <progress

@@ -7,8 +7,9 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import MeetingStartForm from '../components/MeetingStartForm';
+import EmptyState from '../components/EmptyState';
 import { Skeleton } from '../components/ui/skeleton';
-import { Video, Folder, Tag } from 'lucide-react';
+import { Video, Folder, Tag, FileText } from 'lucide-react';
 import { getDocuments, getFolders, createFolder, updateFolder, deleteFolder, updateDocument, deleteDocument, bulkDocuments } from '../lib/api';
 import { useTranslations } from '../lib/i18n';
 import { useUiFeedback } from '../lib/use-ui-feedback';
@@ -45,7 +46,9 @@ export default function Transcriptions() {
   const tList = useTranslations('transcriptions');
   const tSidebar = useTranslations('transcriptionsList');
   const tMeeting = useTranslations('meeting.start');
+  const tEmpty = useTranslations('emptyState');
   const canStartMeeting = usePermission('meeting.start');
+  const canCreateTranscription = usePermission('transcription.write');
   const {
     enabled: vexaEnabled,
     defaultBotName: vexaDefaultBotName,
@@ -93,6 +96,24 @@ export default function Transcriptions() {
     acceptConfirm,
   } = useUiFeedback();
 
+  const loadDocuments = useCallback(async () => {
+    try {
+      const [transcripts, foldersData] = await Promise.all([
+        getDocuments('', { limit: PAGE_SIZE, offset: 0 }),
+        getFolders(),
+      ]);
+      setTranscriptions(transcripts);
+      setHasMore(transcripts.length >= PAGE_SIZE);
+      setFolders(foldersData);
+    } catch {
+      setTranscriptions([]);
+      setHasMore(false);
+      setFolders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
@@ -100,22 +121,14 @@ export default function Transcriptions() {
     }
     if (status !== 'authenticated') return;
 
-    Promise.all([
-      getDocuments('', { limit: PAGE_SIZE, offset: 0 }),
-      getFolders(),
-    ])
-      .then(([transcripts, foldersData]) => {
-        setTranscriptions(transcripts);
-        setHasMore(transcripts.length >= PAGE_SIZE);
-        setFolders(foldersData);
-      })
-      .catch(() => {
-        setTranscriptions([]);
-        setHasMore(false);
-        setFolders([]);
-      })
-      .finally(() => setLoading(false));
-  }, [status, router]);
+    loadDocuments();
+  }, [status, router, loadDocuments]);
+
+  useEffect(() => {
+    const handleOfflineSync = () => loadDocuments({ reset: true });
+    window.addEventListener('ghosttyper:offline-sync-complete', handleOfflineSync);
+    return () => window.removeEventListener('ghosttyper:offline-sync-complete', handleOfflineSync);
+  }, [loadDocuments]);
 
   const handleLoadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
@@ -576,19 +589,14 @@ export default function Transcriptions() {
           {loading ? (
             <ListSkeleton />
           ) : filteredTranscriptions.length === 0 ? (
-            <div className="bg-surface border border-subtle rounded-xl p-12 text-center">
-              <div className="w-16 h-16 bg-hover rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg aria-hidden="true" className="w-8 h-8 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <p className="text-primary font-medium mb-1">
-                {searchQuery ? tSidebar('emptySearch') : tSidebar('emptyFolder')}
-              </p>
-              <p className="text-sm text-secondary">
-                {searchQuery ? 'Versuchen Sie es mit einem anderen Begriff.' : 'Laden Sie etwas hoch oder verschieben Sie Dateien hierher.'}
-              </p>
-            </div>
+            <EmptyState
+              Icon={FileText}
+              title={searchQuery ? tSidebar('emptySearch') : tSidebar('emptyFolder')}
+              description={searchQuery ? tEmpty('search.description') : tEmpty('transcriptions.description')}
+              action={!searchQuery && canCreateTranscription
+                ? { href: '/upload', label: tEmpty('transcriptions.cta') }
+                : null}
+            />
           ) : (
             <div className={viewMode === 'grid' ? 'grid grid-cols-1 xl:grid-cols-2 gap-3' : 'space-y-3'}>
               {filteredTranscriptions.map((t) => (

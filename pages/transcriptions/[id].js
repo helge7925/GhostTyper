@@ -14,6 +14,7 @@ import TranslationCompanionPanel from '../../components/TranslationCompanionPane
 import { getTranscription, deleteTranscription, updateSpeakers, startAnalysis } from '../../lib/api';
 import { STATUS } from '../../lib/constants';
 import { useMessageList, useTranslations } from '../../lib/i18n';
+import { useJobProgress } from '../../lib/use-job-progress';
 import { Button } from '../../components/ui/button';
 import { Card, CardBody } from '../../components/ui/card';
 import { Field } from '../../components/ui/field';
@@ -166,76 +167,22 @@ export default function TranscriptionDetail() {
     statusRef.current = transcription?.status || null;
   }, [transcription?.status]);
 
-  // Live updates via SSE with polling fallback.
-  useEffect(() => {
-    const currentStatus = transcription?.status;
-    if (!currentStatus) return undefined;
-    const trackedStatuses = [STATUS.PENDING, STATUS.QUEUED, STATUS.PROCESSING, STATUS.ANALYZING];
-    if (!trackedStatuses.includes(currentStatus)) return undefined;
-
-    let eventSource = null;
-    let fallbackInterval = null;
-
-    const handleUpdate = (updated) => {
-      const previousStatus = statusRef.current;
-      if (previousStatus !== updated.status) {
-        if (updated.status === STATUS.TRANSCRIBED) {
-          setToast({ message: 'Transkription ist fertig.', type: 'success' });
-        } else if (updated.status === STATUS.ANALYZING) {
-          setToast({ message: 'Transkription ist fertig. Auswertung läuft.', type: 'info' });
-        } else if (updated.status === STATUS.COMPLETED) {
-          setToast({ message: 'Auswertung ist fertig.', type: 'success' });
-        }
-      }
-
-      statusRef.current = updated.status;
-      setTranscription(updated);
-    };
-
-    const startFallbackPolling = () => {
-      if (fallbackInterval) return;
-      fallbackInterval = setInterval(async () => {
-        try {
-          const updated = await getTranscription(id);
-          handleUpdate(updated);
-        } catch {
-          // Ignore temporary fallback errors.
-        }
-      }, 3000);
-    };
-
-    if (typeof window !== 'undefined' && 'EventSource' in window) {
-      eventSource = new EventSource(`/api/transcriptions/${id}/stream`);
-
-      eventSource.addEventListener('transcription', (event) => {
-        try {
-          handleUpdate(JSON.parse(event.data));
-        } catch {
-          // Ignore malformed stream packets.
-        }
-      });
-
-      eventSource.addEventListener('missing', () => {
-        eventSource?.close();
-      });
-
-      eventSource.onerror = () => {
-        eventSource?.close();
-        startFallbackPolling();
-      };
-    } else {
-      startFallbackPolling();
+  const handleProgressSnapshot = useCallback((updated) => {
+    const previousStatus = statusRef.current;
+    if (previousStatus !== updated.status) {
+      if (updated.status === STATUS.TRANSCRIBED) setToast({ message: t('progress.transcribed'), type: 'success' });
+      else if (updated.status === STATUS.ANALYZING) setToast({ message: t('progress.analyzing'), type: 'info' });
+      else if (updated.status === STATUS.COMPLETED) setToast({ message: t('progress.completed'), type: 'success' });
     }
+    statusRef.current = updated.status;
+    setTranscription(updated);
+  }, [t]);
 
-    return () => {
-      if (eventSource) {
-        eventSource.close();
-      }
-      if (fallbackInterval) {
-        clearInterval(fallbackInterval);
-      }
-    };
-  }, [transcription?.status, id]);
+  const jobProgress = useJobProgress(id, {
+    enabled: [STATUS.PENDING, STATUS.QUEUED, STATUS.PROCESSING, STATUS.ANALYZING].includes(transcription?.status),
+    initialSnapshot: transcription,
+    onSnapshot: handleProgressSnapshot,
+  });
 
   const speakerIds = useMemo(() => {
     if (!transcription?.segments) return [];
@@ -460,7 +407,7 @@ export default function TranscriptionDetail() {
 
           <header className="mb-7">
             <div className="flex flex-wrap items-center gap-3 mb-3">
-              <StatusBadge status={transcription.status} />
+              <StatusBadge status={transcription.budget_stop_state !== 'none' ? STATUS.BUDGET_STOPPED : transcription.status} />
               <span className="text-xs text-secondary">
                 {new Date(transcription.created_at).toLocaleDateString('de-DE')} · {typeLabel}
               </span>
@@ -610,6 +557,12 @@ export default function TranscriptionDetail() {
 
             {/* Right: Preview Area */}
             <div className="lg:col-span-2 space-y-6">
+              {transcription.budget_stop_state !== 'none' && (
+                <div className="bg-danger/10 border border-danger/30 text-danger rounded-2xl p-4 text-sm" role="status">
+                  <p className="font-semibold">{t('budgetStoppedTitle')}</p>
+                  <p className="mt-1 text-xs">{t('budgetStoppedDescription')}</p>
+                </div>
+              )}
               {transcription.source === 'vexa' && [STATUS.PENDING, STATUS.PROCESSING].includes(transcription.status) && (
                 <MeetingControlBar
                   transcriptionId={transcription.id}
@@ -630,11 +583,19 @@ export default function TranscriptionDetail() {
                 <ProcessStatusCard
                   title={processState.title}
                   description={processState.description}
-                  steps={processState.steps}
-                  activeStep={processState.activeStep}
-                  done={processState.done}
-                  startedAt={transcription.updated_at}
-                  etaSeconds={transcription.status === STATUS.ANALYZING ? 20 : transcription.status === STATUS.PENDING ? 10 : 40}
+                  steps={jobProgress.steps.map((step) => ({ ...step, label: t(`progress.steps.${step.key}`) }))}
+                  activeStep={jobProgress.activeStep}
+                  done={jobProgress.done}
+                  startedAt={jobProgress.startedAt}
+                  etaTotalSeconds={jobProgress.etaTotalSeconds}
+                  connectionLabel={['stale', 'unavailable', 'polling'].includes(jobProgress.connectionState)
+                    ? t(`progress.connection.${jobProgress.connectionState}`)
+                    : ''}
+                  etaLabels={{
+                    remaining: t('progress.eta.remaining'),
+                    near: t('progress.eta.near'),
+                    overdue: t('progress.eta.overdue'),
+                  }}
                   messages={processMessages}
                 />
               )}

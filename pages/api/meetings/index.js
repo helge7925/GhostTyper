@@ -3,13 +3,14 @@ import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-uti
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { hasPermission } from '../../../lib/permissions';
 import { logAuditEvent } from '../../../lib/audit-log';
-import { upsertDocumentForTranscription } from '../../../lib/documents';
 import { addTranscriptionEvent } from '../../../lib/transcription-events';
 import { resolveVexaConfig } from '../../../lib/integrations';
-import { encryptSecret, decryptSecret } from '../../../lib/secrets';
+import { encryptSecret, decryptSecret, SECRET_CONTEXTS } from '../../../lib/secrets';
 import {
   parseMeetingUrl,
   startBot,
+  stopBot,
+  adminHealthCheck,
   ensureVexaUser,
   createVexaUserToken,
   setUserWebhook,
@@ -17,6 +18,14 @@ import {
 import { startBridgeForTranscription } from '../../../lib/vexa-bridge';
 import { ensureShareTokenForRow } from '../../../lib/share-chat-poster';
 import { logError } from '../../../lib/observability';
+import { upsertDocumentForTranscription } from '../../../lib/documents';
+import {
+  beginReservedProviderCall,
+  budgetIdempotencyKey,
+  handleReservedProviderFailure,
+  reserveProviderSpend,
+} from '../../../lib/budget-runtime';
+import { requestTranscriptionBudgetStop } from '../../../lib/budget-service';
 
 const PROVIDER = 'vexa';
 // Google Meet is intentionally excluded — Google hard-blocks meeting bots on
@@ -77,7 +86,10 @@ async function ensureUserToken({ userId, orgId, userEmail, userName, vexaConfig 
   );
   if (existing.rows.length) {
     const row = existing.rows[0];
-    const apiKey = decryptSecret(row.api_key_encrypted);
+    const apiKey = decryptSecret(row.api_key_encrypted, {
+      field: SECRET_CONTEXTS.vexaUserToken,
+      bindingId: orgId,
+    });
     if (apiKey) {
       await query(`UPDATE vexa_user_tokens SET last_used_at = NOW() WHERE id = $1`, [row.id]);
       return { vexaUserId: row.vexa_user_id, apiKey, fresh: false };
@@ -96,7 +108,10 @@ async function ensureUserToken({ userId, orgId, userEmail, userName, vexaConfig 
   if (typeof apiKey !== 'string' || !apiKey) {
     throw new Error('Vexa returned no token.');
   }
-  const encrypted = encryptSecret(apiKey);
+  const encrypted = encryptSecret(apiKey, {
+    field: SECRET_CONTEXTS.vexaUserToken,
+    bindingId: orgId,
+  });
   if (!encrypted) {
     const error = new Error('SETTINGS_ENCRYPTION_KEY missing.');
     error.code = 'ENCRYPTION_UNAVAILABLE';
@@ -119,7 +134,7 @@ async function handler(req, res) {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ code: 'METHOD_NOT_ALLOWED' });
   }
-  if (!hasPermission(req.role, 'meeting.start')) {
+  if (!hasPermission(req.role, 'meeting.start') || !hasPermission(req.role, 'paid.execute')) {
     return res.status(403).json({ code: 'FORBIDDEN', message: 'Keine Berechtigung.' });
   }
 
@@ -225,6 +240,19 @@ async function handler(req, res) {
     return res.status(400).json({ code: 'INTEGRATION_INCOMPLETE', message: 'Vexa-Konfiguration ist unvollständig.' });
   }
 
+  try {
+    await adminHealthCheck({
+      baseUrl: vexaConfig.baseUrl,
+      adminToken: vexaConfig.adminToken,
+    });
+  } catch (error) {
+    logApiError('Meeting start: Vexa preflight failed', error);
+    return res.status(503).json({
+      code: 'VEXA_UNAVAILABLE',
+      message: 'Der Meeting-Bot-Dienst ist derzeit nicht erreichbar. Bitte versuchen Sie es später erneut.',
+    });
+  }
+
   const language = typeof rawLanguage === 'string' && rawLanguage ? rawLanguage : (vexaConfig.defaultLanguage || 'de');
   const botName = (typeof rawBotName === 'string' && rawBotName.trim()) || vexaConfig.defaultBotName || `${req.org.name} Notes`;
   const shouldAutoAnalyze = autoAnalyze !== false;
@@ -232,7 +260,7 @@ async function handler(req, res) {
   // the LLM-generated title. We avoid showing the raw join URL in the
   // transcription list — it leaks the meeting credentials and looks
   // ugly. Format: "Remote Meeting · Teams · 04.05.2026 09:42".
-  const platformLabel = PLATFORM_LABELS[platform] || platform;
+  const platformLabel = { teams: 'Teams', zoom: 'Zoom', nextcloud_talk: 'Nextcloud Talk' }[platform] || platform;
   const meetingUrlForOriginalName = `Remote Meeting · ${platformLabel} · ${new Date().toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
 
   let userInfo;
@@ -297,14 +325,11 @@ async function handler(req, res) {
     transcriptionId: transcription.id,
     organizationId: orgId,
     ownerUserId: userId,
-    visibility: 'workspace',
+    visibility: 'private',
     sourceType: 'meeting',
     title: meetingUrlForOriginalName,
-    mimeType: null,
-    fileSize: null,
     status: transcription.status,
     folderId: Number.isFinite(Number(folderId)) ? Number(folderId) : null,
-    textPreview: null,
   });
 
   // When translation is enabled at meeting start we mint the public
@@ -336,7 +361,24 @@ async function handler(req, res) {
   });
 
   let botResponse;
+  let initialSttReservation;
+  let botStartAttempted = false;
+  const initialSttIdempotencyKey = budgetIdempotencyKey('meeting-stt', transcription.id, 0, 30);
   try {
+    initialSttReservation = await reserveProviderSpend({
+      idempotencyKey: initialSttIdempotencyKey,
+      organizationId: orgId,
+      userId,
+      transcriptionId: transcription.id,
+      operation: 'meeting_transcription',
+      provider: 'cortecs',
+      model: 'whisper-large-v3',
+      estimatedUsage: { inputQuantity: 30, outputQuantity: 0 },
+      reservationMs: 6 * 60 * 60 * 1000,
+      stopOnDenied: true,
+    });
+    initialSttReservation = await beginReservedProviderCall(initialSttReservation);
+    botStartAttempted = true;
     botResponse = await startBot(
       { baseUrl: vexaConfig.baseUrl, apiKey: userToken.apiKey },
       {
@@ -349,6 +391,56 @@ async function handler(req, res) {
       },
     );
   } catch (error) {
+    // A timed-out/failed POST can still have been accepted by Vexa. Stop the
+    // remote identity before marking the provider outcome or the row failed.
+    if (botStartAttempted) {
+      try {
+        await stopBot(
+          { baseUrl: vexaConfig.baseUrl, apiKey: userToken.apiKey },
+          { platform, nativeMeetingId },
+        );
+      } catch (stopError) {
+        if (stopError.response?.status !== 404) {
+          logError('meetings.bot_start_cleanup_failed', stopError, {
+            transcriptionId: transcription.id,
+            platform,
+            nativeMeetingId,
+          });
+          try {
+            await requestTranscriptionBudgetStop({
+              transcriptionId: transcription.id,
+              organizationId: orgId,
+              userId,
+              requestedBy: userId,
+              reason: 'vexa_start_cleanup_unconfirmed',
+            });
+          } catch (stopRequestError) {
+            logError('meetings.bot_start_stop_request_failed', stopRequestError, {
+              transcriptionId: transcription.id,
+            });
+          }
+        }
+      }
+    }
+    let providerFailure = error;
+    if (initialSttReservation && botStartAttempted) {
+      try {
+        // A successful cleanup DELETE does not prove that no billable work
+        // happened before it. The runtime releases only explicit non-billable
+        // rejections and marks all uncertain outcomes accounting-pending.
+        await handleReservedProviderFailure(initialSttReservation, error, {
+          idempotencyKey: initialSttIdempotencyKey,
+        });
+      } catch (failureError) {
+        providerFailure = failureError;
+        if (failureError.accountingError) {
+          logError('meetings.initial_stt_pending_mark_failed', failureError.accountingError, {
+            transcriptionId: transcription.id,
+            reservationId: initialSttReservation.id,
+          });
+        }
+      }
+    }
     // Vexa returns FastAPI-style errors. `detail` may be a string or an
     // array of {loc, msg, type} entries — coerce both into a readable line.
     const upstreamRaw = error.response?.data?.detail ?? error.response?.data?.message;
@@ -377,6 +469,13 @@ async function handler(req, res) {
       severity: 'warn',
       metadata: { platform, nativeMeetingId, error: upstreamMessage || error.message },
     });
+    if (providerFailure?.code === 'BUDGET_EXCEEDED') {
+      return res.status(429).json({ code: providerFailure.code, message: providerFailure.message });
+    }
+    if (providerFailure?.code === 'BUDGET_ACCOUNTING_UNAVAILABLE'
+        || providerFailure?.code === 'PRICING_CONFIGURATION_MISSING') {
+      return res.status(503).json({ code: providerFailure.code, message: providerFailure.message });
+    }
     return res.status(502).json({ code: 'VEXA_BOT_FAILED', message: upstreamMessage || error.message });
   }
 
@@ -404,7 +503,15 @@ async function handler(req, res) {
     },
   });
 
-  startBridgeForTranscription(transcription.id);
+  startBridgeForTranscription(transcription.id, {
+    source: transcription.source,
+    userId,
+    organizationId: orgId,
+    baseUrl: vexaConfig.baseUrl,
+    apiKey: userToken.apiKey,
+    platform,
+    nativeMeetingId,
+  });
 
   return res.status(201).json({
     id: transcription.id,

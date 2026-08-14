@@ -63,4 +63,5 @@
       compiles.
 
 ## 4. Port
-- [ ] Open mirror change in romaco-scriptor once phases 1–3 land.
+- [x] Mirror change is present in the romaco-scriptor sibling checkout
+      (verified on its current `main`).

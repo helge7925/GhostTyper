@@ -6,12 +6,14 @@ import { useSession } from 'next-auth/react';
 import { Building2, Plus, Users as UsersIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import EmptyState from '../../components/EmptyState';
 import { useTranslations } from '../../lib/i18n';
 
 export default function AdminWorkspacesPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const tNav = useTranslations('nav');
+  const tEmpty = useTranslations('emptyState.workspaces');
 
   const [orgs, setOrgs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -187,7 +189,12 @@ export default function AdminWorkspacesPage() {
           {loading ? (
             <div className="p-6 text-sm text-secondary"><LoadingSpinner /></div>
           ) : orgs.length === 0 ? (
-            <p className="p-6 text-sm text-secondary text-center">Keine Workspaces vorhanden.</p>
+            <EmptyState
+              Icon={Building2}
+              title={tEmpty('title')}
+              description={tEmpty('description')}
+              className="border-0 rounded-none"
+            />
           ) : (
             <ul className="divide-y divide-subtle">
               {orgs.map((o) => (

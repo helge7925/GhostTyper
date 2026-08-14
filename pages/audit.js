@@ -5,32 +5,20 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { Download, Filter, ShieldCheck } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
 import { Skeleton } from '../components/ui/skeleton';
+import { Button } from '../components/ui/button';
 import { useCurrentOrg } from '../lib/use-current-org';
 import { usePermission } from '../lib/use-permission';
 import { cn } from '../lib/utils';
 import { useFormatter, useTranslations } from '../lib/i18n';
+import { eventsToCsv } from '../lib/audit-csv';
 
 const SEVERITY_STYLES = {
   info: 'bg-info/10 text-info border-info/30',
   warn: 'bg-warning/15 text-warning border-warning/30',
   error: 'bg-danger/15 text-danger border-danger/30',
 };
-
-function eventsToCsv(events) {
-  const header = 'id,created_at,user_id,action,target_type,target_id,severity,metadata\n';
-  const rows = events.map((e) => [
-    e.id,
-    e.created_at,
-    e.user_id ?? '',
-    e.action,
-    e.target_type ?? '',
-    e.target_id ?? '',
-    e.severity ?? 'info',
-    JSON.stringify(e.metadata ?? {}).replace(/"/g, '""'),
-  ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-  return header + rows + '\n';
-}
 
 export default function AuditPage() {
   const router = useRouter();
@@ -41,12 +29,17 @@ export default function AuditPage() {
   const t = useTranslations('auditPage');
   const tNav = useTranslations('nav');
   const tCommon = useTranslations('common');
+  const tEmpty = useTranslations('emptyState.audit');
   const { dateTime } = useFormatter();
 
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterAction, setFilterAction] = useState('');
   const [filterSeverity, setFilterSeverity] = useState('');
+  const [packageExporting, setPackageExporting] = useState(false);
+  const [packageError, setPackageError] = useState('');
+  const [verification, setVerification] = useState(null);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
@@ -92,6 +85,43 @@ export default function AuditPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handlePackageExport = async () => {
+    setPackageExporting(true);
+    setPackageError('');
+    try {
+      const response = await fetch('/api/audit-log/export');
+      if (!response.ok) throw new Error('AUDIT_EXPORT_FAILED');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `audit-${org?.slug || 'org'}-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setPackageError(t('exportPackageError'));
+    } finally {
+      setPackageExporting(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    setVerifying(true);
+    setVerification(null);
+    try {
+      const response = await fetch('/api/audit-log?verify=1');
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.code || 'AUDIT_VERIFY_FAILED');
+      setVerification(payload.verification || { valid: false });
+    } catch {
+      setVerification({ valid: false, error: true });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   if (authStatus === 'loading' || orgLoading) {
     return <LoadingSpinner />;
   }
@@ -130,17 +160,34 @@ export default function AuditPage() {
             <p className="text-sm text-secondary mt-1">{t('subtitle')}</p>
           </div>
           {canExport && (
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={events.length === 0}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-subtle bg-surface text-sm text-primary hover:bg-hover-subtle transition-colors disabled:opacity-40"
-            >
-              <Download className="w-4 h-4" aria-hidden="true" />
-              {t('exportCsv')}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={handleExport} disabled={events.length === 0}>
+                <Download className="w-4 h-4" aria-hidden="true" />
+                {t('exportCsv')}
+              </Button>
+              <Button type="button" variant="secondary" onClick={handleVerify} disabled={verifying}>
+                <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                {verifying ? t('verifyingChain') : t('verifyChain')}
+              </Button>
+              <Button type="button" variant="primary" onClick={handlePackageExport} disabled={packageExporting}>
+                <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                {packageExporting ? t('exportingPackage') : t('exportPackage')}
+              </Button>
+            </div>
           )}
         </div>
+
+        {packageError && <p role="alert" className="text-sm text-danger">{packageError}</p>}
+        {verification && (
+          <p role="status" className={cn('text-sm rounded-xl border px-4 py-3', verification.valid
+            ? 'border-success/30 bg-success/10 text-success'
+            : 'border-danger/30 bg-danger/10 text-danger')}
+          >
+            {verification.valid
+              ? t('chainValid', { count: verification.rows || 0 })
+              : t('chainInvalid', { id: verification.errors?.[0]?.id || '–' })}
+          </p>
+        )}
 
         {/* Filter bar */}
         <div className="bg-surface border border-subtle rounded-2xl p-4 flex flex-wrap items-end gap-3">
@@ -193,10 +240,7 @@ export default function AuditPage() {
             ))}
           </div>
         ) : events.length === 0 ? (
-          <div className="bg-surface border border-subtle rounded-2xl p-12 text-center">
-            <Filter className="w-10 h-10 mx-auto text-secondary mb-3" aria-hidden="true" />
-            <p className="text-sm text-secondary">{t('noEvents')}</p>
-          </div>
+          <EmptyState Icon={Filter} title={tEmpty('title')} description={tEmpty('description')} />
         ) : (
           <div className="bg-surface border border-subtle rounded-2xl overflow-hidden">
             <ul className="divide-y divide-subtle">

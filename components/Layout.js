@@ -3,6 +3,7 @@ import { useSession } from 'next-auth/react';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import BottomNav from './BottomNav';
+import OfflineStatus from './OfflineStatus';
 import { useTheme } from '../lib/theme-context';
 import { useUIStore } from '../lib/store/ui-store';
 import { useTranslations } from '../lib/i18n';
@@ -88,6 +89,10 @@ export default function Layout({ children }) {
           </div>
         )}
       </div>
+      <OfflineStatus
+        userId={session?.user?.id}
+        organizationId={session?.user?.currentOrganizationId}
+      />
     </>
   );
 }

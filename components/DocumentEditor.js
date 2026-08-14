@@ -28,6 +28,7 @@ import {
   ListOrdered,
   MoreHorizontal,
   Save,
+  ShieldOff,
 } from 'lucide-react';
 import { useTranslations } from '../lib/i18n';
 import { Button } from './ui/button';
@@ -58,6 +59,7 @@ export default function DocumentEditor({
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [redactionTerms, setRedactionTerms] = useState('');
   const [focusMode, setFocusMode] = useState(false);
   const [focusPreset, setFocusPreset] = useState('paper');
   const [showSourceContent, setShowSourceContent] = useState(false);
@@ -364,6 +366,7 @@ export default function DocumentEditor({
           filename,
           theme: FIXED_PDF_THEME,
           fontPreset: FIXED_PDF_FONT,
+          redactionTerms: redactionTerms.split(/[\n,;]/).map((term) => term.trim()).filter(Boolean),
         }),
       });
 
@@ -518,6 +521,18 @@ export default function DocumentEditor({
                 <Download className="w-4 h-4" aria-hidden="true" />
                 {isExportingPdf ? t('exportPdfBusy') : t('exportPdf')}
               </Button>
+
+              <label className="flex items-center gap-1.5 rounded-lg border border-subtle bg-surface-elevated px-2 py-1" title={t('redactionHint')}>
+                <ShieldOff className="w-3.5 h-3.5 text-secondary" aria-hidden="true" />
+                <span className="sr-only">{t('redactionLabel')}</span>
+                <input
+                  type="text"
+                  value={redactionTerms}
+                  onChange={(event) => setRedactionTerms(event.target.value)}
+                  placeholder={t('redactionPlaceholder')}
+                  className="w-36 bg-transparent text-xs text-primary placeholder:text-secondary outline-none"
+                />
+              </label>
 
               <Button
                 onClick={handleExportDoc}

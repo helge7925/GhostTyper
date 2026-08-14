@@ -2,31 +2,31 @@
 
 ## 1. Redaction Core
 
-- [ ] Port `lib/pdf-redaction-engine.js`.
-- [ ] Confirm redaction removes content-stream text, not just draws boxes.
-- [ ] Keep redaction behind the existing `pdf-render-limiter` bounds.
+- [x] Port `lib/pdf-redaction-engine.js`.
+- [x] Confirm redaction removes content-stream text, not just draws boxes.
+- [x] Keep redaction behind the existing `pdf-render-limiter` bounds.
 
 ## 2. Fonts
 
-- [ ] Port `lib/pdf-fonts.js`.
-- [ ] Wire font resolution into the existing PDF export path.
-- [ ] Verify Latin-only output does not regress.
+- [x] Port `lib/pdf-fonts.js`.
+- [x] Wire font resolution into the existing PDF export path.
+- [x] Verify Latin-only output does not regress.
 
 ## 3. UI
 
-- [ ] Expose redaction on the PDF export surface.
-- [ ] Use current UI primitives (post-sprezzatura tokens/components).
+- [x] Expose redaction on the PDF export surface.
+- [x] Use current UI primitives (post-sprezzatura tokens/components).
 
 ## 4. i18n
 
-- [ ] Add redaction strings to `messages/de.json`.
-- [ ] Add the same keys to `messages/en.json`.
+- [x] Add redaction strings to `messages/de.json`.
+- [x] Add the same keys to `messages/en.json`.
 
 ## 5. Verification
 
-- [ ] Add `tests/pdf-redaction.test.mjs` asserting redacted text is **not
+- [x] Add `tests/pdf-redaction.test.mjs` asserting redacted text is **not
       extractable** from the output (not merely invisible).
-- [ ] Add a font-coverage test for non-Latin script.
-- [ ] `npm run lint`.
-- [ ] `npm test`.
-- [ ] `npm run build`.
+- [x] Add a font-coverage test for non-Latin script.
+- [x] `npm run lint`.
+- [x] `npm test`.
+- [x] `npm run build`.

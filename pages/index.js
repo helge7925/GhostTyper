@@ -4,6 +4,8 @@ import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Button } from '../components/ui/button';
+import OnboardingIntro from '../components/OnboardingIntro';
+import PersonalBudgetCard from '../components/PersonalBudgetCard';
 import { useMessageList, useTranslations } from '../lib/i18n';
 
 function pickRandomLine(pool, previousLine) {
@@ -86,7 +88,8 @@ export default function Home() {
         <title>Dashboard - GhostTyper</title>
       </Head>
 
-      <div className="min-h-[72vh] flex flex-col items-center justify-center text-center animate-fade-in px-4">
+      <div className="max-w-5xl mx-auto animate-fade-in px-4">
+        <div className="min-h-[48vh] flex flex-col items-center justify-center text-center">
         <p className="text-[11px] uppercase tracking-[0.32em] text-info/70 mb-5">
           {tLanding('decoded')}
         </p>
@@ -99,6 +102,9 @@ export default function Home() {
         >
           {welcomeLine}
         </p>
+        </div>
+        <OnboardingIntro />
+        <PersonalBudgetCard className="mt-6" />
       </div>
     </>
   );

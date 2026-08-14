@@ -30,6 +30,8 @@ const pool = new Pool({
 });
 const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
 const DRY_RUN = process.argv.includes('--dry-run');
+let auditChain;
+let auditRetention;
 
 function log(event, details = {}) {
   console.log(JSON.stringify({ timestamp: new Date().toISOString(), event, dryRun: DRY_RUN, details }));
@@ -131,28 +133,61 @@ async function expireFallbackTranscriptions(client, days) {
 }
 
 async function expireOrgAudit(client, organizationId, days) {
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   if (DRY_RUN) {
     const probe = await client.query(
       `SELECT count(*)::int AS n
          FROM audit_log
         WHERE organization_id = $1
-          AND created_at < NOW() - ($2::int * interval '1 day')`,
-      [organizationId, days],
+          AND created_at < $2`,
+      [organizationId, cutoff.toISOString()],
     );
     log('retention.audit.dry_run', { organizationId, days, would_delete: probe.rows[0].n });
     return probe.rows[0].n;
   }
+  await auditChain.lockAuditOrganization(client, organizationId);
+  const currentRows = await client.query(
+    `SELECT id, created_at, entry_hash FROM audit_log
+      WHERE organization_id = $1 ORDER BY id ASC FOR UPDATE`,
+    [organizationId],
+  );
+  const plan = auditRetention.buildAuditRetentionPlan(currentRows.rows, cutoff);
+  const toDelete = plan.prunedRows;
+  const priorHead = plan.priorHead || auditChain.AUDIT_ZERO_HASH;
+  if (toDelete === 0) {
+    log('retention.audit.applied', { organizationId, days, cutoff: cutoff.toISOString(), deleted: 0, priorHead });
+    return 0;
+  }
+  await auditChain.insertChainedAuditEvent(client, {
+    organizationId,
+    action: 'audit.retention.applied',
+    targetType: 'audit_log',
+    severity: 'info',
+    metadata: {
+      auditRetentionDays: days,
+      cutoff: cutoff.toISOString(),
+      prunedRows: toDelete,
+      priorHead,
+      reason: 'Automated audit retention policy',
+    },
+  });
   const result = await client.query(
     `DELETE FROM audit_log
       WHERE organization_id = $1
-        AND created_at < NOW() - ($2::int * interval '1 day')`,
-    [organizationId, days],
+        AND created_at < $2`,
+    [organizationId, cutoff.toISOString()],
   );
-  log('retention.audit.applied', { organizationId, days, deleted: result.rowCount });
+  const rebased = await auditChain.rebaseAuditChain(client, organizationId);
+  log('retention.audit.applied', {
+    organizationId, days, cutoff: cutoff.toISOString(), deleted: result.rowCount,
+    priorHead, rebasedHead: rebased.headHash,
+  });
   return result.rowCount;
 }
 
 async function main() {
+  auditChain = await import('../lib/audit-chain.js');
+  auditRetention = await import('../lib/audit-retention.js');
   const tenant = await loadTenantPolicy();
   const orgs = await loadOrgPolicies();
 

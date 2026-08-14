@@ -1,18 +1,15 @@
-# Status: Port Bilingual Side-by-Side Export
+# Status: Port Bilingual Export
 
-Last updated: 2026-07-30
+Last updated: 2026-08-11
 
 ## Current State
 
-- **Proposed — not started.**
-- Glossary and translation memory are already present upstream; only the
-  bilingual export remains un-ported from `romaco-scriptor`.
+- **Implemented locally.**
+- Added bounded, escaped bilingual alignment plus HTML/PDF export API and
+  translated UI actions. The route uses GhostTyper's document-read permission.
 
 ## Verified
 
-- Not applicable yet (no implementation).
-
-## Notes
-
-- Lowest-effort item of the downstream port set: the core module has no
-  imports and no customer coupling.
+- Alignment, escaping, bounds and format tests pass.
+- `npm run lint`, `npm test` and `npm run build` pass.
+- No customer-specific references remain in the export implementation.

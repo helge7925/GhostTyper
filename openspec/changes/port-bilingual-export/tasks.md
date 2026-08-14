@@ -2,29 +2,29 @@
 
 ## 1. Core
 
-- [ ] Port `lib/bilingual-export.js` from `romaco-scriptor` unchanged.
-- [ ] Confirm no customer-specific references remain.
+- [x] Port `lib/bilingual-export.js` from `romaco-scriptor` unchanged.
+- [x] Confirm no customer-specific references remain.
 
 ## 2. API
 
-- [ ] Port `pages/api/translate/file-bilingual.js`.
-- [ ] Wire it to GhostTyper's document read-permission check.
-- [ ] Keep the downstream size/segment bounds and escaping.
+- [x] Port `pages/api/translate/file-bilingual.js`.
+- [x] Wire it to GhostTyper's document read-permission check.
+- [x] Keep the downstream size/segment bounds and escaping.
 
 ## 3. UI
 
-- [ ] Add the bilingual export action to `pages/translate.js`.
-- [ ] Use current UI primitives (post-sprezzatura tokens/components).
-- [ ] Port the settings surface if downstream exposes one.
+- [x] Add the bilingual export action to `pages/translate.js`.
+- [x] Use current UI primitives (post-sprezzatura tokens/components).
+- [x] Port the settings surface if downstream exposes one.
 
 ## 4. i18n
 
-- [ ] Add action + error strings to `messages/de.json`.
-- [ ] Add the same keys to `messages/en.json`.
+- [x] Add action + error strings to `messages/de.json`.
+- [x] Add the same keys to `messages/en.json`.
 
 ## 5. Verification
 
-- [ ] Add `tests/bilingual-export.test.mjs` (alignment, escaping, bounds).
-- [ ] `npm run lint`.
-- [ ] `npm test`.
-- [ ] `npm run build`.
+- [x] Add `tests/bilingual-export.test.mjs` (alignment, escaping, bounds).
+- [x] `npm run lint`.
+- [x] `npm test`.
+- [x] `npm run build`.

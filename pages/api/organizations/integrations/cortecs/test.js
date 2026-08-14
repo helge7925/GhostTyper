@@ -32,36 +32,31 @@ async function handler(req, res) {
   }
 
   try {
-    const response = await fetchWithTimeout(`${config.baseUrl}/chat/completions`, {
-      method: 'POST',
+    const response = await fetchWithTimeout(`${config.baseUrl}/models`, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         Authorization: `Bearer ${config.apiKey}`,
       },
-      body: JSON.stringify({
-        model: config.chatModel,
-        preference: config.preference || 'balanced',
-        messages: [
-          { role: 'system', content: 'Antworten Sie extrem kurz.' },
-          { role: 'user', content: 'Healthcheck: antworten Sie nur mit OK.' },
-        ],
-      }),
     }, 8000);
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
-      throw new Error(`Cortecs Chat antwortete mit HTTP ${response.status}: ${String(detail).slice(0, 160)}`);
+      throw new Error(`Cortecs Models antwortete mit HTTP ${response.status}: ${String(detail).slice(0, 160)}`);
     }
     const data = await response.json().catch(() => ({}));
-    const sample = String(data?.choices?.[0]?.message?.content || '').slice(0, 40);
+    const models = Array.isArray(data?.data) ? data.data : [];
     await logAuditEvent({
       userId,
       organizationId: orgId,
       action: 'org.integration.cortecs.tested',
       targetType: 'organization_integration',
       targetId: `${orgId}:${PROVIDER}`,
-      metadata: { ok: true, model: data?.model || config.chatModel },
+      metadata: {
+        ok: true,
+        endpoint: 'models',
+        configuredModelListed: models.some((model) => model?.id === config.chatModel),
+      },
     });
-    return res.status(200).json({ ok: true, sample });
+    return res.status(200).json({ ok: true });
   } catch (error) {
     await logAuditEvent({
       userId,

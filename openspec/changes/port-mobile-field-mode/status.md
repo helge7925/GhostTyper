@@ -1,22 +1,22 @@
-# Status: Port Offline-First Mobile Field Mode
+# Status: Port Mobile Field Mode
 
-Last updated: 2026-07-30
+Last updated: 2026-08-11
 
 ## Current State
 
-- **Proposed — not started.**
-- Upstream has `public/manifest.json` but no service worker, no offline
-  queue, no capture idempotency and no connectivity indicator.
+- **Implemented locally; live-device and PostgreSQL smoke remain.**
+- Added network-only service-worker policy, scoped IndexedDB queue, bounded
+  retries, capture-time UUIDs, duplicate-safe server handling, offline status,
+  automatic/manual sync and affected-view refresh.
 
 ## Verified
 
-- Not applicable yet (no implementation).
+- Offline queue and idempotency tests pass.
+- `npm run lint`, `npm test` and `npm run build` pass.
+- PWA manifest is linked and standalone mode is configured.
 
-## Notes
+## Outstanding
 
-- Only customer coupling downstream is two string constants in
-  `lib/offline-queue.js`.
-- The downstream change's manual real-device PWA test is still
-  outstanding; this port inherits that unverified assumption.
-- Conflicts with `port-budget-runtime` and `port-audit-chain` on
-  `lib/db-init.js`.
+- Disposable PostgreSQL smoke could not run: `TEST_DATABASE_URL` is unset and
+  the local Docker daemon is unavailable.
+- PWA install/capture/reconnect must be checked on a real device/browser.

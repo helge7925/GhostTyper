@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import {
+  BadgeEuro,
   Building2,
   Files,
   Languages,
@@ -186,9 +187,16 @@ function SidebarBody({ collapsed = false, onNavigate }) {
           />
         )}
 
-        {/* Global system admin is now reachable from the workspace switcher
-            (workspace creation) and via the Workspace-Admin pages — no need
-            for a dedicated sidebar slot anymore. */}
+        {session.user.role === 'admin' && (
+          <NavRow
+            href="/admin/prices"
+            label={tNav('priceCatalog')}
+            Icon={BadgeEuro}
+            isActive={router.pathname === '/admin/prices'}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        )}
 
       </div>
     </div>

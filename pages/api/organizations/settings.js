@@ -20,8 +20,7 @@ async function handler(req, res) {
     case 'GET': {
       try {
         const result = await query(
-          `SELECT default_language, retention_days, cost_limit_cents, member_monthly_budget_limit_cents,
-                  audit_retention_days, sso_config, context_bias, updated_at
+          `SELECT default_language, retention_days, audit_retention_days, sso_config, context_bias, updated_at
              FROM organization_settings
             WHERE organization_id = $1`,
           [orgId],
@@ -41,11 +40,16 @@ async function handler(req, res) {
         return res.status(403).json({ code: 'FORBIDDEN', message: 'Keine Berechtigung.' });
       }
       const body = req.body && typeof req.body === 'object' ? req.body : {};
+      if (Object.prototype.hasOwnProperty.call(body, 'costLimitCents')
+          || Object.prototype.hasOwnProperty.call(body, 'memberMonthlyBudgetLimitCents')) {
+        return res.status(403).json({
+          code: 'BUDGET_ENDPOINT_REQUIRED',
+          message: 'Use the dedicated workspace budget endpoint.',
+        });
+      }
       const {
         defaultLanguage = null,
         retentionDays = null,
-        costLimitCents = null,
-        memberMonthlyBudgetLimitCents = null,
         auditRetentionDays = null,
         contextBias = null,
       } = body;
@@ -57,14 +61,11 @@ async function handler(req, res) {
       try {
         await query(
           `INSERT INTO organization_settings
-             (organization_id, default_language, retention_days, cost_limit_cents,
-              member_monthly_budget_limit_cents, audit_retention_days, context_bias, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+             (organization_id, default_language, retention_days, audit_retention_days, context_bias, updated_at)
+           VALUES ($1, $2, $3, $4, $5, NOW())
            ON CONFLICT (organization_id) DO UPDATE SET
              default_language = EXCLUDED.default_language,
              retention_days = EXCLUDED.retention_days,
-             cost_limit_cents = EXCLUDED.cost_limit_cents,
-             member_monthly_budget_limit_cents = EXCLUDED.member_monthly_budget_limit_cents,
              audit_retention_days = EXCLUDED.audit_retention_days,
              context_bias = EXCLUDED.context_bias,
              updated_at = NOW()`,
@@ -72,8 +73,6 @@ async function handler(req, res) {
             orgId,
             defaultLanguage || null,
             Number.isFinite(Number(retentionDays)) ? Number(retentionDays) : null,
-            Number.isFinite(Number(costLimitCents)) ? Number(costLimitCents) : null,
-            Number.isFinite(Number(memberMonthlyBudgetLimitCents)) ? Number(memberMonthlyBudgetLimitCents) : null,
             Number.isFinite(Number(auditRetentionDays)) ? Number(auditRetentionDays) : null,
             normalizedContextBias,
           ],
@@ -84,6 +83,7 @@ async function handler(req, res) {
           action: 'org.settings.updated',
           targetType: 'organization',
           targetId: String(orgId),
+          reason: body.reason ?? null,
         });
         return res.status(200).json({ ok: true });
       } catch (error) {

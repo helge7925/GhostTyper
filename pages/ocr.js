@@ -18,6 +18,7 @@ import { Card, CardBody } from '../components/ui/card';
 import { Field } from '../components/ui/field';
 import { Camera, ChevronDown, FileText, ScanText, X } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { createCaptureId, enqueueCapture, isRetryableResponse } from '../lib/offline-queue';
 
 const OCR_LOADING_MESSAGES = [
   'Wir lesen Pixel für Pixel, damit kein Wort verloren geht.',
@@ -83,6 +84,8 @@ export default function OCR() {
   const [stepStartedAt, setStepStartedAt] = useState(null);
   const [analyze, setAnalyze] = useState(true);
   const [error, setError] = useState('');
+  const [offlineSaved, setOfflineSaved] = useState(false);
+  const [clientCaptureId, setClientCaptureId] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   
   // Template & Model states
@@ -138,12 +141,14 @@ export default function OCR() {
 
   function handleFile(f) {
     setError('');
+    setOfflineSaved(false);
     if (!f) return;
     if (f.size > MAX_FILE_SIZE) {
       setError('Datei ist zu groß (max. 500 MB)');
       return;
     }
     setFile(f);
+    setClientCaptureId(createCaptureId());
   }
 
   async function handleSubmit(e) {
@@ -157,10 +162,37 @@ export default function OCR() {
     setMarkdown('');
     setAnalysis(null);
     setTranscriptionId(null);
+
+    const captureId = clientCaptureId || createCaptureId();
+    if (!clientCaptureId) setClientCaptureId(captureId);
+    const userId = session?.user?.id;
+    const organizationId = session?.user?.currentOrganizationId;
+    const captureFields = {
+      analyze,
+      ...(analyze ? { template, model, customPrompt, analysisFocus } : {}),
+    };
+    const saveOffline = async () => {
+      if (!userId || !organizationId) throw new Error(t('offlineScopeMissing'));
+      await enqueueCapture({
+        id: captureId,
+        kind: file.type?.startsWith('image/') && template === 'data_table' ? 'photo_table' : 'ocr',
+        userId,
+        organizationId,
+        blob: file,
+        filename: file.name,
+        fields: captureFields,
+      });
+      setFile(null);
+      setClientCaptureId(null);
+      setOfflineSaved(true);
+    };
     
     const formData = new FormData();
     formData.append('file', file);
     formData.append('analyze', analyze ? 'true' : 'false');
+    formData.append('clientCaptureId', captureId);
+    formData.append('clientCaptureUserId', String(userId || ''));
+    formData.append('clientCaptureOrganizationId', String(organizationId || ''));
     
     if (analyze) {
       formData.append('template', template);
@@ -177,13 +209,21 @@ export default function OCR() {
     }
 
     try {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        await saveOffline();
+        return;
+      }
       const res = await fetch('/api/ocr', {
         method: 'POST',
         body: formData,
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'OCR fehlgeschlagen');
+      if (!res.ok) {
+        const requestError = new Error(data.message || 'OCR fehlgeschlagen');
+        requestError.status = res.status;
+        throw requestError;
+      }
       
       setMarkdown(data.markdown);
       setAnalysis(data.analysis);
@@ -193,7 +233,16 @@ export default function OCR() {
         setShowEditor(true);
       }
     } catch (err) {
-      setError(err.message);
+      const networkFailure = err?.status === undefined;
+      if ((networkFailure || isRetryableResponse(err.status)) && file) {
+        try {
+          await saveOffline();
+        } catch (queueError) {
+          setError(queueError.message || t('offlineStoreFailed'));
+        }
+      } else {
+        setError(err.message);
+      }
     } finally {
       if (analysisStepTimeoutRef.current) {
         clearTimeout(analysisStepTimeoutRef.current);
@@ -269,7 +318,7 @@ export default function OCR() {
                   <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                     Ersetzen
                   </Button>
-                  <Button type="button" variant="ghost" size="icon-sm" onClick={() => setFile(null)} aria-label="Dokument entfernen">
+                  <Button type="button" variant="ghost" size="icon-sm" onClick={() => { setFile(null); setClientCaptureId(null); }} aria-label="Dokument entfernen">
                     <X className="w-4 h-4" aria-hidden="true" />
                   </Button>
                 </div>
@@ -408,6 +457,7 @@ export default function OCR() {
       )}
 
       {error && <div role="alert" className="mt-8 p-4 border border-danger/30 text-danger rounded-xl text-sm text-center animate-fade-in">{error}</div>}
+      {offlineSaved && <div role="status" className="mt-8 p-4 border border-success/30 bg-success/10 text-success rounded-xl text-sm text-center animate-fade-in">{t('savedOffline')}</div>}
       {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
     </>
   );

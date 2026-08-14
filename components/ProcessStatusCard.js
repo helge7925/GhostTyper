@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { remainingEtaSeconds } from '../lib/job-progress';
 
 function hashSeed(seed) {
   let hash = 2166136261;
@@ -41,6 +42,9 @@ export default function ProcessStatusCard({
   messages = [],
   startedAt = null,
   etaSeconds = null,
+  etaTotalSeconds = null,
+  connectionLabel = '',
+  etaLabels = null,
   messageRotationMs = 5600,
 }) {
   const messagePool = useMemo(
@@ -70,10 +74,10 @@ export default function ProcessStatusCard({
   }, [done, shuffledMessages.length, messageRotationMs]);
 
   useEffect(() => {
-    if (done || !etaSeconds) return undefined;
+    if (done || !(etaTotalSeconds ?? etaSeconds)) return undefined;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [done, etaSeconds]);
+  }, [done, etaSeconds, etaTotalSeconds]);
 
   const currentMessage = !done && shuffledMessages.length > 0 ? shuffledMessages[messageIndex] : '';
 
@@ -84,17 +88,20 @@ export default function ProcessStatusCard({
   }, [startedAt]);
 
   const etaText = useMemo(() => {
-    if (done || !etaSeconds || !startTimestamp) return '';
-    const elapsedSeconds = Math.max(0, (now - startTimestamp) / 1000);
-    const remainingSeconds = etaSeconds - elapsedSeconds;
+    const totalSeconds = etaTotalSeconds ?? etaSeconds;
+    if (done || !totalSeconds || !startTimestamp) return '';
+    const remainingSeconds = remainingEtaSeconds({ etaTotalSeconds: totalSeconds, startedAt: startTimestamp, now });
     if (remainingSeconds > 0) {
-      return `Restzeit ca. ${formatDuration(remainingSeconds)}`;
+      const duration = formatDuration(remainingSeconds);
+      return etaLabels?.remaining
+        ? etaLabels.remaining.replace('{duration}', duration)
+        : `Restzeit ca. ${duration}`;
     }
     if (remainingSeconds > -25) {
-      return 'Fast fertig. Letzter Feinschliff läuft.';
+      return etaLabels?.near || 'Fast fertig. Letzter Feinschliff läuft.';
     }
-    return 'Dauert etwas länger als üblich. Wir bleiben dran.';
-  }, [done, etaSeconds, startTimestamp, now]);
+    return etaLabels?.overdue || 'Dauert etwas länger als üblich. Wir bleiben dran.';
+  }, [done, etaLabels, etaSeconds, etaTotalSeconds, startTimestamp, now]);
 
   return (
     <div className="bg-surface border border-subtle rounded-2xl p-5 shadow-xl animate-fade-in">
@@ -103,7 +110,7 @@ export default function ProcessStatusCard({
           done ? 'bg-success/20 text-success' : 'bg-accent/20 text-accent-ink'
         }`}>
           {done ? (
-            <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           ) : (
@@ -141,6 +148,10 @@ export default function ProcessStatusCard({
         <p className="mt-3 text-sm text-accent-ink font-medium">
           {etaText}
         </p>
+      )}
+
+      {connectionLabel && (
+        <p className="mt-2 text-xs text-secondary" role="status">{connectionLabel}</p>
       )}
 
       {currentMessage && (

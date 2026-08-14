@@ -9,6 +9,22 @@ const nextConfig = {
   // (fluent-ffmpeg + @ffmpeg-installer do a runtime require the tracer can't
   // resolve). They stay as plain node_modules requires at runtime.
   serverExternalPackages: ['@ffmpeg-installer/ffmpeg', 'fluent-ffmpeg'],
+  outputFileTracingIncludes: {
+    '/api/translate/file': [
+      './node_modules/@fontsource/noto-sans/LICENSE',
+      './node_modules/@fontsource/noto-sans/unicode.json',
+      './node_modules/@fontsource/noto-sans/files/*.woff',
+      './node_modules/@fontsource/noto-sans-arabic/LICENSE',
+      './node_modules/@fontsource/noto-sans-arabic/unicode.json',
+      './node_modules/@fontsource/noto-sans-arabic/files/*-400-normal.woff',
+      './node_modules/@fontsource/noto-sans-sc/LICENSE',
+      './node_modules/@fontsource/noto-sans-sc/unicode.json',
+      './node_modules/@fontsource/noto-sans-sc/files/*-400-normal.woff',
+      './node_modules/@fontsource/noto-sans-tc/LICENSE',
+      './node_modules/@fontsource/noto-sans-tc/unicode.json',
+      './node_modules/@fontsource/noto-sans-tc/files/*-400-normal.woff',
+    ],
+  },
   // Next.js clamps request bodies passing through middleware/proxy to 10 MB by
   // default. Audio uploads (/api/upload, up to MAX_FILE_SIZE = 500 MB) flow
   // through the global middleware matcher, so raise the cap to match.
