@@ -12,6 +12,13 @@ import { analysisToHtml } from '../lib/export-utils';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { useMessageList, useTranslations } from '../lib/i18n';
 import { MAX_FILE_SIZE } from '../lib/constants';
+import { CHAT_MODEL_OPTIONS } from '../lib/constants';
+import { Button } from '../components/ui/button';
+import { Card, CardBody } from '../components/ui/card';
+import { Field } from '../components/ui/field';
+import { Camera, ChevronDown, FileText, ScanText, X } from 'lucide-react';
+import { cn } from '../lib/utils';
+import { createCaptureId, enqueueCapture, isRetryableResponse } from '../lib/offline-queue';
 
 const OCR_LOADING_MESSAGES = [
   'Wir lesen Pixel für Pixel, damit kein Wort verloren geht.',
@@ -50,7 +57,6 @@ const OCR_PRESETS = {
       analyze: true,
       template: 'meeting',
       model: 'deepseek-v4-pro',
-      showAdvancedOptions: true,
     },
   },
   'ocr-summary': {
@@ -59,7 +65,6 @@ const OCR_PRESETS = {
       analyze: true,
       template: 'generic',
       model: 'deepseek-v4-flash',
-      showAdvancedOptions: true,
     },
   },
 };
@@ -79,6 +84,8 @@ export default function OCR() {
   const [stepStartedAt, setStepStartedAt] = useState(null);
   const [analyze, setAnalyze] = useState(true);
   const [error, setError] = useState('');
+  const [offlineSaved, setOfflineSaved] = useState(false);
+  const [clientCaptureId, setClientCaptureId] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   
   // Template & Model states
@@ -134,19 +141,14 @@ export default function OCR() {
 
   function handleFile(f) {
     setError('');
+    setOfflineSaved(false);
     if (!f) return;
     if (f.size > MAX_FILE_SIZE) {
       setError('Datei ist zu groß (max. 500 MB)');
       return;
     }
     setFile(f);
-  }
-
-  function handleDropZoneKeyDown(event) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      fileInputRef.current?.click();
-    }
+    setClientCaptureId(createCaptureId());
   }
 
   async function handleSubmit(e) {
@@ -160,10 +162,37 @@ export default function OCR() {
     setMarkdown('');
     setAnalysis(null);
     setTranscriptionId(null);
+
+    const captureId = clientCaptureId || createCaptureId();
+    if (!clientCaptureId) setClientCaptureId(captureId);
+    const userId = session?.user?.id;
+    const organizationId = session?.user?.currentOrganizationId;
+    const captureFields = {
+      analyze,
+      ...(analyze ? { template, model, customPrompt, analysisFocus } : {}),
+    };
+    const saveOffline = async () => {
+      if (!userId || !organizationId) throw new Error(t('offlineScopeMissing'));
+      await enqueueCapture({
+        id: captureId,
+        kind: file.type?.startsWith('image/') && template === 'data_table' ? 'photo_table' : 'ocr',
+        userId,
+        organizationId,
+        blob: file,
+        filename: file.name,
+        fields: captureFields,
+      });
+      setFile(null);
+      setClientCaptureId(null);
+      setOfflineSaved(true);
+    };
     
     const formData = new FormData();
     formData.append('file', file);
     formData.append('analyze', analyze ? 'true' : 'false');
+    formData.append('clientCaptureId', captureId);
+    formData.append('clientCaptureUserId', String(userId || ''));
+    formData.append('clientCaptureOrganizationId', String(organizationId || ''));
     
     if (analyze) {
       formData.append('template', template);
@@ -180,13 +209,21 @@ export default function OCR() {
     }
 
     try {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        await saveOffline();
+        return;
+      }
       const res = await fetch('/api/ocr', {
         method: 'POST',
         body: formData,
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'OCR fehlgeschlagen');
+      if (!res.ok) {
+        const requestError = new Error(data.message || 'OCR fehlgeschlagen');
+        requestError.status = res.status;
+        throw requestError;
+      }
       
       setMarkdown(data.markdown);
       setAnalysis(data.analysis);
@@ -196,7 +233,16 @@ export default function OCR() {
         setShowEditor(true);
       }
     } catch (err) {
-      setError(err.message);
+      const networkFailure = err?.status === undefined;
+      if ((networkFailure || isRetryableResponse(err.status)) && file) {
+        try {
+          await saveOffline();
+        } catch (queueError) {
+          setError(queueError.message || t('offlineStoreFailed'));
+        }
+      } else {
+        setError(err.message);
+      }
     } finally {
       if (analysisStepTimeoutRef.current) {
         clearTimeout(analysisStepTimeoutRef.current);
@@ -230,29 +276,29 @@ export default function OCR() {
       <Head><title>{`${t('title')} – GhostTyper`}</title></Head>
 
       {!showEditor ? (
-        <div className="max-w-5xl mx-auto animate-fade-in pb-20">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-2xl font-bold text-primary">{t('title')}</h1>
-              <p className="text-sm text-secondary mt-1">Dokumente lesen und optional zusammenfassen</p>
+        <div className="max-w-2xl mx-auto animate-fade-in pb-20">
+          <header className="mb-7">
+              <p className="text-xs font-medium text-secondary mb-2">Texterkennung</p>
+              <h1 className="text-3xl font-semibold tracking-tight text-primary">{t('title')}</h1>
+              <p className="text-sm leading-6 text-secondary mt-2">Lies Text aus PDFs oder Fotos aus und erstelle auf Wunsch direkt eine strukturierte Auswertung.</p>
               {activePreset && (
-                <p className="text-xs text-info bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 mt-3 inline-flex">
-                  Preset aktiv: {activePreset.label}
-                </p>
+                <div className="flex items-start gap-3 text-sm bg-surface-elevated border border-subtle rounded-xl px-4 py-3 mt-4">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-info shrink-0" aria-hidden="true" />
+                  <div>
+                    <p className="font-medium text-primary">Passende Einstellungen sind bereits gewählt</p>
+                    <p className="text-secondary mt-0.5">{activePreset.label}</p>
+                  </div>
+                </div>
               )}
-            </div>
-          </div>
+          </header>
 
-          <div className="max-w-xl mx-auto space-y-6">
+          <div className="space-y-5">
+            <Card>
+              <CardBody className="p-5 sm:p-6">
             <div 
-              className={`border-2 border-dashed rounded-3xl p-12 text-center transition-all ${
-                dragActive ? 'border-accent bg-accent/10 scale-[1.02]' : 'border-subtle hover:border-emphasis bg-hover-subtle'
-              } ${file ? 'border-success/30 bg-success/5' : ''}`}
-              role="button"
-              tabIndex={0}
-              aria-label="Dokument auswählen oder per Drag-and-drop hochladen"
-              onClick={() => fileInputRef.current?.click()}
-              onKeyDown={handleDropZoneKeyDown}
+              className={`border border-dashed rounded-xl p-8 text-center transition-colors ${
+                dragActive ? 'border-accent bg-accent/5' : 'border-emphasis bg-surface-elevated/40'
+              }`}
               onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
               onDragLeave={() => setDragActive(false)}
               onDrop={(e) => { e.preventDefault(); setDragActive(false); handleFile(e.dataTransfer.files[0]); }}
@@ -261,102 +307,120 @@ export default function OCR() {
               <input type="file" ref={cameraInputRef} onChange={(e) => handleFile(e.target.files[0])} className="hidden" accept="image/*" capture="environment" />
               
               {file ? (
-                <div className="space-y-4">
-                  <div className="w-16 h-16 bg-success/20 rounded-2xl flex items-center justify-center mx-auto text-success font-bold text-xl">{file.name.split('.').pop().toUpperCase()}</div>
-                  <p className="text-primary font-medium">{file.name}</p>
-                  <button onClick={() => setFile(null)} className="text-xs text-secondary hover:text-danger underline">Anderes Dokument</button>
+                <div className="flex items-center justify-center gap-3 text-left">
+                  <span className="h-10 w-10 rounded-lg bg-accent/10 text-accent-ink flex items-center justify-center shrink-0">
+                    <FileText className="w-5 h-5" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-primary truncate">{file.name}</p>
+                    <p className="text-xs text-secondary mt-0.5">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                    Ersetzen
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon-sm" onClick={() => { setFile(null); setClientCaptureId(null); }} aria-label="Dokument entfernen">
+                    <X className="w-4 h-4" aria-hidden="true" />
+                  </Button>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
+                  <span className="mx-auto h-10 w-10 rounded-lg bg-surface border border-subtle text-secondary flex items-center justify-center">
+                    <ScanText className="w-5 h-5" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-primary">Dokument auswählen</p>
+                    <p className="text-xs text-secondary mt-1">PDF oder Bild, bis 500 MB</p>
+                  </div>
                   <div className="flex justify-center gap-4">
-                    <button 
+                    <Button
                       type="button"
                       onClick={() => fileInputRef.current.click()} 
-                      className="flex flex-col items-center gap-2 bg-hover hover:bg-hover-strong text-primary px-6 py-4 rounded-2xl border border-subtle transition-all group w-32"
+                      variant="outline"
                       title="Dokument hochladen"
                     >
-                      <svg className="w-8 h-8 text-accent group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                      <span className="text-[10px] font-bold uppercase tracking-widest">Dokument</span>
-                    </button>
-                    <button 
+                      <FileText className="w-4 h-4" aria-hidden="true" />
+                      Dokument
+                    </Button>
+                    <Button
                       type="button"
                       onClick={() => cameraInputRef.current.click()} 
-                      className="flex flex-col items-center gap-2 bg-hover hover:bg-hover-strong text-primary px-6 py-4 rounded-2xl border border-subtle transition-all group w-32"
+                      variant="outline"
                       title="Foto machen"
                     >
-                      <svg className="w-8 h-8 text-accent group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                      <span className="text-[10px] font-bold uppercase tracking-widest">Kamera</span>
-                    </button>
+                      <Camera className="w-4 h-4" aria-hidden="true" />
+                      Kamera
+                    </Button>
                   </div>
-                  <p className="text-primary font-medium">Dokument hochladen oder fotografieren</p>
                 </div>
               )}
             </div>
+              </CardBody>
+            </Card>
 
-            <div className="flex flex-col items-center gap-6">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <input type="checkbox" checked={analyze} onChange={(e) => setAnalyze(e.target.checked)} className="w-5 h-5 rounded border-subtle bg-hover-subtle accent-accent focus:ring-accent" />
-                <span className="text-sm text-secondary group-hover:text-primary">{t('withAnalysis')}</span>
+            <Card>
+              <CardBody className="p-5">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" checked={analyze} onChange={(e) => setAnalyze(e.target.checked)} className="mt-0.5 w-4 h-4 rounded border-subtle bg-hover-subtle accent-accent focus:ring-accent" />
+                <span>
+                  <span className="block text-sm font-medium text-primary">{t('withAnalysis')}</span>
+                  <span className="block text-xs text-secondary mt-0.5">Erstellt nach der Texterkennung eine Zusammenfassung.</span>
+                </span>
               </label>
 
               {analyze && (
-                <div className="w-full max-w-sm space-y-3">
-                  <button
+                <div className="w-full space-y-3 mt-4 pt-4 border-t border-subtle">
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => setShowAdvancedOptions((prev) => !prev)}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-subtle bg-hover-subtle text-sm text-primary hover:bg-hover-subtle transition-colors"
+                    className="w-full justify-between px-3"
                     aria-expanded={showAdvancedOptions}
                   >
-                    <span>Erweiterte Analyseoptionen</span>
-                    <svg
-                      className={`w-4 h-4 text-secondary transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
+                    <span>Details und Vorgaben</span>
+                    <ChevronDown className={cn('w-4 h-4 text-secondary transition-transform', showAdvancedOptions && 'rotate-180')} aria-hidden="true" />
+                  </Button>
 
                   {showAdvancedOptions && (
-                    <div className="space-y-4 bg-hover-subtle p-4 rounded-xl border border-subtle">
+                    <div className="space-y-4 bg-surface-elevated/50 p-4 rounded-xl border border-subtle">
                       <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[10px] font-bold text-secondary uppercase mb-1.5 ml-1">Modus</label>
+                        <Field label="Art der Auswertung">
                           <select value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none">
                             <option value="generic">Zusammenfassung</option><option value="meeting">Meeting</option><option value="action_items">To-Dos extrahieren</option>
                             {templates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}
                           </select>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-secondary uppercase mb-1.5 ml-1">Modell</label>
+                        </Field>
+                        <Field label="KI-Modell" help="Der Standard passt für die meisten Dokumente.">
                           <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none">
-                            <option value="deepseek-v4-pro">DeepSeek V4 Pro</option><option value="deepseek-v4-flash">DeepSeek V4 Flash</option><option value="kimi-2.6">Kimi 2.6</option>
+                            {CHAT_MODEL_OPTIONS.map((option) => (<option key={option.value} value={option.value}>{option.label}</option>))}
                           </select>
-                        </div>
+                        </Field>
                       </div>
-                      <textarea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Zusätzliche Anweisungen..." rows={2} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none" />
+                      <Field label="Zusätzliche Anweisung" help="Optional: Begriffe, Format oder Kontext für die Auswertung.">
+                        <textarea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} rows={2} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none" />
+                      </Field>
+                      <Field label="Fokus der Analyse" help="Optional: Was ist in diesem Dokument besonders wichtig?">
                       <textarea
                         value={analysisFocus}
                         onChange={(e) => setAnalysisFocus(e.target.value)}
-                        placeholder="Fokus der Analyse: Worauf soll sich das Modell konzentrieren?"
                         rows={2}
                         className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none"
                       />
+                      </Field>
                     </div>
                   )}
                 </div>
               )}
-            </div>
+              </CardBody>
+            </Card>
 
-            <button onClick={handleSubmit} disabled={loading || !file} className="w-full gradient-accent text-white py-4 rounded-2xl text-lg font-semibold shadow-lg shadow-accent/20 hover:shadow-accent/30 disabled:opacity-30 flex flex-col items-center justify-center gap-1">
+            <Button onClick={handleSubmit} disabled={loading || !file} variant="primary" size="lg" className="w-full">
               {loading ? (
                 <div className="flex items-center gap-3">
                   <div className="w-5 h-5 border-2 border-emphasis border-t-white rounded-full animate-spin" />
                   <span>{loadingStep === 'analysis' ? 'Schritt 2/2: Zusammenfassung wird erstellt...' : 'Schritt 1/2: Text wird gelesen...'}</span>
                 </div>
-              ) : 'Vorgang starten'}
-            </button>
+              ) : 'Text erkennen'}
+            </Button>
 
             {loading && (
               <ProcessStatusCard
@@ -392,7 +456,8 @@ export default function OCR() {
         />
       )}
 
-      {error && <div className="mt-8 p-4 bg-danger/10 border border-danger/20 text-danger rounded-2xl text-sm text-center animate-fade-in">{error}</div>}
+      {error && <div role="alert" className="mt-8 p-4 border border-danger/30 text-danger rounded-xl text-sm text-center animate-fade-in">{error}</div>}
+      {offlineSaved && <div role="status" className="mt-8 p-4 border border-success/30 bg-success/10 text-success rounded-xl text-sm text-center animate-fade-in">{t('savedOffline')}</div>}
       {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
     </>
   );

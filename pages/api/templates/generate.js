@@ -1,16 +1,11 @@
 import { generateTemplate } from '../../../lib/ai-service';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
-import {
-  CostLimitCheckUnavailableError,
-  CostLimitExceededError,
-  logUsage,
-  checkCostLimit,
-  withUserCostLock,
-} from '../../../lib/usage';
+import { composeAbortSignals, executeReservedSpend, estimateTextUsage, requestBudgetScope } from '../../../lib/budget-runtime';
 import { getSettingsRow, resolveCortecsConfig } from '../../../lib/settings-service';
 import { resolveChatModel } from '../../../lib/model-policy';
 import { MAX_TEMPLATE_GENERATOR_GOAL_LENGTH } from '../../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
+import { hasPermission } from '../../../lib/permissions';
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -19,6 +14,9 @@ async function handler(req, res) {
 
   const userId = req.userId;
   const orgId = req.org.id;
+  if (!hasPermission(req.role, 'paid.execute')) {
+    return res.status(403).json({ code: 'FORBIDDEN' });
+  }
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'template-generate',
@@ -39,35 +37,40 @@ async function handler(req, res) {
   try {
     const settingsRow = await getSettingsRow(userId);
     const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const apiKey = cortecs.apiKey;
-    const preferredModel = resolveChatModel(cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
+    const preferredModel = resolveChatModel(settingsRow?.preferred_model, null) || cortecs.chatModel;
 
-    if (!apiKey) {
+    if (!cortecs.apiKey) {
       return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert.' });
     }
 
-    const promptText = await withUserCostLock(userId, async () => {
-      const costCheck = await checkCostLimit(userId, orgId);
-      if (!costCheck.allowed) {
-        throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
-      }
-
-      const { promptText: value, usage, model } = await generateTemplate(
+    const { promptText } = await executeReservedSpend(
+      {
+        idempotencyKey: requestBudgetScope(req, 'template-generation', { goal, preferredModel }),
+        organizationId: orgId,
+        userId,
+        operation: 'template_generation',
+        provider: 'cortecs',
+        model: preferredModel,
+        estimatedUsage: estimateTextUsage(goal, {
+          inputBufferTokens: 900,
+          outputMultiplier: 3,
+          outputBufferTokens: 1200,
+        }),
+      },
+      (_reservation, budgetSignal) => generateTemplate(
         goal,
-        apiKey,
+        cortecs.apiKey,
         preferredModel,
-        { baseUrl: cortecs.baseUrl, preference: cortecs.preference },
-      );
-      await logUsage(userId, model, 'template_generation', usage, orgId);
-      return value;
-    });
+        { baseUrl: cortecs.baseUrl, preference: cortecs.preference, signal: composeAbortSignals(budgetSignal) },
+      ),
+    );
 
     return res.status(200).json({ promptText });
   } catch (error) {
-    if (error?.code === 'COST_LIMIT_EXCEEDED') {
+    if (error?.code === 'BUDGET_EXCEEDED') {
       return res.status(429).json({ message: error.message });
     }
-    if (error instanceof CostLimitCheckUnavailableError || error?.code === 'COST_CHECK_UNAVAILABLE') {
+    if (error?.code === 'BUDGET_ACCOUNTING_UNAVAILABLE' || error?.code === 'PRICING_CONFIGURATION_MISSING') {
       return res.status(503).json({ message: error.message });
     }
     logApiError('Error generating template', error);

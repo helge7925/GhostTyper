@@ -1,15 +1,37 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMeetingUrl, mapVexaTranscriptToGhostTyper } from '../lib/api/vexa.js';
+import { parseMeetingUrl, mapVexaTranscriptToGhostTyper, getTranscript } from '../lib/api/vexa.js';
 
-test('parseMeetingUrl recognises Google Meet URLs', () => {
-  const result = parseMeetingUrl('https://meet.google.com/abc-defg-hij');
-  assert.deepEqual(result, { platform: 'google_meet', nativeMeetingId: 'abc-defg-hij' });
+// Google hard-blocks meeting bots on Meet (operator-verified, July 2026: the
+// Vexa bot lands on a dedicated rejection page, not a CAPTCHA). Meet was
+// removed from the outbound bot-start path — parseMeetingUrl() must no
+// longer recognise Meet links as a bot-startable platform. A pasted Meet
+// URL now falls through to the "unsupported" (null) case, same as any
+// other unrecognised meeting link; the redirect-to-tab-audio hint lives
+// client-side in components/MeetingStartForm.js.
+test('parseMeetingUrl no longer recognises Google Meet URLs (redirect/unsupported case)', () => {
+  assert.equal(parseMeetingUrl('https://meet.google.com/abc-defg-hij'), null);
+  assert.equal(parseMeetingUrl('https://meet.google.com/ABC-DEFG-HIJ'), null);
 });
 
-test('parseMeetingUrl normalises Google Meet IDs to lowercase', () => {
-  const result = parseMeetingUrl('https://meet.google.com/ABC-DEFG-HIJ');
-  assert.equal(result.nativeMeetingId, 'abc-defg-hij');
+// Read-side tolerance: functions that act on an *existing* meeting row
+// (stop bot, fetch transcript, post chat, etc.) take whatever platform
+// string is stored on the row and pass it straight through to Vexa — there
+// is no allow-list gate inside the adapter. That must stay true so a
+// historic transcription with meeting_platform='google_meet' (created
+// before this change) can still be read/managed. We can't hit a real Vexa
+// server in this suite, but we can prove there's no platform-specific
+// rejection: with no baseUrl configured, every platform value — including
+// the historic 'google_meet' one — fails identically on the baseUrl guard,
+// never on the platform itself.
+test('getTranscript applies no platform allow-list (historic google_meet rows stay readable)', async () => {
+  for (const platform of ['google_meet', 'teams', 'zoom', 'nextcloud_talk']) {
+    await assert.rejects(
+      () => getTranscript({ baseUrl: undefined, apiKey: 'x' }, { platform, nativeMeetingId: 'abc' }),
+      /Vexa baseUrl is not configured/,
+      `platform=${platform} should fail on the missing-baseUrl guard, not be rejected for its platform value`,
+    );
+  }
 });
 
 test('parseMeetingUrl extracts Zoom ID and passcode', () => {

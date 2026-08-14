@@ -1,27 +1,22 @@
 import { query } from '../../../lib/db';
 import { verifyVexaSignature } from '../../../lib/vexa-webhook-signature';
-import { logApiError, serverError } from '../../../lib/api-utils';
+import { logApiError } from '../../../lib/api-utils';
 import { logAuditEvent } from '../../../lib/audit-log';
 import { addTranscriptionEvent } from '../../../lib/transcription-events';
 import { resolveVexaConfig } from '../../../lib/integrations';
 import { decryptSecret, SECRET_CONTEXTS } from '../../../lib/secrets';
 import { getTranscript, mapVexaTranscriptToGhostTyper } from '../../../lib/api/vexa';
 import { runManualAnalysisJob } from '../../../lib/manual-analysis';
-import { startBridgeForTranscription, stopBridgeForTranscription } from '../../../lib/vexa-bridge';
+import {
+  checkpointVexaMeetingSpend,
+  startBridgeForTranscription,
+  stopBridgeForTranscription,
+} from '../../../lib/vexa-bridge';
 import { ensureShareLinkPostedToChat } from '../../../lib/share-chat-poster';
 import { ensureGdprNoticePostedToChat } from '../../../lib/gdpr-chat-poster';
 import { ensureOverlayStarted, clearOverlay } from '../../../lib/in-meeting-overlay';
 import { stopInMeetingAudio } from '../../../lib/in-meeting-audio';
-import { logUsage } from '../../../lib/usage';
-import { autoIndexDocument } from '../../../lib/document-index';
-
-function totalAudioSeconds(segments) {
-  if (!Array.isArray(segments) || !segments.length) return 0;
-  // Use the last segment's end as the total duration of transcribed audio.
-  const last = segments[segments.length - 1];
-  const ended = typeof last.end === 'number' ? last.end : 0;
-  return Math.max(0, Math.ceil(ended));
-}
+import { upsertDocumentFromTranscription } from '../../../lib/documents';
 
 export const config = {
   api: { bodyParser: false },
@@ -71,7 +66,8 @@ async function recordEventOnce(eventId) {
 async function loadTranscriptionByMeeting({ platform, nativeMeetingId, externalMeetingId }) {
   if (externalMeetingId) {
     const result = await query(
-      `SELECT id, user_id, organization_id, source, status, auto_analyze, custom_prompt
+      `SELECT id, user_id, organization_id, source, status, auto_analyze, custom_prompt,
+              budget_stop_state, meeting_started_at
          FROM transcriptions
         WHERE external_meeting_id = $1
         ORDER BY id DESC
@@ -82,7 +78,8 @@ async function loadTranscriptionByMeeting({ platform, nativeMeetingId, externalM
   }
   if (platform && nativeMeetingId) {
     const result = await query(
-      `SELECT id, user_id, organization_id, source, status, auto_analyze, custom_prompt
+      `SELECT id, user_id, organization_id, source, status, auto_analyze, custom_prompt,
+              budget_stop_state, meeting_started_at
          FROM transcriptions
         WHERE source = 'vexa'
           AND meeting_platform = $1
@@ -119,12 +116,14 @@ async function loadUserToken(userId, orgId) {
 }
 
 async function handleStarted(transcription, payload) {
-  await query(
+  const started = await query(
     `UPDATE transcriptions
         SET status = 'processing', bot_status = 'active', meeting_started_at = COALESCE(meeting_started_at, NOW()), updated_at = NOW()
-      WHERE id = $1`,
+      WHERE id = $1 AND budget_stop_state = 'none'
+      RETURNING id`,
     [transcription.id],
   );
+  if (!started.rowCount) return;
   await addTranscriptionEvent({
     transcriptionId: transcription.id,
     userId: transcription.user_id,
@@ -184,7 +183,8 @@ async function handleStarted(transcription, payload) {
 async function handleStatusChange(transcription, payload) {
   const meeting = pickMeetingFields(payload);
   await query(
-    `UPDATE transcriptions SET bot_status = COALESCE($1, bot_status), updated_at = NOW() WHERE id = $2`,
+    `UPDATE transcriptions SET bot_status = COALESCE($1, bot_status), updated_at = NOW()
+      WHERE id = $2 AND budget_stop_state = 'none'`,
     [meeting.status, transcription.id],
   );
   await addTranscriptionEvent({
@@ -201,7 +201,8 @@ async function handleFailed(transcription, payload) {
   stopBridgeForTranscription(transcription.id, 'bot.failed');
   const reason = payload?.data?.status_change?.reason || 'Bot-Beitritt fehlgeschlagen.';
   await query(
-    `UPDATE transcriptions SET status = 'error', bot_status = 'failed', error = $1, updated_at = NOW() WHERE id = $2`,
+    `UPDATE transcriptions SET status = 'error', bot_status = 'failed', error = $1, updated_at = NOW()
+      WHERE id = $2 AND budget_stop_state = 'none'`,
     [String(reason).slice(0, 500), transcription.id],
   );
   await addTranscriptionEvent({
@@ -250,7 +251,23 @@ async function handleCompleted(transcription, payload, vexaConfig) {
   );
   const mapped = mapVexaTranscriptToGhostTyper(transcript);
 
-  await query(
+  // Commit the final incremental remainder before making the row terminal so
+  // an accounting failure leaves reconcile able to retry safely.
+  await checkpointVexaMeetingSpend({
+    transcript,
+    transcriptionId: transcription.id,
+    organizationId: transcription.organization_id,
+    userId: transcription.user_id,
+    meetingStartedAt: transcription.meeting_started_at,
+    ongoing: false,
+    final: true,
+    baseUrl: vexaConfig.baseUrl,
+    apiKey,
+    platform: meeting.platform,
+    nativeMeetingId: meeting.nativeMeetingId,
+  });
+
+  const finalized = await query(
     `UPDATE transcriptions
         SET status = 'transcribed',
             bot_status = 'completed',
@@ -259,9 +276,11 @@ async function handleCompleted(transcription, payload, vexaConfig) {
             speakers = $3::jsonb,
             meeting_ended_at = COALESCE(meeting_ended_at, NOW()),
             updated_at = NOW()
-      WHERE id = $4`,
+      WHERE id = $4 AND budget_stop_state = 'none'
+      RETURNING id`,
     [mapped.text, JSON.stringify(mapped.segments), JSON.stringify(mapped.speakers), transcription.id],
   );
+  if (!finalized.rowCount) return;
 
   await addTranscriptionEvent({
     transcriptionId: transcription.id,
@@ -271,33 +290,12 @@ async function handleCompleted(transcription, payload, vexaConfig) {
     message: 'Meeting beendet, Transkript gespeichert.',
     meta: { segments: mapped.segments.length, speakers: mapped.speakers.length },
   });
-
-  // Index the final meeting transcript (text + segments). A later auto-analysis
-  // only adds the analysis field, which isn't part of the index, so indexing here
-  // already captures the indexable content.
-  void autoIndexDocument({
-    transcriptionId: transcription.id,
-    organizationId: transcription.organization_id,
-    userId: transcription.user_id,
-  });
-
-  // STT cost: input_tokens column doubles as audio-seconds (see usage.js
-  // MODEL_PRICING comment). Per-user/org attribution flows through usage_log.
-  const seconds = totalAudioSeconds(mapped.segments);
-  if (seconds > 0) {
-    await logUsage(
-      transcription.user_id,
-      'whisper-large-v3',
-      'meeting_transcription',
-      { input_tokens: seconds, output_tokens: 0 },
-      transcription.organization_id,
-    );
-  }
+  await upsertDocumentFromTranscription(transcription.id, transcription.organization_id);
 
   if (transcription.auto_analyze) {
     const lock = await query(
       `UPDATE transcriptions SET status = 'analyzing', updated_at = NOW()
-        WHERE id = $1 AND status = 'transcribed' RETURNING id`,
+        WHERE id = $1 AND status = 'transcribed' AND budget_stop_state = 'none' RETURNING id`,
       [transcription.id],
     );
     if (lock.rowCount > 0) {
@@ -391,6 +389,9 @@ export default async function handler(req, res) {
   const fresh = await recordEventOnce(payload.event_id);
   if (!fresh) {
     return res.status(200).json({ ok: true, deduplicated: true });
+  }
+  if (transcription.budget_stop_state !== 'none') {
+    return res.status(200).json({ ok: true, ignored: 'budget_stop' });
   }
 
   try {

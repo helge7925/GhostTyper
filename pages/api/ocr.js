@@ -1,17 +1,17 @@
 import formidable from 'formidable';
-import { copyFile, unlink, mkdir } from 'fs/promises';
+import { copyFile, unlink, mkdir, readFile } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { query } from '../../lib/db';
 import { withOrgScope } from '../../lib/api/with-org-scope';
 import { performOCR, analyzeTranscription } from '../../lib/ai-service';
 import {
-  CostLimitCheckUnavailableError,
-  CostLimitExceededError,
-  logUsage,
-  checkCostLimit,
-  withUserCostLock,
-} from '../../lib/usage';
+  budgetIdempotencyKey,
+  composeAbortSignals,
+  executeReservedSpend,
+  estimateTextUsage,
+  requestBudgetScope,
+} from '../../lib/budget-runtime';
 import { ACCEPTED_OCR_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE, normalizeAnalysisTemplate } from '../../lib/constants';
 import { resolveChatModel } from '../../lib/model-policy';
 import { getSettingsRow, resolveCortecsConfig, resolveMistralApiKey } from '../../lib/settings-service';
@@ -24,7 +24,12 @@ import { normalizeDataTableAnalysis } from '../../lib/data-table';
 import { normalizeAndValidateTableAnalysis } from '../../lib/table-analysis';
 import { logAuditEvent } from '../../lib/audit-log';
 import { upsertDocumentForTranscription } from '../../lib/documents';
-import { autoIndexDocument } from '../../lib/document-index';
+import {
+  assertClientCaptureScope,
+  findCaptureReplay,
+  isCaptureUniqueViolation,
+  normalizeClientCaptureId,
+} from '../../lib/capture-idempotency';
 
 export const config = {
   api: {
@@ -41,6 +46,14 @@ async function ensureUploadDir() {
 async function safeUnlink(filePath) {
   if (!filePath) return;
   await unlink(filePath).catch(() => {});
+}
+
+async function estimateOcrPages(filePath, mimeType) {
+  if (mimeType !== 'application/pdf') return 1;
+  const bytes = await readFile(filePath);
+  const matches = bytes.toString('latin1').match(/\/Type\s*\/Page(?!s)\b/g);
+  const sizeBound = Math.ceil(bytes.length / (250 * 1024));
+  return Math.min(10_000, Math.max(1, matches?.length || 0, sizeBound));
 }
 
 function parseForm(req) {
@@ -83,8 +96,30 @@ async function handler(req, res) {
     if (!file) {
       return res.status(400).json({ message: 'Keine Datei hochgeladen' });
     }
-
     tempUploadPath = file.filepath || '';
+
+    const clientCaptureId = normalizeClientCaptureId(
+      fields.clientCaptureId?.[0] || fields.clientCaptureId,
+    );
+    assertClientCaptureScope({
+      clientCaptureId,
+      clientCaptureUserId: fields.clientCaptureUserId?.[0] || fields.clientCaptureUserId,
+      clientCaptureOrganizationId: fields.clientCaptureOrganizationId?.[0] || fields.clientCaptureOrganizationId,
+      requestUserId: userId,
+      requestOrganizationId: orgId,
+    });
+    const replay = await findCaptureReplay({ organizationId: orgId, userId, clientCaptureId });
+    if (replay) {
+      await safeUnlink(tempUploadPath);
+      tempUploadPath = '';
+      return res.status(200).json({
+        transcriptionId: replay.id,
+        markdown: replay.text || '',
+        analysis: replay.analysis || null,
+        idempotentReplay: true,
+      });
+    }
+
     const detectedMimeType = await detectOcrMimeType(tempUploadPath);
     if (!detectedMimeType || !ACCEPTED_OCR_TYPES.includes(detectedMimeType)) {
       await safeUnlink(tempUploadPath);
@@ -111,7 +146,7 @@ async function handler(req, res) {
     const settingsRow = await getSettingsRow(userId);
     const mistralApiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
     const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveChatModel(cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
+    const preferredModel = resolveChatModel(settingsRow?.preferred_model, null) || cortecs.chatModel;
     const language = settingsRow?.language || 'de';
     const shouldAnalyze = (fields.analyze?.[0] || fields.analyze) === 'true';
 
@@ -169,7 +204,7 @@ async function handler(req, res) {
     }
     const requestModel = fields.model?.[0] || fields.model;
     const selectedModelForAnalysis = shouldAnalyze
-      ? resolveChatModel(requestModel || preferredModel)
+      ? (resolveChatModel(requestModel, null) || preferredModel)
       : preferredModel;
     if (shouldAnalyze && !selectedModelForAnalysis) {
       await safeUnlink(persistedFilePath);
@@ -178,41 +213,61 @@ async function handler(req, res) {
     }
 
     let resolvedTemplateForAnalysis = null;
-    const { markdown, analysis, selectedModelForSave } = await withUserCostLock(userId, async () => {
-      const costCheck = await checkCostLimit(userId, orgId);
-      if (!costCheck.allowed) {
-        throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
-      }
+    const budgetScope = clientCaptureId
+      ? budgetIdempotencyKey('ocr-capture', orgId, userId, clientCaptureId)
+      : requestBudgetScope(req, 'ocr', file.originalFilename || filename);
+    const estimatedPages = await estimateOcrPages(filePath, detectedMimeType);
+    const { markdown } = await executeReservedSpend(
+      {
+        idempotencyKey: `${budgetScope}:ocr`,
+        organizationId: orgId,
+        userId,
+        operation: 'ocr',
+        provider: 'mistral',
+        model: 'mistral-ocr-latest',
+        estimatedUsage: { inputQuantity: estimatedPages, outputQuantity: 0 },
+      },
+      (_reservation, budgetSignal) => performOCR(filePath, mistralApiKey, detectedMimeType, {
+        signal: composeAbortSignals(budgetSignal),
+      }),
+      (result) => ({
+        ...(result.usage || {}),
+        inputQuantity: result.usage?.pages_processed || result.usage?.pages || estimatedPages,
+        outputQuantity: 0,
+      }),
+    );
 
-      const { markdown: markdownValue, usage: ocrUsage, model: ocrModel } = await performOCR(filePath, mistralApiKey, detectedMimeType);
-      await logUsage(userId, ocrModel, 'ocr', ocrUsage, orgId);
-
-      if (!shouldAnalyze || !markdownValue.trim()) {
-        return {
-          markdown: markdownValue,
-          analysis: null,
-          selectedModelForSave: 'mistral-ocr-latest',
-        };
-      }
-
+    let analysis = null;
+    let selectedModelForSave = 'mistral-ocr-latest';
+    if (shouldAnalyze && markdown.trim()) {
       resolvedTemplateForAnalysis = await resolveTemplate(template, userId);
-      const analysisResult = await analyzeTranscription(
-        markdownValue,
-        resolvedTemplateForAnalysis,
-        cortecs.apiKey,
-        effectiveCustomPrompt,
-        selectedModelForAnalysis,
-        language,
-        { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
+      const analysisResult = await executeReservedSpend(
+        {
+          idempotencyKey: `${budgetScope}:analysis`,
+          organizationId: orgId,
+          userId,
+          operation: 'analysis',
+          provider: 'cortecs',
+          model: selectedModelForAnalysis,
+          estimatedUsage: estimateTextUsage(`${markdown}\n${effectiveCustomPrompt}`, {
+            inputBufferTokens: 1600,
+            outputMultiplier: 0.8,
+            outputBufferTokens: 3500,
+          }),
+        },
+        (_reservation, budgetSignal) => analyzeTranscription(
+          markdown,
+          resolvedTemplateForAnalysis,
+          cortecs.apiKey,
+          effectiveCustomPrompt,
+          selectedModelForAnalysis,
+          language,
+          { baseUrl: cortecs.baseUrl, preference: cortecs.preference, signal: composeAbortSignals(budgetSignal) },
+        ),
       );
-      await logUsage(userId, analysisResult.model, 'analysis', analysisResult.usage, orgId);
-
-      return {
-        markdown: markdownValue,
-        analysis: analysisResult.analysis,
-        selectedModelForSave: selectedModelForAnalysis,
-      };
-    });
+      analysis = analysisResult.analysis;
+      selectedModelForSave = selectedModelForAnalysis;
+    }
 
     let analysisType = 'text';
     let analysisPayload = analysis;
@@ -240,9 +295,11 @@ async function handler(req, res) {
     }
 
     // Save OCR result as a transcription record in the history
-    const transcriptionResult = await query(
-      `INSERT INTO transcriptions (user_id, organization_id, filename, original_name, file_path, file_size, mime_type, template, model, custom_prompt, status, text, analysis, analysis_type, analysis_meta, table_schema)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11, $12, $13, $14, $15)
+    let transcriptionResult;
+    try {
+      transcriptionResult = await query(
+      `INSERT INTO transcriptions (user_id, organization_id, filename, original_name, file_path, file_size, mime_type, template, model, custom_prompt, status, text, analysis, analysis_type, analysis_meta, table_schema, client_capture_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11, $12, $13, $14, $15, $16)
        RETURNING id`,
       [
         userId,
@@ -260,23 +317,36 @@ async function handler(req, res) {
         analysisType,
         analysisMeta ? JSON.stringify(analysisMeta) : null,
         tableSchema ? JSON.stringify(tableSchema) : null,
+        clientCaptureId,
       ]
-    );
+      );
+    } catch (error) {
+      if (!isCaptureUniqueViolation(error)) throw error;
+      const racedReplay = await findCaptureReplay({ organizationId: orgId, userId, clientCaptureId });
+      if (!racedReplay) throw error;
+      await safeUnlink(persistedFilePath);
+      persistedFilePath = '';
+      return res.status(200).json({
+        transcriptionId: racedReplay.id,
+        markdown: racedReplay.text || '',
+        analysis: racedReplay.analysis || null,
+        idempotentReplay: true,
+      });
+    }
 
     const transcriptionId = transcriptionResult.rows[0].id;
-    const ocrDocument = await upsertDocumentForTranscription({
+    await upsertDocumentForTranscription({
       transcriptionId,
       organizationId: orgId,
       ownerUserId: userId,
       visibility: 'private',
-      sourceType: 'ocr',
+      sourceType: analysisType === 'table' ? 'data_table' : 'ocr',
       title: file.originalFilename,
       mimeType: detectedMimeType,
       fileSize: file.size,
       status: 'completed',
       textPreview: markdown,
     });
-    void autoIndexDocument({ documentId: ocrDocument?.id, transcriptionId, organizationId: orgId, userId });
     await addTranscriptionEvent({
       transcriptionId,
       userId,
@@ -307,10 +377,20 @@ async function handler(req, res) {
 
     return res.status(200).json({ transcriptionId, markdown, analysis });
   } catch (error) {
-    if (error?.code === 'COST_LIMIT_EXCEEDED') {
+    if (error?.code === 'INVALID_CLIENT_CAPTURE_ID' || error?.code === 'CAPTURE_SCOPE_REQUIRED') {
+      await safeUnlink(tempUploadPath);
+      await safeUnlink(persistedFilePath);
+      return res.status(400).json({ message: error.message });
+    }
+    if (error?.code === 'CAPTURE_SCOPE_MISMATCH') {
+      await safeUnlink(tempUploadPath);
+      await safeUnlink(persistedFilePath);
+      return res.status(409).json({ message: error.message, code: error.code });
+    }
+    if (error?.code === 'BUDGET_EXCEEDED') {
       return res.status(429).json({ message: error.message });
     }
-    if (error instanceof CostLimitCheckUnavailableError || error?.code === 'COST_CHECK_UNAVAILABLE') {
+    if (error?.code === 'BUDGET_ACCOUNTING_UNAVAILABLE' || error?.code === 'PRICING_CONFIGURATION_MISSING') {
       return res.status(503).json({ message: error.message });
     }
     logApiError('OCR error', error);
@@ -320,4 +400,4 @@ async function handler(req, res) {
   }
 }
 
-export default withOrgScope({ permission: 'transcription.write' }, handler);
+export default withOrgScope({ permission: 'paid.execute' }, handler);

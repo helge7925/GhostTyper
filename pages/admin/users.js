@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Toast from '../../components/Toast';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import EmptyState from '../../components/EmptyState';
 import { useUiFeedback } from '../../lib/use-ui-feedback';
 import { useTranslations } from '../../lib/i18n';
 
@@ -13,6 +14,7 @@ export default function AdminUsers() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const t = useTranslations('admin');
+  const tEmpty = useTranslations('emptyState.users');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -361,9 +363,9 @@ export default function AdminUsers() {
                 <p className="text-xs text-secondary leading-relaxed">
                   💡 <strong className="text-primary">Mistral-API-Key</strong> und <strong className="text-primary">Kostenlimits</strong> werden jetzt
                   pro Workspace verwaltet. Wechsle zu{' '}
-                  <Link href="/settings/organization/members" className="text-accent hover:underline">Workspace verwalten → Mitglieder</Link>{' '}
+                  <Link href="/settings/organization/members" className="text-accent-ink hover:underline">Workspace verwalten → Mitglieder</Link>{' '}
                   oder{' '}
-                  <Link href="/settings/organization/integrations" className="text-accent hover:underline">API-Keys & Integrationen</Link>.
+                  <Link href="/settings/organization/integrations" className="text-accent-ink hover:underline">API-Keys & Integrationen</Link>.
                 </p>
               </div>
             )}
@@ -401,7 +403,7 @@ export default function AdminUsers() {
                   {user.name || user.email}
                 </span>
                 {user.role === 'admin' && (
-                  <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-accent/20 text-accent-ink px-2 py-0.5 rounded-full">
                     Admin
                   </span>
                 )}
@@ -435,9 +437,7 @@ export default function AdminUsers() {
       </div>
 
       {users.length === 0 && !loading && (
-        <div className="bg-surface border border-subtle rounded-xl p-12 text-center">
-          <p className="text-secondary text-sm">Keine User vorhanden.</p>
-        </div>
+        <EmptyState title={tEmpty('title')} description={tEmpty('description')} />
       )}
       {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
       <ConfirmDialog

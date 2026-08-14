@@ -6,6 +6,7 @@ import { addTranscriptionEvent } from '../../../../lib/transcription-events';
 import { runManualAnalysisJob } from '../../../../lib/manual-analysis';
 import { MAX_CUSTOM_PROMPT_LENGTH } from '../../../../lib/constants';
 import { withOrgScope } from '../../../../lib/api/with-org-scope';
+import { hasPermission } from '../../../../lib/permissions';
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -14,6 +15,9 @@ async function handler(req, res) {
 
   const userId = req.userId;
   const orgId = req.org.id;
+  if (!hasPermission(req.role, 'paid.execute')) {
+    return res.status(403).json({ code: 'FORBIDDEN' });
+  }
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'transcription-analyze',
@@ -50,10 +54,9 @@ async function handler(req, res) {
 
   const settingsRow = await getSettingsRow(userId);
   const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-  const apiKey = cortecs.apiKey;
-  const preferredModelFallback = resolveChatModel(cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
+  const preferredModelFallback = resolveChatModel(settingsRow?.preferred_model, null) || cortecs.chatModel;
 
-  if (!apiKey) {
+  if (!cortecs.apiKey) {
     return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert' });
   }
   if (!preferredModelFallback) {
@@ -71,7 +74,7 @@ async function handler(req, res) {
 
   // Atomically lock this job transition and prevent duplicate starts.
   const lockResult = await query(
-    "UPDATE transcriptions SET status = 'analyzing', custom_prompt = $3, updated_at = NOW() WHERE id = $1 AND organization_id = $2 AND status = 'transcribed' RETURNING id",
+    "UPDATE transcriptions SET status = 'analyzing', custom_prompt = $3, updated_at = NOW() WHERE id = $1 AND organization_id = $2 AND status = 'transcribed' AND budget_stop_state = 'none' RETURNING id",
     [transcriptionId, orgId, mergedPrompt || null]
   );
   if (lockResult.rowCount === 0) {

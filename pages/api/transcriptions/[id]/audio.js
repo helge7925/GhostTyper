@@ -2,14 +2,17 @@ import { query } from '../../../../lib/db';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { withOrgScope } from '../../../../lib/api/with-org-scope';
 import { resolveMistralApiKey } from '../../../../lib/settings-service';
-import { logUsage } from '../../../../lib/usage';
+import {
+  assertTranscriptionPaidWorkActive,
+  budgetIdempotencyKey,
+  composeAbortSignals,
+  executeReservedSpend,
+  paidJobAbortSignal,
+  requestBudgetScope,
+} from '../../../../lib/budget-runtime';
 import {
   voxtralTts,
   buildWavHeader,
-  estimatePcmDurationSeconds,
-  PCM_SAMPLE_RATE,
-  PCM_CHANNELS,
-  PCM_BITS_PER_SAMPLE,
 } from '../../../../lib/tts';
 import { logError, logInfo } from '../../../../lib/observability';
 
@@ -64,7 +67,7 @@ async function handler(req, res) {
   // Confirm the row exists, belongs to this org, and is a vexa meeting
   // with translation enabled.
   const row = await query(
-    `SELECT id, source, translation_config, status
+    `SELECT id, source, translation_config, status, budget_stop_state
        FROM transcriptions
       WHERE id = $1 AND organization_id = $2`,
     [transcriptionId, orgId],
@@ -72,6 +75,7 @@ async function handler(req, res) {
   if (!row.rows.length) return res.status(404).json({ code: 'NOT_FOUND' });
   const meta = row.rows[0];
   if (meta.source !== 'vexa') return res.status(400).json({ code: 'NOT_A_MEETING' });
+  if (meta.budget_stop_state !== 'none') return res.status(429).json({ code: 'BUDGET_STOPPED' });
   if (!meta.translation_config?.enabled) {
     return res.status(400).json({ code: 'TRANSLATION_DISABLED' });
   }
@@ -94,29 +98,20 @@ async function handler(req, res) {
   let totalPcmBytes = 0;
   let cancelled = false;
   const startedAt = Date.now();
+  const streamScope = requestBudgetScope(req, 'live-tts', { transcriptionId, requestedLang });
+  const disconnectController = new AbortController();
+  const jobSignal = paidJobAbortSignal(transcriptionId, { organizationId: orgId, userId });
+  const signal = composeAbortSignals(disconnectController.signal, jobSignal);
 
   const cleanup = (reason) => {
     if (cancelled) return;
     cancelled = true;
+    disconnectController.abort();
     clearInterval(interval);
     try {
       res.end();
     } catch {
       /* ignore */
-    }
-    if (totalPcmBytes > 0) {
-      const seconds = estimatePcmDurationSeconds(totalPcmBytes, {
-        sampleRate: PCM_SAMPLE_RATE,
-        channels: PCM_CHANNELS,
-        bitsPerSample: PCM_BITS_PER_SAMPLE,
-      });
-      logUsage(userId, 'voxtral-tts-latest', 'live_tts', {
-        // Per-second billing; logUsage stores the audio duration in
-        // input_tokens by convention for audio operations (mirrors
-        // how `meeting_transcription` is logged today).
-        input_tokens: Math.ceil(seconds),
-        output_tokens: 0,
-      }, orgId).catch((err) => logError('audio_stream.usage_log_failed', err));
     }
     logInfo('audio_stream.closed', { transcriptionId, reason, totalPcmBytes });
   };
@@ -132,13 +127,17 @@ async function handler(req, res) {
 
     try {
       const r = await query(
-        `SELECT translated_segments, status FROM transcriptions WHERE id = $1`,
+        `SELECT translated_segments, status, budget_stop_state FROM transcriptions WHERE id = $1`,
         [transcriptionId],
       );
       const segs = Array.isArray(r.rows[0]?.translated_segments)
         ? r.rows[0].translated_segments
         : [];
       const status = r.rows[0]?.status || meta.status;
+      if (r.rows[0]?.budget_stop_state !== 'none') {
+        cleanup('budget_stop');
+        return;
+      }
 
       // Filter to segments matching the requested language and beyond
       // the cursor.
@@ -146,7 +145,7 @@ async function handler(req, res) {
       for (let i = lastIdx; i < segs.length; i++) {
         const seg = segs[i];
         if ((seg.language || '').toLowerCase() === requestedLang) {
-          matching.push(seg);
+          matching.push({ seg, index: i });
         }
       }
       lastIdx = segs.length;
@@ -163,15 +162,48 @@ async function handler(req, res) {
       }
       lastSawSegmentAt = Date.now();
 
-      for (const seg of matching) {
+      for (const { seg, index } of matching) {
         if (cancelled) return;
+        if (signal.aborted) {
+          cleanup('paid_work_aborted');
+          return;
+        }
         try {
-          const pcm = await voxtralTts({
-            text: seg.text,
-            language: requestedLang,
-            format: 'pcm',
-            apiKey,
-          });
+          const chars = Array.from(String(seg.text || '')).length;
+          if (!chars) continue;
+          const paid = await executeReservedSpend(
+            {
+              idempotencyKey: budgetIdempotencyKey(
+                'live-tts-segment', streamScope, index, seg.start, seg.end, seg.text,
+              ),
+              organizationId: orgId,
+              userId,
+              transcriptionId,
+              operation: 'live_tts',
+              provider: 'mistral',
+              model: 'voxtral-mini-tts-2603',
+              estimatedUsage: { inputQuantity: 0, outputQuantity: chars },
+              reservationMs: 5 * 60 * 1000,
+              stopOnDenied: true,
+            },
+            async (_reservation, budgetSignal) => {
+              const rendered = await voxtralTts({
+                text: seg.text,
+                language: requestedLang,
+                format: 'pcm',
+                apiKey,
+                signal: composeAbortSignals(signal, budgetSignal),
+              });
+              return {
+                pcm: rendered,
+                model: 'voxtral-mini-tts-2603',
+                providerRequestId: rendered.providerRequestId || null,
+              };
+            },
+            () => ({ inputQuantity: 0, outputQuantity: chars }),
+          );
+          const pcm = paid.pcm;
+          await assertTranscriptionPaidWorkActive(transcriptionId);
           if (pcm.length > 0 && !cancelled) {
             const ok = res.write(pcm);
             totalPcmBytes += pcm.length;
@@ -181,6 +213,10 @@ async function handler(req, res) {
           }
         } catch (error) {
           logError('audio_stream.tts_chunk_failed', error, { transcriptionId, language: requestedLang });
+          if (['BUDGET_EXCEEDED', 'BUDGET_ACCOUNTING_UNAVAILABLE', 'PRICING_CONFIGURATION_MISSING', 'PAID_JOB_CANCELLED'].includes(error?.code)) {
+            cleanup('paid_work_blocked');
+            return;
+          }
           // Keep going; missing one segment is better than killing the stream.
         }
       }
@@ -192,4 +228,4 @@ async function handler(req, res) {
   if (interval.unref) interval.unref();
 }
 
-export default withOrgScope({ permission: 'transcription.read' }, handler);
+export default withOrgScope({ permission: 'paid.execute' }, handler);

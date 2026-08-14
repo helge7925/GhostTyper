@@ -59,7 +59,6 @@
 **Request (Beispiel)**:
 ```json
 {
-  "mistralApiKey": "mistral-...",
   "costLimit": 15,
   "memberMonthlyBudgetLimit": 8,
   "preferredModel": "mistral-large-latest"

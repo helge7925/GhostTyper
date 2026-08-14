@@ -49,19 +49,18 @@ Remote-Meeting-Screenshots sind TODO / need capture, bevor sie eingebettet werde
   Datei-Upload. Große Aufnahmen werden automatisch komprimiert und in
   überlappende Abschnitte zerlegt, sodass Dateien jeder Länge trotz
   Größenlimit des Anbieters zuverlässig transkribiert werden.
-- **Remote-Meeting-Bot** für Google Meet, Microsoft Teams und Zoom via
+- **Remote-Meeting-Bot** für Microsoft Teams und Zoom via
   [Vexa Lite](https://github.com/Vexa-ai/vexa) — Live-Transkript fließt
   in den gleichen Editor. Ein Community-Fork
   ([helge7925/vexa](https://github.com/helge7925/vexa), Branch
   `feat/nextcloud-talk-adapter`) ergänzt Nextcloud Talk als vierte
-  Plattform; aktivierbar via `VEXA_LITE_IMAGE`-Override.
+  Plattform; aktivierbar via `VEXA_LITE_IMAGE`-Override. Google Meet ist
+  nicht in der Plattform-Auswahl: Google blockiert Meeting-Bots in Meet
+  hart (eigene Sperr-Seite statt CAPTCHA), daher übernimmt für
+  Meet-Meetings die Tab-/System-Audio-Aufnahme.
 - **OCR** für PDFs und Bilder.
 - **KI-Analyse**: Zusammenfassungen, Meeting-Protokolle, To-Do-Extraktion,
   freie Prompts, eigene Vorlagen und Übersetzungen.
-- **KI-Chat über eigene Inhalte**: Dokumente und Wissensbasen als Kontext
-  anhängen — oder eine Datei direkt in den Chat ziehen/einfügen/hochladen —
-  und Fragen stellen; Unterhaltungen werden automatisch betitelt.
-- **Workspace-Wissensbasen**: Dokumente für RAG-gestützten Chat bündeln.
 - **Datentabellen**: Strukturierte Extraktion aus Audio, Text oder
   Dokumenten; Excel-Export.
 - **Nextcloud-Export**: Transkripte und Analysen per WebDAV in einen
@@ -120,7 +119,8 @@ spürbar langsamer.
 
 ## Schnellstart
 
-Voraussetzungen: Docker + Docker Compose v2, ein Mistral-API-Key.
+Voraussetzungen: Docker + Docker Compose v2, ein Cortecs-API-Key (plus
+ein Mistral-API-Key, falls OCR oder Voxtral TTS genutzt wird).
 
 ```bash
 git clone https://github.com/helge7925/transkription_webapp.git

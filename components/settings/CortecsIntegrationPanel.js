@@ -2,17 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { BrainCircuit, ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react';
 import { useTranslations } from '../../lib/i18n';
 import { useUiFeedback } from '../../lib/use-ui-feedback';
+import { CHAT_MODEL_OPTIONS } from '../../lib/constants';
 
 const ENDPOINT = '/api/organizations/integrations/cortecs';
 const TEST_ENDPOINT = '/api/organizations/integrations/cortecs/test';
-const CHAT_MODELS = [
-  { value: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
-  { value: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
-  { value: 'kimi-2.6', label: 'Kimi 2.6' },
-];
 
 function normalizeChatModel(value) {
-  return CHAT_MODELS.some((model) => model.value === value) ? value : 'deepseek-v4-pro';
+  return CHAT_MODEL_OPTIONS.some((model) => model.value === value) ? value : 'deepseek-v4-pro';
 }
 
 export default function CortecsIntegrationPanel({ canEdit }) {
@@ -160,7 +156,7 @@ export default function CortecsIntegrationPanel({ canEdit }) {
             type="checkbox"
             className="sr-only peer"
             checked={enabled}
-            disabled={!canEdit || saving || (!apiKeyConfigured && !apiKeyInput)}
+            disabled={!canEdit || saving || (!operatorFallback && !apiKeyConfigured && !apiKeyInput)}
             onChange={(e) => handleSave({ enabled: e.target.checked })}
           />
           <span className="w-10 h-6 rounded-full bg-subtle peer-checked:bg-accent transition-colors relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-4" />
@@ -171,7 +167,7 @@ export default function CortecsIntegrationPanel({ canEdit }) {
         <label className="block text-xs font-medium text-secondary">
           {t('chatModelLabel')}
           <select value={chatModel} disabled={!canEdit} onChange={(e) => setChatModel(e.target.value)} className="mt-1.5 w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none disabled:opacity-60">
-            {CHAT_MODELS.map((model) => (
+            {CHAT_MODEL_OPTIONS.map((model) => (
               <option key={model.value} value={model.value}>{model.label}</option>
             ))}
           </select>
@@ -207,11 +203,11 @@ export default function CortecsIntegrationPanel({ canEdit }) {
       </div>
 
       <div className="flex items-center justify-end gap-3 pt-2 border-t border-subtle">
-        <button type="button" disabled={!canEdit || testing || (!apiKeyConfigured && !apiKeyInput)} onClick={handleTest} className="px-4 py-2 rounded-xl text-sm border border-subtle text-primary hover:border-accent disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2">
+        <button type="button" disabled={!canEdit || testing || (!operatorFallback && !apiKeyConfigured && !apiKeyInput)} onClick={handleTest} className="px-4 py-2 rounded-xl text-sm border border-subtle text-primary hover:border-accent disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2">
           {testing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           {t('testButton')}
         </button>
-        <button type="button" disabled={!canEdit || saving} onClick={() => handleSave()} className="px-4 py-2 rounded-xl text-sm bg-accent text-white hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2">
+        <button type="button" disabled={!canEdit || saving} onClick={() => handleSave()} className="px-4 py-2 rounded-xl text-sm bg-accent-strong text-white hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2">
           {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           {tCommon('save')}
         </button>

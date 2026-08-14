@@ -1,24 +1,23 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { Files, Languages, MessageSquare, Mic, ScanText } from 'lucide-react';
+import { Files, Languages, Mic, ScanText } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTranslations } from '../lib/i18n';
 
 /**
  * Bottom navigation for handheld viewports (< md).
- * Top-5 most-used routes; the rest is reachable via the hamburger sheet.
+ * Top routes; the rest is reachable via the hamburger sheet.
  * Respects iOS safe-area-inset via the trailing pb hack.
  */
 // Mirror the desktop sidebar order (Sidebar.js): Transcription →
-// Translation → OCR → Chat → Files. The handheld bar drops Text
-// Refinement to keep five icons. Remote-Meeting opens via the
-// meeting drawer on `/transcriptions?meeting=1` and isn't a separate slot here.
+// Translation → OCR → Files. The handheld bar drops Text Refinement.
+// Remote-Meeting opens via the meeting drawer on `/transcriptions?meeting=1`
+// and isn't a separate slot here.
 const ITEMS = [
   { href: '/upload', labelKey: 'record', Icon: Mic },
   { href: '/translate', labelKey: 'translate', Icon: Languages },
   { href: '/ocr', labelKey: 'ocr', Icon: ScanText },
-  { href: '/chat', labelKey: 'chat', Icon: MessageSquare },
   { href: '/transcriptions', labelKey: 'files', Icon: Files },
 ];
 
@@ -46,10 +45,12 @@ export default function BottomNav() {
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'flex flex-col items-center justify-center gap-0.5 h-full text-[10px] font-medium transition-colors',
-                  isActive ? 'text-accent' : 'text-secondary hover:text-primary',
+                  isActive ? 'text-primary' : 'text-secondary hover:text-primary',
                 )}
               >
-                <Icon className="w-5 h-5" aria-hidden="true" />
+                {/* Icon carries the accent tint (3:1 floor); label stays on
+                    --primary since 10px text needs the 4.5:1 floor. */}
+                <Icon className={cn('w-5 h-5', isActive && 'text-accent-ink')} aria-hidden="true" />
                 <span>{t(labelKey)}</span>
               </Link>
             </li>

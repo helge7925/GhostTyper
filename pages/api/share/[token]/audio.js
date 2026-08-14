@@ -2,14 +2,17 @@ import { query } from '../../../../lib/db';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { resolveShareToken } from '../../../../lib/share-tokens';
 import { resolveMistralApiKey } from '../../../../lib/settings-service';
-import { logUsage } from '../../../../lib/usage';
+import {
+  assertTranscriptionPaidWorkActive,
+  budgetIdempotencyKey,
+  composeAbortSignals,
+  executeReservedSpend,
+  paidJobAbortSignal,
+  requestBudgetScope,
+} from '../../../../lib/budget-runtime';
 import {
   voxtralTts,
   buildWavHeader,
-  estimatePcmDurationSeconds,
-  PCM_SAMPLE_RATE,
-  PCM_CHANNELS,
-  PCM_BITS_PER_SAMPLE,
 } from '../../../../lib/tts';
 import { logError, logInfo } from '../../../../lib/observability';
 import {
@@ -65,6 +68,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ code: 'INTERNAL' });
   }
   if (!row) return res.status(404).json({ code: 'NOT_FOUND' });
+  if (row.budget_stop_state !== 'none') return res.status(429).json({ code: 'BUDGET_STOPPED' });
   if (!row.translation_config?.enabled) {
     return res.status(400).json({ code: 'TRANSLATION_DISABLED' });
   }
@@ -122,20 +126,18 @@ export default async function handler(req, res) {
   const transcriptionId = row.id;
   const ownerUserId = row.user_id;
   const orgId = row.organization_id;
+  const streamScope = requestBudgetScope(req, 'live-tts-share', { transcriptionId, requestedLang, token });
+  const disconnectController = new AbortController();
+  const jobSignal = paidJobAbortSignal(transcriptionId, { organizationId: orgId, userId: ownerUserId });
+  const signal = composeAbortSignals(disconnectController.signal, jobSignal);
 
   const cleanup = (reason) => {
     if (cancelled) return;
     cancelled = true;
+    disconnectController.abort();
     clearInterval(interval);
     try { res.end(); } catch { /* ignore */ }
     releaseSlot();
-    if (totalPcmBytes > 0) {
-      const seconds = estimatePcmDurationSeconds(totalPcmBytes);
-      logUsage(ownerUserId, 'voxtral-mini-tts-2603', 'live_tts_share', {
-        input_tokens: Math.ceil(seconds),
-        output_tokens: 0,
-      }, orgId).catch((err) => logError('share_audio.usage_log_failed', err));
-    }
     logInfo('share_audio.closed', { transcriptionId, reason, totalPcmBytes });
   };
 
@@ -160,12 +162,16 @@ export default async function handler(req, res) {
         ? fresh.translated_segments
         : [];
       const status = fresh.status;
+      if (fresh.budget_stop_state && fresh.budget_stop_state !== 'none') {
+        cleanup('budget_stop');
+        return;
+      }
 
       const matching = [];
       for (let i = lastIdx; i < segs.length; i++) {
         const seg = segs[i];
         if ((seg.language || '').toLowerCase() === requestedLang) {
-          matching.push(seg);
+          matching.push({ seg, index: i });
         }
       }
       lastIdx = segs.length;
@@ -179,15 +185,48 @@ export default async function handler(req, res) {
       }
       lastSawSegmentAt = Date.now();
 
-      for (const seg of matching) {
+      for (const { seg, index } of matching) {
         if (cancelled) return;
+        if (signal.aborted) {
+          cleanup('paid_work_aborted');
+          return;
+        }
         try {
-          const pcm = await voxtralTts({
-            text: seg.text,
-            language: requestedLang,
-            format: 'pcm',
-            apiKey,
-          });
+          const chars = Array.from(String(seg.text || '')).length;
+          if (!chars) continue;
+          const paid = await executeReservedSpend(
+            {
+              idempotencyKey: budgetIdempotencyKey(
+                'share-tts-segment', streamScope, index, seg.start, seg.end, seg.text,
+              ),
+              organizationId: orgId,
+              userId: ownerUserId,
+              transcriptionId,
+              operation: 'live_tts_share',
+              provider: 'mistral',
+              model: 'voxtral-mini-tts-2603',
+              estimatedUsage: { inputQuantity: 0, outputQuantity: chars },
+              reservationMs: 5 * 60 * 1000,
+              stopOnDenied: true,
+            },
+            async (_reservation, budgetSignal) => {
+              const rendered = await voxtralTts({
+                text: seg.text,
+                language: requestedLang,
+                format: 'pcm',
+                apiKey,
+                signal: composeAbortSignals(signal, budgetSignal),
+              });
+              return {
+                pcm: rendered,
+                model: 'voxtral-mini-tts-2603',
+                providerRequestId: rendered.providerRequestId || null,
+              };
+            },
+            () => ({ inputQuantity: 0, outputQuantity: chars }),
+          );
+          const pcm = paid.pcm;
+          await assertTranscriptionPaidWorkActive(transcriptionId);
           if (pcm.length > 0 && !cancelled) {
             const ok = res.write(pcm);
             totalPcmBytes += pcm.length;
@@ -195,6 +234,10 @@ export default async function handler(req, res) {
           }
         } catch (error) {
           logError('share_audio.tts_chunk_failed', error, { transcriptionId, language: requestedLang });
+          if (['BUDGET_EXCEEDED', 'BUDGET_ACCOUNTING_UNAVAILABLE', 'PRICING_CONFIGURATION_MISSING', 'PAID_JOB_CANCELLED'].includes(error?.code)) {
+            cleanup('paid_work_blocked');
+            return;
+          }
         }
       }
     } catch (error) {

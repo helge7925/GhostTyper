@@ -1,8 +1,18 @@
 # Vexa Remote-Meeting-Integration — Operator-Guide
 
-GhostTyper kann Live-Meetings (Google Meet, Microsoft Teams, Zoom) automatisch
-mitschneiden und transkribieren, indem ein Vexa-Lite-Bot dem Meeting beitritt
-und das Transkript an GhostTyper zurückliefert.
+GhostTyper kann Live-Meetings (Microsoft Teams, Zoom, Nextcloud Talk)
+automatisch mitschneiden und transkribieren, indem ein Vexa-Lite-Bot dem
+Meeting beitritt und das Transkript an GhostTyper zurückliefert.
+
+> **Google Meet ist kein Bot-Ziel mehr.** Google blockiert Meeting-Bots auf
+> Meet hart — operator-verifiziert im Juli 2026 landet der Vexa-Bot auf
+> einer dedizierten Sperr-Seite, nicht auf einem CAPTCHA. Meet wurde deshalb
+> vollständig aus dem Bot-Pfad entfernt (`lib/api/vexa.js` `MEETING_URL_PATTERNS`,
+> `pages/api/meetings/index.js` `SUPPORTED_PLATFORMS`,
+> `components/MeetingStartForm.js`). Ein Meet-Link im Start-Dialog zeigt
+> stattdessen einen Hinweis mit Deep-Link zur Tab-/System-Audio-Aufnahme
+> (`/upload?preset=meet-tab-audio`). Historische Transkriptionen mit
+> `meeting_platform='google_meet'` bleiben unverändert lesbar.
 
 ## Zwei-Stufen-Opt-in
 
@@ -245,10 +255,13 @@ Plattformen das real ins Chat-Fenster schreiben, hängt vom Bot-Image ab:
 
 | Plattform | Vanilla `vexaai/vexa-lite` | `vexa-bot-talk` Fork |
 |---|---|---|
-| Google Meet | ✅ | ✅ |
 | Microsoft Teams | ✅ | ✅ |
 | Zoom | ✅ | ✅ |
 | Nextcloud Talk | ❌ Bot tritt nicht bei | ⚠ tritt bei, **Chat-Sender im Bot muss noch verifiziert werden** (`services/vexa-bot/core/src/services/chat.ts` Talk-Branch + Selectors in `platforms/nextcloudtalk/selectors.ts` — siehe `feat/nextcloud-talk-chat` im Vexa-Fork) |
+
+Google Meet fehlt hier bewusst — der Bot startet für Meet gar nicht erst
+(siehe Hinweis oben), also gibt es auch keinen Chat-Auto-Post für diese
+Plattform mehr.
 
 Bei einer Plattform ohne Chat-Sender im Bot wird der Webapp-seitige
 Call still im Log abgelegt (`gdpr_chat_poster.send_failed`); das
@@ -264,19 +277,30 @@ Meeting läuft weiter, nur die Chat-Nachricht erscheint nicht.
 | Status hängt auf 'processing' | Webhook erreicht GhostTyper nicht | Reconcile-Cron läuft? Vexa-User-Webhook gesetzt? |
 | Live-Transkript erscheint nicht | Bridge nicht gestartet | Detail-Seite refreshen; Worker läuft? `lib/vexa-bridge.js` Logs prüfen |
 | `ENCRYPTION_UNAVAILABLE` | `SETTINGS_ENCRYPTION_KEY` fehlt | ENV setzen und Server neu starten |
+| Event „Verbindung gestört" (`vexa_degraded`) | ≥ 10 Poll-Fehler in Folge (Vexa down/unerreichbar) | Vexa-Container/Netz prüfen; Polling verlangsamt sich per Backoff (bis 60 s) und erholt sich automatisch nach dem ersten Erfolg |
+| Event „Keine Wortmeldungen" (`vexa_stale`) | Bot ist zwar drin, aber seit `VEXA_STALE_AFTER_MS` (Standard 3 min) kein neues Segment — evtl. stummgeschaltet/entfernt | Bot im Meeting prüfen; klärt sich selbst beim nächsten Segment (`vexa_recovered`) |
+| `bot_status = rejected` / „Bot nicht eingelassen" | Bot kam nach `VEXA_JOIN_TIMEOUT_MS` (Standard 2 min) nicht ins Meeting (Lobby/Freigabe) und hat nichts produziert | Lobby-/Freigabe-Einstellungen prüfen; alternativ Tab-/System-Audio-Aufnahme nutzen (Link im Fehlerhinweis) |
+| Live-Transkript stoppt nach Deploy/Restart | In-Process-Bridge lebt in `globalThis`, geht bei Neustart verloren | Reconcile-Scan hängt die Bridge für noch laufende Meetings automatisch wieder an (< ein Reconcile-Intervall); `instrumentation.js` startet die Worker beim Boot ohne ersten Request |
 
 ## Verwandte Code-Stellen
 
 - `lib/api/vexa.js` — REST-Client + Adapter (`mapVexaTranscriptToGhostTyper`)
-- `lib/vexa-bridge.js` — Live-Polling-Bridge
+- `lib/vexa-bridge.js` — Live-Polling-Bridge (mit Backoff + Stale-Detektor)
+- `lib/vexa-bridge-utils.js` — reine Entscheidungs-Helfer (Backoff / Stale / Join-Timeout), unit-getestet
+- `lib/vexa-reconcile-worker.js` — In-Process-Reconcile-Scheduler
 - `lib/vexa-webhook-signature.js` — HMAC-Verifikation
 - `lib/integrations.js` — verschlüsselte Org-Konfig
+- `instrumentation.js` — Worker-Autostart beim Boot (Reconcile + Transkription)
 - `pages/api/meetings/*` — Bot-Lifecycle
 - `pages/api/webhooks/vexa.js` — Event-Receiver
-- `pages/api/admin/vexa/reconcile.js` — Cron-Backstop
+- `pages/api/admin/vexa/reconcile.js` — Cron-Backstop + Bridge-Re-Attach + Join-Timeout → `rejected`
 - `components/MeetingStartForm.js` — Start-Dialog (mit Consent)
-- `components/MeetingControlBar.js` — Sprache wechseln / Stop
+- `components/MeetingControlBar.js` — Sprache wechseln / Stop / Bot-Status-Label
 - `components/settings/VexaIntegrationPanel.js` — Settings-UI
+
+Relevante ENV (Bot-Härtung, GhostTyper-seitig): `VEXA_STALE_AFTER_MS`
+(Standard 180000), `VEXA_JOIN_TIMEOUT_MS` (Standard 120000) — siehe
+`.env.example`.
 
 ## Tests
 
@@ -284,6 +308,7 @@ Meeting läuft weiter, nur die Chat-Nachricht erscheint nicht.
 npm test  # Adapter, URL-Parser, HMAC-Verifikation
 ```
 
-Ein End-to-End-Test gegen einen echten Vexa-Lite + ein Sandbox-Google-Meet
-ist manuell zu fahren — siehe `docs/code-review-priorities-*` für das
-Test-Protokoll.
+Ein End-to-End-Test gegen einen echten Vexa-Lite + ein Sandbox-Teams- oder
+Zoom-Meeting ist manuell zu fahren — siehe `docs/code-review-priorities-*`
+für das Test-Protokoll. Google Meet gehört NICHT mehr in dieses
+Test-Protokoll (siehe Hinweis oben).

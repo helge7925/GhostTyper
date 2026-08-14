@@ -75,7 +75,7 @@ export default function AcceptInvitePage() {
           <title>{pageTitle}</title>
         </Head>
         <main className="max-w-lg mx-auto py-16 px-4 text-center space-y-4">
-          <LogIn className="w-10 h-10 text-accent mx-auto" aria-hidden="true" />
+          <LogIn className="w-10 h-10 text-accent-ink mx-auto" aria-hidden="true" />
           <h1 className="text-xl font-semibold text-primary">{tCommon('loginRequired')}</h1>
           <p className="text-sm text-secondary">{t('loginNeeded')}</p>
           <Button asChild>
