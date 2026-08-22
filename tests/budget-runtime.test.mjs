@@ -321,8 +321,8 @@ test('durable stop worker is scheduled and reconcile updates cannot revive stopp
   assert.match(reconcile, /budget_stop_state = 'none'/);
 });
 
-test('pricing seed covers the dedicated knowledge-preparation operation', () => {
-  assert.match(source('../lib/pricing-seed.js'), /'knowledge_prep'/);
+test('dynamic OpenRouter pricing covers the dedicated knowledge-preparation operation', () => {
+  assert.match(source('../lib/openrouter-pricing.js'), /'knowledge_prep'/);
 });
 
 test('OCR capture retries derive budget scope without request-specific entropy', () => {

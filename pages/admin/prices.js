@@ -3,11 +3,11 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { BadgeEuro, Plus } from 'lucide-react';
+import { BadgeDollarSign, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import PricingRateFields from '../../components/PricingRateFields';
-import { eurosToMicros, microsToEuros, toDateTimeLocal, toIsoDate } from '../../lib/billing-ui';
+import { usdToMicros, microsToUsd, toDateTimeLocal, toIsoDate } from '../../lib/billing-ui';
 import { useFormatter, useLocale, useTranslations } from '../../lib/i18n';
 
 const UNITS = ['token', 'audio_second', 'character', 'page', 'request'];
@@ -21,7 +21,7 @@ export default function AdminPricesPage() {
   const tCommon = useTranslations('common');
   const { dateTime } = useFormatter();
   const { locale } = useLocale();
-  const rateCurrency = new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR', maximumFractionDigits: 6 });
+  const rateCurrency = new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 6 });
   const [prices, setPrices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -61,7 +61,7 @@ export default function AdminPricesPage() {
 
   useEffect(() => { load(); }, [load]);
   const updateRate = (field, value) => setRates((current) => ({ ...current, [field]: value }));
-  const displayRate = (value) => value === null || value === undefined ? '—' : rateCurrency.format(microsToEuros(value));
+  const displayRate = (value) => value === null || value === undefined ? '—' : rateCurrency.format(microsToUsd(value));
 
   const submit = async (event) => {
     event.preventDefault();
@@ -73,10 +73,10 @@ export default function AdminPricesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider, model, operation, inputUnit, outputUnit,
-          inputPricePerMillionMicros: eurosToMicros(rates.input),
-          cachedInputPricePerMillionMicros: eurosToMicros(rates.cachedInput, { nullable: true }),
-          cacheWritePricePerMillionMicros: eurosToMicros(rates.cacheWrite, { nullable: true }),
-          outputPricePerMillionMicros: eurosToMicros(rates.output),
+          inputPricePerMillionMicros: usdToMicros(rates.input),
+          cachedInputPricePerMillionMicros: usdToMicros(rates.cachedInput, { nullable: true }),
+          cacheWritePricePerMillionMicros: usdToMicros(rates.cacheWrite, { nullable: true }),
+          outputPricePerMillionMicros: usdToMicros(rates.output),
           effectiveFrom: toIsoDate(effectiveFrom),
           effectiveUntil: effectiveUntil ? toIsoDate(effectiveUntil) : null,
           reason,
@@ -108,7 +108,7 @@ export default function AdminPricesPage() {
       <Head><title>{`${t('title')} - Admin`}</title></Head>
       <main className="max-w-6xl mx-auto pb-20 animate-fade-in space-y-6">
         <header className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div><p className="text-[10px] font-bold uppercase tracking-widest text-secondary">{t('eyebrow')}</p><h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-primary"><BadgeEuro className="w-5 h-5 text-accent-ink" />{t('title')}</h1><p className="mt-1 text-sm text-secondary">{t('description')}</p></div>
+          <div><p className="text-[10px] font-bold uppercase tracking-widest text-secondary">{t('eyebrow')}</p><h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-primary"><BadgeDollarSign className="w-5 h-5 text-accent-ink" />{t('title')}</h1><p className="mt-1 text-sm text-secondary">{t('description')}</p></div>
           <div className="flex flex-wrap items-center gap-3"><Link href="/admin/users" className="text-xs text-secondary hover:text-primary">{t('usersLink')}</Link><button type="button" onClick={() => setShowForm((current) => !current)} className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white"><Plus className="w-4 h-4" />{t('newVersion')}</button></div>
         </header>
         {error && <div role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}

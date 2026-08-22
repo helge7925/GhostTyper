@@ -11,7 +11,7 @@ function headerValue(raw) {
 
 /**
  * Bridge-only callback. The transcription bridge container POSTs here on
- * each transcription (cached ~60s) to fetch the current effective Cortecs
+ * each transcription (cached ~60s) to fetch the current effective OpenRouter
  * key/model plus the workspace-global context bias. This is what makes
  * the admin UI key edits actually take effect at runtime — without it,
  * the bridge would still hold whatever key it was started with.
@@ -88,6 +88,7 @@ export default async function handler(req, res) {
       provider: config.provider,
       baseUrl: config.baseUrl,
       model: config.model,
+      verboseJson: config.verboseJson,
       contextBias: parseContextBias(config.contextBias),
       source: config.source,
       organizationId: config.organizationId,

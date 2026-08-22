@@ -2,8 +2,8 @@ import { query } from '../../../lib/db';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { analyzeTranscription } from '../../../lib/ai-service';
 import { composeAbortSignals, executeReservedSpend, estimateTextUsage, requestBudgetScope } from '../../../lib/budget-runtime';
-import { resolveChatModel } from '../../../lib/model-policy';
-import { getSettingsRow, resolveCortecsConfig } from '../../../lib/settings-service';
+import { resolveConfiguredModel } from '../../../lib/openrouter';
+import { getSettingsRow, resolveOpenRouterConfig } from '../../../lib/settings-service';
 import { MAX_CUSTOM_PROMPT_LENGTH, MAX_DOCUMENT_TEXT_LENGTH } from '../../../lib/constants';
 import { resolveTemplate } from '../../../lib/template-service';
 import { addTranscriptionEvent } from '../../../lib/transcription-events';
@@ -53,14 +53,12 @@ async function handler(req, res) {
     }
 
     const settingsRow = await getSettingsRow(userId);
-    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
+    const openrouter = await resolveOpenRouterConfig({ userId, organizationId: req.org?.id });
     const language = settingsRow?.language || 'de';
-    const selectedModel = resolveChatModel(requestModel, null)
-      || resolveChatModel(settingsRow?.preferred_model, null)
-      || cortecs.chatModel;
+    const selectedModel = resolveConfiguredModel(openrouter, 'chat', requestModel || settingsRow?.preferred_model);
 
-    if (!cortecs.apiKey) {
-      return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert.' });
+    if (!openrouter.apiKey) {
+      return res.status(400).json({ message: 'Kein OpenRouter-API-Key konfiguriert.' });
     }
     if (!selectedModel) {
       return res.status(400).json({ message: 'Ungültiges KI-Modell.' });
@@ -82,7 +80,7 @@ async function handler(req, res) {
         organizationId: orgId,
         userId,
         operation: 'knowledge_prep',
-        provider: 'cortecs',
+        provider: 'openrouter',
         model: selectedModel,
         estimatedUsage: estimateTextUsage(`${text}\n${mergedPrompt}`, {
           inputBufferTokens: 1200,
@@ -93,11 +91,11 @@ async function handler(req, res) {
       (_reservation, budgetSignal) => analyzeTranscription(
         text,
         resolvedTemplate,
-        cortecs.apiKey,
+        openrouter.apiKey,
         mergedPrompt,
         selectedModel,
         language,
-        { baseUrl: cortecs.baseUrl, preference: cortecs.preference, signal: composeAbortSignals(budgetSignal) },
+        { baseUrl: openrouter.baseUrl, fallbackModel: openrouter.defaultModels.chat, signal: composeAbortSignals(budgetSignal) },
       ),
     );
     const analysis = analysisResult.analysis;

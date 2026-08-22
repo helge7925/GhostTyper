@@ -1,0 +1,7 @@
+services:
+  transkription-webapp:
+    ports:
+      - "127.0.0.1:${WEBAPP_HOST_PORT:-3000}:3000"
+  transkription-db:
+    ports:
+      - "127.0.0.1:${DB_HOST_PORT:-5433}:5432"

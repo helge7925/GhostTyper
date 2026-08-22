@@ -13,8 +13,8 @@ import {
   requestBudgetScope,
 } from '../../lib/budget-runtime';
 import { ACCEPTED_OCR_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE, normalizeAnalysisTemplate } from '../../lib/constants';
-import { resolveChatModel } from '../../lib/model-policy';
-import { getSettingsRow, resolveCortecsConfig, resolveMistralApiKey } from '../../lib/settings-service';
+import { resolveConfiguredModel } from '../../lib/openrouter';
+import { getSettingsRow, resolveOpenRouterConfig } from '../../lib/settings-service';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { addTranscriptionEvent } from '../../lib/transcription-events';
 import { resolveTemplate } from '../../lib/template-service';
@@ -144,21 +144,21 @@ async function handler(req, res) {
     tempUploadPath = '';
 
     const settingsRow = await getSettingsRow(userId);
-    const mistralApiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
-    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveChatModel(settingsRow?.preferred_model, null) || cortecs.chatModel;
+    const openrouter = await resolveOpenRouterConfig({ userId, organizationId: req.org?.id });
+    const preferredModel = resolveConfiguredModel(openrouter, 'chat', settingsRow?.preferred_model);
+    const ocrModel = resolveConfiguredModel(openrouter, 'ocr', settingsRow?.ocr_model);
     const language = settingsRow?.language || 'de';
     const shouldAnalyze = (fields.analyze?.[0] || fields.analyze) === 'true';
 
-    if (!mistralApiKey) {
+    if (!openrouter.apiKey || !ocrModel) {
       await safeUnlink(persistedFilePath);
       persistedFilePath = '';
-      return res.status(400).json({ message: 'Kein Mistral API-Key für OCR konfiguriert' });
+      return res.status(400).json({ message: 'OpenRouter OCR ist nicht vollständig konfiguriert' });
     }
-    if (shouldAnalyze && !cortecs.apiKey) {
+    if (shouldAnalyze && !openrouter.apiKey) {
       await safeUnlink(persistedFilePath);
       persistedFilePath = '';
-      return res.status(400).json({ message: 'Kein Cortecs API-Key für Analyse konfiguriert' });
+      return res.status(400).json({ message: 'Kein OpenRouter-API-Key für Analyse konfiguriert' });
     }
     if (!preferredModel) {
       await safeUnlink(persistedFilePath);
@@ -204,7 +204,7 @@ async function handler(req, res) {
     }
     const requestModel = fields.model?.[0] || fields.model;
     const selectedModelForAnalysis = shouldAnalyze
-      ? (resolveChatModel(requestModel, null) || preferredModel)
+      ? resolveConfiguredModel(openrouter, 'chat', requestModel)
       : preferredModel;
     if (shouldAnalyze && !selectedModelForAnalysis) {
       await safeUnlink(persistedFilePath);
@@ -223,11 +223,13 @@ async function handler(req, res) {
         organizationId: orgId,
         userId,
         operation: 'ocr',
-        provider: 'mistral',
-        model: 'mistral-ocr-latest',
+        provider: 'openrouter',
+        model: ocrModel,
+        fallbackModel: openrouter.defaultModels.ocr,
         estimatedUsage: { inputQuantity: estimatedPages, outputQuantity: 0 },
       },
-      (_reservation, budgetSignal) => performOCR(filePath, mistralApiKey, detectedMimeType, {
+      (_reservation, budgetSignal) => performOCR(filePath, openrouter.apiKey, detectedMimeType, {
+        model: ocrModel,
         signal: composeAbortSignals(budgetSignal),
       }),
       (result) => ({
@@ -238,7 +240,7 @@ async function handler(req, res) {
     );
 
     let analysis = null;
-    let selectedModelForSave = 'mistral-ocr-latest';
+    let selectedModelForSave = ocrModel;
     if (shouldAnalyze && markdown.trim()) {
       resolvedTemplateForAnalysis = await resolveTemplate(template, userId);
       const analysisResult = await executeReservedSpend(
@@ -247,7 +249,7 @@ async function handler(req, res) {
           organizationId: orgId,
           userId,
           operation: 'analysis',
-          provider: 'cortecs',
+          provider: 'openrouter',
           model: selectedModelForAnalysis,
           estimatedUsage: estimateTextUsage(`${markdown}\n${effectiveCustomPrompt}`, {
             inputBufferTokens: 1600,
@@ -258,11 +260,11 @@ async function handler(req, res) {
         (_reservation, budgetSignal) => analyzeTranscription(
           markdown,
           resolvedTemplateForAnalysis,
-          cortecs.apiKey,
+          openrouter.apiKey,
           effectiveCustomPrompt,
           selectedModelForAnalysis,
           language,
-          { baseUrl: cortecs.baseUrl, preference: cortecs.preference, signal: composeAbortSignals(budgetSignal) },
+          { baseUrl: openrouter.baseUrl, fallbackModel: openrouter.defaultModels.chat, signal: composeAbortSignals(budgetSignal) },
         ),
       );
       analysis = analysisResult.analysis;

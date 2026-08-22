@@ -38,10 +38,9 @@ test('pricing mutations commit only with their required audit event', () => {
   assert.match(audit, /if \(required && auditError\) throw auditError/);
 });
 
-test('Cortecs connectivity test uses a non-billable model listing request', () => {
-  const integrationTest = source('../pages/api/organizations/integrations/cortecs/test.js');
-  assert.match(integrationTest, /`\$\{config\.baseUrl\}\/models`/);
-  assert.match(integrationTest, /method: 'GET'/);
+test('OpenRouter connectivity test uses only the non-billable model catalogue', () => {
+  const integrationTest = source('../pages/api/organizations/integrations/openrouter/test.js');
+  assert.match(integrationTest, /getOpenRouterCatalogue/);
   assert.doesNotMatch(integrationTest, /chat\/completions|messages\s*:|Healthcheck/);
 });
 

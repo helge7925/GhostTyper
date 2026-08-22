@@ -1,27 +1,24 @@
-"""Bridge between Vexa-Lite and a Cortecs/OpenAI-compatible STT API.
+"""Bridge between Vexa-Lite multipart audio and OpenRouter JSON STT.
 
 Vexa-Lite hard-codes a Whisper-style transcription endpoint and a fixed
 model name. The bridge sits in between to:
 
-  * rewrite the `model` form field in flight,
-  * fetch the current effective Cortecs key/model from the GhostTyper webapp
+  * encode Vexa's multipart audio as OpenRouter ``input_audio``,
+  * fetch the current effective OpenRouter key/model from the GhostTyper webapp
     at request time (cached ~60s) so workspace admins can rotate the key
     via the UI without restarting any container,
-  * inject the workspace-global context terms as the OpenAI-compatible
-    `prompt` field, so user-defined jargon also benefits live transcriptions,
-  * default `response_format=verbose_json` when Vexa-Lite does not set it,
-    so providers can return segments when the selected model supports them.
+  * request ``verbose_json`` only for the integration-probed live model.
 
-If the callback to GhostTyper fails (webapp down, secret mismatch), we
-fall back to the CORTECS_API_KEY env we were started with — so a degraded
-webapp does not take down audio transcription. The legacy
-VEXA_TRANSCRIPTION_TOKEN env var is still honoured as an operator fallback.
+If the callback to GhostTyper fails, the bridge can use the operator-managed
+``OPENROUTER_API_KEY`` fallback. There is no legacy-provider fallback.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import base64
+from pathlib import Path
 
 import aiohttp
 import cachetools
@@ -30,9 +27,9 @@ from fastapi.responses import JSONResponse, Response
 
 UPSTREAM_URL = os.environ.get(
     "UPSTREAM_URL",
-    "https://api.cortecs.ai/v1/audio/transcriptions",
+    "https://openrouter.ai/api/v1/audio/transcriptions",
 )
-DEFAULT_MODEL = os.environ.get("MODEL_OVERRIDE", "whisper-large-v3")
+DEFAULT_MODEL = os.environ.get("MODEL_OVERRIDE", "")
 TIMEOUT_S = float(os.environ.get("UPSTREAM_TIMEOUT_S", "120"))
 
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "").rstrip("/")
@@ -47,11 +44,7 @@ CACHE_TTL_S = float(os.environ.get("WEBAPP_CACHE_TTL_S", "60"))
 # AND caps the working set at WEBAPP_CACHE_MAXSIZE (LRU when full).
 CACHE_MAXSIZE = max(1, int(os.environ.get("WEBAPP_CACHE_MAXSIZE", "1024")))
 
-FALLBACK_API_KEY = (
-    os.environ.get("CORTECS_API_KEY")
-    or os.environ.get("VEXA_TRANSCRIPTION_TOKEN")
-    or ""
-)
+FALLBACK_API_KEY = os.environ.get("OPENROUTER_API_KEY") or ""
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "info").upper()
 logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
@@ -75,6 +68,7 @@ def _cache_default() -> dict:
         "api_key": None,
         "base_url": None,
         "model": DEFAULT_MODEL,
+        "verbose_json": False,
         "context_bias": [],
         "source": None,
     }
@@ -85,7 +79,7 @@ async def fetch_effective_config(
     platform: str | None = None,
     native_meeting_id: str | None = None,
 ) -> dict:
-    """Pull the live effective Cortecs key/model + context bias from the webapp.
+    """Pull the live effective OpenRouter key/model from the webapp.
 
     Cached ``CACHE_TTL_S`` seconds so we don't hammer the webapp on every
     transcription, but short enough that admin-side key rotations take
@@ -123,6 +117,7 @@ async def fetch_effective_config(
                         api_key=body.get("apiKey"),
                         base_url=(body.get("baseUrl") or "").rstrip("/") or None,
                         model=body.get("model") or DEFAULT_MODEL,
+                        verbose_json=bool(body.get("verboseJson")),
                         context_bias=[str(term) for term in bias if term],
                         source=body.get("source"),
                     )
@@ -151,8 +146,8 @@ async def health() -> dict:
 async def proxy(request: Request) -> Response:
     form = await request.form()
 
-    files: list[tuple[str, tuple[str | None, bytes, str | None]]] = []
-    data: list[tuple[str, str]] = []
+    audio_file: tuple[str | None, bytes, str | None] | None = None
+    data: dict[str, str] = {}
     seen_fields: set[str] = set()
 
     org_id = (request.headers.get("x-romaco-org") or "").strip() or None
@@ -165,33 +160,35 @@ async def proxy(request: Request) -> Response:
         native_meeting_id=native_meeting_id,
     )
     effective_model = config.get("model") or DEFAULT_MODEL
+    if not effective_model:
+        return JSONResponse(status_code=503, content={"error": "model_unavailable"})
     upstream_url = config.get("base_url") or None
     upstream_url = f"{upstream_url.rstrip('/')}/audio/transcriptions" if upstream_url else UPSTREAM_URL
 
     for key, value in form.multi_items():
         if hasattr(value, "read") and hasattr(value, "filename"):
             content = await value.read()
-            files.append((key, (value.filename, content, value.content_type)))
+            if audio_file is None:
+                audio_file = (value.filename, content, value.content_type)
         elif key == "model":
-            data.append(("model", effective_model))
+            data["model"] = effective_model
             seen_fields.add("model")
         else:
-            data.append((key, str(value)))
+            data[key] = str(value)
             seen_fields.add(key)
 
     if "model" not in seen_fields:
-        data.append(("model", effective_model))
+        if not effective_model:
+            return JSONResponse(status_code=503, content={"error": "model_unavailable"})
+        data["model"] = effective_model
 
     # Default to verbose_json so providers can return segments when the
     # selected model supports them. Non-destructive: only set if the caller did not.
-    if "response_format" not in seen_fields:
-        data.append(("response_format", "verbose_json"))
+    if config.get("verbose_json") and "response_format" not in seen_fields:
+        data["response_format"] = "verbose_json"
 
-    # Inject workspace-global context terms as OpenAI-compatible prompt.
-    if "prompt" not in seen_fields and config.get("context_bias"):
-        bias_terms = [t for t in config["context_bias"] if isinstance(t, str) and t.strip()]
-        if bias_terms:
-            data.append(("prompt", ", ".join(bias_terms)))
+    if audio_file is None:
+        return JSONResponse(status_code=400, content={"error": "audio_required"})
 
     api_key = config.get("api_key") or FALLBACK_API_KEY
     if not api_key:
@@ -203,28 +200,35 @@ async def proxy(request: Request) -> Response:
                 status_code=503,
                 content={
                     "error": "no_api_key",
-                    "message": "Cortecs API key not configured (workspace UI nor ENV).",
+                    "message": "OpenRouter API key not configured (workspace UI nor ENV).",
                 },
             )
         headers = {"Authorization": forwarded}
     else:
         headers = {"Authorization": f"Bearer {api_key}"}
 
-    form_data = aiohttp.FormData()
-    for key, value in data:
-        form_data.add_field(key, value)
-    for key, (filename, content, content_type) in files:
-        form_data.add_field(
-            key,
-            content,
-            filename=filename or "audio.bin",
-            content_type=content_type or "application/octet-stream",
-        )
+    filename, audio_content, content_type = audio_file
+    extension = Path(filename or "audio.webm").suffix.lower().lstrip(".") or "webm"
+    if extension == "weba":
+        extension = "webm"
+    payload = {
+        "input_audio": {
+            "data": base64.b64encode(audio_content).decode("ascii"),
+            "format": extension,
+        },
+        "model": data["model"],
+        "provider": {"zdr": True, "data_collection": "deny"},
+    }
+    for field in ("language", "temperature", "response_format"):
+        if data.get(field):
+            payload[field] = data[field]
+    headers["HTTP-Referer"] = os.environ.get("APP_URL", "http://localhost:3000")
+    headers["X-OpenRouter-Title"] = "GhostTyper Vexa Bridge"
 
     timeout = aiohttp.ClientTimeout(total=TIMEOUT_S)
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.post(upstream_url, data=form_data, headers=headers) as upstream:
+            async with session.post(upstream_url, json=payload, headers=headers) as upstream:
                 body = await upstream.read()
                 return Response(
                     content=body,

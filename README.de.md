@@ -110,17 +110,15 @@ Vexa-Integration: [`docs/vexa-integration.md`](docs/vexa-integration.md).
 | Mit `vexa`-Profil       | 4 GB  | 2 vCPU   | 20 GB   | + vexa-lite (2 GB) + bridge (256 MB) |
 | 5–10 aktive Nutzer      | 8 GB  | 4 vCPU   | 40 GB SSD | komfortabel für tägliche Team-Nutzung |
 
-Speech-to-Text-Inferenz läuft bei Mistral (Voxtral) — sowohl für Batch-
-Uploads als auch für den Vexa-Live-Pfad, **GPU auf dem Host ist nicht
-nötig**. Browser-Bots innerhalb von Vexa belegen pro paralleles
+Speech-to-Text-Inferenz läuft für Batch-Uploads und den Vexa-Live-Pfad über
+OpenRouter; **eine GPU auf dem Host ist nicht nötig**. Browser-Bots belegen pro paralleles
 Live-Meeting kurzzeitig zusätzlich ~1 GB RAM. Das `vexa-lite`-Image ist
 `linux/amd64`-only — auf Apple Silicon läuft es per Emulation und ist
 spürbar langsamer.
 
 ## Schnellstart
 
-Voraussetzungen: Docker + Docker Compose v2, ein Cortecs-API-Key (plus
-ein Mistral-API-Key, falls OCR oder Voxtral TTS genutzt wird).
+Voraussetzungen: Docker + Docker Compose v2 und ein OpenRouter-API-Key.
 
 ```bash
 git clone https://github.com/helge7925/transkription_webapp.git
@@ -153,18 +151,15 @@ Traefik auf `https://${DOMAIN}`).
 
 ### Mit Remote-Meeting-Bot
 
-Vexa Lite und die Transkriptions-Bridge sind als optionales Compose-Profile
-vorbereitet. Standard-Audiopfad ist **Mistral Voxtral (Paris, EU)**, damit
-biometrische Meeting-Audio-Daten (DSGVO Art. 9) den EU-Raum nicht
-verlassen. Der Bridge-Service heißt `voxtral-bridge` (proxied zu Mistral
-Voxtral; der alte `FIREWORKS_API_KEY`-Env-Wert bleibt als Fallback
-erhalten) — siehe „DSGVO-konformes Setup" unten.
+Vexa Lite und die Transkriptions-Bridge sind als optionales Compose-Profil
+vorbereitet. Die Bridge bezieht den OpenRouter-Schlüssel und das geprüfte
+Live-Standardmodell der Organisation von der Webapp. Jeder Request erzwingt
+ZDR und verbietet Provider-Datensammlung; einen direkten Legacy-Fallback gibt
+es nicht.
 
 ```bash
 COMPOSE_PROFILES=vexa
-# EU-Default — empfohlen
-VEXA_TRANSCRIPTION_URL=https://api.mistral.ai/v1/audio/transcriptions
-VEXA_TRANSCRIPTION_TOKEN=$MISTRAL_API_KEY
+OPENROUTER_API_KEY=                 # optionaler Operator-Fallback
 VEXA_ADMIN_API_TOKEN=$(openssl rand -hex 32)
 BRIDGE_SHARED_SECRET=$(openssl rand -hex 32)
 ```

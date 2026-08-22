@@ -7,7 +7,6 @@ import {
   normalizeProviderUsage,
   PricingConfigurationError,
 } from '../lib/pricing-core.js';
-import { TRANSCRIPTION_MODELS } from '../lib/constants.js';
 import { INITIAL_PROVIDER_PRICES } from '../lib/pricing-seed.js';
 
 const price = {
@@ -78,26 +77,19 @@ test('non-token quantities use the same exact integer calculator', () => {
   assert.equal(audio.estimatedCostMicros, 930);
 });
 
-test('seed catalog includes explicit OCR and corrected provider attribution', () => {
-  assert.ok(INITIAL_PROVIDER_PRICES.some((row) =>
-    row.provider === 'mistral' && row.model === 'mistral-ocr-latest'
-      && row.operation === 'ocr' && row.inputUnit === 'page'));
-  assert.ok(INITIAL_PROVIDER_PRICES.some((row) =>
-    row.provider === 'cortecs' && row.model === 'whisper-large-v3'
-      && row.operation === 'meeting_transcription' && row.inputUnit === 'audio_second'));
-  assert.equal(inferProviderForModel('deepseek-v4-pro'), 'cortecs');
-  assert.equal(inferProviderForModel('mistral-large-latest'), 'cortecs');
-  assert.equal(inferProviderForModel('voxtral-mini-latest'), 'mistral');
+test('production seed has no fixed models and provider attribution is OpenRouter', () => {
+  assert.deepEqual(INITIAL_PROVIDER_PRICES, []);
+  assert.equal(inferProviderForModel('vendor/model'), 'openrouter');
 });
 
-test('every supported upload transcription model resolves its seeded provider', () => {
-  for (const model of TRANSCRIPTION_MODELS) {
-    const provider = inferProviderForModel(model);
-    assert.ok(INITIAL_PROVIDER_PRICES.some((row) =>
-      row.provider === provider && row.model === model && row.operation === 'transcription'),
-    `missing transcription price for ${provider}/${model}`);
-  }
+test('upload transcription uses dynamic OpenRouter provider and model', () => {
   const worker = readFileSync(new URL('../lib/transcription-worker.js', import.meta.url), 'utf8');
-  assert.match(worker, /inferProviderForModel\(cortecs\.transcriptionModel\)/);
-  assert.doesNotMatch(worker, /operation: 'transcription',[\s\S]{0,100}provider: 'cortecs'/);
+  assert.match(worker, /provider: transcriptionProvider/);
+  assert.match(worker, /const transcriptionProvider = 'openrouter'/);
+});
+
+test('provider-reported OpenRouter cost is authoritative', () => {
+  const result = calculateUsageCost(price, { inputQuantity: 99, outputQuantity: 3, cost: 0.012345 });
+  assert.equal(result.actualCostMicros, 12_345);
+  assert.equal(result.estimatedCostMicros, 12_345);
 });

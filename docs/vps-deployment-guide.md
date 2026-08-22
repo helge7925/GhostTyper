@@ -76,8 +76,9 @@ ENABLE_DB_INIT_API=true
 # Optional: Uploads auf Storage Box auslagern (statt Named Volume)
 # UPLOADS_PATH=/mnt/storage-box/ghosttyper/uploads
 
-# Hinweis: MISTRAL_API_KEY wird über die Admin-Oberfläche konfiguriert,
-# nicht mehr über Environment-Variablen.
+# OpenRouter wird bevorzugt über die Admin-Oberfläche konfiguriert.
+# Optionaler Operator-Fallback: OPENROUTER_API_KEY=...
+OUTBOUND_ALLOWED_HOSTS=openrouter.ai
 
 NEXT_PUBLIC_API_URL=/api
 RATE_LIMIT_STORE=db

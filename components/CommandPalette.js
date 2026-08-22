@@ -1,7 +1,7 @@
 import { useRouter } from 'next/router';
 import { useSession, signOut } from 'next-auth/react';
 import {
-  BadgeEuro,
+  BadgeDollarSign,
   Building2,
   History,
   Languages,
@@ -120,7 +120,7 @@ export default function CommandPalette() {
                 value="price pricing catalog preise preiskatalog"
                 onSelect={() => run(() => router.push('/admin/prices'))}
               >
-                <BadgeEuro aria-hidden="true" />
+                <BadgeDollarSign aria-hidden="true" />
                 {tNav('priceCatalog')}
               </CommandItem>
             </>

@@ -9,7 +9,7 @@ import ProcessStatusCard from '../components/ProcessStatusCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { saveDocument } from '../lib/api';
 import { useMessageList, useMessageObject, useTranslations } from '../lib/i18n';
-import { CHAT_MODEL_OPTIONS } from '../lib/constants';
+import { useModelOptions } from '../lib/use-model-options';
 import { usePermission } from '../lib/use-permission';
 import TranslationTermPanel from '../components/TranslationTermPanel';
 import { Button } from '../components/ui/button';
@@ -45,7 +45,9 @@ export default function Translate() {
 
   const [text, setText] = useState('');
   const [targetLanguage, setTargetLanguage] = useState('German');
-  const [model, setModel] = useState('deepseek-v4-pro');
+  const [model, setModel] = useState('');
+  const { options: chatModelOptions, defaultModel } = useModelOptions('chat');
+  useEffect(() => { if (!model && defaultModel) setModel(defaultModel); }, [defaultModel, model]);
   const [translatedText, setTranslatedText] = useState('');
   const [glossaryMeta, setGlossaryMeta] = useState(null);
   const [translatedSource, setTranslatedSource] = useState('');
@@ -383,7 +385,7 @@ export default function Translate() {
                   onChange={(event) => setModel(event.target.value)}
                   className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
                 >
-                  {CHAT_MODEL_OPTIONS.map((option) => (
+                  {chatModelOptions.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
@@ -473,7 +475,7 @@ export default function Translate() {
                 <CardBody className="p-4">
                 <Field label={t('modelLabel')} help={t('modelHint')} className="max-w-md">
                 <select value={model} onChange={e => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none">
-                  {CHAT_MODEL_OPTIONS.map((option) => (
+                  {chatModelOptions.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>

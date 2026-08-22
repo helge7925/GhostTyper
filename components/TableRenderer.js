@@ -21,7 +21,7 @@ function formatValue(value, type) {
   if (type === 'currency') {
     const parsed = Number(value);
     return Number.isFinite(parsed)
-      ? <span className="font-mono">{parsed.toFixed(2).replace('.', ',')} €</span>
+      ? <span className="font-mono">${parsed.toFixed(2)}</span>
       : <span>{value}</span>;
   }
 

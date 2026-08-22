@@ -1,6 +1,7 @@
-import { getSettingsRow } from '../../lib/settings-service';
+import { resolveOpenRouterConfig } from '../../lib/settings-service';
 import { checkCostLimit, CostLimitCheckUnavailableError } from '../../lib/usage';
-import { recommendModelPlan } from '../../lib/model-assistant';
+import { openRouterSortForGoal, recommendModelPlan } from '../../lib/model-assistant';
+import { getOpenRouterCatalogue, modelsForCapability } from '../../lib/openrouter';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { withOrgScope } from '../../lib/api/with-org-scope';
 
@@ -38,7 +39,16 @@ async function handler(req, res) {
       return res.status(400).json({ message: 'Ungültiger Task-Typ' });
     }
 
-    const settings = await getSettingsRow(userId);
+    const config = await resolveOpenRouterConfig({ userId, organizationId: orgId });
+    if (!config.apiKey) return res.status(409).json({ code: 'OPENROUTER_NOT_CONFIGURED' });
+    const catalogue = await getOpenRouterCatalogue({
+      apiKey: config.apiKey,
+      organizationId: orgId,
+      sort: openRouterSortForGoal(goal),
+    });
+    const allowedModels = new Set(config.allowedModels.chat || []);
+    const models = modelsForCapability(catalogue.models, 'chat')
+      .filter((model) => allowedModels.has(model.id));
     const cost = await checkCostLimit(userId, orgId);
 
     const recommendation = recommendModelPlan({
@@ -47,7 +57,7 @@ async function handler(req, res) {
       inputText,
       fileSizeBytes,
       includePostAnalysis: includePostAnalysis === true,
-      preferredModel: settings?.preferred_model || null,
+      models,
       currentCost: cost.currentCost,
       costLimit: cost.limit,
     });

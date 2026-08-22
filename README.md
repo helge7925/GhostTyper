@@ -108,16 +108,15 @@ integration: [`docs/vexa-integration.md`](docs/vexa-integration.md).
 | With `vexa` profile   | 4 GB  | 2 vCPU   | 20 GB   | adds vexa-lite (2 GB) + bridge (256 MB) |
 | 5–10 active users     | 8 GB  | 4 vCPU   | 40 GB SSD | comfortable for daily team usage   |
 
-Speech-to-text inference runs at Mistral (Voxtral) for both batch
-uploads and the live/Vexa path, so **no GPU is required on the host**.
+Speech-to-text inference runs through OpenRouter for both batch uploads and
+the live/Vexa path, so **no GPU is required on the host**.
 Browser bots inside Vexa add roughly 1 GB transient RAM per concurrent
 live meeting. The `vexa-lite` image is `linux/amd64`-only —
 on Apple Silicon it runs under emulation and is noticeably slower.
 
 ## Quickstart
 
-Prerequisites: Docker + Docker Compose v2, a Cortecs API key (plus a
-Mistral API key if you use OCR or Voxtral TTS).
+Prerequisites: Docker + Docker Compose v2 and an OpenRouter API key.
 
 ```bash
 git clone https://github.com/helge7925/transkription_webapp.git
@@ -151,17 +150,13 @@ on `https://${DOMAIN}`).
 ### With remote-meeting bot
 
 Vexa Lite + the transcription bridge are wired up as an optional Compose
-profile. Default audio path is **Mistral Voxtral (Paris, EU)** so the
-biometric meeting audio (GDPR Art. 9) does not leave the EU. The bridge
-service is `voxtral-bridge` (it proxies to Mistral Voxtral; the legacy
-`FIREWORKS_API_KEY` env var is still honoured as a fallback) — see
-"GDPR-conformant setup" below.
+profile. The bridge obtains the organization OpenRouter key and probed live
+model from the webapp. Every request enforces ZDR and denies provider data
+collection; there is no direct legacy-provider fallback.
 
 ```bash
 COMPOSE_PROFILES=vexa
-# EU default — recommended
-VEXA_TRANSCRIPTION_URL=https://api.mistral.ai/v1/audio/transcriptions
-VEXA_TRANSCRIPTION_TOKEN=$MISTRAL_API_KEY
+OPENROUTER_API_KEY=                 # optional operator fallback
 VEXA_ADMIN_API_TOKEN=$(openssl rand -hex 32)
 BRIDGE_SHARED_SECRET=$(openssl rand -hex 32)
 ```

@@ -1,8 +1,8 @@
 import { generateTemplate } from '../../../lib/ai-service';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { composeAbortSignals, executeReservedSpend, estimateTextUsage, requestBudgetScope } from '../../../lib/budget-runtime';
-import { getSettingsRow, resolveCortecsConfig } from '../../../lib/settings-service';
-import { resolveChatModel } from '../../../lib/model-policy';
+import { getSettingsRow, resolveOpenRouterConfig } from '../../../lib/settings-service';
+import { resolveConfiguredModel } from '../../../lib/openrouter';
 import { MAX_TEMPLATE_GENERATOR_GOAL_LENGTH } from '../../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { hasPermission } from '../../../lib/permissions';
@@ -36,11 +36,11 @@ async function handler(req, res) {
 
   try {
     const settingsRow = await getSettingsRow(userId);
-    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveChatModel(settingsRow?.preferred_model, null) || cortecs.chatModel;
+    const openrouter = await resolveOpenRouterConfig({ userId, organizationId: req.org?.id });
+    const preferredModel = resolveConfiguredModel(openrouter, 'chat', settingsRow?.preferred_model);
 
-    if (!cortecs.apiKey) {
-      return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert.' });
+    if (!openrouter.apiKey) {
+      return res.status(400).json({ message: 'Kein OpenRouter-API-Key konfiguriert.' });
     }
 
     const { promptText } = await executeReservedSpend(
@@ -49,7 +49,7 @@ async function handler(req, res) {
         organizationId: orgId,
         userId,
         operation: 'template_generation',
-        provider: 'cortecs',
+        provider: 'openrouter',
         model: preferredModel,
         estimatedUsage: estimateTextUsage(goal, {
           inputBufferTokens: 900,
@@ -59,9 +59,9 @@ async function handler(req, res) {
       },
       (_reservation, budgetSignal) => generateTemplate(
         goal,
-        cortecs.apiKey,
+        openrouter.apiKey,
         preferredModel,
-        { baseUrl: cortecs.baseUrl, preference: cortecs.preference, signal: composeAbortSignals(budgetSignal) },
+        { baseUrl: openrouter.baseUrl, fallbackModel: openrouter.defaultModels.chat, signal: composeAbortSignals(budgetSignal) },
       ),
     );
 

@@ -9,6 +9,8 @@ GhostTyper läuft als Stack aus Docker-Containern. Zwei Compose-Dateien in
   greifen aber erst, wenn ein Traefik im selben `web`-Netzwerk läuft.
 - `docker-compose.dev.yml` — Lokale Entwicklung. Volume-Mount des
   Quelltextes, `npm run dev` mit Hot-Reload statt Standalone-Build.
+- `docker-compose.orbstack.yml` — localhost-only Override für einen lokalen
+  Production-Smoke-Test ohne Traefik.
 
 Quelle für die definitive Konfiguration sind immer die YAML-Dateien
 selbst — dieses Dokument fasst nur den Stand für Operatoren zusammen.
@@ -17,17 +19,15 @@ selbst — dieses Dokument fasst nur den Stand für Operatoren zusammen.
 
 | Service | Container-Name | Image | Pflicht | Port |
 |---|---|---|---|---|
-| `transkription-webapp` | `transkription-webapp` | gebaut aus `Dockerfile` (Tag `transkription-webapp:prod`) | ja | `${WEBAPP_HOST_PORT:-3000}:3000` |
+| `transkription-webapp` | `transkription-webapp` | gebaut aus `Dockerfile` (Tag `transkription-webapp:prod`) | ja | intern :3000; mit OrbStack-Override `127.0.0.1:${WEBAPP_HOST_PORT:-3000}:3000` |
 | `transkription-db` | `transkription-db` | `postgres:16-alpine` | ja | intern :5432 |
 | `vexa-lite` | `transkription-vexa-lite` | `${VEXA_LITE_IMAGE:-vexaai/vexa-lite:0.10.0-260430-1701}` | optional, Profile `vexa` | intern :8056, Dashboard exposed auf `127.0.0.1:${VEXA_DASHBOARD_HOST_PORT:-3300}:3000` |
 | `vexa-db-init` | `transkription-vexa-db-init` | `postgres:16-alpine` | optional, Profile `vexa` | — (One-shot) |
 | `voxtral-bridge` | `transkription-voxtral-bridge` | gebaut aus `services/voxtral-bridge/` (Tag `voxtral-bridge:prod`) | optional, Profile `vexa` | intern :8080 |
 
-`voxtral-bridge` hieß ursprünglich `fireworks-bridge`, als der Upstream-
-Transkriptionsdienst noch Fireworks AI war. Mit dem Migrate auf Mistral
-Voxtral wurde der Service umbenannt; der alte `FIREWORKS_API_KEY`-Env-
-Fallback bleibt im Code für Setups, die ihre `.env` noch nicht rotiert
-haben.
+`voxtral-bridge` übersetzt Vexas Multipart-Audio in den JSON-Vertrag der
+OpenRouter-Transkriptions-API. Schlüssel und Live-Modell werden zur Laufzeit
+aus der Organisationskonfiguration der Webapp geladen.
 
 ## Netzwerke
 
@@ -54,6 +54,19 @@ docker compose -f config/docker-compose.prod.yml \
   --env-file .env up -d --build
 ```
 
+Für den lokalen Production-Smoke-Test mit OrbStack wird zusätzlich der
+localhost-only Override geladen:
+
+```bash
+docker compose -f config/docker-compose.prod.yml \
+  -f config/docker-compose.orbstack.yml \
+  --env-file .env up -d --build
+```
+
+Der Override bindet die Webapp an `127.0.0.1:3000` und PostgreSQL für
+wegwerfbare DB-Tests an `127.0.0.1:5433`. Beide Ports lassen sich mit
+`WEBAPP_HOST_PORT` beziehungsweise `DB_HOST_PORT` ändern.
+
 Nach erstem `up`:
 1. Schema-Init einmalig auslösen:
    ```bash
@@ -67,8 +80,9 @@ Nach erstem `up`:
    ```bash
    npm run seed-admin
    ```
-3. Browser auf `http://localhost:${WEBAPP_HOST_PORT:-3000}` (oder hinter
-   Traefik auf `https://${DOMAIN}`).
+3. Mit dem OrbStack-Override: Browser auf
+   `http://localhost:${WEBAPP_HOST_PORT:-3000}`; andernfalls hinter Traefik
+   auf `https://${DOMAIN}`.
 
 ## Vexa-Profile aktivieren (Remote-Meeting)
 
@@ -77,7 +91,7 @@ Standardmäßig läuft GhostTyper ohne Vexa-Stack. Zum Aktivieren:
 ```bash
 # .env zusätzlich:
 COMPOSE_PROFILES=vexa
-MISTRAL_API_KEY=…                     # gleicher Key wie Batch-Pfad
+OPENROUTER_API_KEY=…                  # optionaler Operator-Fallback
 VEXA_ADMIN_API_TOKEN=$(openssl rand -hex 32)
 BRIDGE_SHARED_SECRET=$(openssl rand -hex 32)
 RECONCILE_API_SECRET=$(openssl rand -hex 32)
@@ -108,7 +122,8 @@ Optional (je nach Setup):
 | `WEBAPP_HOST_PORT` | `3000` | Host-Port für die Webapp |
 | `VEXA_LITE_IMAGE` | upstream Vexa-AI | Override mit Nextcloud-Talk-Fork (`ghcr.io/helge7925/vexa-bot-talk:<tag>`) |
 | `VEXA_DASHBOARD_HOST_PORT` | `3300` | Host-Port für Vexas Operator-Dashboard (Bind 127.0.0.1) |
-| `MISTRAL_API_KEY` | leer | Operator-Fallback wenn keine Workspace-Key gesetzt |
+| `OPENROUTER_API_KEY` | leer | Operator-Fallback, falls kein Organisationsschlüssel gesetzt ist |
+| `OUTBOUND_ALLOWED_HOSTS` | `openrouter.ai` | Exakte Egress-Allowlist für KI-Aufrufe |
 | `AUTH_CREDENTIALS_ENABLED` | `false` | Email/Password-Login zusätzlich zu OIDC |
 | `OIDC_*` | leer | Single-Sign-On gegen einen externen IdP |
 

@@ -3,13 +3,13 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { BadgeEuro, ShieldCheck } from 'lucide-react';
+import { BadgeDollarSign, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import PricingRateFields from '../../../components/PricingRateFields';
 import { useCurrentOrg } from '../../../lib/use-current-org';
 import { usePermission } from '../../../lib/use-permission';
-import { eurosToMicros, microsToEuros, toDateTimeLocal, toIsoDate } from '../../../lib/billing-ui';
+import { usdToMicros, microsToUsd, toDateTimeLocal, toIsoDate } from '../../../lib/billing-ui';
 import { useFormatter, useLocale, useTranslations } from '../../../lib/i18n';
 
 const EMPTY_RATES = { input: '', cachedInput: '', cacheWrite: '', output: '' };
@@ -25,7 +25,7 @@ export default function WorkspacePricingPage() {
   const tCommon = useTranslations('common');
   const { dateTime } = useFormatter();
   const { locale } = useLocale();
-  const rateCurrency = new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR', maximumFractionDigits: 6 });
+  const rateCurrency = new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 6 });
   const [data, setData] = useState({ prices: [], overrides: [] });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -69,7 +69,7 @@ export default function WorkspacePricingPage() {
   }, [data.prices, versionId]);
 
   const updateRate = (field, value) => setRates((current) => ({ ...current, [field]: value }));
-  const displayRate = (value) => value === null || value === undefined ? '—' : rateCurrency.format(microsToEuros(value));
+  const displayRate = (value) => value === null || value === undefined ? '—' : rateCurrency.format(microsToUsd(value));
 
   const submitOverride = async (event) => {
     event.preventDefault();
@@ -85,10 +85,10 @@ export default function WorkspacePricingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           providerPriceVersionId: Number(versionId),
-          inputPricePerMillionMicros: eurosToMicros(rates.input, { nullable: true }),
-          cachedInputPricePerMillionMicros: eurosToMicros(rates.cachedInput, { nullable: true }),
-          cacheWritePricePerMillionMicros: eurosToMicros(rates.cacheWrite, { nullable: true }),
-          outputPricePerMillionMicros: eurosToMicros(rates.output, { nullable: true }),
+          inputPricePerMillionMicros: usdToMicros(rates.input, { nullable: true }),
+          cachedInputPricePerMillionMicros: usdToMicros(rates.cachedInput, { nullable: true }),
+          cacheWritePricePerMillionMicros: usdToMicros(rates.cacheWrite, { nullable: true }),
+          outputPricePerMillionMicros: usdToMicros(rates.output, { nullable: true }),
           effectiveFrom: toIsoDate(effectiveFrom),
           effectiveUntil: effectiveUntil ? toIsoDate(effectiveUntil) : null,
           reason,
@@ -124,7 +124,7 @@ export default function WorkspacePricingPage() {
         <header className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-secondary">{org.name}</p>
-            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-primary"><BadgeEuro className="w-5 h-5 text-accent-ink" />{t('title')}</h1>
+            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-primary"><BadgeDollarSign className="w-5 h-5 text-accent-ink" />{t('title')}</h1>
             <p className="mt-1 text-sm text-secondary">{t(canOverride ? 'ownerDescription' : 'adminDescription', { role })}</p>
           </div>
           <Link href="/settings/organization" className="text-xs text-secondary hover:text-primary">← {tCommon('back')}</Link>

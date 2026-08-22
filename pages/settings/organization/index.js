@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { BadgeEuro, Building2, ChevronRight, BarChart3, Landmark, Plug, Settings as SettingsIcon, ShieldCheck, Users } from 'lucide-react';
+import { BadgeDollarSign, Building2, ChevronRight, BarChart3, Landmark, Plug, Settings as SettingsIcon, ShieldCheck, Users } from 'lucide-react';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import { useCurrentOrg } from '../../../lib/use-current-org';
 import { usePermission } from '../../../lib/use-permission';
@@ -153,7 +153,7 @@ export default function OrgSettingsPage() {
               className="flex items-center justify-between px-5 py-4 hover:bg-hover-subtle transition-colors"
             >
               <div className="flex items-center gap-3">
-                <BadgeEuro className="w-5 h-5 text-secondary" aria-hidden="true" />
+                <BadgeDollarSign className="w-5 h-5 text-secondary" aria-hidden="true" />
                 <div>
                   <p className="text-sm font-medium text-primary">{t('links.pricing')}</p>
                   <p className="text-xs text-secondary">{t('links.pricingDesc')}</p>

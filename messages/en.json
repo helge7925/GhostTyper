@@ -53,7 +53,7 @@
         "languageA": "Language A",
         "languageB": "Language B",
         "sameLanguageError": "Please pick two different languages.",
-        "costWarning": "Live translation incurs extra Mistral costs (Translate + Voxtral TTS) — typically €3–€5 per meeting hour.",
+        "costWarning": "Live translation incurs additional OpenRouter costs based on the allowed models.",
         "overlay": {
           "enable": "Show subtitles in the meeting on the bot tile",
           "hint": "The bot displays the latest translation in large type on its webcam tile — visible even without the companion tab. Participants can pin the bot tile to read along."
@@ -62,7 +62,7 @@
           "enable": "Speak the translation aloud in the meeting",
           "hint": "The bot speaks translated segments in the selected language as a second voice in the meeting. Original voices remain audible.",
           "speakIn": "Speak in",
-          "costWarning": "Costs Voxtral TTS per generated audio second — typically €0.90 per meeting hour.",
+          "costWarning": "OpenRouter TTS is billed according to model pricing and actual usage.",
           "zhFallback": "Voxtral has no Chinese voice yet — the bot uses the default English voice to read Chinese text aloud."
         }
       },
@@ -272,9 +272,9 @@
       "saveReasonMessage": "Please provide a reason for changing the workspace settings.",
       "days": "days",
       "costLimit": "Workspace monthly budget",
-      "costLimitHint": "Hard cap in EUR on AI cost for this workspace. Empty = no limit.",
+      "costLimitHint": "Hard cap in USD on AI cost for this workspace. Empty = no limit.",
       "memberBudget": "Per-member monthly budget",
-      "memberBudgetHint": "Per-member monthly cap in EUR. Combined with the workspace cap; the lower one wins. Empty = no limit."
+      "memberBudgetHint": "Per-member monthly cap in USD. Combined with the workspace cap; the lower one wins. Empty = no limit."
     },
     "usage": {
       "title": "Workspace · Usage",
@@ -296,7 +296,7 @@
       "byOperation": "By operation",
       "byOperationHint": "Current month, sorted by cost.",
       "byMember": "By member",
-      "byMemberHint": "Current month. Members without activity show €0.",
+      "byMemberHint": "Current month. Members without activity show USD 0.",
       "noActivity": "No activity yet this month.",
       "noMembers": "No members.",
       "requestsSuffix": "req",
@@ -825,53 +825,6 @@
       "glossary": "Glossary"
     },
     "integrations": {
-      "mistral": {
-        "title": "Mistral OCR & TTS",
-        "description": "Remains active for OCR and Voxtral TTS. Cortecs handles transcription, analysis, translation and text refinement.",
-        "enableLabel": "Use Mistral for OCR/TTS",
-        "enableHint": "When enabled, the stored key is used for OCR and TTS.",
-        "enableHintWithFallback": "A server default is configured as fallback — the workspace key overrides it.",
-        "apiKeyLabel": "API key",
-        "apiKeyHint": "Stored encrypted (AES-256-GCM); never sent back to the browser.",
-        "apiKeyPlaceholder": "Paste Mistral API key",
-        "configured": "set",
-        "testButton": "Test connection",
-        "connected": "Connected",
-        "disconnected": "Connection failed",
-        "saveSuccess": "Mistral configuration saved.",
-        "saveError": "Save failed.",
-        "loadError": "Could not load configuration.",
-        "testSuccess": "Successfully connected to Mistral.",
-        "testError": "Connection test failed.",
-        "readOnlyHint": "Only workspace admins can manage this integration."
-      },
-      "cortecs": {
-        "title": "Cortecs",
-        "description": "Primary provider for transcription, analysis, translation and text refinement. Defaults: deepseek-v4-pro and whisper-large-v3.",
-        "enableLabel": "Use Cortecs for AI and transcription",
-        "enableHint": "When enabled, Cortecs is used for every workspace member.",
-        "enableHintWithFallback": "A server default is configured as fallback — the workspace key overrides it.",
-        "chatModelLabel": "Chat/analysis model",
-        "transcriptionModelLabel": "Transcription model",
-        "baseUrlLabel": "API base URL",
-        "preferenceLabel": "Routing preference",
-        "preferenceBalanced": "Balanced",
-        "preferenceSpeed": "Speed",
-        "preferenceCost": "Cost",
-        "apiKeyLabel": "API key",
-        "apiKeyHint": "Stored encrypted (AES-256-GCM); never sent back to the browser.",
-        "apiKeyPlaceholder": "Paste Cortecs API key",
-        "configured": "set",
-        "testButton": "Test connection",
-        "connected": "Connected",
-        "disconnected": "Connection failed",
-        "saveSuccess": "Cortecs configuration saved.",
-        "saveError": "Save failed.",
-        "loadError": "Could not load configuration.",
-        "testSuccess": "Successfully connected to Cortecs.",
-        "testError": "Connection test failed.",
-        "readOnlyHint": "Only workspace admins can manage this integration."
-      },
       "vexa": {
         "title": "Remote meeting bot",
         "description": "A bot joins Microsoft Teams, Zoom and Nextcloud Talk meetings and streams live transcripts straight into the GhostTyper workflow. Google Meet blocks meeting bots — tab-audio capture covers Meet instead.",
@@ -1038,9 +991,9 @@
       "auditLog": "Audit log (recent events)",
       "noAuditEvents": "No events yet.",
       "costLimit": "Monthly cost limit",
-      "costLimitHint": "Hard cap per month in EUR. Empty = no limit.",
+      "costLimitHint": "Hard cap per month in USD. Empty = no limit.",
       "memberBudget": "Per-member monthly budget",
-      "memberBudgetHint": "Additional per-member budget in EUR.",
+      "memberBudgetHint": "Additional per-member budget in USD.",
       "usage": "Usage",
       "totalCost": "Total cost",
       "totalRequests": "Requests"
@@ -1194,7 +1147,7 @@
     "rowHintPlaceholder": "Hint for this row",
     "validationHeading": "Please correct the following:",
     "placeholders": {
-      "currency": "0.00 €",
+      "currency": "USD 0.00",
       "number": "0",
       "date": "DD/MM/YYYY",
       "text": "Content"
@@ -1407,7 +1360,7 @@
       "cachedInput": "Cached input",
       "cacheWrite": "Cache write",
       "output": "Output",
-      "rateHint": "EUR per 1 million units",
+      "rateHint": "USD per 1 million units",
       "notSet": "Not set",
       "effectiveFrom": "Effective from",
       "effectiveUntil": "Effective until (optional)"
@@ -1417,7 +1370,7 @@
       "ownerDescription": "Review effective prices and manage contract terms · Role: {role}",
       "adminDescription": "Read-only effective prices · Role: {role}",
       "effectiveTitle": "Currently effective prices",
-      "effectiveHint": "Amounts are shown in EUR per one million of the stated unit.",
+      "effectiveHint": "Amounts are shown in USD per one million of the stated unit.",
       "source": "Source",
       "override": "Workspace contract",
       "catalog": "Global catalog",

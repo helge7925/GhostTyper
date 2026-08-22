@@ -6,8 +6,8 @@ import { query } from '../../../lib/db';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { performOCR, translateTextSegments } from '../../../lib/ai-service';
 import { composeAbortSignals, executeReservedSpend, estimateTextUsage, requestBudgetScope } from '../../../lib/budget-runtime';
-import { getSettingsRow, resolveCortecsConfig, resolveMistralApiKey } from '../../../lib/settings-service';
-import { resolveChatModel } from '../../../lib/model-policy';
+import { getSettingsRow, resolveOpenRouterConfig } from '../../../lib/settings-service';
+import { resolveConfiguredModel } from '../../../lib/openrouter';
 import {
   ACCEPTED_FILE_TRANSLATION_TYPES,
   ACCEPTED_OFFICE_TRANSLATION_TYPES,
@@ -153,7 +153,7 @@ async function translateSegmentsWithGlossary({
         userId: budgetContext.userId,
         transcriptionId: budgetContext.transcriptionId || null,
         operation: budgetContext.operation,
-        provider: 'cortecs',
+        provider: 'openrouter',
         model,
         estimatedUsage: estimateTextUsage(joined, {
           inputBufferTokens: 320 + texts.length * 16,
@@ -407,15 +407,13 @@ async function handler(req, res) {
     const budgetCounter = { value: 0 };
 
     const settingsRow = await getSettingsRow(userId);
-    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const mistralApiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveChatModel(requestModel, null)
-      || resolveChatModel(settingsRow?.preferred_model, null)
-      || cortecs.chatModel;
-    if (!cortecs.apiKey) {
+    const openrouter = await resolveOpenRouterConfig({ userId, organizationId: req.org?.id });
+    const ocrModel = resolveConfiguredModel(openrouter, 'ocr', settingsRow?.ocr_model);
+    const preferredModel = resolveConfiguredModel(openrouter, 'chat', requestModel || settingsRow?.preferred_model);
+    if (!openrouter.apiKey) {
       await safeUnlink(tempUploadPath);
       tempUploadPath = '';
-      return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert' });
+      return res.status(400).json({ message: 'Kein OpenRouter-API-Key konfiguriert' });
     }
     if (!preferredModel) {
       await safeUnlink(tempUploadPath);
@@ -447,10 +445,10 @@ async function handler(req, res) {
             orgId,
             sourceLanguage,
             targetLanguage,
-            apiKey: cortecs.apiKey,
+            apiKey: openrouter.apiKey,
             model: preferredModel,
             glossary,
-            providerOptions: { baseUrl: cortecs.baseUrl, preference: cortecs.preference, signal: requestController.signal },
+            providerOptions: { baseUrl: openrouter.baseUrl, fallbackModel: openrouter.defaultModels.chat, signal: requestController.signal },
             budgetContext: {
               scope: `${budgetScope}:office`,
               counter: budgetCounter,
@@ -591,10 +589,10 @@ async function handler(req, res) {
               orgId,
               sourceLanguage,
               targetLanguage,
-              apiKey: cortecs.apiKey,
+              apiKey: openrouter.apiKey,
               model: preferredModel,
               glossary,
-              providerOptions: { baseUrl: cortecs.baseUrl, preference: cortecs.preference, signal: requestController.signal },
+              providerOptions: { baseUrl: openrouter.baseUrl, fallbackModel: openrouter.defaultModels.chat, signal: requestController.signal },
               budgetContext: {
                 scope: `${budgetScope}:pdf-in-place`,
                 counter: budgetCounter,
@@ -748,8 +746,8 @@ async function handler(req, res) {
 
       pdfBuffer = await (async () => {
         // Step 1: OCR via Mistral — returns Markdown.
-        if (!mistralApiKey) {
-          throw Object.assign(new Error('Kein Mistral API-Key für PDF-OCR konfiguriert.'), { code: 'NO_MISTRAL_OCR_KEY' });
+        if (!openrouter.apiKey || !ocrModel) {
+          throw Object.assign(new Error('OpenRouter OCR ist nicht vollständig konfiguriert.'), { code: 'NO_OPENROUTER_OCR' });
         }
         const estimatedPages = Math.max(
           1,
@@ -762,11 +760,12 @@ async function handler(req, res) {
             organizationId: orgId,
             userId,
             operation: 'ocr',
-            provider: 'mistral',
-            model: 'mistral-ocr-latest',
+            provider: 'openrouter',
+            model: ocrModel,
             estimatedUsage: { inputQuantity: estimatedPages, outputQuantity: 0 },
           },
-          (_reservation, budgetSignal) => performOCR(tempUploadPath, mistralApiKey, 'application/pdf', {
+          (_reservation, budgetSignal) => performOCR(tempUploadPath, openrouter.apiKey, 'application/pdf', {
+            model: ocrModel,
             signal: composeAbortSignals(requestController.signal, budgetSignal),
           }),
           (result) => ({
@@ -794,10 +793,10 @@ async function handler(req, res) {
           orgId,
           sourceLanguage,
           targetLanguage,
-          apiKey: cortecs.apiKey,
+          apiKey: openrouter.apiKey,
           model: preferredModel,
           glossary,
-          providerOptions: { baseUrl: cortecs.baseUrl, preference: cortecs.preference, signal: requestController.signal },
+          providerOptions: { baseUrl: openrouter.baseUrl, fallbackModel: openrouter.defaultModels.chat, signal: requestController.signal },
           budgetContext: {
             scope: `${budgetScope}:pdf-fallback`,
             counter: budgetCounter,
@@ -964,7 +963,7 @@ async function handler(req, res) {
     if (error.code === 'LIMIT_FILE_SIZE' || error.message?.includes('maxFileSize')) {
       return res.status(413).json({ message: 'Datei ist zu groß (max. 500 MB)' });
     }
-    if (error?.code === 'PDF_NO_TEXT' || error?.code === 'PDF_TOO_LARGE' || error?.code === 'NO_MISTRAL_OCR_KEY') {
+    if (error?.code === 'PDF_NO_TEXT' || error?.code === 'PDF_TOO_LARGE' || error?.code === 'NO_OPENROUTER_OCR') {
       return res.status(400).json({ message: error.message });
     }
     logApiError('File translation error', error);

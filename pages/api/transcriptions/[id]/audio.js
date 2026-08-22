@@ -1,7 +1,7 @@
 import { query } from '../../../../lib/db';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { withOrgScope } from '../../../../lib/api/with-org-scope';
-import { resolveMistralApiKey } from '../../../../lib/settings-service';
+import { resolveOpenRouterConfig } from '../../../../lib/settings-service';
 import {
   assertTranscriptionPaidWorkActive,
   budgetIdempotencyKey,
@@ -11,7 +11,7 @@ import {
   requestBudgetScope,
 } from '../../../../lib/budget-runtime';
 import {
-  voxtralTts,
+  openRouterTts,
   buildWavHeader,
 } from '../../../../lib/tts';
 import { logError, logInfo } from '../../../../lib/observability';
@@ -80,7 +80,10 @@ async function handler(req, res) {
     return res.status(400).json({ code: 'TRANSLATION_DISABLED' });
   }
 
-  const apiKey = await resolveMistralApiKey({ userId, organizationId: orgId });
+  const openrouter = await resolveOpenRouterConfig({ userId, organizationId: orgId });
+  const apiKey = openrouter.apiKey;
+  const ttsModel = openrouter.defaultModels.tts;
+  const ttsVoice = openrouter.ttsVoices[ttsModel];
   if (!apiKey) return res.status(503).json({ code: 'NO_API_KEY' });
 
   // Open the streaming response. We send a WAV header up front so the
@@ -180,27 +183,30 @@ async function handler(req, res) {
               userId,
               transcriptionId,
               operation: 'live_tts',
-              provider: 'mistral',
-              model: 'voxtral-mini-tts-2603',
+              provider: 'openrouter',
+              model: ttsModel,
               estimatedUsage: { inputQuantity: 0, outputQuantity: chars },
               reservationMs: 5 * 60 * 1000,
               stopOnDenied: true,
             },
             async (_reservation, budgetSignal) => {
-              const rendered = await voxtralTts({
+              const rendered = await openRouterTts({
                 text: seg.text,
                 language: requestedLang,
                 format: 'pcm',
                 apiKey,
+                model: ttsModel,
+                voice: ttsVoice,
                 signal: composeAbortSignals(signal, budgetSignal),
               });
               return {
                 pcm: rendered,
-                model: 'voxtral-mini-tts-2603',
+                model: ttsModel,
                 providerRequestId: rendered.providerRequestId || null,
+                usage: rendered.usage || null,
               };
             },
-            () => ({ inputQuantity: 0, outputQuantity: chars }),
+            (result) => result.usage || ({ inputQuantity: 0, outputQuantity: chars }),
           );
           const pcm = paid.pcm;
           await assertTranscriptionPaidWorkActive(transcriptionId);
