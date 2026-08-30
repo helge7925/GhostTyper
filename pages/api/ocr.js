@@ -5,6 +5,8 @@ import { randomUUID } from 'crypto';
 import { query } from '../../lib/db';
 import { withOrgScope } from '../../lib/api/with-org-scope';
 import { performOCR, analyzeTranscription } from '../../lib/ai-service';
+import { performOcrEdenAi, analyzeTranscriptionEdenAi } from '../../lib/edenai-service';
+import { resolveActiveProviderConfig } from '../../lib/ai-provider-router';
 import {
   budgetIdempotencyKey,
   composeAbortSignals,
@@ -14,7 +16,7 @@ import {
 } from '../../lib/budget-runtime';
 import { ACCEPTED_OCR_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE, normalizeAnalysisTemplate } from '../../lib/constants';
 import { resolveConfiguredModel } from '../../lib/openrouter';
-import { getSettingsRow, resolveOpenRouterConfig } from '../../lib/settings-service';
+import { getSettingsRow } from '../../lib/settings-service';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { addTranscriptionEvent } from '../../lib/transcription-events';
 import { resolveTemplate } from '../../lib/template-service';
@@ -144,21 +146,35 @@ async function handler(req, res) {
     tempUploadPath = '';
 
     const settingsRow = await getSettingsRow(userId);
-    const openrouter = await resolveOpenRouterConfig({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveConfiguredModel(openrouter, 'chat', settingsRow?.preferred_model);
-    const ocrModel = resolveConfiguredModel(openrouter, 'ocr', settingsRow?.ocr_model);
     const language = settingsRow?.language || 'de';
     const shouldAnalyze = (fields.analyze?.[0] || fields.analyze) === 'true';
 
-    if (!openrouter.apiKey || !ocrModel) {
+    // OCR extraction and analysis both resolve the same `chat` capability
+    // now — neither has an EdenAI-native capability of its own for
+    // extraction (see lib/edenai.js's EDENAI_HARDCODED_MODEL comment),
+    // and analysis was migrated onto the same router in
+    // migrate-chat-to-edenai (previously it kept its own hardcoded
+    // `openrouter` resolution, per the master plan's original chat/
+    // analysis exception list — that exception is now closed). One
+    // resolution serves both blocks below.
+    const activeOcr = await resolveActiveProviderConfig({ userId, organizationId: req.org?.id, capability: 'chat' });
+    const ocrModel = activeOcr.provider === 'edenai'
+      ? activeOcr.model
+      : resolveConfiguredModel(activeOcr, 'ocr', settingsRow?.ocr_model);
+    // EdenAI's chat model is hardcoded — no separate "preferred model"
+    // concept, unlike OpenRouter's catalogue-driven per-user preference.
+    const preferredModel = activeOcr.provider === 'edenai'
+      ? activeOcr.model
+      : resolveConfiguredModel(activeOcr, 'chat', settingsRow?.preferred_model);
+
+    if (!activeOcr.apiKey || !ocrModel) {
       await safeUnlink(persistedFilePath);
       persistedFilePath = '';
-      return res.status(400).json({ message: 'OpenRouter OCR ist nicht vollständig konfiguriert' });
-    }
-    if (shouldAnalyze && !openrouter.apiKey) {
-      await safeUnlink(persistedFilePath);
-      persistedFilePath = '';
-      return res.status(400).json({ message: 'Kein OpenRouter-API-Key für Analyse konfiguriert' });
+      return res.status(400).json({
+        message: activeOcr.provider === 'edenai'
+          ? 'EdenAI OCR ist nicht vollständig konfiguriert'
+          : 'OpenRouter OCR ist nicht vollständig konfiguriert',
+      });
     }
     if (!preferredModel) {
       await safeUnlink(persistedFilePath);
@@ -203,9 +219,10 @@ async function handler(req, res) {
       return res.status(400).json({ message: `Kombinierter Kontext ist zu lang (max. ${MAX_CUSTOM_PROMPT_LENGTH} Zeichen)` });
     }
     const requestModel = fields.model?.[0] || fields.model;
-    const selectedModelForAnalysis = shouldAnalyze
-      ? resolveConfiguredModel(openrouter, 'chat', requestModel)
-      : preferredModel;
+    // EdenAI's chat model is hardcoded — no per-request model override.
+    const selectedModelForAnalysis = activeOcr.provider === 'edenai'
+      ? activeOcr.model
+      : (shouldAnalyze ? resolveConfiguredModel(activeOcr, 'chat', requestModel) : preferredModel);
     if (shouldAnalyze && !selectedModelForAnalysis) {
       await safeUnlink(persistedFilePath);
       persistedFilePath = '';
@@ -223,15 +240,21 @@ async function handler(req, res) {
         organizationId: orgId,
         userId,
         operation: 'ocr',
-        provider: 'openrouter',
+        provider: activeOcr.provider,
         model: ocrModel,
-        fallbackModel: openrouter.defaultModels.ocr,
+        ...(activeOcr.provider === 'edenai' ? {} : { fallbackModel: activeOcr.defaultModels.ocr }),
         estimatedUsage: { inputQuantity: estimatedPages, outputQuantity: 0 },
       },
-      (_reservation, budgetSignal) => performOCR(filePath, openrouter.apiKey, detectedMimeType, {
-        model: ocrModel,
-        signal: composeAbortSignals(budgetSignal),
-      }),
+      (_reservation, budgetSignal) => (activeOcr.provider === 'edenai'
+        ? performOcrEdenAi(filePath, activeOcr.apiKey, detectedMimeType, {
+          model: ocrModel,
+          signal: composeAbortSignals(budgetSignal),
+        })
+        : performOCR(filePath, activeOcr.apiKey, detectedMimeType, {
+          model: ocrModel,
+          organizationId: activeOcr.organizationId,
+          signal: composeAbortSignals(budgetSignal),
+        })),
       (result) => ({
         ...(result.usage || {}),
         inputQuantity: result.usage?.pages_processed || result.usage?.pages || estimatedPages,
@@ -249,7 +272,7 @@ async function handler(req, res) {
           organizationId: orgId,
           userId,
           operation: 'analysis',
-          provider: 'openrouter',
+          provider: activeOcr.provider,
           model: selectedModelForAnalysis,
           estimatedUsage: estimateTextUsage(`${markdown}\n${effectiveCustomPrompt}`, {
             inputBufferTokens: 1600,
@@ -257,15 +280,30 @@ async function handler(req, res) {
             outputBufferTokens: 3500,
           }),
         },
-        (_reservation, budgetSignal) => analyzeTranscription(
-          markdown,
-          resolvedTemplateForAnalysis,
-          openrouter.apiKey,
-          effectiveCustomPrompt,
-          selectedModelForAnalysis,
-          language,
-          { baseUrl: openrouter.baseUrl, fallbackModel: openrouter.defaultModels.chat, signal: composeAbortSignals(budgetSignal) },
-        ),
+        (_reservation, budgetSignal) => (activeOcr.provider === 'edenai'
+          ? analyzeTranscriptionEdenAi(
+            markdown,
+            resolvedTemplateForAnalysis,
+            activeOcr.apiKey,
+            effectiveCustomPrompt,
+            selectedModelForAnalysis,
+            language,
+            { signal: composeAbortSignals(budgetSignal) },
+          )
+          : analyzeTranscription(
+            markdown,
+            resolvedTemplateForAnalysis,
+            activeOcr.apiKey,
+            effectiveCustomPrompt,
+            selectedModelForAnalysis,
+            language,
+            {
+              baseUrl: activeOcr.baseUrl,
+              fallbackModel: activeOcr.defaultModels.chat,
+              organizationId: activeOcr.organizationId,
+              signal: composeAbortSignals(budgetSignal),
+            },
+          )),
       );
       analysis = analysisResult.analysis;
       selectedModelForSave = selectedModelForAnalysis;
@@ -367,6 +405,7 @@ async function handler(req, res) {
       metadata: {
         originalName: file.originalFilename || null,
         mimeType: detectedMimeType,
+        ocrProvider: activeOcr.provider,
         template,
         analysisType,
         size: Number(file.size || 0),
@@ -394,6 +433,11 @@ async function handler(req, res) {
     }
     if (error?.code === 'BUDGET_ACCOUNTING_UNAVAILABLE' || error?.code === 'PRICING_CONFIGURATION_MISSING') {
       return res.status(503).json({ message: error.message });
+    }
+    if (error?.code === 'PDF_TOO_MANY_PAGES') {
+      await safeUnlink(tempUploadPath);
+      await safeUnlink(persistedFilePath);
+      return res.status(400).json({ message: error.message });
     }
     logApiError('OCR error', error);
     await safeUnlink(tempUploadPath);

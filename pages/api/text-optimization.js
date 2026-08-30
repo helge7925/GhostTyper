@@ -1,19 +1,24 @@
 import { optimizeText } from '../../lib/ai-service';
 import { withOrgScope } from '../../lib/api/with-org-scope';
 import { composeAbortSignals, executeReservedSpend, estimateTextUsage, requestBudgetScope } from '../../lib/budget-runtime';
-import { getSettingsRow, resolveOpenRouterConfig } from '../../lib/settings-service';
+import { getSettingsRow } from '../../lib/settings-service';
 import { resolveConfiguredModel } from '../../lib/openrouter';
+import { optimizeTextEdenAi } from '../../lib/edenai-service';
+import { resolveActiveProviderConfig } from '../../lib/ai-provider-router';
 import { MAX_TEXT_OPTIMIZATION_INPUT_LENGTH, MAX_CUSTOM_PROMPT_LENGTH } from '../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { logAuditEvent } from '../../lib/audit-log';
 
+// Only `spelling_grammar` is enabled — the other five presets are
+// genuine LLM rewrites (tone/length/structure changes), and only
+// `spelling_grammar`'s prompt has been stress-tested against the
+// hardcoded EdenAI model (see hardcode-edenai-models/design.md's two
+// revision rounds: 5 German/English texts, several rerun for stability).
+// Deliberately temporary — re-enable a preset here (and in
+// pages/textoptimierung.js's PRESETS array) once it's been verified with
+// the same rigor, not before.
 const ALLOWED_PRESETS = new Set([
   'spelling_grammar',
-  'friendlier',
-  'more_formal',
-  'shorter',
-  'clearer',
-  'email_improve',
 ]);
 
 async function handler(req, res) {
@@ -34,7 +39,7 @@ async function handler(req, res) {
 
   const {
     text,
-    preset = 'clearer',
+    preset = 'spelling_grammar',
     customInstruction = '',
     model: requestModel,
   } = req.body || {};
@@ -54,38 +59,63 @@ async function handler(req, res) {
 
   try {
     const settingsRow = await getSettingsRow(userId);
-    const openrouter = await resolveOpenRouterConfig({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveConfiguredModel(openrouter, 'chat', requestModel || settingsRow?.preferred_model);
+    const trimmedCustomInstruction = typeof customInstruction === 'string' ? customInstruction.trim() : '';
 
-    if (!openrouter.apiKey) {
-      return res.status(400).json({ message: 'Kein OpenRouter-API-Key konfiguriert' });
-    }
-    if (!preferredModel) {
-      return res.status(400).json({ message: 'Ungültiges KI-Modell' });
+    // Every preset (including spelling_grammar — see
+    // hardcode-edenai-models) resolves the `chat` capability uniformly.
+    // spelling_grammar used to route to a dedicated EdenAI grammar
+    // feature; a real comparison found EdenAI's own chat capability with
+    // this same narrow correction prompt corrects German text more
+    // reliably, so it's just another chat preset now.
+    const active = await resolveActiveProviderConfig({ userId, organizationId: orgId, capability: 'chat' });
+
+    let providerModel;
+    let callProvider;
+
+    if (active.provider === 'edenai') {
+      if (!active.apiKey) {
+        return res.status(400).json({ message: 'Kein EdenAI-API-Key konfiguriert' });
+      }
+      providerModel = active.model;
+      callProvider = (_reservation, budgetSignal) => optimizeTextEdenAi(
+        text, preset, trimmedCustomInstruction, active.apiKey, active.model,
+        { signal: composeAbortSignals(budgetSignal) },
+      );
+    } else {
+      const preferredModel = resolveConfiguredModel(active, 'chat', requestModel || settingsRow?.preferred_model);
+      if (!active.apiKey) {
+        return res.status(400).json({ message: 'Kein OpenRouter-API-Key konfiguriert' });
+      }
+      if (!preferredModel) {
+        return res.status(400).json({ message: 'Ungültiges KI-Modell' });
+      }
+      providerModel = preferredModel;
+      callProvider = (_reservation, budgetSignal) => optimizeText(
+        text, preset, trimmedCustomInstruction, active.apiKey, preferredModel,
+        {
+          baseUrl: active.baseUrl,
+          fallbackModel: active.defaultModels.chat,
+          organizationId: active.organizationId,
+          signal: composeAbortSignals(budgetSignal),
+        },
+      );
     }
 
     const result = await executeReservedSpend(
       {
-        idempotencyKey: requestBudgetScope(req, 'text-optimization', { text, preset, customInstruction, preferredModel }),
+        idempotencyKey: requestBudgetScope(req, 'text-optimization', { text, preset, customInstruction, providerModel }),
         organizationId: orgId,
         userId,
         operation: 'text_optimization',
-        provider: 'openrouter',
-        model: preferredModel,
+        provider: active.provider,
+        model: providerModel,
         estimatedUsage: estimateTextUsage(text, {
           inputBufferTokens: 320,
           outputMultiplier: 1.1,
           outputBufferTokens: 192,
         }),
       },
-      (_reservation, budgetSignal) => optimizeText(
-        text,
-        preset,
-        typeof customInstruction === 'string' ? customInstruction.trim() : '',
-        openrouter.apiKey,
-        preferredModel,
-        { baseUrl: openrouter.baseUrl, fallbackModel: openrouter.defaultModels.chat, signal: composeAbortSignals(budgetSignal) },
-      ),
+      callProvider,
     );
     const optimizedText = result.optimizedText;
 
@@ -96,7 +126,8 @@ async function handler(req, res) {
       targetType: 'text_optimization',
       metadata: {
         preset,
-        model: preferredModel,
+        provider: active.provider,
+        model: providerModel,
         inputChars: text.length,
       },
     });

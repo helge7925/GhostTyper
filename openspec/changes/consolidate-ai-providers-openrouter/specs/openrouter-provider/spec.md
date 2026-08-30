@@ -44,3 +44,44 @@ GhostTyper SHALL NOT fall back to a legacy provider after OpenRouter activation.
 - **GIVEN** the workspace is activated and OpenRouter fails
 - **THEN** the operation fails visibly without sending data to a legacy host.
 
+### Requirement: Capability-Aware Chat Parameters
+
+GhostTyper SHALL only send `temperature`, `response_format` or `stream` on a
+chat request when the selected model's catalogue `supported_parameters`
+lists that parameter.
+
+#### Scenario: Model does not support response_format
+
+- **GIVEN** a chat call requests `response_format: json_object`
+- **WHEN** the selected model's catalogue entry does not list
+  `response_format` under `supported_parameters`
+- **THEN** the request is sent without `response_format` rather than
+  discarding the parameter unconditionally regardless of model support.
+
+### Requirement: Best-Effort STT Context Hints
+
+GhostTyper SHALL forward configured context-bias terms to OpenRouter as a
+best-effort provider-specific hint and SHALL NOT silently discard them.
+
+#### Scenario: Context bias is configured
+
+- **GIVEN** a transcription request has non-empty context-bias terms
+- **WHEN** the batch or Vexa-bridge transcription request is built
+- **THEN** the terms are attached via the documented provider-options
+  passthrough (no catalogue signal confirms per-model support), and a batch
+  job additionally records a transcription event and an audit-log entry
+  noting the forwarding outcome.
+
+### Requirement: Model-Unavailable Admin Visibility
+
+GhostTyper SHALL make an admin-visible record when a batch job exhausts its
+`MODEL_UNAVAILABLE` fallback.
+
+#### Scenario: Fallback to the workspace default also fails
+
+- **GIVEN** neither the requested model nor the workspace default is
+  available
+- **WHEN** the batch worker gives up with `MODEL_UNAVAILABLE`
+- **THEN** an audit-log entry is written in addition to the job's own error
+  state, so an admin reviewing the audit log sees the failure.
+

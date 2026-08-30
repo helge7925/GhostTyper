@@ -423,7 +423,7 @@ test('provider lifecycle stamps precede calls and uncertain outcomes retain hold
 
 test('upload and meeting usage use the common retried commit helper', () => {
   const uploadWorker = source('../lib/transcription-worker.js');
-  assert.match(uploadWorker, /executeChunk: async/);
+  assert.match(uploadWorker, /const executeChunk = async/);
   assert.match(uploadWorker, /executeReservedSpend\(\{/);
   assert.match(uploadWorker, /composeAbortSignals\(signal, budgetSignal\)/);
   assert.doesNotMatch(uploadWorker, /beforeChunk:/);

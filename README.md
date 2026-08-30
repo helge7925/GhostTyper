@@ -67,8 +67,8 @@ remote-meeting screenshots are TODO / need capture before they are embedded.
 - **Multi-workspace**: org-scoped data, roles `owner`/`admin`/`member`/
   `viewer`/`auditor`, audit log.
 - **Cost tracking**: monthly breakdown per provider, operation and member.
-- **Provider management**: Mistral, Vexa and Nextcloud managed centrally per
-  workspace; secrets encrypted with AES-256-GCM.
+- **Provider management**: OpenRouter, Vexa and Nextcloud managed centrally
+  per workspace; secrets encrypted with AES-256-GCM.
 
 ## Tech Stack
 
@@ -76,7 +76,7 @@ remote-meeting screenshots are TODO / need capture before they are embedded.
 | -------- | ---------------------------------------------------------------- |
 | Frontend | Next.js 16.x (Pages Router), React 18, Tailwind, Radix, Zustand |
 | Backend  | Next.js API Routes, NextAuth, PostgreSQL 16 (`pg`)               |
-| AI       | Mistral (Chat / OCR / Voxtral batch + live), Vexa Lite           |
+| AI       | OpenRouter (Chat / OCR / batch + live transcription / TTS), Vexa Lite |
 | Infra    | Docker Compose, Traefik (optional), AES-256-GCM (`lib/secrets.js`) |
 | CI       | GitHub Actions: CodeQL, security gates, smoke tests              |
 
@@ -90,11 +90,11 @@ remote-meeting screenshots are TODO / need capture before they are embedded.
    │              │
    │ REST/SSE     │ webhook + bridge
    ▼              ▼
-┌────────┐   ┌──────────────────┐    ┌────────────────────┐
-│ Mistral│◄──┤ Vexa Lite        │───►│ Mistral Voxtral    │
-│ API    │   │ (bot container)  │    │ (via voxtral       │
-│ (batch)│   │                  │    │  translator bridge)│
-└────────┘   └──────────────────┘    └────────────────────┘
+┌──────────┐  ┌──────────────────┐    ┌────────────────────┐
+│OpenRouter│◄─┤ Vexa Lite        │───►│ OpenRouter STT     │
+│ API      │  │ (bot container)  │    │ (via bridge, same  │
+│ (batch)  │  │                  │    │  workspace key)    │
+└──────────┘  └──────────────────┘    └────────────────────┘
 ```
 
 Detailed flow: [`docs/architecture.md`](docs/architecture.md). Vexa
@@ -171,7 +171,7 @@ data-flow review and SCC/TIA implications when switching providers, see
 Per workspace, an admin manages everything under
 **Settings → Workspace verwalten**:
 
-- API keys & integrations (Mistral, Vexa)
+- API keys & integrations (OpenRouter, Vexa)
 - Members & roles (incl. per-member spend caps)
 - Retention windows
 - Usage & cost dashboard

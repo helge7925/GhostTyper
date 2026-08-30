@@ -134,8 +134,9 @@ Optional (je nach Setup):
 1. `deps` — `npm ci`
 2. `builder` — `next build`, erzeugt das `.next/standalone`-Bundle
 3. `runner` — kopiert `.next/standalone` + `.next/static` + `public`,
-   installiert ffmpeg + chromium + nss + freetype + harfbuzz + ttf-freefont
-   (für PDF-Export und Audio-Konvertierung), läuft als nicht-Root-User
+   installiert ffmpeg + chromium + nss + freetype + harfbuzz + ttf-freefont +
+   poppler-utils (für PDF-Export, Audio-Konvertierung und PDF-zu-Bild-
+   Rasterisierung vor EdenAI-OCR), läuft als nicht-Root-User
    `nextjs:1001`, exposed Port 3000, hat einen Health-Check gegen
    `/api/health`.
 

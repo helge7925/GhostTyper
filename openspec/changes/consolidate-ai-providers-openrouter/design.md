@@ -27,13 +27,32 @@ raises `MODEL_UNAVAILABLE`.
 
 ## Workload Adapters
 
-- Chat transformations use `/chat/completions`.
-- Batch and Vexa transcription use `/audio/transcriptions`; only successfully
-  probed live models may request `verbose_json` through the bridge.
+- Chat transformations use `/chat/completions`. `temperature`, `response_format`
+  and `stream` are only sent when the selected model's catalogue
+  `supported_parameters` lists them; the request builder resolves this from
+  the (10-minute-cached) catalogue per call rather than assuming support.
+- Batch and Vexa transcription use `/audio/transcriptions`. Live/Vexa models
+  may only request `verbose_json` once integration-probed
+  (`liveTranscriptionVerified`); batch requests also request `verbose_json`
+  whenever the catalogue independently confirms `response_format` support
+  for the selected transcription default, falling back to the untimestamped
+  single-segment shape otherwise.
+- OpenRouter exposes no catalogue signal for STT vocabulary/context-term
+  support; it is provider-specific (currently Groq only) behind
+  `provider.options.<provider>.prompt`. Configured context-bias terms are
+  therefore forwarded as a best-effort `provider.options.groq.prompt` hint on
+  both the batch and Vexa-bridge paths, and every batch job with non-empty
+  context bias records a transcription event and an audit-log entry
+  (`transcription.context_bias_forwarded`) noting the forwarding outcome —
+  application by the eventually-routed provider is never guaranteed.
 - TTS uses `/audio/speech`; provider PCM is normalized to 22.05 kHz, 16-bit,
   mono before existing WAV concatenation.
 - PDFs use the OpenRouter file-parser with `mistral-ocr`; images use a
   compatible vision model. Both normalize to the existing Markdown result.
+- A batch job that exhausts its `MODEL_UNAVAILABLE` fallback (see below)
+  writes an `org.integration.openrouter.model_unavailable` audit event (severity
+  `warn`) in addition to the job's own error state, so an admin reviewing the
+  audit log — not just the affected user — sees the failure.
 
 ## Pricing And Currency
 

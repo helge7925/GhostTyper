@@ -1,7 +1,8 @@
 import { query } from '../../../../lib/db';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { withOrgScope } from '../../../../lib/api/with-org-scope';
-import { resolveOpenRouterConfig } from '../../../../lib/settings-service';
+import { resolveActiveProviderConfig } from '../../../../lib/ai-provider-router';
+import { synthesizeSpeechEdenAi } from '../../../../lib/edenai-service';
 import {
   assertTranscriptionPaidWorkActive,
   budgetIdempotencyKey,
@@ -80,10 +81,10 @@ async function handler(req, res) {
     return res.status(400).json({ code: 'TRANSLATION_DISABLED' });
   }
 
-  const openrouter = await resolveOpenRouterConfig({ userId, organizationId: orgId });
-  const apiKey = openrouter.apiKey;
-  const ttsModel = openrouter.defaultModels.tts;
-  const ttsVoice = openrouter.ttsVoices[ttsModel];
+  const active = await resolveActiveProviderConfig({ userId, organizationId: orgId, capability: 'tts' });
+  const apiKey = active.apiKey;
+  const ttsModel = active.provider === 'edenai' ? active.model : active.defaultModels.tts;
+  const ttsVoice = active.ttsVoices[ttsModel];
   if (!apiKey) return res.status(503).json({ code: 'NO_API_KEY' });
 
   // Open the streaming response. We send a WAV header up front so the
@@ -183,22 +184,31 @@ async function handler(req, res) {
               userId,
               transcriptionId,
               operation: 'live_tts',
-              provider: 'openrouter',
+              provider: active.provider,
               model: ttsModel,
               estimatedUsage: { inputQuantity: 0, outputQuantity: chars },
               reservationMs: 5 * 60 * 1000,
               stopOnDenied: true,
             },
             async (_reservation, budgetSignal) => {
-              const rendered = await openRouterTts({
-                text: seg.text,
-                language: requestedLang,
-                format: 'pcm',
-                apiKey,
-                model: ttsModel,
-                voice: ttsVoice,
-                signal: composeAbortSignals(signal, budgetSignal),
-              });
+              const rendered = active.provider === 'edenai'
+                ? await synthesizeSpeechEdenAi({
+                  text: seg.text,
+                  format: 'pcm',
+                  apiKey,
+                  model: ttsModel,
+                  voice: ttsVoice,
+                  signal: composeAbortSignals(signal, budgetSignal),
+                })
+                : await openRouterTts({
+                  text: seg.text,
+                  language: requestedLang,
+                  format: 'pcm',
+                  apiKey,
+                  model: ttsModel,
+                  voice: ttsVoice,
+                  signal: composeAbortSignals(signal, budgetSignal),
+                });
               return {
                 pcm: rendered,
                 model: ttsModel,

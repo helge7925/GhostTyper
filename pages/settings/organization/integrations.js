@@ -6,6 +6,8 @@ import { useSession } from 'next-auth/react';
 import { Plug } from 'lucide-react';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import OpenRouterIntegrationPanel from '../../../components/settings/OpenRouterIntegrationPanel';
+import EdenAiIntegrationPanel from '../../../components/settings/EdenAiIntegrationPanel';
+import MistralIntegrationPanel from '../../../components/settings/MistralIntegrationPanel';
 import VexaIntegrationPanel from '../../../components/settings/VexaIntegrationPanel';
 import { useCurrentOrg } from '../../../lib/use-current-org';
 import { usePermission } from '../../../lib/use-permission';
@@ -60,6 +62,7 @@ export default function WorkspaceIntegrationsPage() {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <OpenRouterIntegrationPanel canEdit={canEditIntegrations} />
+            <EdenAiIntegrationPanel canEdit={canEditIntegrations} />
           </div>
         </section>
 
@@ -69,6 +72,7 @@ export default function WorkspaceIntegrationsPage() {
             <p className="text-xs text-secondary mt-1 max-w-prose">{t('meetingBotsHint')}</p>
           </div>
           <VexaIntegrationPanel canEdit={canEditIntegrations} />
+          <MistralIntegrationPanel canEdit={canEditIntegrations} />
         </section>
 
       </main>

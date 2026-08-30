@@ -6,12 +6,13 @@ import { OPENROUTER_BASE_URL, OPENROUTER_CAPABILITIES } from '../lib/openrouter.
 // lib/settings-service.js transitively imports lib/db.js, which throws at
 // module-load time if DATABASE_URL is unset. pg's Pool never connects
 // eagerly (only on first query), and no test below passes an
-// organizationId to resolveEdenAiConfig/resolveOpenRouterConfig, so no
-// query ever actually runs — a syntactically-valid placeholder is enough
-// to satisfy the load-time guard. Set before the (necessarily dynamic, so
-// it runs after this assignment) import of the module under test.
+// organizationId to resolveEdenAiConfig/resolveOpenRouterConfig/
+// resolveMistralConfig, so no query ever actually runs — a
+// syntactically-valid placeholder is enough to satisfy the load-time
+// guard. Set before the (necessarily dynamic, so it runs after this
+// assignment) import of the module under test.
 process.env.DATABASE_URL ||= 'postgres://test:test@localhost:5432/test';
-const { resolveEdenAiConfig, resolveOpenRouterConfig } = await import('../lib/settings-service.js');
+const { resolveEdenAiConfig, resolveOpenRouterConfig, resolveMistralConfig } = await import('../lib/settings-service.js');
 
 // resolveEdenAiConfig's organization-scoped branch calls getIntegration(),
 // which hits the real database — untestable here without the
@@ -32,10 +33,8 @@ test('resolveEdenAiConfig falls back to the operator EDENAI_API_KEY env var when
     assert.equal(config.source, 'operator');
     assert.equal(config.organizationId, null);
     assert.equal(config.userId, 42);
-    for (const capability of ['chat', 'translation', 'ocr', 'transcription', 'liveTranscription', 'tts']) {
-      assert.deepEqual(config.allowedModels[capability], []);
-      assert.equal(config.defaultModels[capability], '');
-    }
+    assert.deepEqual(config.ttsVoices, {});
+    assert.deepEqual(config.activatedCapabilities, []);
   } finally {
     if (original === undefined) delete process.env.EDENAI_API_KEY;
     else process.env.EDENAI_API_KEY = original;
@@ -97,5 +96,39 @@ test('resolveOpenRouterConfig has no operator source when OPENROUTER_API_KEY is 
     assert.equal(config.source, null);
   } finally {
     if (original !== undefined) process.env.OPENROUTER_API_KEY = original;
+  }
+});
+
+// resolveMistralConfig — same operator-fallback-only coverage as the two
+// above (organization-scoped branch calls getIntegration(), untestable
+// here without a real database). Unlike EdenAI/OpenRouter, there is no
+// `enabled` flag or per-capability model map to assert on — see
+// lib/mistral.js's comment for why this config stays deliberately
+// minimal (just an API key).
+
+test('resolveMistralConfig falls back to the operator MISTRAL_API_KEY env var when no organization is given', async () => {
+  const original = process.env.MISTRAL_API_KEY;
+  process.env.MISTRAL_API_KEY = 'operator-secret';
+  try {
+    const config = await resolveMistralConfig({ userId: 42 });
+    assert.equal(config.apiKey, 'operator-secret');
+    assert.equal(config.source, 'operator');
+    assert.equal(config.organizationId, null);
+    assert.equal(config.userId, 42);
+  } finally {
+    if (original === undefined) delete process.env.MISTRAL_API_KEY;
+    else process.env.MISTRAL_API_KEY = original;
+  }
+});
+
+test('resolveMistralConfig has no operator source when MISTRAL_API_KEY is unset', async () => {
+  const original = process.env.MISTRAL_API_KEY;
+  delete process.env.MISTRAL_API_KEY;
+  try {
+    const config = await resolveMistralConfig({});
+    assert.equal(config.apiKey, null);
+    assert.equal(config.source, null);
+  } finally {
+    if (original !== undefined) process.env.MISTRAL_API_KEY = original;
   }
 });

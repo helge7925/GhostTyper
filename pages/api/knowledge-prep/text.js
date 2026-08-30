@@ -1,9 +1,11 @@
 import { query } from '../../../lib/db';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { analyzeTranscription } from '../../../lib/ai-service';
+import { analyzeTranscriptionEdenAi } from '../../../lib/edenai-service';
+import { resolveActiveProviderConfig } from '../../../lib/ai-provider-router';
 import { composeAbortSignals, executeReservedSpend, estimateTextUsage, requestBudgetScope } from '../../../lib/budget-runtime';
 import { resolveConfiguredModel } from '../../../lib/openrouter';
-import { getSettingsRow, resolveOpenRouterConfig } from '../../../lib/settings-service';
+import { getSettingsRow } from '../../../lib/settings-service';
 import { MAX_CUSTOM_PROMPT_LENGTH, MAX_DOCUMENT_TEXT_LENGTH } from '../../../lib/constants';
 import { resolveTemplate } from '../../../lib/template-service';
 import { addTranscriptionEvent } from '../../../lib/transcription-events';
@@ -53,16 +55,8 @@ async function handler(req, res) {
     }
 
     const settingsRow = await getSettingsRow(userId);
-    const openrouter = await resolveOpenRouterConfig({ userId, organizationId: req.org?.id });
+    const active = await resolveActiveProviderConfig({ userId, organizationId: req.org?.id, capability: 'chat' });
     const language = settingsRow?.language || 'de';
-    const selectedModel = resolveConfiguredModel(openrouter, 'chat', requestModel || settingsRow?.preferred_model);
-
-    if (!openrouter.apiKey) {
-      return res.status(400).json({ message: 'Kein OpenRouter-API-Key konfiguriert.' });
-    }
-    if (!selectedModel) {
-      return res.status(400).json({ message: 'Ungültiges KI-Modell.' });
-    }
 
     const focusLabel = language === 'en' ? 'Analysis focus' : 'Fokus der Analyse';
     const mergedPrompt = [
@@ -74,13 +68,50 @@ async function handler(req, res) {
     }
 
     const resolvedTemplate = await resolveTemplate(template, userId);
+
+    let selectedModel;
+    let callProvider;
+
+    if (active.provider === 'edenai') {
+      if (!active.apiKey) {
+        return res.status(400).json({ message: 'Kein EdenAI-API-Key konfiguriert.' });
+      }
+      selectedModel = active.model;
+      callProvider = (_reservation, budgetSignal) => analyzeTranscriptionEdenAi(
+        text, resolvedTemplate, active.apiKey, mergedPrompt, active.model, language,
+        { signal: composeAbortSignals(budgetSignal) },
+      );
+    } else {
+      selectedModel = resolveConfiguredModel(active, 'chat', requestModel || settingsRow?.preferred_model);
+      if (!active.apiKey) {
+        return res.status(400).json({ message: 'Kein OpenRouter-API-Key konfiguriert.' });
+      }
+      if (!selectedModel) {
+        return res.status(400).json({ message: 'Ungültiges KI-Modell.' });
+      }
+      callProvider = (_reservation, budgetSignal) => analyzeTranscription(
+        text,
+        resolvedTemplate,
+        active.apiKey,
+        mergedPrompt,
+        selectedModel,
+        language,
+        {
+          baseUrl: active.baseUrl,
+          fallbackModel: active.defaultModels.chat,
+          organizationId: active.organizationId,
+          signal: composeAbortSignals(budgetSignal),
+        },
+      );
+    }
+
     const analysisResult = await executeReservedSpend(
       {
         idempotencyKey: requestBudgetScope(req, 'knowledge-prep', { text, template, mergedPrompt, selectedModel }),
         organizationId: orgId,
         userId,
         operation: 'knowledge_prep',
-        provider: 'openrouter',
+        provider: active.provider,
         model: selectedModel,
         estimatedUsage: estimateTextUsage(`${text}\n${mergedPrompt}`, {
           inputBufferTokens: 1200,
@@ -88,15 +119,7 @@ async function handler(req, res) {
           outputBufferTokens: 3000,
         }),
       },
-      (_reservation, budgetSignal) => analyzeTranscription(
-        text,
-        resolvedTemplate,
-        openrouter.apiKey,
-        mergedPrompt,
-        selectedModel,
-        language,
-        { baseUrl: openrouter.baseUrl, fallbackModel: openrouter.defaultModels.chat, signal: composeAbortSignals(budgetSignal) },
-      ),
+      callProvider,
     );
     const analysis = analysisResult.analysis;
     const usedModel = analysisResult.model;

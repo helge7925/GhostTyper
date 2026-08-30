@@ -84,13 +84,40 @@ test('catalogue prices normalize dynamically without model ids', () => {
   });
 });
 
-test('production sources contain no fixed model ids or legacy inference hosts', () => {
+test('the main OpenRouter-facing app sources contain no fixed model ids or legacy inference hosts', () => {
+  // Scoped to the actual OpenRouter call sites — NOT
+  // services/voxtral-bridge/main.py or config/docker-compose.prod.yml
+  // any more. Those two now deliberately call Mistral direct
+  // (voxtral-mini-transcribe-realtime-2602, api.mistral.ai) for
+  // live-meeting STT specifically — see
+  // migrate-live-meeting-stt-to-edenai/design.md for why: EdenAI's
+  // async job model and OpenRouter's own gateway were both measured too
+  // slow for a live meeting's chunk cadence, so this one capability
+  // bypasses both. See the next test for what's still guarded in those
+  // two files.
   const files = [
     '../lib/ai-service.js', '../lib/openrouter.js', '../lib/tts.js',
-    '../lib/transcription-worker.js', '../services/voxtral-bridge/main.py',
-    '../config/docker-compose.prod.yml',
+    '../lib/transcription-worker.js',
   ];
   const source = files.map((file) => readFileSync(new URL(file, import.meta.url), 'utf8')).join('\n');
   assert.doesNotMatch(source, /api\.(?:cortecs|mistral)\.ai/);
   assert.doesNotMatch(source, /deepseek-v4|whisper-large-v3|voxtral-mini|mistral-ocr-latest/);
+});
+
+test('the voxtral bridge and its compose config only reference the current realtime model, no legacy ones', () => {
+  const files = ['../services/voxtral-bridge/main.py', '../config/docker-compose.prod.yml'];
+  const source = files.map((file) => readFileSync(new URL(file, import.meta.url), 'utf8')).join('\n');
+  // Cortecs stays fully removed everywhere, including here.
+  assert.doesNotMatch(source, /api\.cortecs\.ai/);
+  // Legacy/wrong model ids that were never correct for this bridge.
+  assert.doesNotMatch(source, /deepseek-v4|whisper-large-v3|mistral-ocr-latest/);
+  // The one model this bridge is allowed to reference is the exact
+  // realtime transcription model, not some other voxtral-mini variant
+  // (e.g. a batch/async one, which would silently break the bridge's
+  // synchronous per-chunk contract).
+  const voxtralMentions = source.match(/voxtral-mini[\w-]*/g) || [];
+  for (const mention of voxtralMentions) {
+    assert.equal(mention, 'voxtral-mini-transcribe-realtime-2602', mention);
+  }
+  assert.match(source, /api\.mistral\.ai|MISTRAL_API_KEY/);
 });

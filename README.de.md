@@ -69,8 +69,8 @@ Remote-Meeting-Screenshots sind TODO / need capture, bevor sie eingebettet werde
   `member`/`viewer`/`auditor`, Audit-Log.
 - **Kosten-Tracking**: Monatliche Aufschlüsselung pro Provider,
   Operation und Mitglied.
-- **Provider-Management**: Mistral, Vexa und Nextcloud zentral pro Workspace
-  verwaltbar; Secrets AES-256-GCM verschlüsselt.
+- **Provider-Management**: OpenRouter, Vexa und Nextcloud zentral pro
+  Workspace verwaltbar; Secrets AES-256-GCM verschlüsselt.
 
 ## Tech-Stack
 
@@ -78,7 +78,7 @@ Remote-Meeting-Screenshots sind TODO / need capture, bevor sie eingebettet werde
 | -------- | ---------------------------------------------------------------- |
 | Frontend | Next.js 16.x (Pages Router), React 18, Tailwind, Radix, Zustand |
 | Backend  | Next.js API Routes, NextAuth, PostgreSQL 16 (`pg`)               |
-| AI       | Mistral (Chat / OCR / Voxtral batch + live), Vexa Lite           |
+| AI       | OpenRouter (Chat / OCR / Batch- & Live-Transkription / TTS), Vexa Lite |
 | Infra    | Docker Compose, Traefik (optional), AES-256-GCM (`lib/secrets.js`) |
 | CI       | GitHub Actions: CodeQL, Security-Gates, Smoke                    |
 
@@ -92,11 +92,11 @@ Remote-Meeting-Screenshots sind TODO / need capture, bevor sie eingebettet werde
    │              │
    │ REST/SSE     │ Webhook + Bridge
    ▼              ▼
-┌────────┐   ┌──────────────────┐    ┌────────────────────┐
-│ Mistral│◄──┤ Vexa Lite        │───►│ Mistral Voxtral    │
-│ API    │   │ (Bot-Container)  │    │ (über Voxtral-     │
-│ (Batch)│   │                  │    │  Bridge-Translator)│
-└────────┘   └──────────────────┘    └────────────────────┘
+┌──────────┐  ┌──────────────────┐    ┌────────────────────┐
+│OpenRouter│◄─┤ Vexa Lite        │───►│ OpenRouter STT     │
+│ API      │  │ (Bot-Container)  │    │ (über Bridge,      │
+│ (Batch)  │  │                  │    │  gleicher Key)     │
+└──────────┘  └──────────────────┘    └────────────────────┘
 ```
 
 Datenfluss-Details: [`docs/architecture.md`](docs/architecture.md).
@@ -174,7 +174,7 @@ Datenfluss-Review und SCC/TIA-Implikationen bei Provider-Wechsel:
 Pro Workspace verwaltet der Admin in
 **Settings → Workspace verwalten**:
 
-- API-Keys & Integrationen (Mistral, Vexa)
+- API-Keys & Integrationen (OpenRouter, Vexa)
 - Mitglieder & Rollen (inkl. per-Member-Kostenlimits)
 - Aufbewahrungsfristen
 - Nutzung & Kosten-Dashboard

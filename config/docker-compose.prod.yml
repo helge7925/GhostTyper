@@ -130,8 +130,12 @@ services:
           || psql -h transkription-db -U ${DB_USER} -d postgres \
             -c "CREATE DATABASE vexa OWNER ${DB_USER}"
 
-  # Tiny proxy that converts Vexa's multipart audio to OpenRouter JSON STT and
-  # loads the organization key/model from the webapp at runtime.
+  # Tiny proxy that converts Vexa's multipart audio to raw PCM (via
+  # ffmpeg) and streams it to Mistral's realtime STT endpoint directly —
+  # not OpenRouter, not EdenAI (both measured too slow for a live
+  # meeting's chunk cadence, see
+  # openspec/changes/migrate-live-meeting-stt-to-edenai/design.md).
+  # Loads the organization's Mistral key from the webapp at runtime.
   voxtral-bridge:
     build:
       context: ../services/voxtral-bridge
@@ -143,13 +147,12 @@ services:
     networks: [internal]
     mem_limit: 256m
     environment:
-      - UPSTREAM_URL=https://openrouter.ai/api/v1/audio/transcriptions
-      - MODEL_OVERRIDE=${OPENROUTER_LIVE_TRANSCRIPTION_MODEL:-}
-      - UPSTREAM_TIMEOUT_S=${VEXA_TRANSCRIPTION_TIMEOUT_S:-120}
+      - MISTRAL_MODEL_OVERRIDE=${MISTRAL_LIVE_TRANSCRIPTION_MODEL:-}
+      - REALTIME_TIMEOUT_S=${VEXA_TRANSCRIPTION_TIMEOUT_S:-15}
       # Webapp callback so key/model changes take effect at runtime (~60s).
       - WEBAPP_URL=http://transkription-webapp:3000
       - BRIDGE_SECRET=${BRIDGE_SHARED_SECRET}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://0.0.0.0:8080/"]
       interval: 30s

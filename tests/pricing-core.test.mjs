@@ -82,10 +82,11 @@ test('production seed has no fixed models and provider attribution is OpenRouter
   assert.equal(inferProviderForModel('vendor/model'), 'openrouter');
 });
 
-test('upload transcription uses dynamic OpenRouter provider and model', () => {
+test('upload transcription resolves its provider dynamically (EdenAI or OpenRouter), not via the inferProviderForModel stub', () => {
   const worker = readFileSync(new URL('../lib/transcription-worker.js', import.meta.url), 'utf8');
-  assert.match(worker, /provider: transcriptionProvider/);
-  assert.match(worker, /const transcriptionProvider = 'openrouter'/);
+  assert.match(worker, /provider: activeTranscription\.provider/);
+  assert.match(worker, /resolveActiveProviderConfig\(\{/);
+  assert.doesNotMatch(worker, /provider: inferProviderForModel/);
 });
 
 test('provider-reported OpenRouter cost is authoritative', () => {
