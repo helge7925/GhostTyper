@@ -5,9 +5,11 @@ import { randomUUID } from 'crypto';
 import { query } from '../../../lib/db';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { performOCR, translateTextSegments } from '../../../lib/ai-service';
+import { translateTextSegmentsEdenAi, performOcrEdenAi } from '../../../lib/edenai-service';
+import { resolveActiveProviderConfig } from '../../../lib/ai-provider-router';
 import { composeAbortSignals, executeReservedSpend, estimateTextUsage, requestBudgetScope } from '../../../lib/budget-runtime';
-import { getSettingsRow, resolveCortecsConfig, resolveMistralApiKey } from '../../../lib/settings-service';
-import { resolveChatModel } from '../../../lib/model-policy';
+import { getSettingsRow, resolveOpenRouterConfig } from '../../../lib/settings-service';
+import { resolveConfiguredModel } from '../../../lib/openrouter';
 import {
   ACCEPTED_FILE_TRANSLATION_TYPES,
   ACCEPTED_OFFICE_TRANSLATION_TYPES,
@@ -134,6 +136,7 @@ async function translateSegmentsWithGlossary({
   orgId,
   sourceLanguage,
   targetLanguage,
+  provider,
   apiKey,
   model,
   glossary,
@@ -153,7 +156,7 @@ async function translateSegmentsWithGlossary({
         userId: budgetContext.userId,
         transcriptionId: budgetContext.transcriptionId || null,
         operation: budgetContext.operation,
-        provider: 'cortecs',
+        provider,
         model,
         estimatedUsage: estimateTextUsage(joined, {
           inputBufferTokens: 320 + texts.length * 16,
@@ -161,19 +164,32 @@ async function translateSegmentsWithGlossary({
           outputBufferTokens: 192 + texts.length * 16,
         }),
       },
-      (_reservation, budgetSignal) => translateTextSegments(
-        texts,
-        targetLanguage,
-        sourceLanguage,
-        apiKey,
-        model,
-        {
-          glossaryBlock,
-          strictPlaceholders: strict,
-          ...providerOptions,
-          signal: composeAbortSignals(providerOptions.signal, budgetSignal),
-        },
-      ),
+      (_reservation, budgetSignal) => (provider === 'edenai'
+        ? translateTextSegmentsEdenAi(
+          texts,
+          targetLanguage,
+          sourceLanguage,
+          apiKey,
+          model,
+          {
+            glossaryBlock,
+            strictPlaceholders: strict,
+            signal: composeAbortSignals(providerOptions.signal, budgetSignal),
+          },
+        )
+        : translateTextSegments(
+          texts,
+          targetLanguage,
+          sourceLanguage,
+          apiKey,
+          model,
+          {
+            glossaryBlock,
+            strictPlaceholders: strict,
+            ...providerOptions,
+            signal: composeAbortSignals(providerOptions.signal, budgetSignal),
+          },
+        )),
     );
   };
   try {
@@ -407,21 +423,50 @@ async function handler(req, res) {
     const budgetCounter = { value: 0 };
 
     const settingsRow = await getSettingsRow(userId);
-    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const mistralApiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveChatModel(requestModel, null)
-      || resolveChatModel(settingsRow?.preferred_model, null)
-      || cortecs.chatModel;
-    if (!cortecs.apiKey) {
-      await safeUnlink(tempUploadPath);
-      tempUploadPath = '';
-      return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert' });
+    const openrouter = await resolveOpenRouterConfig({ userId, organizationId: req.org?.id });
+    // Translation has no EdenAI-native capability of its own — it routes
+    // through `chat` like every other text operation (see lib/edenai.js's
+    // EDENAI_HARDCODED_MODEL comment for why the dedicated
+    // translation/automatic_translation feature was rejected). OCR (the
+    // scanned-PDF fallback below) is the same story: no EdenAI-native
+    // capability, routes through this same `chat` resolution — reused
+    // here rather than resolved twice, since it's genuinely the same
+    // capability/config both features need.
+    const active = await resolveActiveProviderConfig({ userId, organizationId: req.org?.id, capability: 'chat' });
+    // On OpenRouter, OCR keeps its own independently-configurable model
+    // slot (unrelated to this migration); on EdenAI it has none of its
+    // own, so it shares `active.model` with translation.
+    const ocrModel = active.provider === 'edenai'
+      ? active.model
+      : resolveConfiguredModel(openrouter, 'ocr', settingsRow?.ocr_model);
+    let preferredModel;
+    if (active.provider === 'edenai') {
+      if (!active.apiKey) {
+        await safeUnlink(tempUploadPath);
+        tempUploadPath = '';
+        return res.status(400).json({ message: 'Kein EdenAI-API-Key konfiguriert' });
+      }
+      preferredModel = active.model;
+    } else {
+      preferredModel = resolveConfiguredModel(active, 'chat', requestModel || settingsRow?.preferred_model);
+      if (!active.apiKey) {
+        await safeUnlink(tempUploadPath);
+        tempUploadPath = '';
+        return res.status(400).json({ message: 'Kein OpenRouter-API-Key konfiguriert' });
+      }
+      if (!preferredModel) {
+        await safeUnlink(tempUploadPath);
+        tempUploadPath = '';
+        return res.status(400).json({ message: 'Ungültiges KI-Modell' });
+      }
     }
-    if (!preferredModel) {
-      await safeUnlink(tempUploadPath);
-      tempUploadPath = '';
-      return res.status(400).json({ message: 'Ungültiges KI-Modell' });
-    }
+    // Shared across the three translateSegmentsWithGlossary() call sites
+    // below (office/pdf-in-place/pdf-ocr-fallback) — EdenAI's chat
+    // adapter needs no baseUrl/fallbackModel, those are OpenRouter-only
+    // concepts.
+    const translateProviderOptions = (signal) => (active.provider === 'edenai'
+      ? { signal }
+      : { baseUrl: active.baseUrl, fallbackModel: active.defaultModels.chat, signal });
 
     // ====== OFFICE PATH (DOCX/XLSX/PPTX) ======
     if (isOffice) {
@@ -447,10 +492,11 @@ async function handler(req, res) {
             orgId,
             sourceLanguage,
             targetLanguage,
-            apiKey: cortecs.apiKey,
+            provider: active.provider,
+            apiKey: active.apiKey,
             model: preferredModel,
             glossary,
-            providerOptions: { baseUrl: cortecs.baseUrl, preference: cortecs.preference, signal: requestController.signal },
+            providerOptions: translateProviderOptions(requestController.signal),
             budgetContext: {
               scope: `${budgetScope}:office`,
               counter: budgetCounter,
@@ -527,6 +573,7 @@ async function handler(req, res) {
           targetLanguage,
           sourceLanguage,
           languageLabel: languageLabelRaw || null,
+          provider: active.provider,
           model: preferredModel,
           segmentCount: translated.stats.segmentCount,
           warningCount: translated.stats.warningCount,
@@ -591,10 +638,11 @@ async function handler(req, res) {
               orgId,
               sourceLanguage,
               targetLanguage,
-              apiKey: cortecs.apiKey,
+              provider: active.provider,
+              apiKey: active.apiKey,
               model: preferredModel,
               glossary,
-              providerOptions: { baseUrl: cortecs.baseUrl, preference: cortecs.preference, signal: requestController.signal },
+              providerOptions: translateProviderOptions(requestController.signal),
               budgetContext: {
                 scope: `${budgetScope}:pdf-in-place`,
                 counter: budgetCounter,
@@ -676,6 +724,7 @@ async function handler(req, res) {
                   targetLanguage,
                   sourceLanguage,
                   languageLabel: languageLabelRaw || null,
+                  provider: active.provider,
                   model: preferredModel,
                   layoutMode: report.mode,
                   layoutReport: {
@@ -747,9 +796,14 @@ async function handler(req, res) {
       let pdfBuffer;
 
       pdfBuffer = await (async () => {
-        // Step 1: OCR via Mistral — returns Markdown.
-        if (!mistralApiKey) {
-          throw Object.assign(new Error('Kein Mistral API-Key für PDF-OCR konfiguriert.'), { code: 'NO_MISTRAL_OCR_KEY' });
+        // Step 1: OCR — returns Markdown.
+        const ocrApiKey = active.provider === 'edenai' ? active.apiKey : openrouter.apiKey;
+        if (!ocrApiKey || !ocrModel) {
+          throw Object.assign(new Error(
+            active.provider === 'edenai'
+              ? 'EdenAI OCR ist nicht vollständig konfiguriert.'
+              : 'OpenRouter OCR ist nicht vollständig konfiguriert.',
+          ), { code: 'NO_OCR_PROVIDER' });
         }
         const estimatedPages = Math.max(
           1,
@@ -762,13 +816,19 @@ async function handler(req, res) {
             organizationId: orgId,
             userId,
             operation: 'ocr',
-            provider: 'mistral',
-            model: 'mistral-ocr-latest',
+            provider: active.provider,
+            model: ocrModel,
             estimatedUsage: { inputQuantity: estimatedPages, outputQuantity: 0 },
           },
-          (_reservation, budgetSignal) => performOCR(tempUploadPath, mistralApiKey, 'application/pdf', {
-            signal: composeAbortSignals(requestController.signal, budgetSignal),
-          }),
+          (_reservation, budgetSignal) => (active.provider === 'edenai'
+            ? performOcrEdenAi(tempUploadPath, ocrApiKey, 'application/pdf', {
+              model: ocrModel,
+              signal: composeAbortSignals(requestController.signal, budgetSignal),
+            })
+            : performOCR(tempUploadPath, ocrApiKey, 'application/pdf', {
+              model: ocrModel,
+              signal: composeAbortSignals(requestController.signal, budgetSignal),
+            })),
           (result) => ({
             ...(result.usage || {}),
             inputQuantity: result.usage?.pages_processed || result.usage?.pages || estimatedPages,
@@ -794,10 +854,11 @@ async function handler(req, res) {
           orgId,
           sourceLanguage,
           targetLanguage,
-          apiKey: cortecs.apiKey,
+          provider: active.provider,
+          apiKey: active.apiKey,
           model: preferredModel,
           glossary,
-          providerOptions: { baseUrl: cortecs.baseUrl, preference: cortecs.preference, signal: requestController.signal },
+          providerOptions: translateProviderOptions(requestController.signal),
           budgetContext: {
             scope: `${budgetScope}:pdf-fallback`,
             counter: budgetCounter,
@@ -908,6 +969,8 @@ async function handler(req, res) {
           targetLanguage,
           sourceLanguage,
           languageLabel: languageLabelRaw || null,
+          ocrProvider: active.provider,
+          translationProvider: active.provider,
           model: preferredModel,
           layoutMode: 'approximated',
           fallbackReason: pdfFallbackReason,
@@ -964,7 +1027,7 @@ async function handler(req, res) {
     if (error.code === 'LIMIT_FILE_SIZE' || error.message?.includes('maxFileSize')) {
       return res.status(413).json({ message: 'Datei ist zu groß (max. 500 MB)' });
     }
-    if (error?.code === 'PDF_NO_TEXT' || error?.code === 'PDF_TOO_LARGE' || error?.code === 'NO_MISTRAL_OCR_KEY') {
+    if (error?.code === 'PDF_NO_TEXT' || error?.code === 'PDF_TOO_LARGE' || error?.code === 'NO_OCR_PROVIDER' || error?.code === 'PDF_TOO_MANY_PAGES') {
       return res.status(400).json({ message: error.message });
     }
     logApiError('File translation error', error);

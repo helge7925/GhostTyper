@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import {
-  BadgeEuro,
+  BadgeDollarSign,
   Building2,
   Files,
   Languages,
@@ -191,7 +191,7 @@ function SidebarBody({ collapsed = false, onNavigate }) {
           <NavRow
             href="/admin/prices"
             label={tNav('priceCatalog')}
-            Icon={BadgeEuro}
+            Icon={BadgeDollarSign}
             isActive={router.pathname === '/admin/prices'}
             collapsed={collapsed}
             onNavigate={onNavigate}

@@ -12,7 +12,7 @@ import { analysisToHtml } from '../lib/export-utils';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { useMessageList, useTranslations } from '../lib/i18n';
 import { MAX_FILE_SIZE } from '../lib/constants';
-import { CHAT_MODEL_OPTIONS } from '../lib/constants';
+import { useModelOptions } from '../lib/use-model-options';
 import { Button } from '../components/ui/button';
 import { Card, CardBody } from '../components/ui/card';
 import { Field } from '../components/ui/field';
@@ -56,7 +56,6 @@ const OCR_PRESETS = {
     config: {
       analyze: true,
       template: 'meeting',
-      model: 'deepseek-v4-pro',
     },
   },
   'ocr-summary': {
@@ -64,7 +63,6 @@ const OCR_PRESETS = {
     config: {
       analyze: true,
       template: 'generic',
-      model: 'deepseek-v4-flash',
     },
   },
 };
@@ -90,7 +88,9 @@ export default function OCR() {
   
   // Template & Model states
   const [template, setTemplate] = useState('generic');
-  const [model, setModel] = useState('deepseek-v4-pro');
+  const [model, setModel] = useState('');
+  const { options: chatModelOptions, defaultModel } = useModelOptions('chat');
+  useEffect(() => { if (!model && defaultModel) setModel(defaultModel); }, [defaultModel, model]);
   const [customPrompt, setCustomPrompt] = useState('');
   const [analysisFocus, setAnalysisFocus] = useState('');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
@@ -391,7 +391,7 @@ export default function OCR() {
                         </Field>
                         <Field label="KI-Modell" help="Der Standard passt für die meisten Dokumente.">
                           <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-xs text-primary focus:ring-1 focus:ring-accent outline-none">
-                            {CHAT_MODEL_OPTIONS.map((option) => (<option key={option.value} value={option.value}>{option.label}</option>))}
+                            {chatModelOptions.map((option) => (<option key={option.value} value={option.value}>{option.label}</option>))}
                           </select>
                         </Field>
                       </div>

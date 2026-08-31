@@ -5,6 +5,8 @@ import { randomUUID } from 'crypto';
 import { query } from '../../lib/db';
 import { ACCEPTED_AUDIO_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE, normalizeAnalysisTemplate } from '../../lib/constants';
 import { resolveChatModel } from '../../lib/model-policy';
+import { resolveOpenRouterConfig } from '../../lib/settings-service';
+import { resolveConfiguredModel } from '../../lib/openrouter';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { addTranscriptionEvent } from '../../lib/transcription-events';
 import { scanFileForViruses } from '../../lib/virus-scan';
@@ -138,8 +140,9 @@ async function handler(req, res) {
     tempUploadPath = '';
 
     const template = normalizeAnalysisTemplate(fields.template?.[0] || fields.template || 'generic');
-    const requestedModel = fields.model?.[0] || fields.model || 'deepseek-v4-pro';
-    const model = resolveChatModel(requestedModel);
+    const requestedModel = fields.model?.[0] || fields.model || null;
+    const openrouter = await resolveOpenRouterConfig({ userId, organizationId: orgId });
+    const model = resolveConfiguredModel(openrouter, 'chat', requestedModel);
     if (!model) {
       await safeUnlink(persistedFilePath);
       persistedFilePath = '';

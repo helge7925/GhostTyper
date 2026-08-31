@@ -14,21 +14,6 @@
 // tests/budget-runtime.test.mjs. Duplicating it against a real DB would add
 // runtime without adding coverage.
 //
-// BUG (found by this suite, not fixed here — see the `todo` test below and
-// the task report): lib/budget-service.js's internal requestBudgetStop()
-// helper passes an unreferenced, untyped `$3` (`null`) parameter whenever
-// scope !== 'member'. PostgreSQL rejects that with
-// `42P18 could not determine data type of parameter $3`, and the entire
-// enclosing transaction rolls back — so EVERY workspace-scope hard stop
-// (reserveSpend's workspace-exhaustion path, commitSpend's workspace-blocked
-// path, and requestEmergencyBudgetStop, i.e. the admin/owner "emergency
-// stop" button) silently fails: the period never gets marked 'blocked', no
-// budget_stop_outbox row is created, and the caller only sees a generic
-// BudgetAccountingUnavailableError. Member-scope stops are unaffected ($3 is
-// referenced there via `AND user_id = $3`), so the outbox/delivery/
-// concurrency/reconcile tests below deliberately trigger stops via the
-// member-limit path to get real, verified coverage of the parts of the
-// system that are not broken.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -143,12 +128,7 @@ if (env.skip) {
     assert.equal(period.rows[0].state, 'open');
   });
 
-  test('BUG: crossing the WORKSPACE budget threshold does not block the period or enqueue a stop', {
-    todo: 'lib/budget-service.js requestBudgetStop() passes an unreferenced $3 (null) parameter when scope is '
-      + "not 'member' -> Postgres 42P18 'could not determine data type of parameter $3' -> the whole reserveSpend "
-      + 'transaction rolls back. Not fixed here per task instructions (report only, no production-code changes). '
-      + 'See the file-level comment above and the task report for the full repro.',
-  }, async () => {
+  test('crossing the workspace budget threshold blocks the period and enqueues a stop', async () => {
     const organizationId = await createTestOrganization(pool, { name: 'Workspace Threshold Bug Org' });
     const userId = await createTestUser(pool);
     created.organizationIds.push(organizationId);
@@ -203,6 +183,11 @@ if (env.skip) {
   test('concurrent workers claim a pending stop event exactly once (FOR UPDATE SKIP LOCKED)', async () => {
     const { organizationId, userId, transcriptionId, memberLimitMicros } = await fixture();
     await exhaustMemberBudgetAndRequestStop({ organizationId, userId, memberLimitMicros, tag: `claim:${organizationId}` });
+    await pool.query(
+      `UPDATE budget_stop_outbox SET state = 'processed', processed_at = NOW()
+        WHERE organization_id <> $1 AND state IN ('pending', 'processing')`,
+      [organizationId],
+    );
 
     let handledCount = 0;
     const handler = async (event) => {
@@ -291,6 +276,14 @@ if (env.skip) {
     await addOrganizationMember(pool, organizationId, userB);
 
     const CYCLES = 5;
+    const dynamicTestModel = `test/catalog-model-${organizationId}`;
+    await pool.query(
+      `INSERT INTO provider_price_versions
+         (provider, model, operation, currency, input_unit, output_unit,
+          input_price_per_million_micros, output_price_per_million_micros, effective_from)
+       VALUES ('openrouter', $1, 'translation', 'USD', 'token', 'token', 1000, 2000, NOW())`,
+      [dynamicTestModel],
+    );
     async function stream(streamName, userId) {
       for (let i = 0; i < CYCLES; i += 1) {
         const reservation = await reserveSpend({
@@ -301,11 +294,15 @@ if (env.skip) {
           amountMicros: 5_000_000,
           expiresAt: futureIso(60),
         });
-        await commitSpend(reservation.id, {
-          provider: 'cortecs',
-          model: 'deepseek-v4-pro',
-          usage: { input_tokens: 100 + i, output_tokens: 50 },
-        });
+        try {
+          await commitSpend(reservation.id, {
+            provider: 'openrouter',
+            model: dynamicTestModel,
+            usage: { input_tokens: 100 + i, output_tokens: 50 },
+          });
+        } catch (error) {
+          throw error.cause || error;
+        }
       }
     }
 

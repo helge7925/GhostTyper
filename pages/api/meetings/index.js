@@ -26,6 +26,7 @@ import {
   reserveProviderSpend,
 } from '../../../lib/budget-runtime';
 import { requestTranscriptionBudgetStop } from '../../../lib/budget-service';
+import { resolveOpenRouterConfig } from '../../../lib/settings-service';
 
 const PROVIDER = 'vexa';
 // Google Meet is intentionally excluded — Google hard-blocks meeting bots on
@@ -363,6 +364,11 @@ async function handler(req, res) {
   let botResponse;
   let initialSttReservation;
   let botStartAttempted = false;
+  const openrouter = await resolveOpenRouterConfig({ userId, organizationId: orgId });
+  const liveTranscriptionModel = openrouter.defaultModels.liveTranscription;
+  if (!openrouter.apiKey || !liveTranscriptionModel) {
+    return res.status(409).json({ code: 'OPENROUTER_NOT_CONFIGURED', message: 'OpenRouter Live-Transkription ist nicht konfiguriert.' });
+  }
   const initialSttIdempotencyKey = budgetIdempotencyKey('meeting-stt', transcription.id, 0, 30);
   try {
     initialSttReservation = await reserveProviderSpend({
@@ -371,8 +377,8 @@ async function handler(req, res) {
       userId,
       transcriptionId: transcription.id,
       operation: 'meeting_transcription',
-      provider: 'cortecs',
-      model: 'whisper-large-v3',
+      provider: 'openrouter',
+      model: liveTranscriptionModel,
       estimatedUsage: { inputQuantity: 30, outputQuantity: 0 },
       reservationMs: 6 * 60 * 60 * 1000,
       stopOnDenied: true,

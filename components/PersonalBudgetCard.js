@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CircleAlert, CircleCheck, CircleDot, Wallet } from 'lucide-react';
 import { useFormatter, useTranslations } from '../lib/i18n';
-import { microsToEuros } from '../lib/billing-ui';
+import { microsToUsd } from '../lib/billing-ui';
 
 function StatusIcon({ level }) {
   const className = `w-4 h-4 ${level === 'red' ? 'text-danger' : level === 'yellow' ? 'text-warning' : 'text-success'}`;
@@ -34,8 +34,8 @@ export default function PersonalBudgetCard({ className = '' }) {
     };
   }, [t]);
 
-  const cost = microsToEuros(usage?.ownCostMicros);
-  const remaining = microsToEuros(usage?.effectiveRemainingMicros);
+  const cost = microsToUsd(usage?.ownCostMicros);
+  const remaining = microsToUsd(usage?.effectiveRemainingMicros);
   const level = usage?.level || 'green';
 
   return (

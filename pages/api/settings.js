@@ -1,8 +1,9 @@
 import pool from '../../lib/db';
 import { withOrgScope } from '../../lib/api/with-org-scope';
-import { getSettingsRow } from '../../lib/settings-service';
-import { DEFAULT_CHAT_MODEL, normalizeDefaultTemplate } from '../../lib/constants';
+import { getSettingsRow, resolveOpenRouterConfig } from '../../lib/settings-service';
+import { normalizeDefaultTemplate } from '../../lib/constants';
 import { resolveChatModel, resolveOcrModel } from '../../lib/model-policy';
+import { normalizeModelId } from '../../lib/openrouter';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { logAuditEvent } from '../../lib/audit-log';
 
@@ -65,15 +66,16 @@ async function handler(req, res) {
     switch (req.method) {
       case 'GET': {
         const settings = await getSettingsRow(userId);
+        const openrouter = await resolveOpenRouterConfig({ userId, organizationId: orgId });
 
         if (!settings) {
           return res.status(200).json({
             defaultTemplate: 'generic',
             language: 'de',
             contextBias: '',
-            preferredModel: DEFAULT_CHAT_MODEL,
+            preferredModel: openrouter.defaultModels.chat || '',
             defaultTranslateLanguage: 'en',
-            ocrModel: 'mistral-ocr-latest',
+            ocrModel: openrouter.defaultModels.ocr || '',
             remoteMeetingEnabled: true,
           });
         }
@@ -82,9 +84,9 @@ async function handler(req, res) {
           defaultTemplate: normalizeDefaultTemplate(settings.default_template),
           language: settings.language,
           contextBias: normalizeContextBias(settings.context_bias).value || '',
-          preferredModel: resolveChatModel(settings.preferred_model, null) || DEFAULT_CHAT_MODEL,
+          preferredModel: resolveChatModel(settings.preferred_model, null) || openrouter.defaultModels.chat || '',
           defaultTranslateLanguage: settings.default_translate_language || 'en',
-          ocrModel: settings.ocr_model || 'mistral-ocr-latest',
+          ocrModel: resolveOcrModel(settings.ocr_model, null) || openrouter.defaultModels.ocr || '',
           remoteMeetingEnabled: settings.remote_meeting_enabled !== false,
         });
       }
@@ -109,11 +111,14 @@ async function handler(req, res) {
           });
         }
 
-        if (preferredModel !== undefined && resolveChatModel(preferredModel) === null) {
+        const openrouter = await resolveOpenRouterConfig({ userId, organizationId: orgId });
+        const normalizedPreferred = normalizeModelId(preferredModel);
+        const normalizedOcr = normalizeModelId(ocrModel);
+        if (preferredModel !== undefined && (!normalizedPreferred || !openrouter.allowedModels.chat.includes(normalizedPreferred))) {
           return res.status(400).json({ message: 'Ungültiges KI-Modell' });
         }
 
-        if (ocrModel !== undefined && resolveOcrModel(ocrModel) === null) {
+        if (ocrModel !== undefined && (!normalizedOcr || !openrouter.allowedModels.ocr.includes(normalizedOcr))) {
           return res.status(400).json({ message: 'Ungültiges OCR-Modell' });
         }
 

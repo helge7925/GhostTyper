@@ -117,13 +117,16 @@ test('dashboard budget uses the most restrictive limit and stable traffic states
   assert.equal(enriched.budgetTrafficLight.level, 'green');
 });
 
-test('Voxtral TTS pricing treats output usage as synthesized characters', () => {
-  const usageSource = readFileSync(new URL('../lib/usage.js', import.meta.url), 'utf8');
-  assert.match(usageSource, /'voxtral-mini-tts-2603':\s+\{ input: 0\.00,\s+output: 16\.00 \}/);
-  assert.match(usageSource, /'voxtral-tts-latest':\s+\{ input: 0\.00,\s+output: 16\.00 \}/);
+test('OpenRouter TTS pricing is dynamic and actual cost is fetched by generation id', () => {
+  const pricingSource = readFileSync(new URL('../lib/openrouter-pricing-core.js', import.meta.url), 'utf8');
+  const ttsSource = readFileSync(new URL('../lib/tts.js', import.meta.url), 'utf8');
+  assert.match(pricingSource, /capability === 'tts'/);
+  assert.match(pricingSource, /pricing\.audio \?\? pricing\.completion/);
+  assert.match(ttsSource, /getOpenRouterGeneration/);
+  assert.doesNotMatch(ttsSource, /voxtral-mini-tts/);
 });
 
-test('all Voxtral TTS paths reserve and commit synthesized text characters', () => {
+test('all OpenRouter TTS paths reserve and commit synthesized text characters', () => {
   const paths = [
     '../lib/in-meeting-audio.js',
     '../pages/api/transcriptions/[id]/audio.js',

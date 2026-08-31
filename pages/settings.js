@@ -33,7 +33,8 @@ import {
   purgeUnverifiedTranslationMemory,
   getAuditLog,
 } from '../lib/api';
-import { CHAT_MODEL_OPTIONS, normalizeDefaultTemplate } from '../lib/constants';
+import { normalizeDefaultTemplate } from '../lib/constants';
+import { useModelOptions } from '../lib/use-model-options';
 import { DEFAULT_PROMPTS, getPrompt } from '../lib/prompts';
 import TableSchemaBuilder from '../components/TableSchemaBuilder';
 import { validateTableSchema, buildTableExtractionPrompt } from '../lib/table-calculations';
@@ -93,9 +94,11 @@ export default function Settings() {
   const [defaultTemplate, setDefaultTemplate] = useState('generic');
   const [language, setLanguage] = useState('de');
   const [contextBias, setContextBias] = useState('');
-  const [preferredModel, setPreferredModel] = useState('deepseek-v4-pro');
+  const [preferredModel, setPreferredModel] = useState('');
   const [defaultTranslateLanguage, setDefaultTranslateLanguage] = useState('en');
-  const [ocrModel, setOcrModel] = useState('mistral-ocr-latest');
+  const [ocrModel, setOcrModel] = useState('');
+  const { options: chatModelOptions, defaultModel: defaultChatModel } = useModelOptions('chat');
+  const { options: ocrModelOptions, defaultModel: defaultOcrModel } = useModelOptions('ocr');
   const [remoteMeetingEnabled, setRemoteMeetingEnabled] = useState(true);
   const [vexaWorkspaceEnabled, setVexaWorkspaceEnabled] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -211,9 +214,9 @@ export default function Settings() {
         setDefaultTemplate(normalizeDefaultTemplate(settingsData.defaultTemplate));
         setLanguage(settingsData.language || 'de');
         setContextBias(settingsData.contextBias || '');
-        setPreferredModel(settingsData.preferredModel || 'deepseek-v4-pro');
+        setPreferredModel(settingsData.preferredModel || defaultChatModel || '');
         setDefaultTranslateLanguage(settingsData.defaultTranslateLanguage || 'en');
-        setOcrModel(settingsData.ocrModel || 'mistral-ocr-latest');
+        setOcrModel(settingsData.ocrModel || defaultOcrModel || '');
         setRemoteMeetingEnabled(settingsData.remoteMeetingEnabled !== false);
         setPersonalGlossaryEntries(personalGlossaryData.entries || []);
         setWorkspaceGlossaryEntries(workspaceGlossaryData.entries || []);
@@ -246,7 +249,7 @@ export default function Settings() {
         .then((payload) => setAuditEvents(payload?.events || []))
         .catch(() => {});
     }
-  }, [status, router, canReadAudit, canManageGlossary]);
+  }, [status, router, canReadAudit, canManageGlossary, defaultChatModel, defaultOcrModel]);
 
   // Lazy-load the translation-memory browser the first time the glossary tab is
   // opened (TM can be large; no reason to fetch it on every settings visit).
@@ -1213,7 +1216,7 @@ export default function Settings() {
                 <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl opacity-60">
                   <h3 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-4">Modell-Info</h3>
                   <p className="text-xs text-secondary leading-relaxed">
-                    Für die Transkription wird standardmäßig <strong>Cortecs Whisper Large v3</strong> verwendet.
+                    Das Transkriptionsmodell wird dynamisch aus der OpenRouter-Allowlist Ihrer Organisation geladen.
                   </p>
                 </div>
                 <button
@@ -1287,7 +1290,7 @@ export default function Settings() {
                   <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-xl">
                     <h2 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">Standard-Modell</h2>
                     <select value={preferredModel} onChange={e => setPreferredModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent">
-                      {CHAT_MODEL_OPTIONS.map((option) => (
+                      {chatModelOptions.map((option) => (
                         <option key={option.value} value={option.value}>{option.label}</option>
                       ))}
                     </select>
@@ -1405,11 +1408,11 @@ export default function Settings() {
                   <div>
                     <label className="block text-xs font-medium text-secondary mb-1.5">OCR-Modell</label>
                     <select value={ocrModel} onChange={e => setOcrModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none">
-                      <option value="mistral-ocr-latest">Mistral OCR</option>
+                      {ocrModelOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
                   </div>
                   <p className="text-xs text-secondary leading-relaxed italic opacity-70">
-                    Mistral OCR ist spezialisiert auf die präzise Textextraktion aus PDF-Dokumenten und Bildern.
+                    Das OCR-Modell wird dynamisch aus der OpenRouter-Allowlist Ihrer Organisation geladen.
                   </p>
                 </div>
               </div>

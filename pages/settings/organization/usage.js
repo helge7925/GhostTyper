@@ -7,7 +7,7 @@ import { CircleAlert, CircleCheck, CircleDot } from 'lucide-react';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import { useCurrentOrg } from '../../../lib/use-current-org';
 import { usePermission } from '../../../lib/use-permission';
-import { microsToEuros } from '../../../lib/billing-ui';
+import { microsToUsd } from '../../../lib/billing-ui';
 import { cn } from '../../../lib/utils';
 import { useFormatter, useTranslations } from '../../../lib/i18n';
 
@@ -71,7 +71,7 @@ export default function OrgUsagePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const formatEuros = (value) =>
+  const formatUsd = (value) =>
     value === null || value === undefined || Number.isNaN(value) ? '—' : currency.format(value);
   const formatNumber = (value) =>
     value === null || value === undefined || Number.isNaN(value) ? '—' : number.format(value);
@@ -137,8 +137,8 @@ export default function OrgUsagePage() {
   }
 
   const level = data?.level || 'green';
-  const workspaceLimit = microsToEuros(data?.workspaceLimitMicros);
-  const totalCost = microsToEuros(data?.totalCostMicros) || 0;
+  const workspaceLimit = microsToUsd(data?.workspaceLimitMicros);
+  const totalCost = microsToUsd(data?.totalCostMicros) || 0;
   const budgetRatio = data?.workspaceLimitMicros
     ? (Number(data.totalCostMicros || 0) + Number(data.totalReservedMicros || 0)) / data.workspaceLimitMicros
     : null;
@@ -176,10 +176,10 @@ export default function OrgUsagePage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatTile
             label={t('totalCost')}
-            value={formatEuros(totalCost)}
+            value={formatUsd(totalCost)}
             hint={
               workspaceLimit != null
-                ? t('totalCostLimitHint', { limit: formatEuros(workspaceLimit) })
+                ? t('totalCostLimitHint', { limit: formatUsd(workspaceLimit) })
                 : t('totalCostNoLimit')
             }
           />
@@ -208,7 +208,7 @@ export default function OrgUsagePage() {
             <div className="flex items-center justify-between text-sm">
               <span className="text-secondary">{t('budgetUsage')}</span>
               <span className={cn('font-semibold', trafficColor(level))}>
-                {formatEuros(totalCost)} / {formatEuros(workspaceLimit)} ({formatPercent(budgetRatio)})
+                {formatUsd(totalCost)} / {formatUsd(workspaceLimit)} ({formatPercent(budgetRatio)})
               </span>
             </div>
             <ProgressBar value={budgetRatio} level={level} />
@@ -234,7 +234,7 @@ export default function OrgUsagePage() {
                     </p>
                   </div>
                   <p className="text-xs text-secondary">{formatNumber(row.requests)} {t('requestsSuffix')}</p>
-                  <p className="text-sm font-mono text-primary">{formatEuros(row.cost)}</p>
+                  <p className="text-sm font-mono text-primary">{formatUsd(row.cost)}</p>
                 </div>
               ))
             )}
@@ -261,7 +261,7 @@ export default function OrgUsagePage() {
                     </p>
                   </div>
                   <p className="text-xs text-secondary">{formatNumber(row.requests)} {t('requestsSuffix')}</p>
-                  <p className="text-sm font-mono text-primary">{formatEuros(row.cost)}</p>
+                  <p className="text-sm font-mono text-primary">{formatUsd(row.cost)}</p>
                 </div>
               ))
             )}

@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import { useCurrentOrg } from '../../../lib/use-current-org';
 import { usePermission } from '../../../lib/use-permission';
-import { budgetEurosToMicros, microsToEuros } from '../../../lib/billing-ui';
+import { budgetUsdToMicros, microsToUsd } from '../../../lib/billing-ui';
 import { useFormatter, useTranslations } from '../../../lib/i18n';
 
 function BudgetInput({ id, label, hint, value, onChange, disabled }) {
@@ -30,7 +30,7 @@ function BudgetInput({ id, label, hint, value, onChange, disabled }) {
           placeholder={t('noLimit')}
           className="w-full rounded-lg border border-subtle bg-surface-elevated px-3 py-2 text-sm text-primary outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
         />
-        <span className="text-xs text-secondary">EUR</span>
+        <span className="text-xs text-secondary">USD</span>
       </div>
     </label>
   );
@@ -70,8 +70,8 @@ export default function WorkspaceBudgetsPage() {
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(t('loadError'));
       setData(payload);
-      setWorkspaceLimit(microsToEuros(payload.workspaceLimitMicros)?.toFixed(2) || '');
-      setDefaultMemberLimit(microsToEuros(payload.defaultMemberLimitMicros)?.toFixed(2) || '');
+      setWorkspaceLimit(microsToUsd(payload.workspaceLimitMicros)?.toFixed(2) || '');
+      setDefaultMemberLimit(microsToUsd(payload.defaultMemberLimitMicros)?.toFixed(2) || '');
       setMemberId((current) => payload.members?.some((member) => String(member.userId) === String(current))
         ? current
         : String(payload.members?.[0]?.userId || ''));
@@ -88,7 +88,7 @@ export default function WorkspaceBudgetsPage() {
 
   useEffect(() => {
     const member = data?.members?.find((item) => String(item.userId) === String(memberId));
-    setMemberLimit(microsToEuros(member?.monthlyLimitMicros)?.toFixed(2) || '');
+    setMemberLimit(microsToUsd(member?.monthlyLimitMicros)?.toFixed(2) || '');
   }, [memberId, data]);
 
   const patch = async (body) => {
@@ -119,8 +119,8 @@ export default function WorkspaceBudgetsPage() {
     event.preventDefault();
     try {
       const saved = await patch({
-        workspaceLimitMicros: budgetEurosToMicros(workspaceLimit),
-        defaultMemberLimitMicros: budgetEurosToMicros(defaultMemberLimit),
+        workspaceLimitMicros: budgetUsdToMicros(workspaceLimit),
+        defaultMemberLimitMicros: budgetUsdToMicros(defaultMemberLimit),
         reason: workspaceReason,
       });
       if (saved) setWorkspaceReason('');
@@ -134,7 +134,7 @@ export default function WorkspaceBudgetsPage() {
     if (!memberId) return;
     try {
       const saved = await patch({
-        member: { userId: Number(memberId), monthlyLimitMicros: budgetEurosToMicros(memberLimit) },
+        member: { userId: Number(memberId), monthlyLimitMicros: budgetUsdToMicros(memberLimit) },
         reason: memberReason,
       });
       if (saved) setMemberReason('');
@@ -217,7 +217,7 @@ export default function WorkspaceBudgetsPage() {
             <textarea id="member-budget-reason" required maxLength={500} rows={2} value={memberReason} onChange={(event) => setMemberReason(event.target.value)} className="mt-1.5 w-full rounded-lg border border-subtle bg-surface-elevated px-3 py-2 text-sm text-primary outline-none focus:ring-2 focus:ring-accent" placeholder={t('reasonPlaceholder')} />
           </label>
           <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
-            <p className="text-xs text-secondary">{t('currentDefault', { amount: data?.defaultMemberLimitMicros == null ? t('noLimit') : currency.format(microsToEuros(data.defaultMemberLimitMicros)) })}</p>
+            <p className="text-xs text-secondary">{t('currentDefault', { amount: data?.defaultMemberLimitMicros == null ? t('noLimit') : currency.format(microsToUsd(data.defaultMemberLimitMicros)) })}</p>
             <button type="submit" disabled={busy || !memberId || !memberReason.trim()} className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? tCommon('saving') : t('saveMember')}</button>
           </div>
         </form>

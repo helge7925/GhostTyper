@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { Check, ChevronDown, FileAudio, Mic, MonitorSpeaker, Upload, X } from 'lucide-react';
-import { CHAT_MODEL_OPTIONS, CHAT_MODELS, ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE, normalizeDefaultTemplate } from '../lib/constants';
+import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE, normalizeDefaultTemplate } from '../lib/constants';
+import { useModelOptions } from '../lib/use-model-options';
 import { uploadAudio, getTemplates, getSettings } from '../lib/api';
 import AudioRecorder from './AudioRecorder';
 import SystemAudioRecorder from './SystemAudioRecorder';
@@ -16,7 +17,6 @@ import { createCaptureId, enqueueCapture, isRetryableResponse } from '../lib/off
 // remains accepted by the backend (see lib/template-service.js) so legacy
 // DB rows still resolve.
 const BUILTIN_TEMPLATE_VALUES = new Set(['generic', 'meeting', 'action_items', 'data_table', 'aufmass']);
-const ALLOWED_CHAT_MODELS = new Set(CHAT_MODELS);
 const ALLOWED_UPLOAD_MODES = new Set(['file', 'record', 'system-audio']);
 
 function resolvePresetTemplate(templateValue, templates) {
@@ -34,7 +34,10 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
   const tForm = useTranslations('components.uploadForm');
   const [file, setFile] = useState(null);
   const [template, setTemplate] = useState('generic');
-  const [model, setModel] = useState('deepseek-v4-pro');
+  const [model, setModel] = useState('');
+  const { options: chatModelOptions, defaultModel } = useModelOptions('chat');
+  const allowedChatModels = useMemo(() => new Set(chatModelOptions.map((option) => option.value)), [chatModelOptions]);
+  useEffect(() => { if (!model && defaultModel) setModel(defaultModel); }, [defaultModel, model]);
   const [templates, setTemplates] = useState([]);
   const [diarize, setDiarize] = useState(false);
   const [autoAnalyze, setAutoAnalyze] = useState(true);
@@ -74,7 +77,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
           nextTemplate = presetTemplate;
         }
         setTemplate(nextTemplate);
-        if (ALLOWED_CHAT_MODELS.has(presetConfig?.model)) {
+        if (allowedChatModels.has(presetConfig?.model)) {
           setModel(presetConfig.model);
         }
         if (ALLOWED_UPLOAD_MODES.has(presetConfig?.uploadMode)) {
@@ -97,20 +100,20 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
         }
       })
       .catch(err => console.error('Error loading upload options:', err));
-  }, [presetConfig]);
+  }, [allowedChatModels, presetConfig]);
 
   useEffect(() => {
     if (!presetConfig) return;
     const presetTemplate = resolvePresetTemplate(presetConfig.template, templates);
     if (presetTemplate) setTemplate(presetTemplate);
-    if (ALLOWED_CHAT_MODELS.has(presetConfig.model)) setModel(presetConfig.model);
+    if (allowedChatModels.has(presetConfig.model)) setModel(presetConfig.model);
     if (ALLOWED_UPLOAD_MODES.has(presetConfig.uploadMode)) setUploadMode(presetConfig.uploadMode);
     if (typeof presetConfig.autoAnalyze === 'boolean') setAutoAnalyze(presetConfig.autoAnalyze);
     if (typeof presetConfig.diarize === 'boolean') setDiarize(presetConfig.diarize);
     if (typeof presetConfig.customPrompt === 'string') setCustomPrompt(presetConfig.customPrompt);
     if (typeof presetConfig.analysisFocus === 'string') setAnalysisFocus(presetConfig.analysisFocus);
     if (presetConfig.showAdvancedOptions) setShowAdvancedOptions(true);
-  }, [presetConfig, templates]);
+  }, [allowedChatModels, presetConfig, templates]);
 
   function validateFile(f) {
     const type = f.type.split(';')[0];
@@ -387,7 +390,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
             )}
             <Field label={tForm('modelLabel')} htmlFor="upload-model" help={tForm('modelHint')}>
               <select id="upload-model" value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none">
-                {CHAT_MODEL_OPTIONS.map((option) => (
+                {chatModelOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>

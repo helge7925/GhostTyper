@@ -1,7 +1,8 @@
 import { query } from '../../../../lib/db';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
 import { resolveShareToken } from '../../../../lib/share-tokens';
-import { resolveMistralApiKey } from '../../../../lib/settings-service';
+import { resolveActiveProviderConfig } from '../../../../lib/ai-provider-router';
+import { synthesizeSpeechEdenAi } from '../../../../lib/edenai-service';
 import {
   assertTranscriptionPaidWorkActive,
   budgetIdempotencyKey,
@@ -11,7 +12,7 @@ import {
   requestBudgetScope,
 } from '../../../../lib/budget-runtime';
 import {
-  voxtralTts,
+  openRouterTts,
   buildWavHeader,
 } from '../../../../lib/tts';
 import { logError, logInfo } from '../../../../lib/observability';
@@ -100,12 +101,16 @@ export default async function handler(req, res) {
     throw error;
   }
 
-  // Use the row owner's Mistral key — share viewers don't have one,
-  // and the workspace that owns the meeting pays for the TTS bytes.
-  const apiKey = await resolveMistralApiKey({
+  // Use the row owner's TTS provider config — share viewers don't have
+  // one, and the workspace that owns the meeting pays for the TTS bytes.
+  const active = await resolveActiveProviderConfig({
     userId: row.user_id,
     organizationId: row.organization_id,
+    capability: 'tts',
   });
+  const apiKey = active.apiKey;
+  const ttsModel = active.provider === 'edenai' ? active.model : active.defaultModels.tts;
+  const ttsVoice = active.ttsVoices[ttsModel];
   if (!apiKey) {
     releaseSlot();
     return res.status(503).json({ code: 'NO_API_KEY' });
@@ -203,27 +208,39 @@ export default async function handler(req, res) {
               userId: ownerUserId,
               transcriptionId,
               operation: 'live_tts_share',
-              provider: 'mistral',
-              model: 'voxtral-mini-tts-2603',
+              provider: active.provider,
+              model: ttsModel,
               estimatedUsage: { inputQuantity: 0, outputQuantity: chars },
               reservationMs: 5 * 60 * 1000,
               stopOnDenied: true,
             },
             async (_reservation, budgetSignal) => {
-              const rendered = await voxtralTts({
-                text: seg.text,
-                language: requestedLang,
-                format: 'pcm',
-                apiKey,
-                signal: composeAbortSignals(signal, budgetSignal),
-              });
+              const rendered = active.provider === 'edenai'
+                ? await synthesizeSpeechEdenAi({
+                  text: seg.text,
+                  format: 'pcm',
+                  apiKey,
+                  model: ttsModel,
+                  voice: ttsVoice,
+                  signal: composeAbortSignals(signal, budgetSignal),
+                })
+                : await openRouterTts({
+                  text: seg.text,
+                  language: requestedLang,
+                  format: 'pcm',
+                  apiKey,
+                  model: ttsModel,
+                  voice: ttsVoice,
+                  signal: composeAbortSignals(signal, budgetSignal),
+                });
               return {
                 pcm: rendered,
-                model: 'voxtral-mini-tts-2603',
+                model: ttsModel,
                 providerRequestId: rendered.providerRequestId || null,
+                usage: rendered.usage || null,
               };
             },
-            () => ({ inputQuantity: 0, outputQuantity: chars }),
+            (result) => result.usage || ({ inputQuantity: 0, outputQuantity: chars }),
           );
           const pcm = paid.pcm;
           await assertTranscriptionPaidWorkActive(transcriptionId);

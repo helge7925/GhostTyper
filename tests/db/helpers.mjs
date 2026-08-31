@@ -78,18 +78,33 @@ export async function setupDbTestEnvironment() {
     };
   }
 
+  const setupClient = await pool.connect();
+  let extensionError = null;
   try {
-    await pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
-  } catch (error) {
+    // node:test runs DB files concurrently. Serialize the complete fresh
+    // schema bootstrap so CREATE EXTENSION/TABLE statements from two files
+    // cannot race in PostgreSQL's system catalog.
+    await setupClient.query('SELECT pg_advisory_lock(192837465)');
+    try {
+      await setupClient.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
+    } catch (error) {
+      extensionError = error;
+    }
+    if (!extensionError) {
+      const { initDatabase } = await import('../../lib/db-init.js');
+      await initDatabase();
+    }
+  } finally {
+    await setupClient.query('SELECT pg_advisory_unlock(192837465)').catch(() => {});
+    setupClient.release();
+  }
+  if (extensionError) {
     await pool.end().catch(() => {});
     return {
-      skip: `pg_trgm extension is unavailable on TEST_DATABASE_URL (${error.message}). `
+      skip: `pg_trgm extension is unavailable on TEST_DATABASE_URL (${extensionError.message}). `
         + 'The official postgres:16 image bundles it; a bare-metal install may need the postgresql-contrib package.',
     };
   }
-
-  const { initDatabase } = await import('../../lib/db-init.js');
-  await initDatabase();
 
   return { pool };
 }

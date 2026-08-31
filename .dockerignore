@@ -1,5 +1,9 @@
 node_modules
+.next
 .git
+uploads
+coverage
+playwright-report
 Dockerfile
 .dockerignore
 config

@@ -37,7 +37,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/pdf-fonts ./pdf-fonts
 
 RUN apk add --no-cache ffmpeg chromium nss freetype harfbuzz ttf-freefont \
-    font-noto-cjk
+    font-noto-cjk poppler-utils
 RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
 
 USER nextjs

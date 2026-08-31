@@ -13,13 +13,11 @@ import { Field } from '../components/ui/field';
 import { Check, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 
+// Only spelling_grammar is enabled — see pages/api/text-optimization.js's
+// ALLOWED_PRESETS comment. The other five presets come back once each is
+// individually verified with the same rigor.
 const PRESETS = [
   { id: 'spelling_grammar', label: 'Rechtschreibung & Grammatik' },
-  { id: 'friendlier', label: 'Freundlicher' },
-  { id: 'more_formal', label: 'Formeller' },
-  { id: 'shorter', label: 'Kürzer' },
-  { id: 'clearer', label: 'Klarer' },
-  { id: 'email_improve', label: 'E-Mail verbessern' },
 ];
 
 export default function Textoptimierung() {

@@ -1,8 +1,10 @@
 import { generateTemplate } from '../../../lib/ai-service';
+import { generateTemplateEdenAi } from '../../../lib/edenai-service';
+import { resolveActiveProviderConfig } from '../../../lib/ai-provider-router';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { composeAbortSignals, executeReservedSpend, estimateTextUsage, requestBudgetScope } from '../../../lib/budget-runtime';
-import { getSettingsRow, resolveCortecsConfig } from '../../../lib/settings-service';
-import { resolveChatModel } from '../../../lib/model-policy';
+import { getSettingsRow } from '../../../lib/settings-service';
+import { resolveConfiguredModel } from '../../../lib/openrouter';
 import { MAX_TEMPLATE_GENERATOR_GOAL_LENGTH } from '../../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { hasPermission } from '../../../lib/permissions';
@@ -36,33 +38,53 @@ async function handler(req, res) {
 
   try {
     const settingsRow = await getSettingsRow(userId);
-    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveChatModel(settingsRow?.preferred_model, null) || cortecs.chatModel;
+    const active = await resolveActiveProviderConfig({ userId, organizationId: orgId, capability: 'chat' });
 
-    if (!cortecs.apiKey) {
-      return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert.' });
+    let providerModel;
+    let callProvider;
+
+    if (active.provider === 'edenai') {
+      if (!active.apiKey) {
+        return res.status(400).json({ message: 'Kein EdenAI-API-Key konfiguriert.' });
+      }
+      providerModel = active.model;
+      callProvider = (_reservation, budgetSignal) => generateTemplateEdenAi(
+        goal, active.apiKey, active.model, { signal: composeAbortSignals(budgetSignal) },
+      );
+    } else {
+      const preferredModel = resolveConfiguredModel(active, 'chat', settingsRow?.preferred_model);
+      if (!active.apiKey) {
+        return res.status(400).json({ message: 'Kein OpenRouter-API-Key konfiguriert.' });
+      }
+      providerModel = preferredModel;
+      callProvider = (_reservation, budgetSignal) => generateTemplate(
+        goal,
+        active.apiKey,
+        preferredModel,
+        {
+          baseUrl: active.baseUrl,
+          fallbackModel: active.defaultModels.chat,
+          organizationId: active.organizationId,
+          signal: composeAbortSignals(budgetSignal),
+        },
+      );
     }
 
     const { promptText } = await executeReservedSpend(
       {
-        idempotencyKey: requestBudgetScope(req, 'template-generation', { goal, preferredModel }),
+        idempotencyKey: requestBudgetScope(req, 'template-generation', { goal, providerModel }),
         organizationId: orgId,
         userId,
         operation: 'template_generation',
-        provider: 'cortecs',
-        model: preferredModel,
+        provider: active.provider,
+        model: providerModel,
         estimatedUsage: estimateTextUsage(goal, {
           inputBufferTokens: 900,
           outputMultiplier: 3,
           outputBufferTokens: 1200,
         }),
       },
-      (_reservation, budgetSignal) => generateTemplate(
-        goal,
-        cortecs.apiKey,
-        preferredModel,
-        { baseUrl: cortecs.baseUrl, preference: cortecs.preference, signal: composeAbortSignals(budgetSignal) },
-      ),
+      callProvider,
     );
 
     return res.status(200).json({ promptText });

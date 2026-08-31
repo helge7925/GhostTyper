@@ -361,7 +361,7 @@ export default function AdminUsers() {
             {editingUser && (
               <div className="border-t border-subtle pt-4 bg-hover-subtle/50 rounded-xl px-4 py-3">
                 <p className="text-xs text-secondary leading-relaxed">
-                  💡 <strong className="text-primary">Mistral-API-Key</strong> und <strong className="text-primary">Kostenlimits</strong> werden jetzt
+                  💡 <strong className="text-primary">OpenRouter-Integration</strong> und <strong className="text-primary">Kostenlimits</strong> werden
                   pro Workspace verwaltet. Wechsle zu{' '}
                   <Link href="/settings/organization/members" className="text-accent-ink hover:underline">Workspace verwalten → Mitglieder</Link>{' '}
                   oder{' '}
