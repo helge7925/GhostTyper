@@ -93,6 +93,9 @@
   "overrides": {
     "next-auth": {
       "nodemailer": "$nodemailer"
+    },
+    "exceljs": {
+      "uuid": "^11.1.1"
     }
   }
 }
