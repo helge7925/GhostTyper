@@ -1,17 +1,22 @@
-import { useState, useRef, useEffect } from 'react';
-import { Mic, MonitorSpeaker, Upload } from 'lucide-react';
-import { CHAT_MODEL_OPTIONS, CHAT_MODELS, ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE, normalizeDefaultTemplate } from '../lib/constants';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useSession } from 'next-auth/react';
+import { Check, ChevronDown, FileAudio, Mic, MonitorSpeaker, Upload, X } from 'lucide-react';
+import { ACCEPTED_AUDIO_TYPES, MAX_FILE_SIZE, normalizeDefaultTemplate } from '../lib/constants';
+import { useModelOptions } from '../lib/use-model-options';
 import { uploadAudio, getTemplates, getSettings } from '../lib/api';
 import AudioRecorder from './AudioRecorder';
 import SystemAudioRecorder from './SystemAudioRecorder';
 import { getSystemAudioCapabilities } from '../lib/audio-utils';
 import { useTranslations } from '../lib/i18n';
+import { Button } from './ui/button';
+import { Field } from './ui/field';
+import { cn } from '../lib/utils';
+import { createCaptureId, enqueueCapture, isRetryableResponse } from '../lib/offline-queue';
 
 // `aufmass` is intentionally absent from the user-facing offering but
 // remains accepted by the backend (see lib/template-service.js) so legacy
 // DB rows still resolve.
 const BUILTIN_TEMPLATE_VALUES = new Set(['generic', 'meeting', 'action_items', 'data_table', 'aufmass']);
-const ALLOWED_CHAT_MODELS = new Set(CHAT_MODELS);
 const ALLOWED_UPLOAD_MODES = new Set(['file', 'record', 'system-audio']);
 
 function resolvePresetTemplate(templateValue, templates) {
@@ -24,11 +29,15 @@ function resolvePresetTemplate(templateValue, templates) {
 }
 
 export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTemplate = false, templateLabel = '' }) {
+  const { data: session } = useSession();
   const t = useTranslations('upload');
   const tForm = useTranslations('components.uploadForm');
   const [file, setFile] = useState(null);
   const [template, setTemplate] = useState('generic');
-  const [model, setModel] = useState('deepseek-v4-pro');
+  const [model, setModel] = useState('');
+  const { options: chatModelOptions, defaultModel } = useModelOptions('chat');
+  const allowedChatModels = useMemo(() => new Set(chatModelOptions.map((option) => option.value)), [chatModelOptions]);
+  useEffect(() => { if (!model && defaultModel) setModel(defaultModel); }, [defaultModel, model]);
   const [templates, setTemplates] = useState([]);
   const [diarize, setDiarize] = useState(false);
   const [autoAnalyze, setAutoAnalyze] = useState(true);
@@ -40,6 +49,8 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState(null);
+  const [offlineSaved, setOfflineSaved] = useState(false);
+  const [fileCaptureId, setFileCaptureId] = useState(null);
   const [systemAudioCaps, setSystemAudioCaps] = useState({ tabAudio: false, systemAudio: false });
   const inputRef = useRef(null);
   const textTemplates = templates.filter((entry) => !entry.template_type || entry.template_type === 'text');
@@ -66,7 +77,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
           nextTemplate = presetTemplate;
         }
         setTemplate(nextTemplate);
-        if (ALLOWED_CHAT_MODELS.has(presetConfig?.model)) {
+        if (allowedChatModels.has(presetConfig?.model)) {
           setModel(presetConfig.model);
         }
         if (ALLOWED_UPLOAD_MODES.has(presetConfig?.uploadMode)) {
@@ -89,20 +100,20 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
         }
       })
       .catch(err => console.error('Error loading upload options:', err));
-  }, [presetConfig]);
+  }, [allowedChatModels, presetConfig]);
 
   useEffect(() => {
     if (!presetConfig) return;
     const presetTemplate = resolvePresetTemplate(presetConfig.template, templates);
     if (presetTemplate) setTemplate(presetTemplate);
-    if (ALLOWED_CHAT_MODELS.has(presetConfig.model)) setModel(presetConfig.model);
+    if (allowedChatModels.has(presetConfig.model)) setModel(presetConfig.model);
     if (ALLOWED_UPLOAD_MODES.has(presetConfig.uploadMode)) setUploadMode(presetConfig.uploadMode);
     if (typeof presetConfig.autoAnalyze === 'boolean') setAutoAnalyze(presetConfig.autoAnalyze);
     if (typeof presetConfig.diarize === 'boolean') setDiarize(presetConfig.diarize);
     if (typeof presetConfig.customPrompt === 'string') setCustomPrompt(presetConfig.customPrompt);
     if (typeof presetConfig.analysisFocus === 'string') setAnalysisFocus(presetConfig.analysisFocus);
     if (presetConfig.showAdvancedOptions) setShowAdvancedOptions(true);
-  }, [presetConfig, templates]);
+  }, [allowedChatModels, presetConfig, templates]);
 
   function validateFile(f) {
     const type = f.type.split(';')[0];
@@ -123,6 +134,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
       return;
     }
     setFile(f);
+    setFileCaptureId(createCaptureId());
   }
 
   function handleDrop(e) {
@@ -146,7 +158,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
                       blob.type.includes('ogg') ? 'ogg' : 'webm';
     
     const recordedFile = new File([blob], `aufnahme-${Date.now()}.${extension}`, { type: blob.type });
-    setFile(recordedFile);
+    handleFile(recordedFile);
     setUploadMode('file');
   }
 
@@ -156,21 +168,63 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
 
     setUploading(true);
     setError(null);
+    setOfflineSaved(false);
     setProgress(0);
 
+    const userId = session?.user?.id;
+    const organizationId = session?.user?.currentOrganizationId;
+    const clientCaptureId = fileCaptureId || createCaptureId();
+    if (!fileCaptureId) setFileCaptureId(clientCaptureId);
+    const uploadOptions = {
+      template, model, diarize, customPrompt, analysisFocus, autoAnalyze,
+      clientCaptureId,
+      clientCaptureUserId: userId,
+      clientCaptureOrganizationId: organizationId,
+    };
+
+    const saveOffline = async () => {
+      if (!userId || !organizationId) throw new Error(tForm('offlineScopeMissing'));
+      await enqueueCapture({
+        id: clientCaptureId,
+        kind: 'audio',
+        userId,
+        organizationId,
+        blob: file,
+        filename: file.name,
+        fields: { template, model, diarize, customPrompt, analysisFocus, autoAnalyze },
+      });
+      setFile(null);
+      setFileCaptureId(null);
+      setProgress(0);
+      setOfflineSaved(true);
+    };
+
     try {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        await saveOffline();
+        return;
+      }
       const progressInterval = setInterval(() => {
         setProgress((prev) => Math.min(prev + 10, 90));
       }, 200);
 
-      const result = await uploadAudio(file, { template, model, diarize, customPrompt, analysisFocus, autoAnalyze });
-
-      clearInterval(progressInterval);
+      let result;
+      try {
+        result = await uploadAudio(file, uploadOptions);
+      } catch (uploadError) {
+        const networkFailure = uploadError?.status === undefined;
+        if (!networkFailure && !isRetryableResponse(uploadError.status)) throw uploadError;
+        await saveOffline();
+        return;
+      } finally {
+        clearInterval(progressInterval);
+      }
       setProgress(100);
       setFile(null);
+      setFileCaptureId(null);
       if (onSuccess) onSuccess(result);
     } catch (err) {
-      setError(err.message || 'Fehler beim Hochladen.');
+      setError(err.message || tForm('offlineStoreFailed'));
     } finally {
       setUploading(false);
     }
@@ -178,8 +232,9 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="mb-2">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-hover-subtle border border-subtle">
+      <fieldset>
+        <legend className="text-xs font-medium text-secondary mb-2">{tForm('sourceLabel')}</legend>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 p-1 rounded-xl bg-surface-elevated border border-subtle">
           {[
             { mode: 'file', label: tForm('tabUpload'), Icon: Upload, show: true },
             { mode: 'record', label: tForm('tabRecord'), Icon: Mic, show: true },
@@ -192,11 +247,12 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
                 type="button"
                 onClick={() => setUploadMode(mode)}
                 aria-pressed={active}
-                className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                className={cn(
+                  'min-h-10 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
                   active
-                    ? 'gradient-accent text-white shadow-lg shadow-accent/25'
-                    : 'text-secondary hover:text-primary hover:bg-hover'
-                }`}
+                    ? 'bg-surface text-primary border-subtle'
+                    : 'border-transparent text-secondary hover:text-primary hover:bg-hover-subtle',
+                )}
               >
                 <Icon className="w-4 h-4 shrink-0" />
                 <span className="truncate">{label}</span>
@@ -204,22 +260,24 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
             );
           })}
         </div>
-      </div>
+      </fieldset>
 
       {uploadMode === 'file' ? (
         <div
           onDrop={handleDrop}
           onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
           onDragLeave={() => setDragActive(false)}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={handleFileZoneKeyDown}
-          role="button"
-          tabIndex={0}
+          onClick={() => {
+            if (!file) inputRef.current?.click();
+          }}
+          onKeyDown={file ? undefined : handleFileZoneKeyDown}
+          role={file ? 'group' : 'button'}
+          tabIndex={file ? undefined : 0}
           aria-label={tForm('dragOrClick')}
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+          className={`border border-dashed rounded-xl p-8 sm:p-10 text-center cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent ${
             dragActive
-              ? 'border-accent bg-accent/10'
-              : 'border-emphasis hover:border-emphasis'
+              ? 'border-accent bg-accent/5'
+              : 'border-emphasis bg-surface-elevated/40 hover:border-accent/60 hover:bg-surface-elevated'
           }`}
         >
           <input
@@ -230,19 +288,46 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
             className="hidden"
           />
           {file ? (
-            <p className="text-sm text-primary">
-              <span className="font-medium">{file.name}</span>{' '}
-              <span className="text-secondary">
-                ({(file.size / 1024 / 1024).toFixed(1)} MB)
+            <div className="flex items-center justify-center gap-3 text-left">
+              <span className="h-10 w-10 rounded-lg bg-accent/10 text-accent-ink flex items-center justify-center shrink-0">
+                <FileAudio className="w-5 h-5" aria-hidden="true" />
               </span>
-            </p>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-primary truncate">{file.name}</p>
+                <p className="text-xs text-secondary mt-0.5">
+                  {(file.size / 1024 / 1024).toFixed(1)} MB
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => inputRef.current?.click()}
+              >
+                {tForm('replaceFile')}
+              </Button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setFile(null);
+                  setFileCaptureId(null);
+                  if (inputRef.current) inputRef.current.value = '';
+                }}
+                className="h-9 w-9 rounded-lg text-secondary hover:text-danger hover:bg-danger/10 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                aria-label={tForm('removeFile')}
+              >
+                <X className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
           ) : (
             <div>
-              <svg className="mx-auto w-10 h-10 text-secondary mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              <p className="text-sm text-secondary">{tForm('dragOrClick')}</p>
-              <p className="text-xs text-secondary/60 mt-1">{t('fileFormats')}</p>
+              <span className="mx-auto mb-4 h-10 w-10 rounded-lg bg-surface border border-subtle text-secondary flex items-center justify-center">
+                <Upload className="w-5 h-5" aria-hidden="true" />
+              </span>
+              <p className="text-sm font-medium text-primary">{tForm('selectFile')}</p>
+              <p className="text-xs text-secondary mt-1">{tForm('dragHint')}</p>
+              <p className="text-xs text-muted mt-3">{t('fileFormats')}</p>
             </div>
           )}
         </div>
@@ -252,71 +337,69 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
         <AudioRecorder onRecordingComplete={handleRecordingComplete} />
       )}
 
-      <div className="space-y-3 pt-2">
-        <label className="flex items-center gap-3 cursor-pointer group">
+      <fieldset className="border-t border-subtle pt-5">
+        <legend className="sr-only">{tForm('outputLabel')}</legend>
+        <p className="text-xs font-medium text-secondary mb-3">{tForm('outputLabel')}</p>
+        <div className="grid sm:grid-cols-2 gap-2">
+        <label className="flex items-start gap-3 cursor-pointer rounded-lg p-3 border border-subtle hover:bg-hover-subtle transition-colors">
           <input type="checkbox" checked={diarize} onChange={(e) => setDiarize(e.target.checked)} className="w-4 h-4 accent-accent bg-surface-elevated border-emphasis rounded focus:ring-accent" />
-          <span className="text-sm text-secondary group-hover:text-primary transition-colors">{t('diarize')}</span>
+          <span>
+            <span className="block text-sm font-medium text-primary">{t('diarize')}</span>
+            <span className="block text-xs text-secondary mt-0.5">{tForm('diarizeHint')}</span>
+          </span>
         </label>
-        <label className="flex items-center gap-3 cursor-pointer group">
+        <label className="flex items-start gap-3 cursor-pointer rounded-lg p-3 border border-subtle hover:bg-hover-subtle transition-colors">
           <input type="checkbox" checked={autoAnalyze} onChange={(e) => setAutoAnalyze(e.target.checked)} className="w-4 h-4 accent-accent bg-surface-elevated border-emphasis rounded focus:ring-accent" />
-          <span className="text-sm text-secondary group-hover:text-primary transition-colors">{t('autoAnalyze')}</span>
+          <span>
+            <span className="block text-sm font-medium text-primary">{t('autoAnalyze')}</span>
+            <span className="block text-xs text-secondary mt-0.5">{tForm('autoAnalyzeHint')}</span>
+          </span>
         </label>
-      </div>
+        </div>
+      </fieldset>
 
-      <div className="pt-1">
-        <button
+      <div className="border-t border-subtle pt-4">
+        <Button
           type="button"
+          variant="ghost"
           onClick={() => setShowAdvancedOptions((prev) => !prev)}
-          className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-subtle bg-hover-subtle text-sm text-primary hover:bg-hover-subtle transition-colors"
+          className="w-full justify-between px-3"
           aria-expanded={showAdvancedOptions}
         >
-          <span>Erweiterte Optionen</span>
-          <svg
-            className={`w-4 h-4 text-secondary transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+          <span>{tForm('advancedOptions')}</span>
+          <ChevronDown className={cn('w-4 h-4 text-secondary transition-transform', showAdvancedOptions && 'rotate-180')} aria-hidden="true" />
+        </Button>
       </div>
 
       {showAdvancedOptions && (
-        <div className="space-y-4 bg-hover-subtle border border-subtle rounded-xl p-4">
+        <div className="space-y-4 bg-surface-elevated/50 border border-subtle rounded-xl p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {!lockTemplate ? (
-              <div>
-                <label htmlFor="upload-template" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">Analyse-Modus</label>
+              <Field label={tForm('analysisMode')} htmlFor="upload-template" help={tForm('analysisModeHint')}>
                 <select id="upload-template" value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none">
                   <optgroup label="Standard"><option value="generic">Zusammenfassung</option><option value="meeting">Meeting-Protokoll</option><option value="action_items">To-Dos extrahieren</option></optgroup>
                   {textTemplates.length > 0 && <optgroup label="Eigene Text-Vorlagen">{textTemplates.map(t => <option key={t.id} value={`custom-${t.id}`}>{t.name}</option>)}</optgroup>}
                 </select>
-              </div>
+              </Field>
             ) : (
-              <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">Analyse-Modus</label>
+              <Field label={tForm('analysisMode')} className="md:col-span-1">
                 <div className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary">
                   {templateLabel || template}
                 </div>
-              </div>
+              </Field>
             )}
-            <div>
-              <label htmlFor="upload-model" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">KI-Modell</label>
+            <Field label={tForm('modelLabel')} htmlFor="upload-model" help={tForm('modelHint')}>
               <select id="upload-model" value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none">
-                {CHAT_MODEL_OPTIONS.map((option) => (
+                {chatModelOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] text-secondary">Im Zweifel den Standard lassen — die Kurzbeschreibung hilft bei der Wahl.</p>
-            </div>
+            </Field>
           </div>
-          <div>
-            <label htmlFor="upload-prompt" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">{t('additionalContext')}</label>
+          <Field label={t('additionalContext')} htmlFor="upload-prompt" help={tForm('contextHelp')}>
             <textarea id="upload-prompt" value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder={t('additionalContextHint')} rows={2} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none resize-none" />
-          </div>
-          <div>
-            <label htmlFor="upload-analysis-focus" className="block text-xs font-medium text-secondary mb-1.5 uppercase tracking-widest">{t('analysisFocus')}</label>
+          </Field>
+          <Field label={t('analysisFocus')} htmlFor="upload-analysis-focus" help={tForm('focusHelp')}>
             <textarea
               id="upload-analysis-focus"
               value={analysisFocus}
@@ -325,11 +408,16 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
               rows={2}
               className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none resize-none"
             />
-          </div>
+          </Field>
         </div>
       )}
 
-      {error && <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm">{error}</div>}
+      {error && <div role="alert" className="border border-danger/30 text-danger px-4 py-3 rounded-lg text-sm">{error}</div>}
+      {offlineSaved && (
+        <div role="status" className="border border-success/30 bg-success/10 text-success px-4 py-3 rounded-lg text-sm">
+          {tForm('savedOffline')}
+        </div>
+      )}
 
       {uploading && (
         <progress
@@ -339,9 +427,14 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
         />
       )}
 
-      <button type="submit" disabled={!file || uploading} className="w-full gradient-accent text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 disabled:opacity-30 transition-all hover:scale-[1.01]">
-        {uploading ? t('submitting') : t('submit')}
-      </button>
+      <Button type="submit" disabled={!file || uploading} variant="primary" size="lg" className="w-full">
+        {uploading ? t('submitting') : (
+          <>
+            <Check className="w-4 h-4" aria-hidden="true" />
+            {t('submit')}
+          </>
+        )}
+      </Button>
     </form>
   );
 }

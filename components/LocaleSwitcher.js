@@ -71,7 +71,7 @@ export default function LocaleSwitcher({ className = '', compact = true }) {
                 event.preventDefault();
                 handlePick(code);
               }}
-              className={cn('flex items-center justify-between gap-2', active && 'text-accent')}
+              className={cn('flex items-center justify-between gap-2', active && 'text-accent-ink')}
             >
               <span className="flex items-center gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-secondary w-6">
@@ -79,7 +79,7 @@ export default function LocaleSwitcher({ className = '', compact = true }) {
                 </span>
                 <span>{t(code)}</span>
               </span>
-              {active && <Check className="w-4 h-4 text-accent" aria-hidden="true" />}
+              {active && <Check className="w-4 h-4 text-accent-ink" aria-hidden="true" />}
             </DropdownMenuItem>
           );
         })}

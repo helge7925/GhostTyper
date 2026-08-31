@@ -29,7 +29,7 @@ function highlightTerms(text, terms) {
   const lowerSet = new Set(clean.map((term) => term.toLowerCase()));
   return source.split(pattern).map((part, index) => (
     lowerSet.has(String(part).toLowerCase())
-      ? <mark key={index} className="bg-accent/20 text-accent rounded px-0.5">{part}</mark>
+      ? <mark key={index} className="bg-accent/20 text-accent-ink rounded px-0.5">{part}</mark>
       : <span key={index}>{part}</span>
   ));
 }
@@ -39,7 +39,7 @@ function TierBadge({ tier, label }) {
   return (
     <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest rounded px-1.5 py-0.5 border ${
       isPersonal
-        ? 'text-accent bg-accent/10 border-accent/20'
+        ? 'text-accent-ink bg-accent/10 border-accent/20'
         : 'text-secondary bg-hover-subtle border-subtle'
     }`}>
       {label}
@@ -100,7 +100,7 @@ function SegmentReviewRow({ segment, sourceLang, targetLang, onError }) {
               type="button"
               onClick={handleSaveCorrection}
               disabled={saving || !value.trim()}
-              className="text-xs font-bold text-accent uppercase disabled:opacity-40"
+              className="text-xs font-bold text-accent-ink uppercase disabled:opacity-40"
             >
               {saving ? '…' : t('saveCorrection')}
             </button>
@@ -257,14 +257,14 @@ export default function TranslationTermPanel({
                 <button
                   type="button"
                   onClick={() => setAddScope('personal')}
-                  className={`px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-widest transition-colors ${addScope === 'personal' ? 'bg-accent text-white' : 'text-secondary'}`}
+                  className={`px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-widest transition-colors ${addScope === 'personal' ? 'bg-accent-strong text-white' : 'text-secondary'}`}
                 >
                   {t('scopePersonal')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setAddScope('workspace')}
-                  className={`px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-widest transition-colors ${addScope === 'workspace' ? 'bg-accent text-white' : 'text-secondary'}`}
+                  className={`px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-widest transition-colors ${addScope === 'workspace' ? 'bg-accent-strong text-white' : 'text-secondary'}`}
                 >
                   {t('scopeWorkspace')}
                 </button>
@@ -280,7 +280,7 @@ export default function TranslationTermPanel({
                   className="inline-flex items-center gap-1.5 bg-hover-subtle hover:bg-hover-strong border border-subtle hover:border-accent/40 rounded-lg px-2 py-1 text-xs text-primary transition-all"
                   title={t('addTitle')}
                 >
-                  <svg className="w-3.5 h-3.5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  <svg aria-hidden="true" className="w-3.5 h-3.5 text-accent-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                   <span className="font-medium">{entry.term}</span>
                 </button>
               </li>
@@ -303,7 +303,7 @@ export default function TranslationTermPanel({
             className="flex items-center gap-2 text-xs font-semibold text-secondary hover:text-primary uppercase tracking-widest"
             aria-expanded={reviewOpen}
           >
-            <svg className={`w-3.5 h-3.5 transition-transform ${reviewOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            <svg aria-hidden="true" className={`w-3.5 h-3.5 transition-transform ${reviewOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             {t('reviewTitle', { count: segments.length })}
           </button>
           {reviewOpen && (

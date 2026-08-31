@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { Loader2, Video } from 'lucide-react';
+import { ChevronDown, Loader2, Video } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,8 @@ import {
 } from './ui/dialog';
 import { useTranslations } from '../lib/i18n';
 import { useUiFeedback } from '../lib/use-ui-feedback';
+import { Button } from './ui/button';
+import { Field, FieldInput } from './ui/field';
 
 // Google hard-blocks meeting bots on Meet (operator-verified, July 2026: the
 // Vexa bot lands on a dedicated rejection page, not a CAPTCHA). Meet is no
@@ -152,42 +154,41 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-secondary mb-1.5">{t('urlLabel')}</label>
-            <input
+          <Field label={t('urlLabel')} help={!meetBlocked ? (platform ? t(`platform.${platform}`) : t('urlHint')) : undefined}>
+            <FieldInput
               type="url"
               required
               autoFocus
               placeholder="https://teams.microsoft.com/l/meetup-join/…"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-1 focus:ring-accent"
             />
-            {!meetBlocked && (
-              <p className="mt-1 text-[10px] text-secondary">
-                {platform ? t(`platform.${platform}`) : t('urlHint')}
-              </p>
-            )}
             {platform === 'nextcloud_talk' && (
-              <p className="mt-1.5 text-[10px] text-warning">
+              <p className="mt-1.5 text-xs text-warning">
                 {t('nextcloudTalkLobbyHint')}
               </p>
             )}
             {meetBlocked && (
-              <div className="mt-1.5 text-[10px] text-warning bg-warning/10 border border-warning/30 rounded-lg px-2.5 py-2 leading-snug">
+              <div className="mt-2 text-xs text-warning border-l-2 border-warning/50 pl-3 leading-snug">
                 <p className="font-medium text-primary">{t('meetBlocked.title')}</p>
                 <p className="mt-0.5">{t('meetBlocked.hint')}</p>
                 <Link
                   href="/upload?preset=meet-tab-audio"
                   onClick={() => onOpenChange(false)}
-                  className="inline-block mt-1.5 underline text-accent hover:no-underline"
+                  className="inline-block mt-1.5 font-medium text-primary underline underline-offset-2 hover:no-underline"
                 >
                   {t('meetBlocked.cta')}
                 </Link>
               </div>
             )}
-          </div>
+          </Field>
 
+          <details className="group border border-subtle rounded-xl bg-surface">
+            <summary className="flex items-center justify-between cursor-pointer list-none px-4 py-3 text-sm font-medium text-primary">
+              {t('options')}
+              <ChevronDown className="w-4 h-4 text-secondary transition-transform group-open:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="border-t border-subtle p-4 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-secondary mb-1.5">{t('botNameLabel')}</label>
@@ -196,7 +197,7 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
                 value={botName}
                 placeholder={defaultBotName || 'GhostTyper Notes'}
                 onChange={(e) => setBotName(e.target.value)}
-                className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none"
+                className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
               />
             </div>
             <div>
@@ -204,7 +205,7 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary outline-none"
+                className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
               >
                 <option value="de">Deutsch</option>
                 <option value="en">English</option>
@@ -241,7 +242,7 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
             </span>
           </label>
 
-          <div className="border border-subtle rounded-xl p-3 space-y-2">
+          <div className="border border-subtle rounded-xl bg-surface-elevated/40 p-3 space-y-2">
             <label className="flex items-start gap-3 text-xs text-secondary">
               <input
                 type="checkbox"
@@ -256,11 +257,11 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
                 <p className="text-[10px] text-secondary leading-snug">{t('translation.hint')}</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-medium text-secondary mb-1 uppercase tracking-wider">{t('translation.languageA')}</label>
+                    <label className="block text-xs font-medium text-secondary mb-1">{t('translation.languageA')}</label>
                     <select
                       value={translationLangA}
                       onChange={(e) => setTranslationLangA(e.target.value)}
-                      className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none"
+                      className="w-full bg-surface border border-subtle rounded-lg px-3 py-2 text-xs text-primary outline-none"
                     >
                       <option value="de">Deutsch</option>
                       <option value="en">English</option>
@@ -273,11 +274,11 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-secondary mb-1 uppercase tracking-wider">{t('translation.languageB')}</label>
+                    <label className="block text-xs font-medium text-secondary mb-1">{t('translation.languageB')}</label>
                     <select
                       value={translationLangB}
                       onChange={(e) => setTranslationLangB(e.target.value)}
-                      className="w-full bg-surface-elevated border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none"
+                      className="w-full bg-surface border border-subtle rounded-lg px-3 py-2 text-xs text-primary outline-none"
                     >
                       <option value="en">English</option>
                       <option value="de">Deutsch</option>
@@ -353,8 +354,10 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
               </>
             )}
           </div>
+            </div>
+          </details>
 
-          <label className="flex items-start gap-3 text-xs text-primary bg-warning/10 border border-warning/30 rounded-xl px-3 py-2">
+          <label className="flex items-start gap-3 text-xs text-primary border border-warning/40 rounded-xl px-3 py-3">
             <input
               type="checkbox"
               checked={consent}
@@ -366,22 +369,22 @@ export default function MeetingStartForm({ open, onOpenChange, defaultBotName, d
           </label>
 
           <DialogFooter>
-            <button
+            <Button
               type="button"
-              className="px-4 py-2 rounded-xl text-sm border border-subtle text-primary hover:bg-hover-subtle"
+              variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={submitting}
             >
               {tCommon('cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={!valid}
-              className="px-4 py-2 rounded-xl text-sm bg-accent text-white hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+              variant="primary"
             >
               {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {t('cta')}
-            </button>
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

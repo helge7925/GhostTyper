@@ -85,12 +85,12 @@ export default function DocumentDetailPage() {
               </div>
               {Array.isArray(document.tags) && document.tags.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {document.tags.map((tag) => <span key={tag} className="px-2 py-0.5 rounded-full bg-accent/10 text-accent text-xs">#{tag}</span>)}
+                  {document.tags.map((tag) => <span key={tag} className="px-2 py-0.5 rounded-full bg-accent/10 text-accent-ink text-xs">#{tag}</span>)}
                 </div>
               )}
             </div>
             <div className="flex flex-wrap gap-2">
-              {document.transcription_id && <Link href={`/transcriptions/${document.transcription_id}`} className="px-3 py-2 rounded-lg bg-accent text-white text-xs font-semibold">Transkript öffnen</Link>}
+              {document.transcription_id && <Link href={`/transcriptions/${document.transcription_id}`} className="px-3 py-2 rounded-lg bg-accent-strong text-white text-xs font-semibold">Transkript öffnen</Link>}
               <button type="button" onClick={editTags} className="px-3 py-2 rounded-lg border border-subtle text-xs text-primary">Tags</button>
               <button type="button" disabled={busy} onClick={remove} className="px-3 py-2 rounded-lg bg-danger/10 text-danger text-xs font-semibold disabled:opacity-50">Löschen</button>
             </div>

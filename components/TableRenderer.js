@@ -21,7 +21,7 @@ function formatValue(value, type) {
   if (type === 'currency') {
     const parsed = Number(value);
     return Number.isFinite(parsed)
-      ? <span className="font-mono">{parsed.toFixed(2).replace('.', ',')} €</span>
+      ? <span className="font-mono">${parsed.toFixed(2)}</span>
       : <span>{value}</span>;
   }
 
@@ -220,7 +220,7 @@ export default function TableRenderer({
                 onClick={() => setEditMode((prev) => !prev)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   editMode
-                    ? 'bg-accent text-white'
+                    ? 'bg-accent-strong text-white'
                     : 'bg-hover-subtle text-secondary hover:text-primary'
                 }`}
               >

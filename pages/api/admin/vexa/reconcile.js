@@ -7,8 +7,9 @@ import { resolveVexaConfig } from '../../../../lib/integrations';
 import { decryptSecret, SECRET_CONTEXTS } from '../../../../lib/secrets';
 import { getTranscript, mapVexaTranscriptToGhostTyper } from '../../../../lib/api/vexa';
 import { runManualAnalysisJob } from '../../../../lib/manual-analysis';
-import { logUsage } from '../../../../lib/usage';
 import {
+  checkpointVexaMeetingSpend,
+  isVexaBudgetSafetyError,
   startBridgeForTranscription,
   stopBridgeForTranscription,
   isBridgeActive,
@@ -42,13 +43,14 @@ function checkSecret(req) {
 async function loadOpenMeetings() {
   const result = await query(
     `SELECT id, user_id, organization_id, status, bot_status, auto_analyze,
-            meeting_platform, native_meeting_id, external_meeting_id,
-            updated_at, created_at,
+             meeting_platform, native_meeting_id, external_meeting_id,
+             updated_at, created_at, meeting_started_at,
             CASE WHEN jsonb_typeof(segments) = 'array'
                  THEN jsonb_array_length(segments) ELSE 0 END AS segment_count
        FROM transcriptions
       WHERE source = 'vexa'
-        AND status IN ('pending', 'processing')
+         AND status IN ('pending', 'processing')
+         AND budget_stop_state = 'none'
         AND updated_at < NOW() - ($1 || ' minutes')::interval
       ORDER BY updated_at ASC
       LIMIT $2`,
@@ -81,7 +83,7 @@ async function rejectNeverAdmitted(row) {
   const locked = await query(
     `UPDATE transcriptions SET status = 'error', bot_status = 'rejected',
                                error = $1, updated_at = NOW()
-      WHERE id = $2 AND status IN ('pending','processing')
+      WHERE id = $2 AND status IN ('pending','processing') AND budget_stop_state = 'none'
       RETURNING id`,
     [errorMessage.slice(0, 500), row.id],
   );
@@ -118,7 +120,7 @@ async function reconcileOne(row) {
       `UPDATE transcriptions SET status = 'error', bot_status = 'failed',
                                  error = 'Reconcile-Timeout (kein Webhook eingegangen)',
                                  updated_at = NOW()
-        WHERE id = $1 AND status IN ('pending','processing')`,
+        WHERE id = $1 AND status IN ('pending','processing') AND budget_stop_state = 'none'`,
       [row.id],
     );
     await addTranscriptionEvent({
@@ -172,21 +174,56 @@ async function reconcileOne(row) {
     }
     if (segments.length > 0) {
       const mappedLive = mapVexaTranscriptToGhostTyper(transcript);
-      await query(
+      const synced = await query(
         `UPDATE transcriptions
             SET segments = $1::jsonb,
                 speakers = $2::jsonb,
                 text = $3,
                 updated_at = NOW()
-          WHERE id = $4 AND status IN ('pending','processing')`,
+          WHERE id = $4 AND status IN ('pending','processing') AND budget_stop_state = 'none'
+          RETURNING id`,
         [JSON.stringify(mappedLive.segments), JSON.stringify(mappedLive.speakers), mappedLive.text, row.id],
       );
+      if (synced.rowCount === 0) return { id: row.id, action: 'budget_stopped' };
+    }
+    try {
+      await checkpointVexaMeetingSpend({
+        transcript,
+        transcriptionId: row.id,
+        organizationId: row.organization_id,
+        userId: row.user_id,
+        meetingStartedAt: row.meeting_started_at,
+        ongoing: true,
+        baseUrl: integration.config.baseUrl,
+        apiKey,
+        platform: row.meeting_platform,
+        nativeMeetingId: row.native_meeting_id,
+      });
+    } catch (error) {
+      if (isVexaBudgetSafetyError(error)) {
+        return { id: row.id, action: 'budget_stop_requested' };
+      }
+      throw error;
     }
     // Bridge recovery: this row is genuinely still running, so if the
     // in-process bridge died (deploy/restart mid-meeting) re-attach it.
     // Idempotent — isBridgeActive guards a live bridge on the same instance.
     if (!isBridgeActive(row.id)) {
-      startBridgeForTranscription(row.id);
+      const runnable = await query(
+        `SELECT 1 FROM transcriptions
+          WHERE id = $1 AND status IN ('pending','processing') AND budget_stop_state = 'none'`,
+        [row.id],
+      );
+      if (!runnable.rowCount) return { id: row.id, action: 'budget_stopped' };
+      startBridgeForTranscription(row.id, {
+        source: 'vexa',
+        userId: row.user_id,
+        organizationId: row.organization_id,
+        baseUrl: integration.config.baseUrl,
+        apiKey,
+        platform: row.meeting_platform,
+        nativeMeetingId: row.native_meeting_id,
+      });
     }
     return { id: row.id, action: 'still_running' };
   }
@@ -196,7 +233,7 @@ async function reconcileOne(row) {
       `UPDATE transcriptions SET status = 'error', bot_status = 'failed',
                                  error = 'Vexa meldet failed (Reconcile)',
                                  updated_at = NOW()
-        WHERE id = $1 AND status IN ('pending','processing')`,
+        WHERE id = $1 AND status IN ('pending','processing') AND budget_stop_state = 'none'`,
       [row.id],
     );
     await addTranscriptionEvent({
@@ -210,6 +247,26 @@ async function reconcileOne(row) {
   }
 
   const mapped = mapVexaTranscriptToGhostTyper(transcript);
+  try {
+    await checkpointVexaMeetingSpend({
+      transcript,
+      transcriptionId: row.id,
+      organizationId: row.organization_id,
+      userId: row.user_id,
+      meetingStartedAt: row.meeting_started_at,
+      ongoing: false,
+      final: true,
+      baseUrl: integration.config.baseUrl,
+      apiKey,
+      platform: row.meeting_platform,
+      nativeMeetingId: row.native_meeting_id,
+    });
+  } catch (error) {
+    if (isVexaBudgetSafetyError(error)) {
+      return { id: row.id, action: 'budget_stop_requested' };
+    }
+    throw error;
+  }
   const lock = await query(
     `UPDATE transcriptions
         SET status = 'transcribed',
@@ -219,7 +276,7 @@ async function reconcileOne(row) {
             speakers = $3::jsonb,
             meeting_ended_at = COALESCE(meeting_ended_at, NOW()),
             updated_at = NOW()
-      WHERE id = $4 AND status IN ('pending','processing')
+      WHERE id = $4 AND status IN ('pending','processing') AND budget_stop_state = 'none'
       RETURNING id`,
     [mapped.text, JSON.stringify(mapped.segments), JSON.stringify(mapped.speakers), row.id],
   );
@@ -235,22 +292,10 @@ async function reconcileOne(row) {
     meta: { segments: mapped.segments.length, speakers: mapped.speakers.length },
   });
 
-  const lastSegment = mapped.segments.length ? mapped.segments[mapped.segments.length - 1] : null;
-  const seconds = lastSegment ? Math.max(0, Math.ceil(lastSegment.end || 0)) : 0;
-  if (seconds > 0) {
-    await logUsage(
-      row.user_id,
-      'whisper-large-v3',
-      'meeting_transcription',
-      { input_tokens: seconds, output_tokens: 0 },
-      row.organization_id,
-    );
-  }
-
   if (row.auto_analyze) {
     const analyzeLock = await query(
       `UPDATE transcriptions SET status = 'analyzing', updated_at = NOW()
-        WHERE id = $1 AND status = 'transcribed' RETURNING id`,
+        WHERE id = $1 AND status = 'transcribed' AND budget_stop_state = 'none' RETURNING id`,
       [row.id],
     );
     if (analyzeLock.rowCount > 0) {

@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from '../lib/i18n';
 import { useWakeLock } from '../lib/use-wake-lock';
+import { Check, Mic, Pause, Play, RotateCcw, SlidersHorizontal, Square } from 'lucide-react';
+import { Button } from './ui/button';
 
 export default function AudioRecorder({ onRecordingComplete }) {
   const t = useTranslations('components.audioRecorder');
@@ -435,21 +437,25 @@ export default function AudioRecorder({ onRecordingComplete }) {
             className="w-full"
           />
         </div>
-        <div className="flex gap-3">
-          <button
+        <div className="flex flex-wrap gap-3">
+          <Button
             type="button"
             onClick={handleDiscard}
-            className="flex-1 border border-emphasis text-secondary py-2 rounded-full text-sm font-medium hover:bg-hover transition-colors"
+            variant="outline"
+            className="flex-1"
           >
+            <RotateCcw className="w-4 h-4" aria-hidden="true" />
             {t('rerecord')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={handleUseRecording}
-            className="flex-1 gradient-accent text-white py-2 rounded-full text-sm font-medium transition-colors"
+            variant="primary"
+            className="flex-1"
           >
+            <Check className="w-4 h-4" aria-hidden="true" />
             {t('uploadRecording')}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -458,7 +464,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm text-center">
+        <div role="alert" className="border border-danger/30 text-danger px-4 py-3 rounded-lg text-sm text-center">
           {error}
         </div>
       )}
@@ -473,7 +479,7 @@ export default function AudioRecorder({ onRecordingComplete }) {
               className="mb-6 w-full max-w-[300px] h-[80px] bg-hover-subtle border border-subtle rounded-xl"
             />
             <div className="w-full max-w-[300px] mb-4">
-              <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-secondary mb-1">
+              <div className="flex items-center justify-between text-xs text-secondary mb-1">
                 <span>{t('level')}</span>
                 <span>{inputLevel}%</span>
               </div>
@@ -500,10 +506,8 @@ export default function AudioRecorder({ onRecordingComplete }) {
             </div>
           </div>
         ) : (
-          <div className="w-20 h-20 rounded-full bg-accent/20 mb-4 flex items-center justify-center">
-            <svg className="w-10 h-10 text-accent" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
-            </svg>
+          <div className="w-14 h-14 rounded-xl bg-accent/10 text-accent-ink mb-4 flex items-center justify-center">
+            <Mic className="w-7 h-7" aria-hidden="true" />
           </div>
         )}
 
@@ -511,50 +515,55 @@ export default function AudioRecorder({ onRecordingComplete }) {
           {formatDuration(duration)}
         </p>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           {!isRecording ? (
-            <button
+            <Button
               type="button"
               onClick={startRecording}
-              className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors shadow-lg shadow-accent/20 hover:scale-105 transform active:scale-95"
+              variant="primary"
             >
+              <Mic className="w-4 h-4" aria-hidden="true" />
               {t('start')}
-            </button>
+            </Button>
           ) : (
             <>
               {isPaused ? (
-                <button
+                <Button
                   type="button"
                   onClick={resumeRecording}
-                  className="border border-emphasis text-secondary px-6 py-2.5 rounded-full text-sm font-medium hover:bg-hover transition-colors"
+                  variant="outline"
                 >
+                  <Play className="w-4 h-4" aria-hidden="true" />
                   {t('resume')}
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
                   type="button"
                   onClick={pauseRecording}
-                  className="border border-emphasis text-secondary px-6 py-2.5 rounded-full text-sm font-medium hover:bg-hover transition-colors"
+                  variant="outline"
                 >
+                  <Pause className="w-4 h-4" aria-hidden="true" />
                   {t('pause')}
-                </button>
+                </Button>
               )}
-              <button
+              <Button
                 type="button"
                 onClick={calibrateInputLevel}
                 disabled={isPaused || isCalibrating || visualizerUnavailable}
-                className="border border-emphasis text-secondary px-4 py-2.5 rounded-full text-sm font-medium hover:bg-hover transition-colors disabled:opacity-40"
+                variant="ghost"
                 title={t('calibrationHint')}
               >
+                <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
                 {isCalibrating ? t('calibrationActive') : t('calibrationStart')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={stopRecording}
-                className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors shadow-lg hover:shadow-accent/20 hover:scale-105 transform active:scale-95"
+                variant="destructive-solid"
               >
+                <Square className="w-4 h-4" aria-hidden="true" />
                 {t('stop')}
-              </button>
+              </Button>
             </>
           )}
         </div>

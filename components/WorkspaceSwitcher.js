@@ -122,7 +122,7 @@ export default function WorkspaceSwitcher({ className = '' }) {
                   event.preventDefault();
                   handleSelect(item.id);
                 }}
-                className={cn('flex items-center gap-2', isActive && 'text-accent')}
+                className={cn('flex items-center gap-2', isActive && 'text-accent-ink')}
               >
                 <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <div className="flex flex-col flex-1 min-w-0">
@@ -131,7 +131,7 @@ export default function WorkspaceSwitcher({ className = '' }) {
                     {item.role}
                   </span>
                 </div>
-                {isActive && <Check className="w-4 h-4 text-accent" aria-hidden="true" />}
+                {isActive && <Check className="w-4 h-4 text-accent-ink" aria-hidden="true" />}
               </DropdownMenuItem>
             );
           })}
@@ -143,7 +143,7 @@ export default function WorkspaceSwitcher({ className = '' }) {
                   event.preventDefault();
                   setCreateOpen(true);
                 }}
-                className="flex items-center gap-2 text-accent"
+                className="flex items-center gap-2 text-accent-ink"
               >
                 <Plus className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span className="text-sm">Neuer Workspace</span>
@@ -198,7 +198,7 @@ export default function WorkspaceSwitcher({ className = '' }) {
               <button
                 type="submit"
                 disabled={creating || !createName.trim()}
-                className="px-4 py-2 rounded-xl text-sm bg-accent text-white hover:bg-accent/90 disabled:opacity-50 inline-flex items-center gap-2"
+                className="px-4 py-2 rounded-xl text-sm bg-accent-strong text-white hover:bg-accent/90 disabled:opacity-50 inline-flex items-center gap-2"
               >
                 {creating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 Anlegen
