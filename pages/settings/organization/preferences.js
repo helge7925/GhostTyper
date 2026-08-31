@@ -9,6 +9,7 @@ import { Button } from '../../../components/ui/button';
 import { useCurrentOrg } from '../../../lib/use-current-org';
 import { usePermission } from '../../../lib/use-permission';
 import { useTranslations } from '../../../lib/i18n';
+import ConfirmDialog from '../../../components/ConfirmDialog';
 
 function NumberField({ id, label, hint, value, onChange, suffix = null, min = 0, step = 1, disabled = false }) {
   return (
@@ -63,10 +64,9 @@ export default function OrgPreferencesPage() {
   const [saving, setSaving] = useState(false);
   const [defaultLanguage, setDefaultLanguage] = useState('');
   const [retentionDays, setRetentionDays] = useState(null);
-  const [costLimitEuros, setCostLimitEuros] = useState(null);
-  const [memberMonthlyBudgetEuros, setMemberMonthlyBudgetEuros] = useState(null);
   const [auditRetentionDays, setAuditRetentionDays] = useState(null);
   const [contextBias, setContextBias] = useState('');
+  const [confirmSave, setConfirmSave] = useState(false);
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
@@ -85,12 +85,6 @@ export default function OrgPreferencesPage() {
         const s = payload.settings || {};
         setDefaultLanguage(s.default_language || '');
         setRetentionDays(s.retention_days ?? null);
-        setCostLimitEuros(s.cost_limit_cents != null ? s.cost_limit_cents / 100 : null);
-        setMemberMonthlyBudgetEuros(
-          s.member_monthly_budget_limit_cents != null
-            ? s.member_monthly_budget_limit_cents / 100
-            : null,
-        );
         setAuditRetentionDays(s.audit_retention_days ?? null);
         setContextBias(s.context_bias || '');
       })
@@ -103,8 +97,7 @@ export default function OrgPreferencesPage() {
     };
   }, [org]);
 
-  const handleSave = async (event) => {
-    event.preventDefault();
+  const performSave = async (reason) => {
     if (!canEdit) return;
     setSaving(true);
     try {
@@ -114,11 +107,9 @@ export default function OrgPreferencesPage() {
         body: JSON.stringify({
           defaultLanguage: defaultLanguage || null,
           retentionDays,
-          costLimitCents: costLimitEuros != null ? Math.round(costLimitEuros * 100) : null,
-          memberMonthlyBudgetLimitCents:
-            memberMonthlyBudgetEuros != null ? Math.round(memberMonthlyBudgetEuros * 100) : null,
           auditRetentionDays,
           contextBias,
+          reason,
         }),
       });
       if (!response.ok) {
@@ -131,7 +122,13 @@ export default function OrgPreferencesPage() {
       toast.error(error?.message || tErrors('connection'));
     } finally {
       setSaving(false);
+      setConfirmSave(false);
     }
+  };
+
+  const handleSave = (event) => {
+    event.preventDefault();
+    if (canEdit) setConfirmSave(true);
   };
 
   if (authStatus === 'loading' || orgLoading || loading) {
@@ -209,30 +206,6 @@ export default function OrgPreferencesPage() {
             />
 
             <NumberField
-              id="cost-limit"
-              label={tPref('costLimit')}
-              hint={tPref('costLimitHint')}
-              value={costLimitEuros}
-              onChange={setCostLimitEuros}
-              suffix="€"
-              min={0}
-              step={0.01}
-              disabled={!canEdit}
-            />
-
-            <NumberField
-              id="member-budget"
-              label={tPref('memberBudget')}
-              hint={tPref('memberBudgetHint')}
-              value={memberMonthlyBudgetEuros}
-              onChange={setMemberMonthlyBudgetEuros}
-              suffix="€"
-              min={0}
-              step={0.01}
-              disabled={!canEdit}
-            />
-
-            <NumberField
               id="audit-retention"
               label={tPref('auditRetention')}
               hint={tPref('auditRetentionHint')}
@@ -269,6 +242,16 @@ export default function OrgPreferencesPage() {
           )}
         </form>
       </main>
+      <ConfirmDialog
+        open={confirmSave}
+        title={tPref('title')}
+        message={tPref('saveReasonMessage')}
+        confirmLabel={tCommon('save')}
+        busy={saving}
+        reasonRequired
+        onConfirm={performSave}
+        onCancel={() => setConfirmSave(false)}
+      />
     </>
   );
 }

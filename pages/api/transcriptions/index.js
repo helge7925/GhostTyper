@@ -26,7 +26,8 @@ async function handler(req, res) {
         const { search, scope, limit, offset } = parseTranscriptionsListParams(req.query || {});
         const useFullSearch = scope === 'full' && search.length >= 3;
 
-        let sql = `SELECT id, original_name, status, template, mime_type, folder_id, is_favorite, created_at, updated_at
+        let sql = `SELECT id, original_name, status, template, mime_type, folder_id, is_favorite,
+                          budget_stop_state, cancel_reason, created_at, updated_at
                    FROM transcriptions
                    WHERE organization_id = $1`;
         const params = [orgId];

@@ -45,10 +45,12 @@ export default function BottomNav() {
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'flex flex-col items-center justify-center gap-0.5 h-full text-[10px] font-medium transition-colors',
-                  isActive ? 'text-accent' : 'text-secondary hover:text-primary',
+                  isActive ? 'text-primary' : 'text-secondary hover:text-primary',
                 )}
               >
-                <Icon className="w-5 h-5" aria-hidden="true" />
+                {/* Icon carries the accent tint (3:1 floor); label stays on
+                    --primary since 10px text needs the 4.5:1 floor. */}
+                <Icon className={cn('w-5 h-5', isActive && 'text-accent-ink')} aria-hidden="true" />
                 <span>{t(labelKey)}</span>
               </Link>
             </li>

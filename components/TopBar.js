@@ -23,6 +23,7 @@ import {
 import ThemeToggle from './ThemeToggle';
 import LocaleSwitcher from './LocaleSwitcher';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
+import { Button } from './ui/button';
 import { useUIStore } from '../lib/store/ui-store';
 import { useTranslations } from '../lib/i18n';
 
@@ -50,7 +51,7 @@ function ProfileMenu({ session }) {
               className="w-8 h-8 rounded-full object-cover border border-subtle"
             />
           ) : (
-            <span className="w-8 h-8 rounded-full gradient-accent flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-accent/20">
+            <span className="w-8 h-8 rounded-full gradient-accent flex items-center justify-center text-xs font-bold text-white">
               {initials}
             </span>
           )}
@@ -141,19 +142,21 @@ export default function TopBar() {
       role="banner"
     >
       {/* Left: Hamburger (mobile/tablet) | Sidebar collapse toggle (desktop) */}
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={openSidebar}
-        className="xl:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg text-secondary hover:text-primary hover:bg-hover-subtle transition-colors"
+        className="xl:hidden w-10 h-10 rounded-lg"
         aria-label={tBar('openSidebar')}
       >
         <Menu className="w-5 h-5" aria-hidden="true" />
-      </button>
+      </Button>
 
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={toggleSidebarCollapsed}
-        className="hidden xl:inline-flex items-center justify-center w-10 h-10 rounded-lg text-secondary hover:text-primary hover:bg-hover-subtle transition-colors"
+        className="hidden xl:inline-flex w-10 h-10 rounded-lg"
         aria-label={sidebarCollapsed ? tBar('expandSidebar') : tBar('collapseSidebar')}
       >
         {sidebarCollapsed ? (
@@ -161,7 +164,7 @@ export default function TopBar() {
         ) : (
           <ChevronsLeft className="w-5 h-5" aria-hidden="true" />
         )}
-      </button>
+      </Button>
 
       {/* Logo (mobile only — tablet has WorkspaceSwitcher there, desktop has logo in the persistent sidebar) */}
       <Link href="/" className="md:hidden flex items-center gap-2 min-w-0">
@@ -176,10 +179,11 @@ export default function TopBar() {
       </div>
 
       {/* Center: Command palette trigger (tablet+ only — mobile gets icon-only) */}
-      <button
+      <Button
         type="button"
+        variant="outline"
         onClick={openCommandPalette}
-        className="hidden md:inline-flex flex-1 items-center gap-2 max-w-md mx-auto h-9 rounded-xl border border-subtle bg-surface px-3 text-sm text-secondary hover:text-primary hover:bg-hover-subtle transition-colors"
+        className="hidden md:inline-flex flex-1 justify-start gap-2 max-w-md mx-auto h-9 rounded-xl px-3 text-sm font-normal"
         aria-label={tBar('openSearch')}
       >
         <Search className="w-4 h-4" aria-hidden="true" />
@@ -187,19 +191,20 @@ export default function TopBar() {
         <kbd className="text-[10px] font-semibold tracking-wider text-secondary border border-subtle rounded px-1.5 py-0.5">
           {shortcutKey} K
         </kbd>
-      </button>
+      </Button>
 
       <div className="flex-1 md:hidden" />
 
       {/* Right: Mobile search icon, locale, theme toggle, profile menu */}
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={openCommandPalette}
-        className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg text-secondary hover:text-primary hover:bg-hover-subtle transition-colors"
+        className="md:hidden w-10 h-10 rounded-lg"
         aria-label={tBar('openSearch')}
       >
         <Search className="w-5 h-5" aria-hidden="true" />
-      </button>
+      </Button>
 
       <LocaleSwitcher />
       <ThemeToggle compact />

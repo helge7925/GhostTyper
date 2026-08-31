@@ -31,7 +31,8 @@
       2-col datasheet, table-heavy manual, scanned PDF (fallback),
       long→short (de→en) and short→long (en→de).
 - [x] Docs + CHANGELOG.
-- [ ] Mirror spec in romaco-scriptor (after stabilization).
+- [x] Mirror spec in romaco-scriptor (verified in the sibling checkout;
+      fork port tasks and implementation are present).
 
 ## Open points / phase-2
 - Strip original text objects under the white-out (confidentiality).

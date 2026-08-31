@@ -215,7 +215,7 @@ export default function GlossaryPanel({ showToast, confirm, defaultTranslateLang
             type="button"
             onClick={() => triggerGlossaryImport(scope)}
             disabled={glossaryIoBusy === `${scope}:import`}
-            className="px-2.5 py-2 rounded-xl border border-subtle text-xs text-accent hover:border-accent/40 disabled:opacity-40"
+            className="px-2.5 py-2 rounded-xl border border-subtle text-xs text-accent-ink hover:border-accent/40 disabled:opacity-40"
             title={t('io.import')}
           >
             {glossaryIoBusy === `${scope}:import` ? '...' : t('io.import')}
@@ -346,7 +346,7 @@ export default function GlossaryPanel({ showToast, confirm, defaultTranslateLang
                       <button
                         type="button"
                         onClick={() => editGlossaryEntry(entry, scope)}
-                        className="text-xs font-bold text-accent uppercase"
+                        className="text-xs font-bold text-accent-ink uppercase"
                       >
                         {t('edit')}
                       </button>
@@ -402,7 +402,7 @@ export default function GlossaryPanel({ showToast, confirm, defaultTranslateLang
               <button
                 type="button"
                 onClick={() => resetGlossaryEditor('personal')}
-                className="px-3 py-2 rounded-xl border border-subtle text-xs text-accent hover:border-accent/40"
+                className="px-3 py-2 rounded-xl border border-subtle text-xs text-accent-ink hover:border-accent/40"
               >
                 {t('addEntry')}
               </button>
@@ -437,7 +437,7 @@ export default function GlossaryPanel({ showToast, confirm, defaultTranslateLang
                 <button
                   type="button"
                   onClick={() => resetGlossaryEditor('workspace')}
-                  className="px-3 py-2 rounded-xl border border-subtle text-xs text-accent hover:border-accent/40"
+                  className="px-3 py-2 rounded-xl border border-subtle text-xs text-accent-ink hover:border-accent/40"
                 >
                   {t('addEntry')}
                 </button>
@@ -563,7 +563,7 @@ export default function GlossaryPanel({ showToast, confirm, defaultTranslateLang
             <button
               type="button"
               onClick={() => switchGlossaryScope('personal')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${editorScope === 'personal' ? 'border-accent bg-accent/10 text-accent' : 'border-subtle text-secondary hover:text-primary'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${editorScope === 'personal' ? 'border-accent bg-accent/10 text-accent-ink' : 'border-subtle text-secondary hover:text-primary'}`}
             >
               {t('scopePersonal')}
             </button>
@@ -572,7 +572,7 @@ export default function GlossaryPanel({ showToast, confirm, defaultTranslateLang
               onClick={() => switchGlossaryScope('workspace')}
               disabled={!canManageGlossary}
               title={!canManageGlossary ? t('workspaceLocked') : undefined}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-40 ${editorScope === 'workspace' ? 'border-accent bg-accent/10 text-accent' : 'border-subtle text-secondary hover:text-primary'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-40 ${editorScope === 'workspace' ? 'border-accent bg-accent/10 text-accent-ink' : 'border-subtle text-secondary hover:text-primary'}`}
             >
               {t('scopeWorkspace')}
             </button>

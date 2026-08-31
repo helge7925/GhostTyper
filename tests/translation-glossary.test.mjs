@@ -2,11 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   aggregateSegmentMetadata,
+  buildTMContextPromptBlock,
   buildGlossaryPromptBlock,
   describeGlossaryApplication,
   getGlossaryForPair,
   hashSource,
   lookupTM,
+  lookupTMMatch,
+  lookupTMMatchesBatch,
   lookupTMBatch,
   normalizeForHash,
   protectDoNotTranslate,
@@ -20,6 +23,7 @@ import {
   translateTextWithGlossaryGuard,
   upsertVerifiedTM,
 } from '../lib/translation-glossary.js';
+import { buildBilingualHtml, normalizeBilingualExportInput } from '../lib/bilingual-export.js';
 import { normalizeGlossaryPayload } from '../lib/translation-glossary-validation.js';
 
 test('buildGlossaryPromptBlock returns empty string for empty glossary', () => {
@@ -98,6 +102,13 @@ test('protectDoNotTranslate and restore round-trip when terms are absent', () =>
 test('hashSource normalizes case and whitespace', () => {
   assert.equal(normalizeForHash('  Hallo   WELT\n'), 'hallo welt');
   assert.equal(hashSource('Hallo Welt'), hashSource('  hallo\nwelt  '));
+});
+
+test('TM normalization canonicalizes Unicode to NFC', () => {
+  const composed = 'Qualität für Café';
+  const decomposed = 'Qualita\u0308t fu\u0308r Cafe\u0301';
+  assert.equal(normalizeForHash(decomposed), normalizeForHash(composed));
+  assert.equal(hashSource(decomposed), hashSource(composed));
 });
 
 test('lookupTM finds exact normalized hash with injected query store', async () => {
@@ -268,8 +279,10 @@ test('storeTM upserts with normalized hash using injected query store', async ()
     assert.equal(params[1], 'de');
     assert.equal(params[2], 'en');
     assert.equal(params[3], hashSource('Hello world'));
-    assert.equal(params[4], 'Hello world');
-    assert.equal(params[5], 'Hallo Welt');
+    assert.equal(params[4], normalizeForHash('Hello world'));
+    assert.equal(params[5], 'Hello world');
+    assert.equal(params[6], 'Hallo Welt');
+    assert.match(sql, /WHERE translation_memory\.verified = false/);
     return { rows: [] };
   };
   assert.equal(await storeTM(7, 'de', 'en', 'Hello world', 'Hallo Welt', fakeQuery), true);
@@ -290,6 +303,16 @@ test('storeTM supports auto source language and skips empty text', async () => {
     throw new Error('query should not be called');
   };
   assert.equal(await storeTM(7, 'de', 'en', ' ', 'Hallo', fakeQuery), false);
+});
+
+test('automatic storeTM cannot overwrite a verified entry', async () => {
+  let capturedSql = '';
+  await storeTM(7, 'de', 'en', 'Verifizierte Quelle', 'Automatisches Ziel', async (sql) => {
+    capturedSql = sql;
+    return { rows: [] };
+  });
+  assert.match(capturedSql, /ON CONFLICT/);
+  assert.match(capturedSql, /WHERE translation_memory\.verified = false/);
 });
 
 // ---------------------------------------------------------------------------
@@ -360,6 +383,368 @@ test('lookupTMBatch prefers the verified row per hash and bumps only the winners
   assert.deepEqual([...updateCalls[0]].sort((a, b) => a - b), [10, 20]);
 });
 
+test('structured TM lookup gives exact matches precedence without running fuzzy search', async () => {
+  const source = 'Die Verpackungsmaschine läuft heute stabil.';
+  let fuzzyQueries = 0;
+  const fakeQuery = async (sql, params) => {
+    if (/UPDATE translation_memory/.test(sql)) return { rows: [] };
+    if (/similarity\(/.test(sql)) {
+      fuzzyQueries += 1;
+      return { rows: [] };
+    }
+    assert.deepEqual(params.slice(0, 3), [11, 'de', 'en']);
+    return {
+      rows: [{
+        id: 1,
+        source_hash: hashSource(source),
+        source_normalized: normalizeForHash(source),
+        source_text: source,
+        target_text: 'The packaging machine is running reliably today.',
+        verified: false,
+      }],
+    };
+  };
+  const match = await lookupTMMatch(11, 'German', 'English', source, fakeQuery);
+  assert.equal(match.type, 'exact');
+  assert.equal(match.score, 1);
+  assert.equal(match.autoReusable, true);
+  assert.equal(fuzzyQueries, 0);
+});
+
+test('auto source language keeps exact matches but disables fuzzy lookup', async () => {
+  const exactSource = 'Exact source stored under automatic detection.';
+  let fuzzyQueries = 0;
+  const fakeQuery = async (sql) => {
+    if (/UPDATE translation_memory/.test(sql)) return { rows: [] };
+    if (/similarity\(/.test(sql)) {
+      fuzzyQueries += 1;
+      return { rows: [] };
+    }
+    return {
+      rows: [{
+        id: 19,
+        source_hash: hashSource(exactSource),
+        source_normalized: normalizeForHash(exactSource),
+        source_text: exactSource,
+        target_text: 'Exact automatic-language target.',
+        verified: true,
+      }],
+    };
+  };
+
+  const matches = await lookupTMMatchesBatch(
+    11,
+    'auto',
+    'English',
+    [exactSource, 'A similar but language-unknown source must not be reused fuzzily.'],
+    fakeQuery,
+  );
+  assert.equal(matches[0].type, 'exact');
+  assert.equal(matches[1], null);
+  assert.equal(fuzzyQueries, 0);
+});
+
+test('automatic fuzzy reuse requires a verified high-confidence candidate', async () => {
+  const source = 'The packaging machine is running reliably during the qualification batch.';
+  const run = async (verified) => lookupTMMatch(3, 'en', 'de', source, async (sql) => {
+    if (/UPDATE translation_memory/.test(sql)) return { rows: [] };
+    if (!/similarity\(/.test(sql)) return { rows: [] };
+    return {
+      rows: [{
+        input_index: 1,
+        id: verified ? 20 : 21,
+        source_text: 'The packaging machine is running reliably in the qualification batch.',
+        target_text: 'Die Verpackungsmaschine läuft im Qualifizierungslauf zuverlässig.',
+        verified,
+        score: 0.96,
+      }],
+    };
+  });
+
+  assert.equal((await run(false)).autoReusable, false);
+  assert.equal((await run(true)).autoReusable, true);
+});
+
+test('short strings never receive automatic fuzzy substitution', async () => {
+  const fakeQuery = async (sql) => {
+    if (/UPDATE translation_memory/.test(sql)) return { rows: [] };
+    if (!/similarity\(/.test(sql)) return { rows: [] };
+    return {
+      rows: [{
+        input_index: 1,
+        id: 31,
+        source_text: 'Batch ID',
+        target_text: 'Chargen-ID',
+        verified: true,
+        score: 0.99,
+      }],
+    };
+  };
+  const match = await lookupTMMatch(3, 'en', 'de', 'Batch No', fakeQuery);
+  assert.equal(match.type, 'fuzzy');
+  assert.equal(match.autoReusable, false);
+});
+
+test('structured batch lookup is aligned and keeps org/language isolation in both queries', async () => {
+  const texts = [
+    'Exact source segment for the current workspace.',
+    'Near identical sufficiently long source segment for batch lookup.',
+  ];
+  const calls = [];
+  const fakeQuery = async (sql, params) => {
+    if (/UPDATE translation_memory/.test(sql)) return { rows: [] };
+    calls.push({ sql, params });
+    if (/similarity\(/.test(sql)) {
+      return {
+        rows: [{
+          input_index: 1,
+          id: 42,
+          source_text: 'Near-identical sufficiently long source segment for batch lookup.',
+          target_text: 'Fuzzy target',
+          verified: true,
+          score: 0.95,
+        }],
+      };
+    }
+    return {
+      rows: [{
+        id: 41,
+        source_hash: hashSource(texts[0]),
+        source_normalized: normalizeForHash(texts[0]),
+        source_text: texts[0],
+        target_text: 'Exact target',
+        verified: false,
+      }],
+    };
+  };
+  const matches = await lookupTMMatchesBatch(77, 'DE', 'EN', texts, fakeQuery);
+  assert.deepEqual(matches.map((match) => match.type), ['exact', 'fuzzy']);
+  assert.deepEqual(matches.map((match) => match.targetText), ['Exact target', 'Fuzzy target']);
+  assert.equal(calls.length, 2);
+  for (const call of calls) assert.deepEqual(call.params.slice(0, 3), [77, 'de', 'en']);
+  assert.match(calls[1].sql, /ORDER BY score DESC, tm\.verified DESC/);
+});
+
+test('a relevant personal glossary rule blocks fuzzy auto-reuse but keeps context', async () => {
+  const source = 'The Granulator remains stable throughout the complete production batch.';
+  const glossary = {
+    entries: [{ source_term: 'Granulator', target_term: 'my grinder', tier: 'personal' }],
+    doNotTranslate: [],
+    personalTerms: ['Granulator'],
+  };
+  const fakeQuery = async (sql) => {
+    if (/UPDATE translation_memory/.test(sql)) return { rows: [] };
+    if (!/similarity\(/.test(sql)) return { rows: [] };
+    return {
+      rows: [{
+        input_index: 1,
+        id: 51,
+        source_text: 'The Granulator remains stable throughout the full production batch.',
+        target_text: 'Der Granulator bleibt während der gesamten Produktionscharge stabil.',
+        verified: true,
+        score: 0.97,
+      }],
+    };
+  };
+  const match = await lookupTMMatch(2, 'en', 'de', source, { glossary, queryFn: fakeQuery });
+  assert.equal(match.personalGlossaryBlocked, true);
+  assert.equal(match.autoReusable, false);
+  assert.match(buildTMContextPromptBlock([match]), /context only/);
+});
+
+test('an unavailable personal glossary blocks fuzzy reuse without hiding the candidate', async () => {
+  const source = 'The packaging machine remains stable throughout the complete production batch.';
+  const fakeQuery = async (sql) => {
+    if (/UPDATE translation_memory/.test(sql)) return { rows: [] };
+    if (!/similarity\(/.test(sql)) return { rows: [] };
+    return {
+      rows: [{
+        input_index: 1,
+        id: 52,
+        source_text: 'The packaging machine remains stable throughout the full production batch.',
+        target_text: 'Die Verpackungsmaschine bleibt während der gesamten Produktionscharge stabil.',
+        verified: true,
+        score: 0.98,
+      }],
+    };
+  };
+  const glossary = {
+    entries: [], doNotTranslate: [], personalTerms: [], personalGlossaryUnavailable: true,
+  };
+  const match = await lookupTMMatch(2, 'en', 'de', source, { glossary, queryFn: fakeQuery });
+  assert.equal(match.type, 'fuzzy');
+  assert.equal(match.personalGlossaryUnavailableBlocked, true);
+  assert.equal(match.autoReusable, false);
+  assert.match(buildTMContextPromptBlock([match]), /context only/);
+});
+
+test('personal glossary unavailability does not change exact-match reuse', async () => {
+  const source = 'Exact source remains exact.';
+  const fakeQuery = async (sql) => {
+    if (/UPDATE translation_memory/.test(sql)) return { rows: [] };
+    return {
+      rows: [{
+        id: 53,
+        source_hash: hashSource(source),
+        source_normalized: normalizeForHash(source),
+        source_text: source,
+        target_text: 'Exact target remains exact.',
+        verified: false,
+      }],
+    };
+  };
+  const glossary = {
+    entries: [], doNotTranslate: [], personalTerms: [], personalGlossaryUnavailable: true,
+  };
+  const match = await lookupTMMatch(2, 'en', 'de', source, { glossary, queryFn: fakeQuery });
+  assert.equal(match.type, 'exact');
+  assert.equal(match.autoReusable, true);
+});
+
+test('critical numeric, unit, and identifier changes block high-scoring fuzzy reuse', async () => {
+  const fixtures = [
+    {
+      source: 'The RX-500 maximum operating pressure is 10 bar during the qualification run.',
+      candidate: 'The RX-500 maximum operating pressure is 12 bar during the qualification run.',
+    },
+    {
+      source: 'The RX-500 maximum operating pressure is 10 bar during the qualification run.',
+      candidate: 'The RX-500 maximum operating pressure is 10 psi during the qualification run.',
+    },
+    {
+      source: 'The RX-500 packaging machine remains stable throughout the qualification run.',
+      candidate: 'The RX-600 packaging machine remains stable throughout the qualification run.',
+    },
+  ];
+  for (const [index, fixture] of fixtures.entries()) {
+    const match = await lookupTMMatch(2, 'en', 'de', fixture.source, async (sql) => {
+      if (/UPDATE translation_memory/.test(sql)) return { rows: [] };
+      if (!/similarity\(/.test(sql)) return { rows: [] };
+      return {
+        rows: [{
+          input_index: 1,
+          id: 70 + index,
+          source_text: fixture.candidate,
+          target_text: 'Unsafe stale target',
+          verified: true,
+          score: 0.99,
+        }],
+      };
+    });
+    assert.equal(match.criticalTokensMatch, false);
+    assert.equal(match.autoReusable, false);
+  }
+});
+
+test('negation changes block high-scoring fuzzy reuse across supported languages', async () => {
+  const fixtures = [
+    ['The operator must not open the guard while the packaging machine is running.',
+      'The operator must open the guard while the packaging machine is running.'],
+    ['Der Bediener darf die Schutzhaube während des Betriebs nicht öffnen.',
+      'Der Bediener darf die Schutzhaube während des Betriebs öffnen.'],
+    ['设备运行期间不得打开安全防护罩并且必须记录所有参数。',
+      '设备运行期间可以打开安全防护罩并且必须记录所有参数。'],
+    ["The operator mustn't open the guard while the packaging machine is running.",
+      'The operator must open the guard while the packaging machine is running.'],
+    ["Operators don't bypass the interlock during the complete qualification run.",
+      'Operators bypass the interlock during the complete qualification run.'],
+    ['The control system won’t start the machine while the safety guard is open.',
+      'The control system will start the machine while the safety guard is open.'],
+    ["The safety guard can't be opened while the packaging machine is running.",
+      'The safety guard can be opened while the packaging machine is running.'],
+    ["The operator needn't bypass the interlock during the qualification run.",
+      'The operator may bypass the interlock during the qualification run.'],
+    ['Der Bediener darf die Schutzhaube während des Betriebs nie öffnen.',
+      'Der Bediener darf die Schutzhaube während des Betriebs öffnen.'],
+    ['Weder der Bediener noch der Prüfer darf die laufende Maschine öffnen.',
+      'Der Bediener oder der Prüfer darf die laufende Maschine öffnen.'],
+    ['Keine Schutzhaube darf während des vollständigen Betriebs geöffnet werden.',
+      'Die Schutzhaube darf während des vollständigen Betriebs geöffnet werden.'],
+    ['设备运行期间别打开安全防护罩并且必须记录所有参数。',
+      '设备运行期间打开安全防护罩并且必须记录所有参数。'],
+    ['設備運行期間別打開安全防護罩並且必須記錄所有參數。',
+      '設備運行期間打開安全防護罩並且必須記錄所有參數。'],
+  ];
+  for (const [index, [source, candidate]] of fixtures.entries()) {
+    const match = await lookupTMMatch(2, 'de', 'en', source, async (sql) => {
+      if (/UPDATE translation_memory/.test(sql)) return { rows: [] };
+      if (!/similarity\(/.test(sql)) return { rows: [] };
+      return {
+        rows: [{
+          input_index: 1,
+          id: 80 + index,
+          source_text: candidate,
+          target_text: 'Unsafe stale target',
+          verified: true,
+          score: 0.99,
+        }],
+      };
+    });
+    assert.equal(match.negationsMatch, false);
+    assert.equal(match.autoReusable, false);
+  }
+});
+
+test('matching critical tokens and negations still allow verified fuzzy reuse', async () => {
+  const source = 'The RX-500 pressure must not exceed 10 bar during the complete qualification run.';
+  const candidate = 'The RX-500 pressure must not exceed 10 bar during the full qualification run.';
+  const match = await lookupTMMatch(2, 'en', 'de', source, async (sql) => {
+    if (/UPDATE translation_memory/.test(sql)) return { rows: [] };
+    if (!/similarity\(/.test(sql)) return { rows: [] };
+    return {
+      rows: [{
+        input_index: 1,
+        id: 90,
+        source_text: candidate,
+        target_text: 'Der Druck des RX-500 darf 10 bar nicht überschreiten.',
+        verified: true,
+        score: 0.98,
+      }],
+    };
+  });
+  assert.equal(match.criticalTokensMatch, true);
+  assert.equal(match.negationsMatch, true);
+  assert.equal(match.autoReusable, true);
+});
+
+test('verified high-confidence Chinese candidates can be reused when sufficiently long', async () => {
+  const source = '包装设备在整个确认批次期间保持稳定运行并记录所有参数。';
+  const fakeQuery = async (sql) => {
+    if (/UPDATE translation_memory/.test(sql)) return { rows: [] };
+    if (!/similarity\(/.test(sql)) return { rows: [] };
+    return {
+      rows: [{
+        input_index: 1,
+        id: 61,
+        source_text: '包装设备在整个验证批次期间保持稳定运行并记录所有参数。',
+        target_text: 'The packaging equipment runs reliably throughout the qualification batch and records all parameters.',
+        verified: true,
+        score: 0.95,
+      }],
+    };
+  };
+  assert.equal((await lookupTMMatch(2, 'zh-cn', 'en', source, fakeQuery)).autoReusable, true);
+});
+
+test('verified high-confidence German candidates can be reused when sufficiently long', async () => {
+  const source = 'Die Verpackungsmaschine läuft während des gesamten Qualifizierungslaufs stabil.';
+  const fakeQuery = async (sql) => {
+    if (/UPDATE translation_memory/.test(sql)) return { rows: [] };
+    if (!/similarity\(/.test(sql)) return { rows: [] };
+    return {
+      rows: [{
+        input_index: 1,
+        id: 62,
+        source_text: 'Die Verpackungsmaschine läuft im gesamten Qualifizierungslauf stabil.',
+        target_text: 'The packaging machine runs reliably throughout the qualification batch.',
+        verified: true,
+        score: 0.94,
+      }],
+    };
+  };
+  assert.equal((await lookupTMMatch(2, 'de', 'en', source, fakeQuery)).autoReusable, true);
+});
+
 test('upsertVerifiedTM writes verified=true with an upsert and normalized languages', async () => {
   let capturedSql = '';
   let capturedParams = null;
@@ -371,13 +756,14 @@ test('upsertVerifiedTM writes verified=true with an upsert and normalized langua
   assert.equal(await upsertVerifiedTM(7, 'German', 'English', 'Hallo Welt', 'Hello world', fakeQuery), true);
   assert.match(capturedSql, /ON CONFLICT/);
   assert.match(capturedSql, /verified = true/);
-  assert.match(capturedSql, /VALUES \(\$1, \$2, \$3, \$4, \$5, \$6, true, NOW\(\)\)/);
+  assert.match(capturedSql, /VALUES \(\$1, \$2, \$3, \$4, \$5, \$6, \$7, true, NOW\(\)\)/);
   assert.equal(capturedParams[0], 7);
   assert.equal(capturedParams[1], 'de');
   assert.equal(capturedParams[2], 'en');
   assert.equal(capturedParams[3], hashSource('Hallo Welt'));
-  assert.equal(capturedParams[4], 'Hallo Welt');
-  assert.equal(capturedParams[5], 'Hello world');
+  assert.equal(capturedParams[4], normalizeForHash('Hallo Welt'));
+  assert.equal(capturedParams[5], 'Hallo Welt');
+  assert.equal(capturedParams[6], 'Hello world');
 });
 
 test('upsertVerifiedTM rejects empty source/target without touching the store', async () => {
@@ -387,6 +773,36 @@ test('upsertVerifiedTM rejects empty source/target without touching the store', 
   assert.equal(await upsertVerifiedTM(7, 'de', 'en', '   ', 'Hello', fakeQuery), false);
   assert.equal(await upsertVerifiedTM(7, 'de', 'en', 'Hallo', '  ', fakeQuery), false);
   assert.equal(await upsertVerifiedTM(null, 'de', 'en', 'Hallo', 'Hello', fakeQuery), false);
+});
+
+test('buildBilingualHtml renders escaped side-by-side table', () => {
+  const html = buildBilingualHtml({
+    title: 'Export',
+    pairs: [{ source: '<Quelle>', target: 'Target & more' }],
+  });
+  assert.match(html, /<table>/);
+  assert.match(html, /&lt;Quelle&gt;/);
+  assert.match(html, /Target &amp; more/);
+});
+
+test('bilingual export validation rejects invalid formats, field types, and oversized content', () => {
+  assert.match(normalizeBilingualExportInput({ pairs: [{ source: 'a', target: 'b' }], format: 'docx' }).error, /Format/);
+  assert.match(normalizeBilingualExportInput({ pairs: [{ source: {}, target: 'b' }] }).error, /string/);
+  assert.match(normalizeBilingualExportInput({
+    pairs: [{ source: 'a'.repeat(120_001), target: 'b' }],
+  }).error, /too long/);
+});
+
+test('bilingual export validation applies safe defaults', () => {
+  const result = normalizeBilingualExportInput({ pairs: [{ source: '<a>', target: 'b' }] });
+  assert.equal(result.error, undefined);
+  assert.deepEqual(result.value, {
+    pairs: [{ source: '<a>', target: 'b' }],
+    format: 'html',
+    title: 'Bilingual translation',
+    sourceLabel: 'Source',
+    targetLabel: 'Target',
+  });
 });
 
 test('glossary API payload validation normalizes language codes and rejects malformed input', () => {
@@ -565,4 +981,19 @@ test('aggregateSegmentMetadata dedupes applied/masked/violations and counts retr
   assert.deepEqual(aggregated.masked.map((entry) => entry.term).sort(), ['Kilian', 'Romaco']);
   assert.deepEqual(aggregated.dntViolations, [{ term: 'Kilian' }]);
   assert.equal(aggregated.retriedSegments, 1);
+});
+
+test('aggregateSegmentMetadata surfaces exact/fuzzy hit counts and review suggestions', () => {
+  const fuzzySuggestion = {
+    type: 'fuzzy', id: 90, score: 0.81, sourceText: 'Similar source',
+    targetText: 'Similar target', verified: false, autoReusable: false,
+  };
+  const aggregated = aggregateSegmentMetadata([
+    { tmMatch: { type: 'exact', id: 1 }, tmSuggestions: [] },
+    { tmMatch: { type: 'fuzzy', id: 2 }, tmSuggestions: [] },
+    { tmMatch: null, tmSuggestions: [fuzzySuggestion] },
+  ]);
+  assert.equal(aggregated.exactTmHits, 1);
+  assert.equal(aggregated.fuzzyTmHits, 1);
+  assert.deepEqual(aggregated.tmSuggestions, [fuzzySuggestion]);
 });

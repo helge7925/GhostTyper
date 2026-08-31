@@ -35,6 +35,7 @@ module.exports = {
         accent: {
           DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
           strong: 'rgb(var(--accent-strong) / <alpha-value>)',
+          ink: 'rgb(var(--accent-ink) / <alpha-value>)',
         },
 
         // Semantic states

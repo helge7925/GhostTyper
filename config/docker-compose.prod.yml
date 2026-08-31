@@ -39,18 +39,11 @@ services:
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-https://${DOMAIN}}
       - APP_PUBLIC_URL=${APP_PUBLIC_URL:-http://transkription-webapp:3000}
-      # Operator default for the Cortecs key used by the live/Vexa
-      # transcription bridge. The admin UI in
-      # /settings/organization/integrations can override this — the bridge
-      # picks up the override via /api/internal/whisper-config.
-      # Same key the batch-transcription path uses, so a single CORTECS_API_KEY
-      # ENV is enough for both paths.
-      - CORTECS_API_KEY=${CORTECS_API_KEY:-${VEXA_TRANSCRIPTION_TOKEN:-}}
-      - CORTECS_BASE_URL=${CORTECS_BASE_URL:-https://api.cortecs.ai/v1}
-      - CORTECS_CHAT_MODEL=${CORTECS_CHAT_MODEL:-deepseek-v4-pro}
-      - CORTECS_TRANSCRIPTION_MODEL=${CORTECS_TRANSCRIPTION_MODEL:-whisper-large-v3}
-      - CORTECS_PREFERENCE=${CORTECS_PREFERENCE:-balanced}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-${VEXA_TRANSCRIPTION_TOKEN:-}}
+      # Optional operator fallback. Organization configuration and all model
+      # governance are managed in /settings/organization/integrations.
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_LIVE_TRANSCRIPTION_MODEL=${OPENROUTER_LIVE_TRANSCRIPTION_MODEL:-}
+      - OUTBOUND_ALLOWED_HOSTS=${OUTBOUND_ALLOWED_HOSTS:-openrouter.ai}
       - BRIDGE_SHARED_SECRET=${BRIDGE_SHARED_SECRET}
       - AUTH_CREDENTIALS_ENABLED=${AUTH_CREDENTIALS_ENABLED:-false}
       - OIDC_PROVIDER_NAME=${OIDC_PROVIDER_NAME:-Single Sign-On}
@@ -137,10 +130,12 @@ services:
           || psql -h transkription-db -U ${DB_USER} -d postgres \
             -c "CREATE DATABASE vexa OWNER ${DB_USER}"
 
-  # Tiny proxy that rewrites Vexa's hardcoded model name to the configured
-  # Cortecs/OpenAI-compatible STT model and forwards to Cortecs by default.
-  # The bridge injects workspace-global context terms as prompt and defaults
-  # response_format=verbose_json so providers can return segments where supported.
+  # Tiny proxy that converts Vexa's multipart audio to raw PCM (via
+  # ffmpeg) and streams it to Mistral's realtime STT endpoint directly —
+  # not OpenRouter, not EdenAI (both measured too slow for a live
+  # meeting's chunk cadence, see
+  # openspec/changes/migrate-live-meeting-stt-to-edenai/design.md).
+  # Loads the organization's Mistral key from the webapp at runtime.
   voxtral-bridge:
     build:
       context: ../services/voxtral-bridge
@@ -152,14 +147,12 @@ services:
     networks: [internal]
     mem_limit: 256m
     environment:
-      - UPSTREAM_URL=${VEXA_TRANSCRIPTION_URL:-https://api.cortecs.ai/v1/audio/transcriptions}
-      - MODEL_OVERRIDE=${VEXA_TRANSCRIPTION_MODEL:-whisper-large-v3}
-      - UPSTREAM_TIMEOUT_S=${VEXA_TRANSCRIPTION_TIMEOUT_S:-120}
-      # Webapp callback so the Cortecs key/model set in the admin UI takes
-      # effect at runtime (cached ~60s). Falls back to CORTECS_API_KEY.
+      - MISTRAL_MODEL_OVERRIDE=${MISTRAL_LIVE_TRANSCRIPTION_MODEL:-}
+      - REALTIME_TIMEOUT_S=${VEXA_TRANSCRIPTION_TIMEOUT_S:-15}
+      # Webapp callback so key/model changes take effect at runtime (~60s).
       - WEBAPP_URL=http://transkription-webapp:3000
       - BRIDGE_SECRET=${BRIDGE_SHARED_SECRET}
-      - CORTECS_API_KEY=${CORTECS_API_KEY:-${VEXA_TRANSCRIPTION_TOKEN:-}}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://0.0.0.0:8080/"]
       interval: 30s

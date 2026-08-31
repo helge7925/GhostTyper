@@ -1,20 +1,17 @@
 import { translateText } from '../../lib/ai-service';
 import { withOrgScope } from '../../lib/api/with-org-scope';
-import {
-  CostLimitCheckUnavailableError,
-  assertBudgetWithinLimits,
-  estimateTextTransformCost,
-  logUsage,
-} from '../../lib/usage';
-import { resolveChatModel } from '../../lib/model-policy';
-import { getSettingsRow, resolveCortecsConfig } from '../../lib/settings-service';
+import { composeAbortSignals, executeReservedSpend, estimateTextUsage, requestBudgetScope } from '../../lib/budget-runtime';
+import { resolveConfiguredModel } from '../../lib/openrouter';
+import { getSettingsRow } from '../../lib/settings-service';
+import { translateTextEdenAi } from '../../lib/edenai-service';
+import { resolveActiveProviderConfig } from '../../lib/ai-provider-router';
 import { MAX_TRANSLATE_INPUT_LENGTH } from '../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { logAuditEvent } from '../../lib/audit-log';
 import {
   describeGlossaryApplication,
   getGlossaryForPair,
-  lookupTM,
+  lookupTMMatch,
   shouldSkipTMForText,
   storeTM,
   translateTextWithGlossaryGuard,
@@ -47,29 +44,45 @@ async function handler(req, res) {
 
   try {
     const settingsRow = await getSettingsRow(userId);
-    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const apiKey = cortecs.apiKey;
-    const preferredModel = resolveChatModel(requestModel, null)
-      || resolveChatModel(settingsRow?.preferred_model, null)
-      || cortecs.chatModel;
+    // Translation has no EdenAI-native capability of its own — it routes
+    // through `chat` like every other text operation (see lib/edenai.js's
+    // EDENAI_HARDCODED_MODEL comment for why the dedicated
+    // translation/automatic_translation feature was rejected).
+    const active = await resolveActiveProviderConfig({ userId, organizationId: req.org?.id, capability: 'chat' });
 
-    if (!apiKey) {
-      return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert' });
-    }
-    if (!preferredModel) {
-      return res.status(400).json({ message: 'Ungültiges KI-Modell' });
+    let preferredModel;
+    if (active.provider === 'edenai') {
+      if (!active.apiKey) {
+        return res.status(400).json({ message: 'Kein EdenAI-API-Key konfiguriert' });
+      }
+      preferredModel = active.model;
+    } else {
+      preferredModel = resolveConfiguredModel(active, 'chat', requestModel || settingsRow?.preferred_model);
+      if (!active.apiKey) {
+        return res.status(400).json({ message: 'Kein OpenRouter-API-Key konfiguriert' });
+      }
+      if (!preferredModel) {
+        return res.status(400).json({ message: 'Ungültiges KI-Modell' });
+      }
     }
 
-    let glossary = { entries: [], doNotTranslate: [] };
+    let glossary = { entries: [], doNotTranslate: [], personalTerms: [] };
     try {
       glossary = await getGlossaryForPair(orgId, sourceLanguage, targetLanguage, { userId });
     } catch (error) {
       logApiError('Translation glossary lookup error', error);
+      glossary = {
+        entries: [],
+        doNotTranslate: [],
+        personalTerms: [],
+        personalGlossaryUnavailable: true,
+      };
     }
 
+    let tmCandidate = null;
     try {
-      const cachedTranslation = await lookupTM(orgId, sourceLanguage, targetLanguage, text);
-      if (cachedTranslation) {
+      tmCandidate = await lookupTMMatch(orgId, sourceLanguage, targetLanguage, text, { glossary });
+      if (tmCandidate?.autoReusable) {
         await logAuditEvent({
           userId,
           organizationId: orgId,
@@ -81,18 +94,22 @@ async function handler(req, res) {
             model: preferredModel,
             inputChars: text.length,
             translationMemory: true,
+            translationMemoryType: tmCandidate.type,
+            translationMemoryScore: tmCandidate.score,
           },
         });
         const cachedMeta = describeGlossaryApplication(glossary, text);
         return res.status(200).json({
-          translatedText: cachedTranslation,
+          translatedText: tmCandidate.targetText,
           fromTranslationMemory: true,
+          translationMemory: { match: tmCandidate, suggestions: [] },
           glossary: {
             applied: cachedMeta.applied,
             masked: cachedMeta.masked,
             dntViolations: [],
             tmHits: 1,
             retried: false,
+            translationMemory: { match: tmCandidate, suggestions: [] },
           },
         });
       }
@@ -100,33 +117,62 @@ async function handler(req, res) {
       logApiError('Translation memory lookup error', error);
     }
 
-    // Budget gate first (short advisory-lock hold), then the chat call
-    // outside the lock so it doesn't pin a pool connection.
-    const estimatedCost = estimateTextTransformCost(preferredModel, text, {
-      inputBufferTokens: 90,
-      outputMultiplier: 1.1,
-      outputBufferTokens: 90,
-    });
-    await assertBudgetWithinLimits(userId, orgId, estimatedCost);
-
+    const budgetScope = requestBudgetScope(req, 'translation', { text, sourceLanguage, targetLanguage, preferredModel });
+    let providerCall = 0;
     const guard = await translateTextWithGlossaryGuard({
       text,
       glossary,
+      tmSuggestions: tmCandidate && !tmCandidate.personalGlossaryUnavailableBlocked ? [tmCandidate] : [],
       translate: async (maskedText, { glossaryBlock, strict }) => {
-        const result = await translateText(
-          maskedText,
-          targetLanguage,
-          sourceLanguage,
-          apiKey,
-          preferredModel,
-          { glossaryBlock, strictPlaceholders: strict, baseUrl: cortecs.baseUrl, preference: cortecs.preference }
+        providerCall += 1;
+        const result = await executeReservedSpend(
+          {
+            idempotencyKey: `${budgetScope}:call:${providerCall}`,
+            organizationId: orgId,
+            userId,
+            operation: 'translation',
+            provider: active.provider,
+            model: preferredModel,
+            estimatedUsage: estimateTextUsage(maskedText, {
+              inputBufferTokens: 320,
+              outputMultiplier: 1.25,
+              outputBufferTokens: 160,
+            }),
+          },
+          (_reservation, budgetSignal) => (active.provider === 'edenai'
+            ? translateTextEdenAi(
+              maskedText,
+              targetLanguage,
+              sourceLanguage,
+              active.apiKey,
+              preferredModel,
+              {
+                glossaryBlock,
+                strictPlaceholders: strict,
+                signal: composeAbortSignals(budgetSignal),
+              },
+            )
+            : translateText(
+              maskedText,
+              targetLanguage,
+              sourceLanguage,
+              active.apiKey,
+              preferredModel,
+              {
+                glossaryBlock,
+                strictPlaceholders: strict,
+                baseUrl: active.baseUrl,
+                fallbackModel: active.defaultModels.chat,
+                organizationId: active.organizationId,
+                signal: composeAbortSignals(budgetSignal),
+              },
+            )),
         );
         return { translatedText: result.translatedText, usage: result.usage, model: result.model };
       },
     });
     const translatedText = guard.translatedText;
 
-    await logUsage(userId, guard.model || preferredModel, 'translation', guard.usage, orgId);
     // TM leak guard: never cache a translation shaped by a personal glossary
     // entry into the org-wide translation memory.
     if (!shouldSkipTMForText(glossary, text)) {
@@ -145,6 +191,7 @@ async function handler(req, res) {
       metadata: {
         targetLanguage,
         sourceLanguage,
+        provider: active.provider,
         model: preferredModel,
         inputChars: text.length,
         glossaryApplied: guard.applied.length,
@@ -156,19 +203,22 @@ async function handler(req, res) {
 
     return res.status(200).json({
       translatedText,
+      fromTranslationMemory: false,
+      translationMemory: { match: null, suggestions: tmCandidate ? [tmCandidate] : [] },
       glossary: {
         applied: guard.applied,
         masked: guard.masked,
         dntViolations: guard.dntViolations,
         tmHits: 0,
         retried: guard.retried,
+        translationMemory: { match: null, suggestions: tmCandidate ? [tmCandidate] : [] },
       },
     });
   } catch (error) {
-    if (error?.code === 'COST_LIMIT_EXCEEDED' || error?.code === 'BUDGET_GUARDRAIL_EXCEEDED') {
+    if (error?.code === 'BUDGET_EXCEEDED') {
       return res.status(429).json({ message: error.message });
     }
-    if (error instanceof CostLimitCheckUnavailableError || error?.code === 'COST_CHECK_UNAVAILABLE') {
+    if (error?.code === 'BUDGET_ACCOUNTING_UNAVAILABLE' || error?.code === 'PRICING_CONFIGURATION_MISSING') {
       return res.status(503).json({ message: error.message });
     }
     logApiError('Translation error', error);
@@ -176,4 +226,4 @@ async function handler(req, res) {
   }
 }
 
-export default withOrgScope(handler);
+export default withOrgScope({ permission: 'paid.execute' }, handler);
