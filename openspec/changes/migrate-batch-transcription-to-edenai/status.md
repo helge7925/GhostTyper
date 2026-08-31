@@ -4,13 +4,23 @@ Last updated: 2026-08-30
 
 ## Current State
 
-- **Implemented**, two manual-verification tasks remaining (5.1/5.2) and
-  the pricing runbook step (3.1) — same "code done, real-workspace
-  smoke-test still open" state `migrate-translation-to-edenai` finished
-  in. Third capability decided under the `hardcode-edenai-models`
-  architecture (`chat` first, `translation`-routed-through-`chat`
-  second, `transcription` now third — its own real EdenAI capability,
-  unlike the previous two).
+- **Implemented**, two manual-verification tasks remaining (5.1/5.2) —
+  the pricing runbook step (3.1) that used to be the other open item is
+  now closed, see below. Third capability decided under the
+  `hardcode-edenai-models` architecture (`chat` first,
+  `translation`-routed-through-`chat` second, `transcription` now
+  third — its own real EdenAI capability, unlike the previous two).
+
+## Pricing seeded automatically (2026-08-31)
+
+Task 3.1's admin-runbook price row now ships as code instead:
+`lib/pricing-seed.js`'s `INITIAL_PROVIDER_PRICES` seeds the exact
+`(edenai, audio/speech_to_text_async/gladia, transcription)` row at
+$0.0102/min automatically on every `initDatabase()` call — no admin
+action needed before a workspace activates `transcription` for the
+first time. See `migrate-live-meeting-stt-to-edenai/status.md` for the
+full cross-cutting writeup (why this is safe for EdenAI/Mistral but not
+OpenRouter, and the real-Postgres verification done for it).
 
 ## Model selection: gladia (2026-08-30)
 
@@ -118,10 +128,6 @@ testing-methodology lesson are in design.md.
 
 ## Outstanding
 
-- Task 3.1: create the `(edenai, audio/speech_to_text_async/gladia,
-  transcription)` price row — not yet needed since no workspace has
-  activated this capability yet, but blocks activation via
-  `findMissingEdenAiPrices` until it exists.
 - Tasks 5.1/5.2: full DB + `next dev` + browser manual verification
   (activate `transcription`, upload a real multi-chunk audio file,
   confirm `usage_log` and the analysis-stays-on-OpenRouter behavior

@@ -40,6 +40,7 @@ coverage
 # from local syntax checks should never end up in git).
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Claude Code (local dev tooling)
 .claude/

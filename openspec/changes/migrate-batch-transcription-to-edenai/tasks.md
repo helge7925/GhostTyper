@@ -41,10 +41,16 @@
 
 ## 3. Pricing
 
-- [ ] 3.1 Admin runbook: create the `(edenai,
-  audio/speech_to_text_async/gladia, transcription)` price row before
-  activating the `transcription` capability for any workspace. Not yet
-  done — no workspace has activated this capability yet.
+- [x] 3.1 **Changed from the original plan** — done via code, not an
+  admin runbook step. The `(edenai, audio/speech_to_text_async/gladia,
+  transcription)` price row is now seeded automatically by
+  `lib/pricing-seed.js`'s `INITIAL_PROVIDER_PRICES` on every
+  `initDatabase()` call, using the exact $0.0102/min rate already
+  documented above — no admin action needed before a workspace
+  activates `transcription` for the first time. Verified end-to-end
+  against a real, throwaway local Postgres instance (never the user's
+  running containers). See `migrate-live-meeting-stt-to-edenai/status.md`
+  for the cross-cutting writeup of this seeding mechanism.
 
 ## 4. Tests
 

@@ -57,23 +57,35 @@
 - [x] 5.1 `lib/edenai-pricing.js`'s `tts` operation list (`['tts',
   'live_tts', 'live_tts_share', 'in_meeting_tts']`) was already correct
   from the foundation phase — no change needed.
-- [ ] 5.2 Admin runbook: create the `(edenai,
-  audio/tts/google/gemini-2.5-flash-tts, <operation>)` price row for
-  each of the four operations above before activating TTS for any
-  workspace. Not yet done — no workspace has activated this yet.
+- [x] 5.2 **Changed from the original plan** — done via code, not an
+  admin runbook step. All four `(edenai, audio/tts/google/gemini-2.5-
+  flash-tts, <operation>)` price rows are now seeded automatically by
+  `lib/pricing-seed.js`'s `INITIAL_PROVIDER_PRICES` on every
+  `initDatabase()` call — no admin action needed before a workspace
+  activates TTS for the first time. The per-character rate is a real
+  conversion of the $0.006/min figure (using this change's own measured
+  ~974 chars/min throughput), not a vendor-quoted per-character price —
+  see that file's TTS section for the full derivation and its
+  documented limitation. Verified end-to-end against a real, throwaway
+  local Postgres instance (never the user's running containers).
+  `tests/pricing-seed.test.mjs` covers the seed data structurally.
 
 ## 6. Tests
 
 - [x] 6.1 `tests/edenai-tts.test.mjs`: `synthesizeSpeechEdenAi` — empty
   text, missing model, default-voice fallback, explicit-voice override,
-  sync-mode logical failure, audio-download failure. The full
-  `mp3ToCanonicalPcm` round trip (real ffmpeg mp3→PCM conversion) is not
-  exercised — no existing test in this suite exercises it for
-  `openRouterTts` either, and mocking a real decodable MP3 payload was
-  judged not worth the complexity for a helper function this app's other
-  TTS path already runs in production. `safeFetch`'s DNS-based host
-  check is exercised safely using a loopback IP (127.0.0.1), avoiding
-  any real network dependency in the test.
+  sync-mode logical failure, audio-download failure. **Update
+  (2026-08-31)**: the `mp3ToCanonicalPcm` round trip this task originally
+  left untested now has real coverage —
+  `tests/tts-pcm-conversion.test.mjs` synthesizes real MP3s via
+  `@ffmpeg-installer/ffmpeg` (already an app dependency, no graceful-skip
+  needed) and verifies output size/scaling, plus a real, previously
+  undocumented behavior found along the way: non-MP3 input resolves with
+  an empty buffer rather than throwing (ffmpeg's forced `inputFormat`
+  is lenient) — matches how call sites already treat a zero-length PCM
+  buffer as "nothing to send." `safeFetch`'s DNS-based host check is
+  exercised safely using a loopback IP (127.0.0.1), avoiding any real
+  network dependency in the test.
 - [x] 6.2 `tests/edenai.test.mjs`: updated the existing
   `EDENAI_HARDCODED_MODEL` shape test, which asserted `tts` was still
   `null` — now asserts the real chosen model and voice fallback.

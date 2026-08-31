@@ -85,6 +85,23 @@ it looked reasonable on paper.
   this verification round, written to scratchpad only (chmod 600),
   deleted immediately after use, repo-wide grep confirmed no leak.
 
+## Real gap found and closed: chat's price was never actually sourced (2026-08-31)
+
+Task 4.1 originally said no new price work was needed here, reasoning
+that `chat`'s pricing requirement already existed from earlier
+capabilities. True, but incomplete: nobody in this migration sequence
+had ever actually looked up EdenAI's real rate for
+`mistral/mistral-small-latest` — a gap in the research, not a
+deliberately deferred task. Fetched live from EdenAI's own
+`GET /v3/models?feature=text&subfeature=chat` catalogue: $0.15/million
+input tokens, $0.60/million output tokens (exactly Mistral's own direct
+API pricing, no visible EdenAI markup on this entry). All eight `chat`
+operations, plus `transcription` (gladia) and TTS's four operations from
+the earlier changes in this sequence, are now seeded automatically via
+`lib/pricing-seed.js` — see `migrate-live-meeting-stt-to-edenai/status.md`
+for the full cross-cutting writeup of that seeding mechanism (it covers
+Mistral's row too, not just EdenAI's).
+
 ## Outstanding
 
 - Task 6.5: full manual verification through the real UI (activate

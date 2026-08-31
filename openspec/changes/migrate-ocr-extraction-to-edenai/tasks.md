@@ -39,11 +39,20 @@
 
 ## 3. Pricing
 
-- [ ] 3.1 Admin runbook: create the `(edenai, mistral/mistral-small-
-  latest, ocr)` price row under the `chat` capability's price set before
-  activating `chat` for any workspace that will use OCR — no separate
-  `ocr` capability activation exists to gate on. Not yet done — no
-  workspace has activated this yet.
+- [x] 3.1 **Changed from the original plan** — done via code, not an
+  admin runbook step. The `(edenai, mistral/mistral-small-latest, ocr)`
+  price row is now seeded automatically by `lib/pricing-seed.js`'s
+  `INITIAL_PROVIDER_PRICES` on every `initDatabase()` call — no admin
+  action needed. Unlike the token-based `chat` operations, this row's
+  rate is *derived*, not quoted: EdenAI's model catalogue has no flat
+  per-image price for `mistral/mistral-small-latest` (vision input is
+  tokenized, billed at the same per-token rate as text), so the page
+  rate is estimated from one real observed OCR call's actual token usage
+  (prompt_tokens=2242, completion_tokens=117 for a synthetic one-page
+  business document), rounded up for headroom against denser real
+  documents — see `lib/pricing-seed.js`'s comment for the full
+  derivation and `migrate-live-meeting-stt-to-edenai/status.md` for the
+  cross-cutting writeup of the seeding mechanism itself.
 
 ## 4. Tests
 

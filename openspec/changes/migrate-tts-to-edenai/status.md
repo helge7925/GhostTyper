@@ -89,21 +89,43 @@ TTS model later should re-verify voice selection explicitly, not assume
   clean.
 - `openspec validate migrate-tts-to-edenai --strict` passes.
 
+## Pricing seeded automatically, PCM conversion tested (2026-08-31)
+
+Both items below were flagged as open in this section and are now
+closed:
+
+- The four TTS price rows now live in `lib/pricing-seed.js`'s
+  `INITIAL_PROVIDER_PRICES`, seeded automatically on every
+  `initDatabase()` call — no admin action needed before a workspace
+  activates TTS. Per the user's own observation: pricing shouldn't need
+  a workspace to exist first, and `provider_price_versions` already has
+  no `organization_id` column (it's a platform-wide catalogue), so this
+  was always structurally possible — it just hadn't been done yet.
+  Verified end-to-end against a real, throwaway local Postgres (never
+  the user's running containers): `initDatabase()` ran clean,
+  `resolveProviderPrice` resolved a seeded TTS row with no
+  `organizationId`. The rate is a real conversion of the $0.006/min
+  figure using this change's own measured chars/min throughput — an
+  estimate for reservation purposes, not a vendor-quoted per-character
+  price (see `lib/pricing-seed.js`'s comment for the full derivation).
+- `mp3ToCanonicalPcm` now has real test coverage
+  (`tests/tts-pcm-conversion.test.mjs`) — synthesizes actual MP3s via
+  the already-installed `@ffmpeg-installer/ffmpeg` dependency (unlike
+  poppler in the OCR tests, no graceful skip needed, since this binary
+  ships with `npm ci`). Along the way, found and documented a real,
+  previously-unverified behavior: forced-format ffmpeg decoding of
+  non-MP3 input resolves with an empty buffer instead of throwing —
+  matches how every TTS call site already treats a zero-length PCM
+  buffer (skip the write), so not a new failure mode, just now a tested
+  one instead of an assumed one.
+
 ## Outstanding
 
-- Task 5.2: create the `(edenai, audio/tts/google/gemini-2.5-flash-tts,
-  <operation>)` price rows (four operations: `tts`, `live_tts`,
-  `live_tts_share`, `in_meeting_tts`) before activating TTS for any
-  workspace. Not yet done — no workspace has activated this yet.
 - Tasks 7.3/7.4: full real-workspace verification (in-meeting audio
   injection, live read-aloud, share-link read-aloud, `usage_log` rows
   with `provider='edenai'`) — not yet run. Same open-item pattern as
   every other change in this migration sequence's final manual-
   verification tasks.
-- `mp3ToCanonicalPcm`'s actual ffmpeg mp3→PCM conversion path is not
-  covered by an automated test for either TTS provider (EdenAI or
-  OpenRouter) — flagged as a pre-existing gap this change did not
-  introduce, not fixed here (see tasks.md 6.1).
 - `speed`/`speaking_pitch`/`speaking_volume` (present in EdenAI's `tts`
   input schema) are not wired up — matches `openRouterTts`'s existing
   feature set exactly, a deliberate non-goal of this change, not an

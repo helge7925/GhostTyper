@@ -177,22 +177,56 @@ The two items flagged above as open have been addressed:
     (dummy — no output quantity is ever reported for STT, so this unit
     choice is unused but required by `validatePriceVersion`),
     `outputPricePerMillionMicros=0`.
-  - **Not created in the database by this change** — same as every
-    other price row in this migration sequence (see
-    `migrate-batch-transcription-to-edenai/status.md`'s identical
-    treatment of the `gladia` row): this is real billing configuration
-    on whatever database this deployment points at, entered manually via
-    the existing `/admin/prices` UI with a mandatory audit `reason`, not
-    something to script or insert directly. The values above are ready
-    to paste in as-is.
+  - **Not created via the live `/admin/prices` UI by this change** —
+    same reasoning as every other price row in this migration sequence
+    at the time (see `migrate-batch-transcription-to-edenai/status.md`'s
+    identical treatment of the `gladia` row): real billing configuration
+    on a live deployment's database isn't something to script or insert
+    directly against a running instance. **Superseded 2026-08-31**: this
+    exact row (and every other price row this migration sequence left as
+    an admin-runbook task) is now seeded automatically at DB-init time
+    instead — see the next section. The distinction that made a live
+    admin action off-limits (touching a *running* deployment's database)
+    doesn't apply to a value baked into a schema-init script that ships
+    in the same commit as the code depending on it.
+
+## Pricing seeded automatically, no admin step needed (2026-08-31)
+
+The user pointed out that pricing shouldn't need a workspace to exist
+first, and should apply automatically once one activates a capability —
+which is exactly how `provider_price_versions` already works (no
+`organization_id` column; it's a platform-wide catalogue). This exact
+row now lives in `lib/pricing-seed.js`'s `INITIAL_PROVIDER_PRICES`,
+inserted once by `seedProviderPrices()` on every `initDatabase()` call
+(idempotent, `ON CONFLICT DO NOTHING`) — no admin runbook step required
+before a workspace can activate Mistral for the first time. Verified
+end-to-end against a real, throwaway local Postgres instance (never the
+user's running containers): `initDatabase()` completed cleanly, and
+`resolveProviderPrice({provider:'mistral',
+model:'voxtral-mini-transcribe-realtime-2602',
+operation:'meeting_transcription'})` resolved the seeded row with no
+`organizationId` argument — confirming it applies platform-wide, not
+per-workspace. See `lib/pricing-seed.js`'s header comment for the full
+reasoning (including why this is safe for EdenAI/Mistral specifically
+but deliberately not done for OpenRouter, whose prices stay live-synced)
+and `tests/pricing-seed.test.mjs` for the structural test coverage.
+
+## Bridge pytest suite added (2026-08-31)
+
+The "no repeatable, CI-run test for the bridge" gap (tasks.md's 6.1) is
+closed: `services/voxtral-bridge/tests/test_main.py` (26 tests) mocks
+the webapp config callback, the Mistral realtime SDK, and ffmpeg's
+subprocess call, running offline in under half a second. Wired into CI
+as a new `bridge-test` job in `.github/workflows/pr-tests.yml`.
+`requirements.txt`/`requirements-dev.txt` split so test dependencies
+never ship in the production Docker image. This does not replace task
+1.3's live end-to-end verification (real server, real Mistral,
+real audio) — that remains the stronger evidence for the actual
+WebSocket protocol behavior; this suite's job is to keep that behavior
+from silently regressing between now and the next live check.
 
 ## Outstanding
 
-- Admin runbook: create the price row using the exact values documented
-  above via `/admin/prices` before activating Mistral for any real
-  workspace — the new pricing gate will refuse to save an API key until
-  this row exists, so this is now a hard precondition, not just a
-  suggestion.
 - Tasks 7.2/7.3: full real-meeting end-to-end verification (bot joins a
   real platform, live captions appear, meeting finalizes,
   `usage_log` shows `provider='mistral'` rows) — not yet run. Task 7.1
@@ -200,11 +234,6 @@ The two items flagged above as open have been addressed:
   production; this is the remaining full-integration check (Vexa-Lite
   bot + bridge + webapp + billing), same open-item pattern as every
   other change in this migration sequence.
-- No `pytest` suite exists for the bridge (see tasks.md's 6.1) — real
-  live-server verification was done instead (arguably stronger evidence
-  for this specific risk), but it isn't a repeatable CI check. A
-  follow-up pytest suite (mocking the Mistral SDK) would close this gap
-  properly.
 - Context-bias/vocabulary forwarding and diarization/segments are both
   real, acknowledged feature gaps relative to what the OpenRouter path
   had (best-effort) or what Mistral's realtime API could in principle

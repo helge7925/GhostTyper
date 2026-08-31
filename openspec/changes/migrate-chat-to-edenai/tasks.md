@@ -59,14 +59,24 @@
 
 ## 4. Pricing
 
-- [x] 4.1 No new price rows needed — `chat`'s pricing was already
-  required (and, per every prior status.md in this sequence, not yet
-  created) by the capabilities that already used it
-  (`translation`/OCR/`spelling_grammar`). Analysis/template-generation/
-  knowledge-prep operations were already listed in
+- [x] 4.1 No new price *operations* needed — `chat`'s eight operations
+  (`analysis`, `text_optimization`, `template_generation`,
+  `knowledge_prep`, `translation`, `office_translation`,
+  `live_translation`, `ocr`) were already listed in
   `lib/edenai-pricing.js`'s `EDENAI_OPERATIONS.chat` from the foundation
-  phase, so the same price row that already gates chat activation
-  covers these operations too — no runbook task to add here.
+  phase. **Update (2026-08-31)**: all eight now have real, seeded price
+  rows too — `mistral/mistral-small-latest`'s actual token rate
+  ($0.15/M input, $0.60/M output, read live from EdenAI's
+  `GET /v3/models?feature=text&subfeature=chat` catalogue, no EdenAI
+  markup over Mistral's own direct pricing) was previously never
+  sourced anywhere in this migration sequence — a real gap, not
+  intentionally deferred. `lib/pricing-seed.js`'s
+  `INITIAL_PROVIDER_PRICES` now seeds all seven token-based operations
+  plus a separately-derived page-based rate for `ocr` (that operation
+  bills by page count, not token, per `pages/api/ocr.js`'s reservation
+  shape — the page rate is estimated from one real observed OCR call's
+  token usage, see that file's comment) — automatically, on every
+  `initDatabase()` call, no admin runbook step needed.
 
 ## 5. Tests
 

@@ -77,8 +77,13 @@ test('non-token quantities use the same exact integer calculator', () => {
   assert.equal(audio.estimatedCostMicros, 930);
 });
 
-test('production seed has no fixed models and provider attribution is OpenRouter', () => {
-  assert.deepEqual(INITIAL_PROVIDER_PRICES, []);
+test('production seed never bakes in an OpenRouter price (that stays live-synced), and provider attribution stub is OpenRouter', () => {
+  // See lib/pricing-seed.js's header comment: OpenRouter prices are
+  // intentionally never seeded here (they'd drift from the live-synced
+  // catalogue) — EdenAI/Mistral rows are, since neither has a live
+  // pricing API and a workspace shouldn't have to wait on a manual admin
+  // action just to activate a capability for the first time.
+  assert.ok(INITIAL_PROVIDER_PRICES.every((row) => row.provider !== 'openrouter'));
   assert.equal(inferProviderForModel('vendor/model'), 'openrouter');
 });
 

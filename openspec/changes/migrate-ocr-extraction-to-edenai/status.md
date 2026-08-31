@@ -4,11 +4,22 @@ Last updated: 2026-08-30
 
 ## Current State
 
-- **Implemented**, two manual-verification tasks (5.1/5.2) and the
-  pricing runbook step (3.1) remaining — same "code done, real-workspace
-  smoke-test still open" state the two prior EdenAI migrations finished
-  in. Fourth capability decided under the `hardcode-edenai-models`
-  architecture.
+- **Implemented**, two manual-verification tasks (5.1/5.2) remaining —
+  the pricing runbook step (3.1) that used to be the other open item is
+  now closed, see below. Fourth capability decided under the
+  `hardcode-edenai-models` architecture.
+
+## Pricing seeded automatically (2026-08-31)
+
+Task 3.1's admin-runbook price row now ships as code instead:
+`lib/pricing-seed.js`'s `INITIAL_PROVIDER_PRICES` seeds the `(edenai,
+mistral/mistral-small-latest, ocr)` row automatically on every
+`initDatabase()` call — no admin action needed. This rate is *derived*,
+not quoted (EdenAI's catalogue has no flat per-image price for this
+model — vision input is tokenized at the same rate as text), from one
+real observed OCR call's actual token usage, rounded up for headroom.
+See `migrate-live-meeting-stt-to-edenai/status.md` for the full
+cross-cutting writeup of the seeding mechanism.
 
 ## Design correction: no dedicated document-parsing feature exists (2026-08-30)
 
@@ -121,14 +132,6 @@ ffmpeg/chromium in the Docker image's dependency pattern.
 
 ## Outstanding
 
-- Task 3.1: create the `(edenai, mistral/mistral-small-latest, ocr)`
-  price row under `chat`'s price set — not yet needed since no workspace
-  has activated `chat` for OCR use yet, but blocks activation via
-  `findMissingEdenAiPrices` until it exists (note: `chat` was already
-  activatable for spelling_grammar/translation before this change; the
-  `ocr` operation specifically still needs its own price row even on an
-  already-activated `chat` capability, since `findMissingEdenAiPrices`
-  checks every operation in `EDENAI_OPERATIONS.chat` individually).
 - Tasks 5.1/5.2: full DB + `next dev` + browser manual verification
   (activate `chat`, upload a table-heavy scan through the real UI,
   confirm the analysis pipeline and the scanned-PDF translation flow) —

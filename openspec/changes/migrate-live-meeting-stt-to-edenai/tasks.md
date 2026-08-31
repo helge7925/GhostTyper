@@ -93,26 +93,35 @@ original plan" rather than silently rewritten.
   the gap flagged in status.md where a saved key went live with no
   pricing pre-flight. `tests/mistral-pricing.test.mjs` covers the gate
   function.
-- [ ] 5.2 Admin runbook: create the `(mistral,
+- [x] 5.2 **Changed from the original plan** — done via code, not an
+  admin runbook step. The exact `(mistral,
   voxtral-mini-transcribe-realtime-2602, meeting_transcription)` price
-  row before activating live-meeting STT for any workspace. Not yet
-  done — no workspace has activated this yet, and per 5.1 the app will
-  now refuse to let it happen without this row anyway. Note: this is a
-  NEW provider in `provider_price_versions`, not an existing EdenAI/
-  OpenRouter row extended. Exact values (researched against Mistral's
-  own docs, $0.006/min) are documented in status.md, ready to paste into
-  `/admin/prices`.
+  row is now seeded automatically by `lib/pricing-seed.js`'s
+  `INITIAL_PROVIDER_PRICES` (run once by `seedProviderPrices()` on every
+  `initDatabase()` call — see that file's header comment for why this is
+  safe for EdenAI/Mistral specifically, unlike OpenRouter). No admin
+  action needed before activating this capability for the first time;
+  verified end-to-end against a real throwaway Postgres instance
+  (`initDatabase()` ran clean, `resolveProviderPrice({provider:'mistral',
+  model:'voxtral-mini-transcribe-realtime-2602',
+  operation:'meeting_transcription'})` resolved the seeded row with no
+  organizationId — confirms it applies platform-wide, not per-workspace).
+  `tests/pricing-seed.test.mjs` covers the seed data structurally.
 
 ## 6. Tests
 
-- [x] 6.1 **Changed from the original plan** — no
-  `services/voxtral-bridge/tests/` pytest suite was added (no
-  `edenai_client.py` exists to test). The bridge's actual behavior was
-  instead verified live end-to-end (task 1.3) against a real running
-  server, which is a stronger check than a mocked unit test would have
-  been for this specific risk (real WebSocket protocol, real audio
-  transcode) — but it is not a repeatable, CI-run test, which is a real
-  gap flagged in status.md's Outstanding section, not silently accepted.
+- [x] 6.1 **Changed from the original plan, twice.** Originally: no
+  `services/voxtral-bridge/tests/` pytest suite (no `edenai_client.py` to
+  test), verified live instead. **Update (2026-08-31)**: a real pytest
+  suite now exists (`services/voxtral-bridge/tests/test_main.py`, 26
+  tests) — mocks the webapp config callback, the Mistral realtime SDK,
+  and ffmpeg's subprocess call, so it runs offline and fast. Wired into
+  CI (`.github/workflows/pr-tests.yml`'s new `bridge-test` job). This
+  closes the "not a repeatable, CI-run test" gap status.md's Outstanding
+  section flagged — the original live end-to-end verification (task 1.3)
+  remains the stronger evidence for the real Mistral protocol behavior
+  and is not replaced by this suite, which mocks that protocol rather
+  than exercising it.
 - [x] 6.2 `tests/mistral.test.mjs`: `normalizeMistralConfig`/
   `MISTRAL_LIVE_TRANSCRIPTION_MODEL` (3 tests).
   `tests/settings-service.test.mjs`: `resolveMistralConfig` operator-
