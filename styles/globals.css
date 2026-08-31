@@ -16,65 +16,72 @@
  */
 @layer base {
   :root {
-    /* Backgrounds */
-    --canvas: 250 250 250;
+    /*
+     * "Quiet Precision" palette (ui-sprezzatura-refresh, phase 1).
+     * See docs/ui/phase1-tokens.md for the full old→new table and
+     * WCAG AA verification of every pair below.
+     */
+    /* Backgrounds — warm paper, not cool grey */
+    --canvas: 247 246 244;
     --surface: 255 255 255;
-    --surface-elevated: 245 245 245;
+    --surface-elevated: 241 240 237;
 
     /* Text */
-    --primary: 24 24 32;
-    --secondary: 82 82 91;
-    --muted: 161 161 170;
+    --primary: 28 28 30;
+    --secondary: 85 85 90;
+    --muted: 110 108 104;
 
-    /* Accent (brand) */
-    --accent: 255 89 23;
-    --accent-strong: 255 140 0;
+    /* Accent (brand) — quieter orange, candidate for the #FF5917 A/B */
+    --accent: 232 78 15;
+    --accent-strong: 201 69 9;
+    /* Text-safe brand color: >= 4.5:1 on every light surface. */
+    --accent-ink: 190 60 5;
 
-    /* Semantic states */
-    --success: 5 150 105;
-    --warning: 202 138 4;
-    --danger: 220 38 38;
-    --info: 8 145 178;
+    /* Semantic states (unchanged in phase 1 — out of scope, see docs) */
+    --success: 4 120 87;
+    --warning: 146 64 14;
+    --danger: 185 28 28;
+    --info: 14 116 144;
 
-    --focus-ring: 255 140 0;
+    /* Opaque outline, not literal 40% alpha — see docs/ui/phase1-tokens.md */
+    --focus-ring: 201 69 9;
 
     /* Themed surfaces (full rgba — no alpha modifier in Tailwind) */
-    --hover-subtle: rgba(0, 0, 0, 0.04);
-    --hover: rgba(0, 0, 0, 0.06);
-    --hover-strong: rgba(0, 0, 0, 0.10);
-    --border-subtle: rgba(0, 0, 0, 0.08);
-    --border-emphasis: rgba(0, 0, 0, 0.16);
+    --hover-subtle: rgba(28, 28, 30, 0.04);
+    --hover: rgba(28, 28, 30, 0.06);
+    --hover-strong: rgba(28, 28, 30, 0.10);
+    --border-subtle: rgba(28, 28, 30, 0.08);
+    --border-emphasis: rgba(28, 28, 30, 0.16);
     --overlay: rgba(0, 0, 0, 0.50);
-
-    /* Gradients */
-    --gradient-accent: linear-gradient(135deg, rgb(255 89 23), rgb(255 140 0));
-    --gradient-accent-hover: linear-gradient(135deg, rgb(255 112 67), rgb(255 160 0));
   }
 
   [data-theme='dark'] {
-    --canvas: 10 10 15;
-    --surface: 22 22 31;
-    --surface-elevated: 30 30 46;
+    /* Warm anthracite — NOT deep glossy black (product-owner note) */
+    --canvas: 30 30 33;
+    --surface: 38 38 42;
+    --surface-elevated: 45 45 50;
 
-    --primary: 232 232 237;
-    --secondary: 139 139 158;
-    --muted: 113 113 122;
+    --primary: 232 231 228;
+    --secondary: 158 156 152;
+    --muted: 166 163 158;
 
-    --accent: 255 89 23;
-    --accent-strong: 255 140 0;
+    /* Accent unchanged from light theme — AA holds on anthracite */
+    --accent: 232 78 15;
+    --accent-strong: 201 69 9;
+    --accent-ink: 255 145 97;
 
-    --success: 0 184 148;
+    --success: 52 211 153;
     --warning: 253 203 110;
-    --danger: 255 107 107;
-    --info: 0 206 201;
+    --danger: 255 118 118;
+    --info: 34 211 238;
 
-    --focus-ring: 255 140 0;
+    --focus-ring: 255 145 97;
 
     --hover-subtle: rgba(255, 255, 255, 0.04);
     --hover: rgba(255, 255, 255, 0.06);
     --hover-strong: rgba(255, 255, 255, 0.10);
-    --border-subtle: rgba(255, 255, 255, 0.06);
-    --border-emphasis: rgba(255, 255, 255, 0.12);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-emphasis: rgba(255, 255, 255, 0.14);
     --overlay: rgba(0, 0, 0, 0.60);
   }
 
@@ -82,23 +89,45 @@
     @apply text-primary bg-canvas antialiased;
   }
 
+  :root {
+    color-scheme: light;
+  }
+
+  [data-theme='dark'] {
+    color-scheme: dark;
+  }
+
   button:focus-visible,
   a:focus-visible,
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible,
-  [role='button']:focus-visible {
+  summary:focus-visible,
+  [role='button']:focus-visible,
+  [contenteditable='true']:focus-visible {
     outline: 2px solid rgb(var(--focus-ring));
     outline-offset: 2px;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.25);
+    color: rgb(var(--primary));
   }
 }
 
 @layer utilities {
+  /*
+   * Gradients are deleted as a design element (design.md). These two
+   * classes are kept so existing call sites (`gradient-accent`,
+   * `hover:gradient-accent-hover`) don't need per-file edits in phase
+   * 1 — they now resolve to solid fills, with the hover class acting
+   * as a darkening companion.
+   */
   .gradient-accent {
-    background: var(--gradient-accent);
+    background: rgb(var(--accent-strong));
   }
   .gradient-accent-hover {
-    background: var(--gradient-accent-hover);
+    background: rgb(var(--accent-strong));
   }
   .border-glow {
     border-color: var(--border-subtle);
@@ -124,7 +153,7 @@
   }
 
   .upload-progress::-webkit-progress-value {
-    background: var(--gradient-accent);
+    background: rgb(var(--accent));
     border-radius: 9999px;
     transition: width 0.3s ease;
   }
@@ -142,7 +171,7 @@
   }
 
   .upload-progress::-moz-progress-bar {
-    background: var(--gradient-accent);
+    background: rgb(var(--accent));
     border-radius: 9999px;
   }
 

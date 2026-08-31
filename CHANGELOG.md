@@ -7,6 +7,29 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Added
+- **Layouterhaltende PDF-Übersetzung (DeepL-artig) für digitale PDFs.**
+  Digitale PDFs mit eingebettetem Text-Layer werden jetzt *in-place*
+  übersetzt statt über OCR neu gerendert: `lib/pdf-inplace.js` erkennt den
+  Text-Layer (`detectTextLayer`, pdfjs-dist Legacy-Build ohne Worker),
+  extrahiert positionierte Runs (`extractRuns`), segmentiert sie in
+  Absätze mit Spalten-/Lese-Reihenfolge-Heuristik (`segmentRuns`),
+  übersetzt segmentweise über dieselbe Glossar-/TM-Maschinerie wie der
+  Office-Pfad und zeichnet die Übersetzung mit pdf-lib über das
+  Originallayout (`rewritePdf`: White-Out der Original-Runs + Redraw).
+  Überlauf-Strategie: Schriftgröße bis −20 % verkleinern, dann Umbruch
+  innerhalb der Absatz-Bbox; nie stilles Abschneiden — Überläufe werden
+  gezählt. Ein Layout-Report (`{pages, segments, translated, overflows,
+  fontFallbacks, nonEncodable, mode}`) reist im neuen Header
+  `X-GhostTyper-Layout` mit; `X-GhostTyper-PDF-Layout-Mode` ist `in-place`.
+  Scans, nicht-lateinische Zielsprachen und nicht-WinAnsi-kodierbare
+  Zieltexte fallen sauber auf den bestehenden OCR→Render-Pfad zurück
+  (Modus `approximated`, mit Grund im Report). Phase-1-Scope:
+  lateinische Zielschrift, StandardFonts (Helvetica/Times/Courier,
+  WinAnsi inkl. ä/ö/ü/ß), Overlay-Rewrite. Siehe
+  `openspec/changes/pdf-inplace-translation/`. Neue Abhängigkeiten:
+  `pdfjs-dist`, `pdf-lib`. Der Office-Übersetzungspfad bleibt unverändert.
+
 ### Removed
 - **Chat, Workspace-Wissen (RAG-Index) und Aufgaben entfernt.**
   GhostTypers Strategie ist es, ein kleines Set von Kernfunktionen zu
@@ -27,6 +50,19 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
   die RAG-Index-Hooks (Reindex-Button, Chunk-Anzeige, Backfill-Endpoint)
   wurden entfernt. `improve-files-knowledge-tasks-chat` ist durch diese
   Änderung ersetzt und archiviert.
+- **Google Meet aus dem Meeting-Bot-Pfad entfernt.** Google blockiert
+  Meeting-Bots auf Meet hart (operator-verifiziert Juli 2026: dedizierte
+  Sperr-Seite statt CAPTCHA) — ein Bot-Start gegen Meet ist ein
+  garantierter Fehlschlag. `google_meet` ist raus aus der
+  URL-Erkennung (`components/MeetingStartForm.js`), der
+  Outbound-Plattform-Zuordnung (`lib/api/vexa.js`
+  `MEETING_URL_PATTERNS`) und dem Bot-Start-Gate
+  (`pages/api/meetings/index.js` `SUPPORTED_PLATFORMS`). Ein
+  eingefügter Meet-Link zeigt stattdessen einen Hinweis mit Deep-Link
+  zur Tab-/System-Audio-Aufnahme (`/upload?preset=meet-tab-audio`).
+  Historische Transkriptionen mit `meeting_platform='google_meet'`
+  bleiben unverändert lesbar — nur der Outbound-Pfad für neue Bot-Starts
+  ist betroffen. Teams, Zoom und Nextcloud Talk sind unverändert.
 
 ### Changed
 - **Service rename: `fireworks-bridge` → `voxtral-bridge`.** Der

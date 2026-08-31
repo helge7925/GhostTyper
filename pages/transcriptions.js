@@ -7,8 +7,9 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import MeetingStartForm from '../components/MeetingStartForm';
+import EmptyState from '../components/EmptyState';
 import { Skeleton } from '../components/ui/skeleton';
-import { Video, Folder, Tag } from 'lucide-react';
+import { Video, Folder, Tag, FileText } from 'lucide-react';
 import { getDocuments, getFolders, createFolder, updateFolder, deleteFolder, updateDocument, deleteDocument, bulkDocuments } from '../lib/api';
 import { useTranslations } from '../lib/i18n';
 import { useUiFeedback } from '../lib/use-ui-feedback';
@@ -45,7 +46,9 @@ export default function Transcriptions() {
   const tList = useTranslations('transcriptions');
   const tSidebar = useTranslations('transcriptionsList');
   const tMeeting = useTranslations('meeting.start');
+  const tEmpty = useTranslations('emptyState');
   const canStartMeeting = usePermission('meeting.start');
+  const canCreateTranscription = usePermission('transcription.write');
   const {
     enabled: vexaEnabled,
     defaultBotName: vexaDefaultBotName,
@@ -93,6 +96,24 @@ export default function Transcriptions() {
     acceptConfirm,
   } = useUiFeedback();
 
+  const loadDocuments = useCallback(async () => {
+    try {
+      const [transcripts, foldersData] = await Promise.all([
+        getDocuments('', { limit: PAGE_SIZE, offset: 0 }),
+        getFolders(),
+      ]);
+      setTranscriptions(transcripts);
+      setHasMore(transcripts.length >= PAGE_SIZE);
+      setFolders(foldersData);
+    } catch {
+      setTranscriptions([]);
+      setHasMore(false);
+      setFolders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
@@ -100,22 +121,14 @@ export default function Transcriptions() {
     }
     if (status !== 'authenticated') return;
 
-    Promise.all([
-      getDocuments('', { limit: PAGE_SIZE, offset: 0 }),
-      getFolders(),
-    ])
-      .then(([transcripts, foldersData]) => {
-        setTranscriptions(transcripts);
-        setHasMore(transcripts.length >= PAGE_SIZE);
-        setFolders(foldersData);
-      })
-      .catch(() => {
-        setTranscriptions([]);
-        setHasMore(false);
-        setFolders([]);
-      })
-      .finally(() => setLoading(false));
-  }, [status, router]);
+    loadDocuments();
+  }, [status, router, loadDocuments]);
+
+  useEffect(() => {
+    const handleOfflineSync = () => loadDocuments({ reset: true });
+    window.addEventListener('ghosttyper:offline-sync-complete', handleOfflineSync);
+    return () => window.removeEventListener('ghosttyper:offline-sync-complete', handleOfflineSync);
+  }, [loadDocuments]);
 
   const handleLoadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
@@ -403,21 +416,21 @@ export default function Transcriptions() {
             <h2 className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em]">{tSidebar('folders')}</h2>
             <button
               onClick={() => setIsCreatingFolder(true)}
-              className="p-1 hover:bg-hover-subtle rounded text-accent transition-colors"
+              className="p-1 hover:bg-hover-subtle rounded text-accent-ink transition-colors"
               title={tSidebar('newFolder')}
               aria-label={tSidebar('newFolderTooltip')}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             </button>
           </div>
 
           <div className="space-y-1">
             <button
               onClick={() => setActiveFolderId(null)}
-              className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center justify-between gap-3 ${activeFolderId === null ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-secondary hover:bg-hover-subtle'}`}
+              className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center justify-between gap-3 ${activeFolderId === null ? 'bg-accent-strong text-white shadow-lg shadow-accent/20' : 'text-secondary hover:bg-hover-subtle'}`}
             >
               <span className="flex items-center gap-3 min-w-0">
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                <svg aria-hidden="true" className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
                 <span className="truncate">{tSidebar('allFiles')}</span>
               </span>
               <span className="text-[10px] opacity-70">{transcriptions.length}</span>
@@ -455,10 +468,10 @@ export default function Transcriptions() {
                   <div className="flex items-center">
                     <button
                       onClick={() => setActiveFolderId(folder.id)}
-                      className={`flex-1 text-left px-3 py-2 pr-16 rounded-xl text-sm transition-all flex items-center justify-between gap-3 min-w-0 ${String(activeFolderId) === String(folder.id) ? 'bg-accent/20 text-accent border border-accent/20' : 'text-secondary hover:bg-hover-subtle'}`}
+                      className={`flex-1 text-left px-3 py-2 pr-16 rounded-xl text-sm transition-all flex items-center justify-between gap-3 min-w-0 ${String(activeFolderId) === String(folder.id) ? 'bg-accent/20 text-accent-ink border border-accent/20' : 'text-secondary hover:bg-hover-subtle'}`}
                     >
                       <span className="flex items-center gap-3 min-w-0">
-                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                        <svg aria-hidden="true" className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
                         <span className="truncate">{folder.name}</span>
                       </span>
                       <span className="text-[10px] opacity-70">{folderCounts[String(folder.id)] || 0}</span>
@@ -467,17 +480,17 @@ export default function Transcriptions() {
                     <div className="absolute right-2 flex gap-1 transition-opacity opacity-100 md:opacity-0 md:group-hover:opacity-100">
                       <button 
                         onClick={() => { setEditingFolderId(folder.id); setEditFolderName(folder.name); }}
-                        className="p-1 text-secondary hover:text-white"
+                        className="p-1 text-secondary hover:text-primary"
                         aria-label={tSidebar('renameFolderAria', { name: folder.name })}
                       >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        <svg aria-hidden="true" className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                       </button>
                       <button 
                         onClick={() => handleDeleteFolder(folder.id)}
                         className="p-1 text-secondary hover:text-danger"
                         aria-label={tSidebar('deleteFolderAria', { name: folder.name })}
                       >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        <svg aria-hidden="true" className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
                   </div>
@@ -499,7 +512,7 @@ export default function Transcriptions() {
                 {searching ? (
                   <div className="w-4 h-4 border-2 border-emphasis border-t-accent rounded-full animate-spin absolute left-3 top-1/2 -translate-y-1/2" />
                 ) : (
-                  <svg className="w-4 h-4 text-secondary absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  <svg aria-hidden="true" className="w-4 h-4 text-secondary absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 )}
                 <label htmlFor="transcription-search" className="sr-only">Dateien durchsuchen</label>
                 <input 
@@ -515,7 +528,7 @@ export default function Transcriptions() {
                 <button
                   type="button"
                   onClick={() => setMeetingDialogOpen(true)}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 transition-colors whitespace-nowrap"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border border-accent/40 bg-accent/10 text-accent-ink hover:bg-accent/20 transition-colors whitespace-nowrap"
                 >
                   <Video className="w-4 h-4" />
                   <span>{tMeeting('buttonLabel')}</span>
@@ -550,7 +563,7 @@ export default function Transcriptions() {
               <option value="processing">Verarbeitung</option>
               <option value="error">Fehler</option>
             </select>
-            <button type="button" onClick={() => setFavoriteOnly((value) => !value)} className={`px-3 py-1.5 rounded-lg text-xs border ${favoriteOnly ? 'bg-accent text-white border-accent' : 'border-subtle text-secondary hover:text-primary'}`}>
+            <button type="button" onClick={() => setFavoriteOnly((value) => !value)} className={`px-3 py-1.5 rounded-lg text-xs border ${favoriteOnly ? 'bg-accent-strong text-white border-accent' : 'border-subtle text-secondary hover:text-primary'}`}>
               Favoriten
             </button>
             <button type="button" onClick={() => setViewMode((value) => value === 'list' ? 'grid' : 'list')} className="px-3 py-1.5 rounded-lg text-xs border border-subtle text-secondary hover:text-primary">
@@ -561,11 +574,11 @@ export default function Transcriptions() {
                 <button type="button" onClick={handleBulkDelete} className="px-3 py-1.5 rounded-lg text-xs bg-danger/10 text-danger border border-danger/30">
                   {selectedIds.size} löschen
                 </button>
-                <button type="button" onClick={handleBulkMove} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-accent/10 text-accent border border-accent/30">
+                <button type="button" onClick={handleBulkMove} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-accent/10 text-accent-ink border border-accent/30">
                   <Folder className="w-3.5 h-3.5" />
                   Verschieben
                 </button>
-                <button type="button" onClick={handleBulkTag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-accent/10 text-accent border border-accent/30">
+                <button type="button" onClick={handleBulkTag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-accent/10 text-accent-ink border border-accent/30">
                   <Tag className="w-3.5 h-3.5" />
                   Tags
                 </button>
@@ -576,19 +589,14 @@ export default function Transcriptions() {
           {loading ? (
             <ListSkeleton />
           ) : filteredTranscriptions.length === 0 ? (
-            <div className="bg-surface border border-subtle rounded-xl p-12 text-center">
-              <div className="w-16 h-16 bg-hover rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <p className="text-primary font-medium mb-1">
-                {searchQuery ? tSidebar('emptySearch') : tSidebar('emptyFolder')}
-              </p>
-              <p className="text-sm text-secondary">
-                {searchQuery ? 'Versuchen Sie es mit einem anderen Begriff.' : 'Laden Sie etwas hoch oder verschieben Sie Dateien hierher.'}
-              </p>
-            </div>
+            <EmptyState
+              Icon={FileText}
+              title={searchQuery ? tSidebar('emptySearch') : tSidebar('emptyFolder')}
+              description={searchQuery ? tEmpty('search.description') : tEmpty('transcriptions.description')}
+              action={!searchQuery && canCreateTranscription
+                ? { href: '/upload', label: tEmpty('transcriptions.cta') }
+                : null}
+            />
           ) : (
             <div className={viewMode === 'grid' ? 'grid grid-cols-1 xl:grid-cols-2 gap-3' : 'space-y-3'}>
               {filteredTranscriptions.map((t) => (

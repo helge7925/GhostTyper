@@ -26,7 +26,31 @@ jobs:
         run: npm ci
 
       - name: Run unit tests
-        run: node --no-warnings --test tests/documents-access.test.mjs tests/chat-citations.test.mjs tests/chat-stream-utils.test.mjs tests/chat-actions-utils.test.mjs
+        run: npm test
         env:
           # Skip DB-dependent tests in PR CI (they require DATABASE_URL)
           DATABASE_URL: ''
+
+  bridge-test:
+    name: Voxtral Bridge Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: services/voxtral-bridge/requirements*.txt
+
+      - name: Install dependencies
+        working-directory: services/voxtral-bridge
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run unit tests
+        working-directory: services/voxtral-bridge
+        run: pytest

@@ -5,6 +5,8 @@ import { randomUUID } from 'crypto';
 import { query } from '../../lib/db';
 import { ACCEPTED_AUDIO_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE, normalizeAnalysisTemplate } from '../../lib/constants';
 import { resolveChatModel } from '../../lib/model-policy';
+import { resolveOpenRouterConfig } from '../../lib/settings-service';
+import { resolveConfiguredModel } from '../../lib/openrouter';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { addTranscriptionEvent } from '../../lib/transcription-events';
 import { scanFileForViruses } from '../../lib/virus-scan';
@@ -12,6 +14,12 @@ import { logAuditEvent } from '../../lib/audit-log';
 import { detectAudioMimeType, extensionFromDetectedMime } from '../../lib/file-signature';
 import { withOrgScope } from '../../lib/api/with-org-scope';
 import { upsertDocumentForTranscription } from '../../lib/documents';
+import {
+  assertClientCaptureScope,
+  findCaptureReplay,
+  isCaptureUniqueViolation,
+  normalizeClientCaptureId,
+} from '../../lib/capture-idempotency';
 
 export const config = {
   api: {
@@ -72,9 +80,26 @@ async function handler(req, res) {
       return res.status(400).json({ message: 'Keine Datei hochgeladen' });
     }
 
+    tempUploadPath = file.filepath || '';
+    const clientCaptureId = normalizeClientCaptureId(
+      fields.clientCaptureId?.[0] || fields.clientCaptureId,
+    );
+    assertClientCaptureScope({
+      clientCaptureId,
+      clientCaptureUserId: fields.clientCaptureUserId?.[0] || fields.clientCaptureUserId,
+      clientCaptureOrganizationId: fields.clientCaptureOrganizationId?.[0] || fields.clientCaptureOrganizationId,
+      requestUserId: userId,
+      requestOrganizationId: orgId,
+    });
+    const replay = await findCaptureReplay({ organizationId: orgId, userId, clientCaptureId });
+    if (replay) {
+      await safeUnlink(tempUploadPath);
+      tempUploadPath = '';
+      return res.status(200).json({ ...replay, idempotentReplay: true });
+    }
+
     const rawMimeType = (file.mimetype || '').toString();
     const reportedMimeType = rawMimeType.split(';')[0];
-    tempUploadPath = file.filepath || '';
     const detectedMimeType = await detectAudioMimeType(tempUploadPath);
 
     if (!detectedMimeType || (!ACCEPTED_AUDIO_TYPES.includes(detectedMimeType) && !detectedMimeType.startsWith('audio/'))) {
@@ -115,8 +140,9 @@ async function handler(req, res) {
     tempUploadPath = '';
 
     const template = normalizeAnalysisTemplate(fields.template?.[0] || fields.template || 'generic');
-    const requestedModel = fields.model?.[0] || fields.model || 'deepseek-v4-pro';
-    const model = resolveChatModel(requestedModel);
+    const requestedModel = fields.model?.[0] || fields.model || null;
+    const openrouter = await resolveOpenRouterConfig({ userId, organizationId: orgId });
+    const model = resolveConfiguredModel(openrouter, 'chat', requestedModel);
     if (!model) {
       await safeUnlink(persistedFilePath);
       persistedFilePath = '';
@@ -148,12 +174,22 @@ async function handler(req, res) {
     }
     const autoAnalyze = (fields.autoAnalyze?.[0] || fields.autoAnalyze) !== 'false';
 
-    const result = await query(
-      `INSERT INTO transcriptions (user_id, organization_id, filename, original_name, file_path, file_size, mime_type, template, model, diarize, custom_prompt, auto_analyze, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending')
+    let result;
+    try {
+      result = await query(
+      `INSERT INTO transcriptions (user_id, organization_id, filename, original_name, file_path, file_size, mime_type, template, model, diarize, custom_prompt, auto_analyze, status, client_capture_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending', $13)
        RETURNING id, filename, original_name, status, template, model, diarize, auto_analyze, created_at`,
-      [userId, orgId, filename, file.originalFilename, filePath, file.size, detectedMimeType, template, model, diarize, combinedPrompt || null, autoAnalyze]
-    );
+      [userId, orgId, filename, file.originalFilename, filePath, file.size, detectedMimeType, template, model, diarize, combinedPrompt || null, autoAnalyze, clientCaptureId]
+      );
+    } catch (error) {
+      if (!isCaptureUniqueViolation(error)) throw error;
+      const racedReplay = await findCaptureReplay({ organizationId: orgId, userId, clientCaptureId });
+      if (!racedReplay) throw error;
+      await safeUnlink(persistedFilePath);
+      persistedFilePath = '';
+      return res.status(200).json({ ...racedReplay, idempotentReplay: true });
+    }
     await upsertDocumentForTranscription({
       transcriptionId: result.rows[0].id,
       organizationId: orgId,
@@ -196,6 +232,16 @@ async function handler(req, res) {
     persistedFilePath = '';
     return res.status(201).json(result.rows[0]);
   } catch (error) {
+    if (error?.code === 'INVALID_CLIENT_CAPTURE_ID' || error?.code === 'CAPTURE_SCOPE_REQUIRED') {
+      await safeUnlink(tempUploadPath);
+      await safeUnlink(persistedFilePath);
+      return res.status(400).json({ message: error.message });
+    }
+    if (error?.code === 'CAPTURE_SCOPE_MISMATCH') {
+      await safeUnlink(tempUploadPath);
+      await safeUnlink(persistedFilePath);
+      return res.status(409).json({ message: error.message, code: error.code });
+    }
     logApiError('Upload error', error);
     await safeUnlink(tempUploadPath);
     await safeUnlink(persistedFilePath);

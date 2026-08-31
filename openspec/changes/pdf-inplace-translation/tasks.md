@@ -1,25 +1,46 @@
 # Tasks: Layout-Preserving PDF Translation
 
 ## 1. Foundations
-- [ ] Add `pdfjs-dist` + `pdf-lib` + fallback font; license check.
-- [ ] `lib/pdf-inplace.js`: text-layer detection + run extraction.
-- [ ] Segmenter (runs → lines → paragraphs) with unit tests on fixtures.
+- [x] Add `pdfjs-dist` + `pdf-lib`; license check. (No embeddable Unicode
+      font added — phase 1 renders with pdf-lib StandardFonts / WinAnsi;
+      full font matching + Unicode embedding is phase 2.)
+- [x] `lib/pdf-inplace.js`: text-layer detection + run extraction.
+- [x] Segmenter (runs → lines → paragraphs) with unit tests on fixtures.
 
 ## 2. Translate & rewrite
-- [ ] Batched TM lookup + glossary block (from
-      `upstream-translation-glossary`).
-- [ ] pdf-lib rewrite pass (white-out, redraw, fit strategy, fallback
-      font embedding).
-- [ ] Layout report (stats) + response headers + UI display.
+- [x] Batched TM lookup + glossary block (reuses `translateSegmentsWithGlossary`
+      / `translateSegmentsWithGlossaryGuard` — same path as the office flow).
+- [x] pdf-lib rewrite pass (white-out, redraw, fit strategy). Font
+      *fallback* uses StandardFonts by serif/mono/sans classification;
+      Unicode font embedding deferred to phase 2.
+- [x] Layout report (stats) + response headers (`X-GhostTyper-Layout`,
+      `X-GhostTyper-PDF-Layout-Mode`). UI display of the report is a
+      follow-up (headers are emitted and audited today).
 
 ## 3. Integration
-- [ ] `pages/api/translate/file.js`: route digital PDFs to in-place
-      path; scans keep OCR fallback (flagged).
-- [ ] Budget gate + usage logging parity with office path.
-- [ ] History row stores layout report.
+- [x] `pages/api/translate/file.js`: route digital PDFs to in-place
+      path; scans keep OCR fallback (flagged `approximated`).
+- [x] Budget gate + usage logging parity with office path.
+- [x] History row + audit metadata store the layout report / mode.
 
 ## 4. Verification
-- [ ] Golden-file tests green; manual matrix: 1-col report, 2-col
-      datasheet, table-heavy manual, scanned PDF (fallback), long → short
-      language pair (de→en) and short → long (en→de).
-- [ ] Docs + CHANGELOG; then open mirror spec in romaco-scriptor.
+- [x] Golden-file tests green (segmentation + rewrite round-trip,
+      overflow counting, non-encodable safety net). Fixtures are built
+      programmatically with pdf-lib — no binaries in the repo.
+- [ ] Manual matrix (needs a live env + real PDFs): 1-col report,
+      2-col datasheet, table-heavy manual, scanned PDF (fallback),
+      long→short (de→en) and short→long (en→de).
+- [x] Docs + CHANGELOG.
+- [x] Mirror spec in romaco-scriptor (verified in the sibling checkout;
+      fork port tasks and implementation are present).
+
+## Open points / phase-2
+- Strip original text objects under the white-out (confidentiality).
+- Embed a Unicode fallback font → CJK/RTL/cyrillic/greek targets
+  (today routed to the OCR fallback).
+- True font matching/embedding instead of StandardFont substitution.
+- AcroForm field text (preserved untouched today).
+- Non-encodable target currently reroutes to OCR *after* translating the
+  segments (double cost in that rare case); a pre-translation script
+  check could avoid it.
+- Surface the layout report in the translate UI (headers exist).

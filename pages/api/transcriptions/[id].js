@@ -13,6 +13,8 @@ import {
 } from '../../../lib/transcription-stale';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { hasPermission } from '../../../lib/permissions';
+import { upsertDocumentFromTranscription } from '../../../lib/documents';
+import { logAuditEvent } from '../../../lib/audit-log';
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
@@ -53,7 +55,7 @@ async function handler(req, res) {
                   source, meeting_platform, native_meeting_id, external_meeting_id, bot_status,
                   meeting_started_at, meeting_ended_at,
                   translated_segments, translation_config, in_meeting_overlay_enabled,
-                  audio_injection_lang
+                   audio_injection_lang, cancel_requested_at, cancel_reason, budget_stop_state
            FROM transcriptions
            WHERE id = $1 AND organization_id = $2`,
           [transId, orgId]
@@ -209,28 +211,16 @@ async function handler(req, res) {
           `UPDATE transcriptions SET ${updates.join(', ')} WHERE id = $${paramIndex++} AND organization_id = $${paramIndex}`,
           values
         );
-
-        if (folderId !== undefined || isFavorite !== undefined) {
-          const docUpdates = [];
-          const docValues = [];
-          let docParamIndex = 1;
-          if (folderId !== undefined) {
-            docUpdates.push(`folder_id = $${docParamIndex++}`);
-            docValues.push(folderId === undefined ? null : folderId);
-          }
-          if (isFavorite !== undefined) {
-            docUpdates.push(`is_favorite = $${docParamIndex++}`);
-            docValues.push(Boolean(isFavorite));
-          }
-          if (docUpdates.length > 0) {
-            docUpdates.push('updated_at = NOW()');
-            docValues.push(transId, orgId);
-            await query(
-              `UPDATE documents SET ${docUpdates.join(', ')} WHERE transcription_id = $${docParamIndex++} AND organization_id = $${docParamIndex}`,
-              docValues,
-            );
-          }
-        }
+        await upsertDocumentFromTranscription(transId, orgId);
+        await logAuditEvent({
+          userId,
+          organizationId: orgId,
+          action: 'transcription.updated',
+          targetType: 'transcription',
+          targetId: String(transId),
+          metadata: { fields: Object.keys(req.body || {}).filter((key) => key !== 'reason') },
+          reason: req.body?.reason ?? null,
+        });
 
         return res.status(200).json({ message: 'Gespeichert' });
       } catch (error) {
@@ -259,6 +249,15 @@ async function handler(req, res) {
         }
 
         await query('DELETE FROM transcriptions WHERE id = $1 AND organization_id = $2', [transId, orgId]);
+        await logAuditEvent({
+          userId,
+          organizationId: orgId,
+          action: 'transcription.deleted',
+          targetType: 'transcription',
+          targetId: String(transId),
+          severity: 'warn',
+          reason: req.body?.reason ?? null,
+        });
         return res.status(200).json({ message: 'Erfolgreich gelöscht' });
       } catch (error) {
         logApiError('Transcription DELETE error', error);

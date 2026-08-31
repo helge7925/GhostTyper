@@ -11,8 +11,9 @@ Dieses Dokument ist bewusst kurz gehalten. Der produktnahe Feature-Überblick st
 - Versions-/Release-Stand: [`../CHANGELOG.md`](../CHANGELOG.md)
 - Produktivitätsfeatures:
   - Audio-Transkription via Mistral Voxtral (Datei-Upload + Browser-Aufnahme)
-  - Remote-Meeting-Bot (Google Meet, Microsoft Teams, Zoom + Nextcloud
-    Talk via Fork) mit Live-Transkript-Streaming
+  - Remote-Meeting-Bot (Microsoft Teams, Zoom + Nextcloud Talk via Fork)
+    mit Live-Transkript-Streaming — Google Meet blockiert Meeting-Bots,
+    dafür Tab-/System-Audio-Aufnahme
   - OCR auf PDF/Bild via Mistral OCR
   - Datentabellen mit Metadaten, Zeilentiteln, Spaltentiteln und
     Excel-/CSV-/HTML-Export
