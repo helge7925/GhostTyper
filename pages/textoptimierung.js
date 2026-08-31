@@ -7,14 +7,17 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { mdToHtml } from '../lib/export-utils';
 import { saveDocument } from '../lib/api';
 import { useTranslations } from '../lib/i18n';
+import { Button } from '../components/ui/button';
+import { Card, CardBody } from '../components/ui/card';
+import { Field } from '../components/ui/field';
+import { Check, Sparkles } from 'lucide-react';
+import { cn } from '../lib/utils';
 
+// Only spelling_grammar is enabled — see pages/api/text-optimization.js's
+// ALLOWED_PRESETS comment. The other five presets come back once each is
+// individually verified with the same rigor.
 const PRESETS = [
   { id: 'spelling_grammar', label: 'Rechtschreibung & Grammatik' },
-  { id: 'friendlier', label: 'Freundlicher' },
-  { id: 'more_formal', label: 'Formeller' },
-  { id: 'shorter', label: 'Kürzer' },
-  { id: 'clearer', label: 'Klarer' },
-  { id: 'email_improve', label: 'E-Mail verbessern' },
 ];
 
 export default function Textoptimierung() {
@@ -89,77 +92,83 @@ export default function Textoptimierung() {
         <title>{`${t('title')} – GhostTyper`}</title>
       </Head>
 
-      <div className="max-w-5xl mx-auto animate-fade-in pb-20">
-        <div className="mb-8">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-secondary">{t('title')}</p>
-          <h1 className="text-2xl font-bold text-primary mt-1">{t('title')}</h1>
-          <p className="text-sm text-secondary mt-2 max-w-2xl">{t('subtitle')}</p>
-        </div>
+      <div className="max-w-3xl mx-auto animate-fade-in pb-20">
+        <header className="mb-7">
+          <p className="text-xs font-medium text-secondary mb-2">{t('eyebrow')}</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-primary">{t('title')}</h1>
+          <p className="text-sm leading-6 text-secondary mt-2 max-w-2xl">{t('subtitle')}</p>
+        </header>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-surface border border-subtle rounded-2xl p-5">
-            <label htmlFor="text-optimization-input" className="block text-xs font-bold uppercase tracking-widest text-secondary mb-3">
-              {t('input')}
-            </label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <Card>
+            <CardBody className="p-5 sm:p-6">
+            <Field label={t('input')} htmlFor="text-optimization-input" help={t('inputHelp')}>
             <textarea
               id="text-optimization-input"
               value={text}
               onChange={(event) => setText(event.target.value)}
               rows={6}
-              placeholder={t('input')}
-              className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none focus:ring-1 focus:ring-accent resize-y"
+              placeholder={t('inputPlaceholder')}
+              className="w-full bg-surface-elevated border border-subtle rounded-lg px-4 py-3 text-sm text-primary outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent resize-y"
             />
-          </div>
+            </Field>
+            </CardBody>
+          </Card>
 
-          <div className="bg-surface border border-subtle rounded-2xl p-5 space-y-5">
+          <Card>
+            <CardBody className="p-5 sm:p-6 space-y-5">
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-secondary mb-3">{t('preset')}</p>
+              <p className="text-xs font-medium text-secondary mb-1">{t('preset')}</p>
+              <p className="text-xs text-muted mb-3">{t('presetHelp')}</p>
               <div className="flex flex-wrap gap-2">
                 {PRESETS.map((entry) => (
                   <button
                     key={entry.id}
                     type="button"
                     onClick={() => setPreset(entry.id)}
-                    className={`px-3 py-2 rounded-xl text-xs border transition-colors ${
+                    aria-pressed={preset === entry.id}
+                    className={cn('inline-flex items-center gap-1.5 min-h-10 px-3 py-2 rounded-lg text-xs font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
                       preset === entry.id
-                        ? 'bg-accent text-white border-accent'
-                        : 'bg-hover-subtle border-subtle text-primary hover:border-accent/40'
-                    }`}
+                        ? 'bg-surface-elevated text-primary border-emphasis'
+                        : 'bg-transparent border-subtle text-secondary hover:text-primary hover:bg-hover-subtle'
+                    )}
                   >
+                    {preset === entry.id && <Check className="w-3.5 h-3.5" aria-hidden="true" />}
                     {t(`presets.${entry.id}`)}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div>
-              <label htmlFor="text-optimization-instruction" className="block text-xs font-bold uppercase tracking-widest text-secondary mb-2">
-                {t('customInstruction')}
-              </label>
+            <Field label={t('customInstruction')} htmlFor="text-optimization-instruction" help={t('instructionHelp')}>
               <textarea
                 id="text-optimization-instruction"
                 value={customInstruction}
                 onChange={(event) => setCustomInstruction(event.target.value)}
                 rows={3}
                 placeholder={t('customInstructionHint')}
-                className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none focus:ring-1 focus:ring-accent resize-y"
+                className="w-full bg-surface-elevated border border-subtle rounded-lg px-4 py-3 text-sm text-primary outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent resize-y"
               />
-            </div>
-          </div>
+            </Field>
+            </CardBody>
+          </Card>
 
           {error && (
-            <div className="p-4 bg-danger/10 border border-danger/20 text-danger rounded-2xl text-sm">
+            <div role="alert" className="p-4 border border-danger/30 text-danger rounded-xl text-sm">
               {error}
             </div>
           )}
 
-          <button
+          <Button
             type="submit"
             disabled={loading || !text.trim()}
-            className="w-full gradient-accent text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 disabled:opacity-30"
+            variant="primary"
+            size="lg"
+            className="w-full"
           >
+            <Sparkles className="w-4 h-4" aria-hidden="true" />
             {loading ? t('submitting') : t('submit')}
-          </button>
+          </Button>
         </form>
       </div>
     </>
