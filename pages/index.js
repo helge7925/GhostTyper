@@ -3,6 +3,9 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { Button } from '../components/ui/button';
+import OnboardingIntro from '../components/OnboardingIntro';
+import PersonalBudgetCard from '../components/PersonalBudgetCard';
 import { useMessageList, useTranslations } from '../lib/i18n';
 
 function pickRandomLine(pool, previousLine) {
@@ -58,6 +61,7 @@ export default function Home() {
 
         <div className="min-h-[70vh] flex items-center justify-center">
           <div className="text-center max-w-lg">
+            <h1 className="sr-only">GhostTyper</h1>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo-text.png"
@@ -67,12 +71,9 @@ export default function Home() {
               className="h-16 w-auto mx-auto mb-6"
             />
             <p className="text-xl text-secondary mb-10 leading-relaxed">{tAuth('tagline')}</p>
-            <Link
-              href="/login"
-              className="gradient-accent text-white px-8 py-3 rounded-full text-base font-medium hover:gradient-accent-hover transition-all shadow-lg hover:shadow-accent/20"
-            >
-              {tLanding('ctaStart')}
-            </Link>
+            <Button asChild variant="primary" size="lg">
+              <Link href="/login">{tLanding('ctaStart')}</Link>
+            </Button>
           </div>
         </div>
       </>
@@ -87,7 +88,8 @@ export default function Home() {
         <title>Dashboard - GhostTyper</title>
       </Head>
 
-      <div className="min-h-[72vh] flex flex-col items-center justify-center text-center animate-fade-in px-4">
+      <div className="max-w-5xl mx-auto animate-fade-in px-4">
+        <div className="min-h-[48vh] flex flex-col items-center justify-center text-center">
         <p className="text-[11px] uppercase tracking-[0.32em] text-info/70 mb-5">
           {tLanding('decoded')}
         </p>
@@ -100,6 +102,9 @@ export default function Home() {
         >
           {welcomeLine}
         </p>
+        </div>
+        <OnboardingIntro />
+        <PersonalBudgetCard className="mt-6" />
       </div>
     </>
   );

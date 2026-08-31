@@ -1,45 +1,52 @@
-# AI-Integration Dokumentation
+# KI-Integration über OpenRouter
 
-## Übersicht
+GhostTyper verwendet OpenRouter als einzigen anwendungsseitigen KI-Provider.
+Vexa und Nextcloud bleiben eigenständige Integrationen. OpenRouter kann intern
+unterschiedliche Modellanbieter routen, sofern deren Endpunkte Zero Data
+Retention unterstützen und keine Datensammlung durchführen.
 
-Dieses Dokument beschreibt die AI-Integration für die GhostTyper WebApp.
-- Cortecs-Modelle: Transkription, Analyse, Übersetzung, Textoptimierung
-- Mistral-Modelle: OCR und Voxtral-TTS
+## Konfiguration und Governance
 
-## Architektur
+Organisationsadmins konfigurieren unter
+`/settings/organization/integrations` einen verschlüsselt gespeicherten
+OpenRouter-Schlüssel, eine Allowlist und je ein Standardmodell für `chat`,
+`ocr`, `transcription`, `liveTranscription` und `tts`. Modell-Slugs kommen
+ausschließlich aus dem dynamischen OpenRouter-Katalog. Das optionale
+`OPENROUTER_API_KEY` ist ein Operator-Fallback; es ersetzt keine vollständige
+Allowlist und keine Standards.
 
-### AI-Integration-Fluss
+Die Aktivierung führt kleine kostenpflichtige Proben für alle fünf Fähigkeiten
+aus. Erst danach wird die Organisation atomar auf OpenRouter geschaltet und
+Legacy-Schlüssel werden entfernt. Ein nicht verfügbares Nutzermodell wird
+genau einmal durch den Organisationsstandard derselben Fähigkeit ersetzt.
 
-1. **Audio-Verarbeitung**: Audio-Aufnahmen werden serverseitig via FFmpeg in MP3 konvertiert, um maximale Kompatibilität mit STT-APIs zu gewährleisten.
-2. **Transkription**: Die Audio-Datei wird standardmäßig über Cortecs mit `whisper-large-v3` transkribiert.
-3. **Analyse**: Das Transkript wird basierend auf Vorlagen über Cortecs mit `deepseek-v4-pro` analysiert.
-4. **OCR**: Dokumente (PDF/Bilder) werden mit Mistral OCR (`mistral-ocr-latest`) verarbeitet.
-5. **Übersetzung**: Texte werden über Cortecs in die gewählte Zielsprache übersetzt.
-6. **Speichern**: Alle Ergebnisse werden strukturiert in der PostgreSQL-Datenbank gespeichert.
+## Laufzeitpfade
 
-## Konfiguration
+- Chat, Analyse, Übersetzung, Textoptimierung und Vorlagen verwenden
+  `/chat/completions`.
+- Batch- und Live-STT verwenden `/audio/transcriptions` mit Base64-Audio.
+- TTS verwendet `/audio/speech`; Audio für WAV-Streams wird per ffmpeg auf
+  22.050 Hz, 16 Bit und Mono normalisiert.
+- Bilder werden als Base64-Bildeingabe an das freigegebene OCR-Modell gesendet.
+- PDFs verwenden den OpenRouter-`file-parser` mit `mistral-ocr` und liefern
+  Markdown in den bestehenden GhostTyper-Vertrag zurück.
 
-### Cortecs-API
+Jeder Request setzt `provider.zdr=true` und
+`provider.data_collection="deny"`. API-Schlüssel und interne Routingdetails
+werden nicht an Clients ausgegeben.
 
-Die Cortecs-API-Logik für Chat/STT ist zentral in `lib/ai-service.js` implementiert. Mistral-spezifische OCR bleibt im selben Modul isoliert.
+## Katalog, Preise und Budgets
 
-**Transkription:**
-Nutzt den Cortecs `/audio/transcriptions` Endpoint. Workspace-Kontextbegriffe werden als OpenAI-kompatibles `prompt` übergeben.
+Der serverseitige Katalog schneidet die für den Schlüssel verfügbaren Modelle
+mit ZDR-fähigen Modellen. Er wird zehn Minuten gecacht; ein bis zu 24 Stunden
+alter Stand ist nur für die Modellanzeige zulässig. Allowlist und Standards
+bleiben in der verschlüsselten Integrationskonfiguration.
 
-**Analyse & Chat:**
-Nutzt den Cortecs `/chat/completions` Endpoint mit JSON-Response-Format für strukturierte Analysen.
+Budgets, Preise und Usage werden ausschließlich in USD geführt. Katalogpreise
+werden für erlaubte Modelle versioniert; nicht normalisierbare Preisstrukturen
+benötigen vor Freigabe einen manuellen Preis. Für abgeschlossene Requests ist
+`usage.cost` maßgeblich. TTS-Kosten werden über die OpenRouter-Generation-ID
+nachgeladen.
 
-### Unterstützte Modelle
-- **Batch-Transkription** (Datei-Upload): `whisper-large-v3`
-- **Live-Transkription** (Vexa-Pfad): `whisper-large-v3` über die interne Bridge
-- **Analyse / Chat**: `deepseek-v4-pro`
-- **OCR**: `mistral-ocr-latest`
-- **Übersetzung/Textoptimierung**: `deepseek-v4-pro`, wählbar pro Workspace
-
-## Umgebung
-
-Die Umgebung wird über die `.env`-Datei konfiguriert:
-
-- **CORTECS_API_KEY**: API-Schlüssel für Transkription, Analyse, Übersetzung und Textoptimierung.
-- **MISTRAL_API_KEY**: Mistral API-Schlüssel für OCR und TTS.
-- **DATABASE_URL**: Verbindung zur PostgreSQL-Datenbank.
+Weitere Details und Abnahmekriterien stehen in
+`openspec/changes/consolidate-ai-providers-openrouter/`.

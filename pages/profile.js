@@ -4,6 +4,10 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useTranslations } from '../lib/i18n';
+import { Camera } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
+import { Field, FieldInput } from '../components/ui/field';
 
 export default function Profile() {
   const { data: session, status, update } = useSession();
@@ -122,8 +126,9 @@ export default function Profile() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Avatar Section */}
-          <div className="bg-surface border border-subtle rounded-2xl p-8 flex flex-col items-center text-center">
+          <Card className="p-8 flex flex-col items-center text-center">
             <input 
+              id="profile-avatar"
               type="file" 
               ref={fileInputRef} 
               onChange={handleFileChange} 
@@ -131,122 +136,117 @@ export default function Profile() {
               className="hidden" 
             />
             
-            <div 
+            <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="relative cursor-pointer group"
+              className="relative rounded-full group"
+              aria-label="Profilbild auswählen"
             >
               {formData.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img 
                   src={formData.avatarUrl} 
                   alt="Avatar" 
-                  className="w-32 h-32 rounded-full object-cover border-4 border-accent/20 group-hover:border-accent/50 transition-all shadow-2xl" 
+                  className="w-32 h-32 rounded-full object-cover border-4 border-accent/20 group-hover:border-accent/50 transition-colors"
                 />
               ) : (
-                <div className="w-32 h-32 rounded-full gradient-accent flex items-center justify-center text-4xl font-bold text-white uppercase shadow-2xl shadow-accent/20 group-hover:scale-105 transition-transform">
+                <div className="w-32 h-32 rounded-full gradient-accent flex items-center justify-center text-4xl font-bold text-white uppercase">
                   {formData.email.substring(0, 2)}
                 </div>
               )}
               
               <div className="absolute inset-0 bg-overlay rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
+                <Camera className="w-8 h-8 text-white" aria-hidden="true" />
               </div>
-            </div>
+            </button>
             
-            <h2 className="mt-4 text-sm font-semibold text-primary uppercase tracking-widest">Profilbild ändern</h2>
-            <p className="text-[10px] text-secondary mt-1">Klicke auf das Bild, um ein neues Foto hochzuladen</p>
-          </div>
+            <h2 className="mt-4 text-sm font-semibold text-primary">Profilbild ändern</h2>
+            <p className="text-xs text-secondary mt-1">Bild auswählen, maximal 2 MB.</p>
+          </Card>
 
           {/* Account Info */}
-          <div className="bg-surface border border-subtle rounded-2xl p-6 space-y-4 shadow-xl">
-            <h2 className="text-sm font-semibold text-secondary uppercase tracking-wider mb-2">Account-Informationen</h2>
+          <Card className="p-6 space-y-4">
+            <h2 className="text-sm font-semibold text-primary mb-2">Account-Informationen</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-secondary mb-1.5">{t('name')}</label>
-                <input
+              <Field label={t('name')} htmlFor="profile-name">
+                <FieldInput
+                  id="profile-name"
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none transition-all"
                 />
-              </div>
+              </Field>
 
-              <div>
-                <label className="block text-xs font-medium text-secondary mb-1.5">{t('email')}</label>
-                <input
+              <Field label={t('email')} htmlFor="profile-email" required>
+                <FieldInput
+                  id="profile-email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
-                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none transition-all"
                 />
-              </div>
+              </Field>
             </div>
-          </div>
+          </Card>
 
           {/* Password Section */}
-          <div className="bg-surface border border-subtle rounded-2xl p-6 space-y-4 shadow-xl">
-            <h2 className="text-sm font-semibold text-secondary uppercase tracking-wider mb-2">Passwort ändern</h2>
+          <Card className="p-6 space-y-4">
+            <h2 className="text-sm font-semibold text-primary mb-2">Passwort ändern</h2>
             
-            <div>
-              <label className="block text-xs font-medium text-secondary mb-1.5">{t('currentPassword')}</label>
-              <input
+            <Field label={t('currentPassword')} htmlFor="profile-current-password">
+              <FieldInput
+                id="profile-current-password"
                 type="password"
                 value={formData.currentPassword}
                 onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
                 placeholder="Zur Bestätigung erforderlich"
-                className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none transition-all"
               />
-            </div>
+            </Field>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-subtle pt-4">
-              <div>
-                <label className="block text-xs font-medium text-secondary mb-1.5">{t('newPassword')}</label>
-                <input
+              <Field label={t('newPassword')} htmlFor="profile-new-password">
+                <FieldInput
+                  id="profile-new-password"
                   type="password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   placeholder="Min. 8 Zeichen"
-                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none transition-all"
                 />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-secondary mb-1.5">{t('confirmPassword')}</label>
-                <input
+              </Field>
+              <Field label={t('confirmPassword')} htmlFor="profile-confirm-password">
+                <FieldInput
+                  id="profile-confirm-password"
                   type="password"
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   placeholder="Passwort wiederholen"
-                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none transition-all"
                 />
-              </div>
+              </Field>
             </div>
-          </div>
+          </Card>
 
           {error && (
-            <div className="p-4 bg-danger/10 border border-danger/20 text-danger rounded-xl text-sm animate-fade-in text-center shadow-lg">
+            <div role="alert" className="p-4 border border-danger/30 text-danger rounded-xl text-sm animate-fade-in text-center">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="p-4 bg-success/10 border border-success/20 text-success rounded-xl text-sm animate-fade-in text-center shadow-lg">
+            <div role="status" className="p-4 border border-success/30 text-success rounded-xl text-sm animate-fade-in text-center">
               {success}
             </div>
           )}
 
           <div className="flex justify-end pt-2 pb-12">
-            <button
+            <Button
               type="submit"
+              variant="primary"
+              size="lg"
               disabled={saving}
-              className="gradient-accent text-white px-10 py-3.5 rounded-full text-sm font-semibold shadow-lg shadow-accent/20 hover:shadow-accent/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:-translate-y-0.5 active:translate-y-0"
             >
               {saving ? tCommon('saving') : tCommon('save')}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

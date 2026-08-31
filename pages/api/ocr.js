@@ -1,18 +1,22 @@
 import formidable from 'formidable';
-import { copyFile, unlink, mkdir } from 'fs/promises';
+import { copyFile, unlink, mkdir, readFile } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { query } from '../../lib/db';
 import { withOrgScope } from '../../lib/api/with-org-scope';
 import { performOCR, analyzeTranscription } from '../../lib/ai-service';
+import { performOcrEdenAi, analyzeTranscriptionEdenAi } from '../../lib/edenai-service';
+import { resolveActiveProviderConfig } from '../../lib/ai-provider-router';
 import {
-  CostLimitCheckUnavailableError,
-  assertBudgetWithinLimits,
-  logUsage,
-} from '../../lib/usage';
+  budgetIdempotencyKey,
+  composeAbortSignals,
+  executeReservedSpend,
+  estimateTextUsage,
+  requestBudgetScope,
+} from '../../lib/budget-runtime';
 import { ACCEPTED_OCR_TYPES, MAX_CUSTOM_PROMPT_LENGTH, MAX_FILE_SIZE, normalizeAnalysisTemplate } from '../../lib/constants';
-import { resolveChatModel } from '../../lib/model-policy';
-import { getSettingsRow, resolveCortecsConfig, resolveMistralApiKey } from '../../lib/settings-service';
+import { resolveConfiguredModel } from '../../lib/openrouter';
+import { getSettingsRow } from '../../lib/settings-service';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { addTranscriptionEvent } from '../../lib/transcription-events';
 import { resolveTemplate } from '../../lib/template-service';
@@ -22,7 +26,12 @@ import { normalizeDataTableAnalysis } from '../../lib/data-table';
 import { normalizeAndValidateTableAnalysis } from '../../lib/table-analysis';
 import { logAuditEvent } from '../../lib/audit-log';
 import { upsertDocumentForTranscription } from '../../lib/documents';
-import { autoIndexDocument } from '../../lib/document-index';
+import {
+  assertClientCaptureScope,
+  findCaptureReplay,
+  isCaptureUniqueViolation,
+  normalizeClientCaptureId,
+} from '../../lib/capture-idempotency';
 
 export const config = {
   api: {
@@ -39,6 +48,14 @@ async function ensureUploadDir() {
 async function safeUnlink(filePath) {
   if (!filePath) return;
   await unlink(filePath).catch(() => {});
+}
+
+async function estimateOcrPages(filePath, mimeType) {
+  if (mimeType !== 'application/pdf') return 1;
+  const bytes = await readFile(filePath);
+  const matches = bytes.toString('latin1').match(/\/Type\s*\/Page(?!s)\b/g);
+  const sizeBound = Math.ceil(bytes.length / (250 * 1024));
+  return Math.min(10_000, Math.max(1, matches?.length || 0, sizeBound));
 }
 
 function parseForm(req) {
@@ -81,8 +98,30 @@ async function handler(req, res) {
     if (!file) {
       return res.status(400).json({ message: 'Keine Datei hochgeladen' });
     }
-
     tempUploadPath = file.filepath || '';
+
+    const clientCaptureId = normalizeClientCaptureId(
+      fields.clientCaptureId?.[0] || fields.clientCaptureId,
+    );
+    assertClientCaptureScope({
+      clientCaptureId,
+      clientCaptureUserId: fields.clientCaptureUserId?.[0] || fields.clientCaptureUserId,
+      clientCaptureOrganizationId: fields.clientCaptureOrganizationId?.[0] || fields.clientCaptureOrganizationId,
+      requestUserId: userId,
+      requestOrganizationId: orgId,
+    });
+    const replay = await findCaptureReplay({ organizationId: orgId, userId, clientCaptureId });
+    if (replay) {
+      await safeUnlink(tempUploadPath);
+      tempUploadPath = '';
+      return res.status(200).json({
+        transcriptionId: replay.id,
+        markdown: replay.text || '',
+        analysis: replay.analysis || null,
+        idempotentReplay: true,
+      });
+    }
+
     const detectedMimeType = await detectOcrMimeType(tempUploadPath);
     if (!detectedMimeType || !ACCEPTED_OCR_TYPES.includes(detectedMimeType)) {
       await safeUnlink(tempUploadPath);
@@ -107,21 +146,35 @@ async function handler(req, res) {
     tempUploadPath = '';
 
     const settingsRow = await getSettingsRow(userId);
-    const mistralApiKey = await resolveMistralApiKey({ userId, organizationId: req.org?.id });
-    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const preferredModel = resolveChatModel(settingsRow?.preferred_model, null) || cortecs.chatModel;
     const language = settingsRow?.language || 'de';
     const shouldAnalyze = (fields.analyze?.[0] || fields.analyze) === 'true';
 
-    if (!mistralApiKey) {
+    // OCR extraction and analysis both resolve the same `chat` capability
+    // now — neither has an EdenAI-native capability of its own for
+    // extraction (see lib/edenai.js's EDENAI_HARDCODED_MODEL comment),
+    // and analysis was migrated onto the same router in
+    // migrate-chat-to-edenai (previously it kept its own hardcoded
+    // `openrouter` resolution, per the master plan's original chat/
+    // analysis exception list — that exception is now closed). One
+    // resolution serves both blocks below.
+    const activeOcr = await resolveActiveProviderConfig({ userId, organizationId: req.org?.id, capability: 'chat' });
+    const ocrModel = activeOcr.provider === 'edenai'
+      ? activeOcr.model
+      : resolveConfiguredModel(activeOcr, 'ocr', settingsRow?.ocr_model);
+    // EdenAI's chat model is hardcoded — no separate "preferred model"
+    // concept, unlike OpenRouter's catalogue-driven per-user preference.
+    const preferredModel = activeOcr.provider === 'edenai'
+      ? activeOcr.model
+      : resolveConfiguredModel(activeOcr, 'chat', settingsRow?.preferred_model);
+
+    if (!activeOcr.apiKey || !ocrModel) {
       await safeUnlink(persistedFilePath);
       persistedFilePath = '';
-      return res.status(400).json({ message: 'Kein Mistral API-Key für OCR konfiguriert' });
-    }
-    if (shouldAnalyze && !cortecs.apiKey) {
-      await safeUnlink(persistedFilePath);
-      persistedFilePath = '';
-      return res.status(400).json({ message: 'Kein Cortecs API-Key für Analyse konfiguriert' });
+      return res.status(400).json({
+        message: activeOcr.provider === 'edenai'
+          ? 'EdenAI OCR ist nicht vollständig konfiguriert'
+          : 'OpenRouter OCR ist nicht vollständig konfiguriert',
+      });
     }
     if (!preferredModel) {
       await safeUnlink(persistedFilePath);
@@ -166,9 +219,10 @@ async function handler(req, res) {
       return res.status(400).json({ message: `Kombinierter Kontext ist zu lang (max. ${MAX_CUSTOM_PROMPT_LENGTH} Zeichen)` });
     }
     const requestModel = fields.model?.[0] || fields.model;
-    const selectedModelForAnalysis = shouldAnalyze
-      ? (resolveChatModel(requestModel, null) || preferredModel)
-      : preferredModel;
+    // EdenAI's chat model is hardcoded — no per-request model override.
+    const selectedModelForAnalysis = activeOcr.provider === 'edenai'
+      ? activeOcr.model
+      : (shouldAnalyze ? resolveConfiguredModel(activeOcr, 'chat', requestModel) : preferredModel);
     if (shouldAnalyze && !selectedModelForAnalysis) {
       await safeUnlink(persistedFilePath);
       persistedFilePath = '';
@@ -176,28 +230,81 @@ async function handler(req, res) {
     }
 
     let resolvedTemplateForAnalysis = null;
-    // Budget gate first (short advisory-lock hold), then OCR + analysis
-    // outside the lock so the long provider calls don't pin a pool
-    // connection.
-    await assertBudgetWithinLimits(userId, orgId);
-
-    const { markdown, usage: ocrUsage, model: ocrModel } = await performOCR(filePath, mistralApiKey, detectedMimeType);
-    await logUsage(userId, ocrModel, 'ocr', ocrUsage, orgId);
+    const budgetScope = clientCaptureId
+      ? budgetIdempotencyKey('ocr-capture', orgId, userId, clientCaptureId)
+      : requestBudgetScope(req, 'ocr', file.originalFilename || filename);
+    const estimatedPages = await estimateOcrPages(filePath, detectedMimeType);
+    const { markdown } = await executeReservedSpend(
+      {
+        idempotencyKey: `${budgetScope}:ocr`,
+        organizationId: orgId,
+        userId,
+        operation: 'ocr',
+        provider: activeOcr.provider,
+        model: ocrModel,
+        ...(activeOcr.provider === 'edenai' ? {} : { fallbackModel: activeOcr.defaultModels.ocr }),
+        estimatedUsage: { inputQuantity: estimatedPages, outputQuantity: 0 },
+      },
+      (_reservation, budgetSignal) => (activeOcr.provider === 'edenai'
+        ? performOcrEdenAi(filePath, activeOcr.apiKey, detectedMimeType, {
+          model: ocrModel,
+          signal: composeAbortSignals(budgetSignal),
+        })
+        : performOCR(filePath, activeOcr.apiKey, detectedMimeType, {
+          model: ocrModel,
+          organizationId: activeOcr.organizationId,
+          signal: composeAbortSignals(budgetSignal),
+        })),
+      (result) => ({
+        ...(result.usage || {}),
+        inputQuantity: result.usage?.pages_processed || result.usage?.pages || estimatedPages,
+        outputQuantity: 0,
+      }),
+    );
 
     let analysis = null;
-    let selectedModelForSave = 'mistral-ocr-latest';
+    let selectedModelForSave = ocrModel;
     if (shouldAnalyze && markdown.trim()) {
       resolvedTemplateForAnalysis = await resolveTemplate(template, userId);
-      const analysisResult = await analyzeTranscription(
-        markdown,
-        resolvedTemplateForAnalysis,
-        cortecs.apiKey,
-        effectiveCustomPrompt,
-        selectedModelForAnalysis,
-        language,
-        { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
+      const analysisResult = await executeReservedSpend(
+        {
+          idempotencyKey: `${budgetScope}:analysis`,
+          organizationId: orgId,
+          userId,
+          operation: 'analysis',
+          provider: activeOcr.provider,
+          model: selectedModelForAnalysis,
+          estimatedUsage: estimateTextUsage(`${markdown}\n${effectiveCustomPrompt}`, {
+            inputBufferTokens: 1600,
+            outputMultiplier: 0.8,
+            outputBufferTokens: 3500,
+          }),
+        },
+        (_reservation, budgetSignal) => (activeOcr.provider === 'edenai'
+          ? analyzeTranscriptionEdenAi(
+            markdown,
+            resolvedTemplateForAnalysis,
+            activeOcr.apiKey,
+            effectiveCustomPrompt,
+            selectedModelForAnalysis,
+            language,
+            { signal: composeAbortSignals(budgetSignal) },
+          )
+          : analyzeTranscription(
+            markdown,
+            resolvedTemplateForAnalysis,
+            activeOcr.apiKey,
+            effectiveCustomPrompt,
+            selectedModelForAnalysis,
+            language,
+            {
+              baseUrl: activeOcr.baseUrl,
+              fallbackModel: activeOcr.defaultModels.chat,
+              organizationId: activeOcr.organizationId,
+              signal: composeAbortSignals(budgetSignal),
+            },
+          )),
       );
-      await logUsage(userId, analysisResult.model, 'analysis', analysisResult.usage, orgId);
       analysis = analysisResult.analysis;
       selectedModelForSave = selectedModelForAnalysis;
     }
@@ -228,9 +335,11 @@ async function handler(req, res) {
     }
 
     // Save OCR result as a transcription record in the history
-    const transcriptionResult = await query(
-      `INSERT INTO transcriptions (user_id, organization_id, filename, original_name, file_path, file_size, mime_type, template, model, custom_prompt, status, text, analysis, analysis_type, analysis_meta, table_schema)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11, $12, $13, $14, $15)
+    let transcriptionResult;
+    try {
+      transcriptionResult = await query(
+      `INSERT INTO transcriptions (user_id, organization_id, filename, original_name, file_path, file_size, mime_type, template, model, custom_prompt, status, text, analysis, analysis_type, analysis_meta, table_schema, client_capture_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11, $12, $13, $14, $15, $16)
        RETURNING id`,
       [
         userId,
@@ -248,23 +357,36 @@ async function handler(req, res) {
         analysisType,
         analysisMeta ? JSON.stringify(analysisMeta) : null,
         tableSchema ? JSON.stringify(tableSchema) : null,
+        clientCaptureId,
       ]
-    );
+      );
+    } catch (error) {
+      if (!isCaptureUniqueViolation(error)) throw error;
+      const racedReplay = await findCaptureReplay({ organizationId: orgId, userId, clientCaptureId });
+      if (!racedReplay) throw error;
+      await safeUnlink(persistedFilePath);
+      persistedFilePath = '';
+      return res.status(200).json({
+        transcriptionId: racedReplay.id,
+        markdown: racedReplay.text || '',
+        analysis: racedReplay.analysis || null,
+        idempotentReplay: true,
+      });
+    }
 
     const transcriptionId = transcriptionResult.rows[0].id;
-    const ocrDocument = await upsertDocumentForTranscription({
+    await upsertDocumentForTranscription({
       transcriptionId,
       organizationId: orgId,
       ownerUserId: userId,
       visibility: 'private',
-      sourceType: 'ocr',
+      sourceType: analysisType === 'table' ? 'data_table' : 'ocr',
       title: file.originalFilename,
       mimeType: detectedMimeType,
       fileSize: file.size,
       status: 'completed',
       textPreview: markdown,
     });
-    void autoIndexDocument({ documentId: ocrDocument?.id, transcriptionId, organizationId: orgId, userId });
     await addTranscriptionEvent({
       transcriptionId,
       userId,
@@ -283,6 +405,7 @@ async function handler(req, res) {
       metadata: {
         originalName: file.originalFilename || null,
         mimeType: detectedMimeType,
+        ocrProvider: activeOcr.provider,
         template,
         analysisType,
         size: Number(file.size || 0),
@@ -295,11 +418,26 @@ async function handler(req, res) {
 
     return res.status(200).json({ transcriptionId, markdown, analysis });
   } catch (error) {
-    if (error?.code === 'COST_LIMIT_EXCEEDED') {
+    if (error?.code === 'INVALID_CLIENT_CAPTURE_ID' || error?.code === 'CAPTURE_SCOPE_REQUIRED') {
+      await safeUnlink(tempUploadPath);
+      await safeUnlink(persistedFilePath);
+      return res.status(400).json({ message: error.message });
+    }
+    if (error?.code === 'CAPTURE_SCOPE_MISMATCH') {
+      await safeUnlink(tempUploadPath);
+      await safeUnlink(persistedFilePath);
+      return res.status(409).json({ message: error.message, code: error.code });
+    }
+    if (error?.code === 'BUDGET_EXCEEDED') {
       return res.status(429).json({ message: error.message });
     }
-    if (error instanceof CostLimitCheckUnavailableError || error?.code === 'COST_CHECK_UNAVAILABLE') {
+    if (error?.code === 'BUDGET_ACCOUNTING_UNAVAILABLE' || error?.code === 'PRICING_CONFIGURATION_MISSING') {
       return res.status(503).json({ message: error.message });
+    }
+    if (error?.code === 'PDF_TOO_MANY_PAGES') {
+      await safeUnlink(tempUploadPath);
+      await safeUnlink(persistedFilePath);
+      return res.status(400).json({ message: error.message });
     }
     logApiError('OCR error', error);
     await safeUnlink(tempUploadPath);
@@ -308,4 +446,4 @@ async function handler(req, res) {
   }
 }
 
-export default withOrgScope({ permission: 'transcription.write' }, handler);
+export default withOrgScope({ permission: 'paid.execute' }, handler);

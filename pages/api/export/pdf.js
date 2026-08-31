@@ -5,6 +5,7 @@ import { renderPdfBufferFromHtml } from '../../../lib/pdf-export';
 import { withPdfRenderSlot } from '../../../lib/pdf-render-limiter';
 import { normalizePdfFontPreset, normalizePdfTheme } from '../../../lib/pdf-print-style';
 import { logAuditEvent } from '../../../lib/audit-log';
+import { redactHtmlText } from '../../../lib/pdf-html-redaction';
 
 export const config = {
   api: {
@@ -55,7 +56,7 @@ export default async function handler(req, res) {
   if (!allowed) return;
 
   try {
-    const { html, filename, theme, fontPreset } = req.body || {};
+    const { html, filename, theme, fontPreset, redactionTerms } = req.body || {};
     if (!html || typeof html !== 'string') {
       return res.status(400).json({ message: 'HTML-Inhalt fehlt.' });
     }
@@ -63,7 +64,8 @@ export default async function handler(req, res) {
       return res.status(413).json({ message: 'HTML-Inhalt ist zu groß für den PDF-Export.' });
     }
 
-    const pdfBuffer = await withPdfRenderSlot(() => renderPdfBufferFromHtml(html, {
+    const redaction = redactHtmlText(html, redactionTerms);
+    const pdfBuffer = await withPdfRenderSlot(() => renderPdfBufferFromHtml(redaction.html, {
       theme: normalizePdfTheme(theme),
       fontPreset: normalizePdfFontPreset(fontPreset),
       documentTitle: normalizeDocumentTitle(filename),
@@ -77,6 +79,8 @@ export default async function handler(req, res) {
       metadata: {
         filename: safeName,
         htmlLength: html.length,
+        redactionTerms: redaction.terms,
+        redactionsApplied: redaction.applied,
       },
     });
 
@@ -86,6 +90,9 @@ export default async function handler(req, res) {
     return res.status(200).send(pdfBuffer);
   } catch (error) {
     const errorMessage = String(error?.message || '');
+    if (error?.code?.includes('REDACTION') || errorMessage.includes('REDACTION')) {
+      return res.status(400).json({ message: 'Die Schwärzung konnte nicht sicher angewendet werden.' });
+    }
     if (errorMessage.startsWith('PDF_RENDERER_UNAVAILABLE')) {
       return res.status(503).json({ message: 'PDF-Renderer ist nicht verfügbar. Chromium/Chrome installieren oder PDF_CHROMIUM_PATH setzen.' });
     }

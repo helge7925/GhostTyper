@@ -107,12 +107,12 @@ export default function TableEditor({
     <div className="fixed inset-0 z-[60] bg-canvas flex flex-col animate-fade-in">
       <nav className="min-h-16 border-b border-subtle bg-surface flex flex-wrap md:flex-nowrap items-center justify-between gap-2 px-3 md:px-6 py-2 shrink-0">
         <div className="flex items-center gap-3 md:gap-4 min-w-0">
-          <button onClick={handleCancelClick} className="p-2 rounded-full transition-all text-secondary hover:text-accent bg-hover-subtle">
+          <button onClick={handleCancelClick} className="p-2 rounded-full transition-all text-secondary hover:text-accent-ink bg-hover-subtle">
             <span className="sr-only">{t('closeEditor')}</span>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </button>
           <div className="flex flex-col min-w-0">
-            <span className="text-[10px] font-bold text-accent uppercase tracking-widest leading-none">{t('eyebrow')}</span>
+            <span className="text-[10px] font-bold text-accent-ink uppercase tracking-widest leading-none">{t('eyebrow')}</span>
             <span className="text-sm font-medium text-primary truncate max-w-[260px]">{filename}</span>
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function TableEditor({
                 aria-expanded={showSourceContent}
               >
                 <span>{showSourceContent ? t('hideSource', { label: resolvedSourceLabel }) : t('showSource', { label: resolvedSourceLabel })}</span>
-                <svg
+                <svg aria-hidden="true"
                   className={`w-4 h-4 text-secondary transition-transform ${showSourceContent ? 'rotate-180' : ''}`}
                   fill="none"
                   stroke="currentColor"

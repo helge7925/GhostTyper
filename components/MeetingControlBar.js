@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Square, Languages, ArrowLeftRight, Share2, Copy, Check, Tv, Volume2 } from 'lucide-react';
 import { useUiFeedback } from '../lib/use-ui-feedback';
+import { usePermission } from '../lib/use-permission';
+import { useFormatter, useTranslations } from '../lib/i18n';
+import { shouldPollLiveUsage } from '../lib/live-usage';
+
+// bot_status values with a friendly, localized label. Anything not listed
+// (e.g. a raw Vexa status we don't map yet) falls through to the raw value.
+const KNOWN_BOT_STATUSES = ['requested', 'joining', 'awaiting_admission', 'active', 'completed', 'failed', 'rejected'];
 
 export default function MeetingControlBar({
   transcriptionId,
@@ -16,14 +23,60 @@ export default function MeetingControlBar({
   // never resolve and the Stop button would silently hang. We use the browser
   // native confirm here; it also lets us spell out the Whisper-chunk caveat.
   const { showToast } = useUiFeedback();
+  const canViewCost = usePermission('org.read');
+  const { currency } = useFormatter();
+  const tLiveCost = useTranslations('meeting.liveCost');
+  const tBotStatus = useTranslations('meeting.botStatus');
+  const rawBotStatus = String(botStatus || '').toLowerCase();
+  const botStatusLabel = KNOWN_BOT_STATUSES.includes(rawBotStatus)
+    ? tBotStatus(rawBotStatus)
+    : (botStatus || tBotStatus('active'));
   const [language, setLanguage] = useState(currentLanguage || 'de');
   const [updatingLanguage, setUpdatingLanguage] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [updatingTranslation, setUpdatingTranslation] = useState(false);
+  const [liveUsage, setLiveUsage] = useState({ state: 'loading', totalCost: null, finished: false });
 
   const translationOn = !!translationConfig?.enabled;
   const translationFrom = translationConfig?.fromLang || 'de';
   const translationTo = translationConfig?.toLang || 'en';
+
+  useEffect(() => {
+    if (!shouldPollLiveUsage({ canViewCost, transcriptionId, finished: liveUsage.finished })) return undefined;
+    let cancelled = false;
+    let controller = null;
+    const load = async () => {
+      controller?.abort();
+      controller = new AbortController();
+      try {
+        const response = await fetch(`/api/usage/live?meetingId=${encodeURIComponent(transcriptionId)}`, {
+          credentials: 'same-origin',
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`HTTP_${response.status}`);
+        const payload = await response.json();
+        if (!cancelled) setLiveUsage(payload);
+      } catch (error) {
+        if (!cancelled && error?.name !== 'AbortError') {
+          setLiveUsage((previous) => ({ ...previous, state: 'unavailable' }));
+        }
+      }
+    };
+    load();
+    const timer = setInterval(load, 12_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      controller?.abort();
+    };
+  }, [canViewCost, liveUsage.finished, transcriptionId]);
+
+  const liveCostLevel = liveUsage.budgetTrafficLight?.level || 'green';
+  const liveCostClass = liveCostLevel === 'red'
+    ? 'border-danger/40 text-danger bg-danger/10'
+    : liveCostLevel === 'yellow'
+      ? 'border-warning/40 text-warning bg-warning/10'
+      : 'border-success/30 text-success bg-success/10';
 
   const sendTranslation = async (next) => {
     setUpdatingTranslation(true);
@@ -249,13 +302,25 @@ export default function MeetingControlBar({
           <div className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" aria-hidden />
           <div>
             <p className="text-sm font-medium text-primary">Bot ist im Meeting</p>
-            <p className="text-[11px] text-secondary">Status: {botStatus || 'aktiv'}</p>
+            <p className="text-[11px] text-secondary">Status: {botStatusLabel}</p>
           </div>
         </div>
         {/* flex-wrap + justify-end so the toggle row stays right-aligned
             but breaks into a second row instead of overflowing when
             translation/overlay/audio toggles are all visible. */}
         <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
+          {canViewCost && (
+            <div className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs ${liveCostClass}`} role="status">
+              <span>{tLiveCost('label')}</span>
+              <strong>
+                {liveUsage.totalCost == null
+                  ? tLiveCost(liveUsage.state === 'loading' ? 'loading' : 'unavailable')
+                  : currency.format(liveUsage.totalCost)}
+              </strong>
+              {liveUsage.state === 'stale' && <span className="text-[10px]">{tLiveCost('stale')}</span>}
+              {liveUsage.state === 'finished' && <span className="text-[10px]">{tLiveCost('finished')}</span>}
+            </div>
+          )}
           <div className="inline-flex items-center gap-2 bg-hover-subtle border border-subtle rounded-xl px-2 py-1.5">
             <Languages className="w-3.5 h-3.5 text-secondary" />
             <select

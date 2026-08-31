@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import StatusBadge from './StatusBadge';
-import AddToKnowledgeButton from './AddToKnowledgeButton';
 import { useFormatter, useLocale, useTranslations } from '../lib/i18n';
 
 const TEMPLATE_LABELS = {
@@ -17,10 +16,7 @@ export default function TranscriptionCard({
   folders = [],
   onMove,
   onToggleFavorite,
-  onReindex,
-  reindexing = false,
   onDelete,
-  canAddToKnowledge = false,
   selectable = false,
   selected = false,
   onSelect,
@@ -40,9 +36,6 @@ export default function TranscriptionCard({
     mime_type,
     folder_id,
     is_favorite,
-    chunk_count,
-    index_job_status,
-    index_job_error,
     tags = [],
     created_at,
     createdAt,
@@ -60,32 +53,17 @@ export default function TranscriptionCard({
   const isTranslation = source_type === 'translation' || template === 'translation';
   const isDataTable = source_type === 'data_table';
   const isMeeting = source_type === 'meeting';
-  const hasChunks = Number(chunk_count || 0) > 0;
-  const effectiveIndexStatus = reindexing ? 'processing' : index_job_status;
-  const indexStatusLabel = effectiveIndexStatus === 'processing' ? 'Index läuft'
-    : effectiveIndexStatus === 'queued' ? 'Index wartet'
-    : effectiveIndexStatus === 'completed' ? `Indexiert${hasChunks ? ` · ${chunk_count}` : ''}`
-    : effectiveIndexStatus === 'error' ? 'Indexfehler'
-    : hasChunks ? `Indexiert · ${chunk_count}`
-    : 'Nicht indexiert';
-  const indexStatusClass = effectiveIndexStatus === 'processing' || effectiveIndexStatus === 'queued'
-    ? 'bg-info/10 text-info border-info/20'
-    : effectiveIndexStatus === 'completed' || hasChunks
-      ? 'bg-success/10 text-success border-success/20'
-      : effectiveIndexStatus === 'error'
-        ? 'bg-danger/10 text-danger border-danger/20'
-        : 'bg-hover-subtle text-secondary border-subtle';
   const templateLabel = TEMPLATE_LABELS[template]
     ? TEMPLATE_LABELS[template][locale] || TEMPLATE_LABELS[template].de
     : template;
 
   let typeLabel = tNav('transcription');
   let Icon = (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
     </svg>
   );
-  let iconColor = 'bg-accent/10 text-accent';
+  let iconColor = 'bg-accent/10 text-accent-ink';
 
   if (isMeeting) {
     typeLabel = tNav('remoteMeeting');
@@ -97,7 +75,7 @@ export default function TranscriptionCard({
     typeLabel = tNav('ocr');
     iconColor = 'bg-info/10 text-info';
     Icon = (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     );
@@ -105,7 +83,7 @@ export default function TranscriptionCard({
     typeLabel = tNav('translation');
     iconColor = 'bg-success/10 text-success';
     Icon = (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
       </svg>
     );
@@ -128,11 +106,11 @@ export default function TranscriptionCard({
           {onToggleFavorite && (
             <button 
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); }}
-              className={`shrink-0 transition-colors ${is_favorite ? 'text-accent' : 'text-secondary/30 hover:text-accent/50'}`}
+              className={`shrink-0 transition-colors ${is_favorite ? 'text-accent-ink' : 'text-secondary/30 hover:text-accent-ink/50'}`}
               title={is_favorite ? tDetail('unfavorite') : tDetail('favorite')}
               aria-label={is_favorite ? `${displayName} — ${tDetail('unfavorite')}` : `${displayName} — ${tDetail('favorite')}`}
             >
-              <svg className="w-5 h-5" fill={is_favorite ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+              <svg aria-hidden="true" className="w-5 h-5" fill={is_favorite ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
               </svg>
             </button>
@@ -145,7 +123,7 @@ export default function TranscriptionCard({
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-medium text-primary truncate group-hover:text-accent transition-colors">{displayName}</h3>
+                <h3 className="text-sm font-medium text-primary truncate group-hover:text-accent-ink transition-colors">{displayName}</h3>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-hover-subtle text-secondary uppercase tracking-widest font-bold shrink-0">
                   {typeLabel}
                 </span>
@@ -154,12 +132,6 @@ export default function TranscriptionCard({
                     {visibility === 'private' ? 'Privat' : 'Workspace'}
                   </span>
                 )}
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded border uppercase tracking-widest font-bold shrink-0 ${indexStatusClass}`}
-                  title={index_job_error || indexStatusLabel}
-                >
-                  {indexStatusLabel}
-                </span>
               </div>
               <p className="text-xs text-secondary mt-1">
                 {dateTime.format(new Date(date))}
@@ -170,7 +142,7 @@ export default function TranscriptionCard({
               {Array.isArray(tags) && tags.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {tags.slice(0, 5).map((tag) => (
-                    <span key={tag} className="px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[10px]">#{tag}</span>
+                    <span key={tag} className="px-1.5 py-0.5 rounded-full bg-accent/10 text-accent-ink text-[10px]">#{tag}</span>
                   ))}
                 </div>
               )}
@@ -194,32 +166,15 @@ export default function TranscriptionCard({
             </select>
           )}
           <StatusBadge status={status} />
-          {canAddToKnowledge && visibility === 'workspace' && (
-            <AddToKnowledgeButton documentId={id} displayName={displayName} />
-          )}
-          {onReindex && (
-            <button
-              type="button"
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onReindex(); }}
-              disabled={reindexing}
-              className="p-2 text-secondary hover:text-accent hover:bg-accent/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-wait"
-              title={reindexing ? 'Index wird erstellt' : 'Index neu erstellen'}
-              aria-label={`${displayName} — ${reindexing ? 'Index wird erstellt' : 'Index neu erstellen'}`}
-            >
-              <svg className={`w-4 h-4 ${reindexing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
-          )}
           {onEditTags && (
             <button
               type="button"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditTags(); }}
-              className="p-2 text-secondary hover:text-accent hover:bg-accent/10 rounded-lg transition-all"
+              className="p-2 text-secondary hover:text-accent-ink hover:bg-accent/10 rounded-lg transition-all"
               title="Tags bearbeiten"
               aria-label={`${displayName} — Tags bearbeiten`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M3 11l8.5 8.5a2.121 2.121 0 003 0L21 13V3h-10L3 11z" /></svg>
+              <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M3 11l8.5 8.5a2.121 2.121 0 003 0L21 13V3h-10L3 11z" /></svg>
             </button>
           )}
           {onDelete && (
@@ -229,7 +184,7 @@ export default function TranscriptionCard({
               title={tDetail('delete')}
               aria-label={`${displayName} — ${tDetail('delete')}`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
