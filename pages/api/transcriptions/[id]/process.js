@@ -4,6 +4,7 @@ import { addTranscriptionEvent } from '../../../../lib/transcription-events';
 import { ensureTranscriptionWorkerRunning, queueTranscriptionJob } from '../../../../lib/transcription-worker';
 import { runManualAnalysisJob } from '../../../../lib/manual-analysis';
 import { withOrgScope } from '../../../../lib/api/with-org-scope';
+import { hasPermission } from '../../../../lib/permissions';
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,6 +13,9 @@ async function handler(req, res) {
 
   const userId = req.userId;
   const orgId = req.org.id;
+  if (!hasPermission(req.role, 'paid.execute')) {
+    return res.status(403).json({ code: 'FORBIDDEN' });
+  }
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'transcription-process',
@@ -31,7 +35,7 @@ async function handler(req, res) {
     // audio worker (which expects a file_path and crashes with `path.extname(null)`
     // on rows that came from the meeting bot).
     const head = await query(
-      `SELECT id, source, status, text, user_id, file_path
+      `SELECT id, source, status, text, user_id, file_path, budget_stop_state
          FROM transcriptions
         WHERE id = $1 AND organization_id = $2`,
       [transcriptionId, orgId]
@@ -42,6 +46,12 @@ async function handler(req, res) {
     }
 
     const row = head.rows[0];
+    if (row.budget_stop_state !== 'none') {
+      return res.status(409).json({
+        code: 'STOPPED_BY_BUDGET',
+        message: 'This job was stopped by a hard budget and cannot be restarted.',
+      });
+    }
     const ownerId = row.user_id || userId;
     const isVexaRow = row.source === 'vexa';
     const hasText = typeof row.text === 'string' && row.text.trim().length > 0;
@@ -76,6 +86,7 @@ async function handler(req, res) {
           WHERE id = $1
             AND organization_id = $2
             AND status IN ('pending','processing','transcribed','error')
+            AND budget_stop_state = 'none'
           RETURNING id`,
         [transcriptionId, orgId]
       );
@@ -126,6 +137,7 @@ async function handler(req, res) {
        WHERE id = $1
          AND organization_id = $2
          AND status = 'pending'
+         AND budget_stop_state = 'none'
        RETURNING id, user_id`,
       [transcriptionId, orgId]
     );

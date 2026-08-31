@@ -279,7 +279,10 @@ const langBadgeStyle = {
   fontSize: 36,
   letterSpacing: 8,
   fontWeight: 600,
-  background: '#FF5917',
+  // Same document as the rest of the app (_app.js loads globals.css),
+  // so this can reference the accent token directly rather than
+  // duplicate the literal hex — see docs/ui/phase1-tokens.md.
+  background: 'rgb(var(--accent))',
   padding: '12px 24px',
   borderRadius: 12,
   display: 'inline-block',

@@ -2,7 +2,7 @@
 
 ## Dokumentationsstand
 - **Erstellt**: 05.02.2026
-- **Letzte Aktualisierung**: 07.05.2026
+- **Letzte Aktualisierung**: 22.08.2026
 - **Status**: Inkrementell gepflegt; Quelle der Wahrheit sind die
   Handler-Files unter `pages/api/`
 - **Version**: 0.3.0
@@ -30,7 +30,7 @@
 ### Funktionsbereinigung
 - Entfernte App-Bereiche: Echtzeitverarbeitung, Wissensgraph, Mindmap, Infografik/Sketch, Text-Assistent und Workflows.
 - Entfernte API-Bereiche: `/api/realtime/*`, `/api/workflows/*`, `/api/text-ai`, `/api/text-tasks/*`, `/api/sketch-summary`.
-- Google/Gemini-Key-Verwaltung ist nicht mehr Teil der Settings-API. Die aktive KI-/OCR-Konfiguration basiert auf Mistral.
+- KI- und OCR-Konfiguration basieren auf der Organisations-Allowlist des einzigen Providers OpenRouter.
 - Tabellen-Vorlagen sind content-only: API und Prompting lassen keine Berechnungen, Formeln oder Summen für neue Tabellen-Vorlagen zu.
 
 ### GET `/api/settings`
@@ -44,9 +44,9 @@
   "defaultTemplate": "generic",
   "language": "de",
   "contextBias": "Begriff A, Begriff B",
-  "preferredModel": "mistral-large-latest",
+  "preferredModel": "anbieter/modell-slug",
   "defaultTranslateLanguage": "en",
-  "ocrModel": "mistral-ocr-latest",
+  "ocrModel": "anbieter/vision-modell",
   "costLimit": 15.0,
   "memberMonthlyBudgetLimit": 8.0
 }
@@ -61,7 +61,7 @@
 {
   "costLimit": 15,
   "memberMonthlyBudgetLimit": 8,
-  "preferredModel": "mistral-large-latest"
+  "preferredModel": "anbieter/modell-slug"
 }
 ```
 

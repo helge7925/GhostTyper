@@ -46,26 +46,11 @@ async function handler(req, res) {
   switch (req.method) {
     case 'GET': {
       try {
-        // Join settings (per-user) + this month's usage so the workspace
-        // admin sees everything the global /admin/users sees — scoped to
-        // the active org and updated live whenever a user's row changes.
         const result = await query(
           `SELECT u.id, u.email, u.name, u.avatar_url,
-                  m.role, m.joined_at,
-                  (s.mistral_api_key IS NOT NULL OR s.mistral_api_key_encrypted IS NOT NULL) AS api_key_configured,
-                  s.cost_limit AS personal_cost_limit,
-                  s.member_monthly_budget_limit AS personal_member_budget_limit,
-                  COALESCE(usage.total_cost, 0) AS month_cost
+                   m.role, m.joined_at
              FROM organization_members m
              JOIN users u ON u.id = m.user_id
-        LEFT JOIN settings s ON s.user_id = u.id
-        LEFT JOIN (
-                SELECT user_id, SUM(estimated_cost)::float AS total_cost
-                  FROM usage_log
-                 WHERE organization_id = $1
-                   AND created_at >= date_trunc('month', NOW())
-                 GROUP BY user_id
-              ) usage ON usage.user_id = u.id
             WHERE m.organization_id = $1
             ORDER BY m.role = 'owner' DESC, m.role = 'admin' DESC, m.joined_at ASC`,
           [orgId],
@@ -117,6 +102,7 @@ async function handler(req, res) {
           targetType: 'user',
           targetId: String(targetUserId),
           metadata: { newRole: role },
+          reason: req.body?.reason ?? null,
         });
         return res.status(200).json({ ok: true });
       } catch (error) {
@@ -165,6 +151,7 @@ async function handler(req, res) {
           targetType: 'user',
           targetId: String(targetUserId),
           severity: 'warn',
+          reason: req.body?.reason ?? null,
         });
         return res.status(200).json({ ok: true });
       } catch (error) {

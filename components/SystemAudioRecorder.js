@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from '../lib/i18n';
 import { getSystemAudioCapabilities } from '../lib/audio-utils';
 import { useWakeLock } from '../lib/use-wake-lock';
+import { MonitorSpeaker, Square, Volume2 } from 'lucide-react';
+import { Button } from './ui/button';
 
 export default function SystemAudioRecorder({ onRecordingComplete }) {
   const t = useTranslations('components.systemAudioRecorder');
@@ -218,21 +220,23 @@ export default function SystemAudioRecorder({ onRecordingComplete }) {
             className="w-full"
           />
         </div>
-        <div className="flex gap-3">
-          <button
+        <div className="flex flex-wrap gap-3">
+          <Button
             type="button"
             onClick={handleDiscard}
-            className="flex-1 border border-emphasis text-secondary py-2 rounded-full text-sm font-medium hover:bg-hover transition-colors"
+            variant="outline"
+            className="flex-1"
           >
             {t('discard')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={handleUseRecording}
-            className="flex-1 gradient-accent text-white py-2 rounded-full text-sm font-medium transition-colors"
+            variant="primary"
+            className="flex-1"
           >
             {t('useRecording')}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -241,7 +245,7 @@ export default function SystemAudioRecorder({ onRecordingComplete }) {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm text-center">
+        <div role="alert" className="border border-danger/30 text-danger px-4 py-3 rounded-lg text-sm text-center">
           {error}
         </div>
       )}
@@ -254,32 +258,28 @@ export default function SystemAudioRecorder({ onRecordingComplete }) {
                 {audioSourceType === 'system' ? t('recordingSystem') : t('recordingTab')}
               </p>
             </div>
-            <div className="w-16 h-16 rounded-full mb-4 flex items-center justify-center bg-accent/20 animate-pulse">
-              <svg className="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-              </svg>
+            <div className="w-14 h-14 rounded-xl mb-4 flex items-center justify-center bg-accent/10 text-accent-ink">
+              <Volume2 className="w-7 h-7" aria-hidden="true" />
             </div>
           </div>
         ) : (
           <div className="w-full max-w-sm text-center">
-            <div className="w-20 h-20 rounded-full bg-accent/20 mb-4 flex items-center justify-center mx-auto">
-              <svg className="w-10 h-10 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
+            <div className="w-14 h-14 rounded-xl bg-accent/10 text-accent-ink mb-4 flex items-center justify-center mx-auto">
+              <MonitorSpeaker className="w-7 h-7" aria-hidden="true" />
             </div>
             <p className="text-sm text-secondary mb-3">
               {t('description')}
             </p>
             <div className="bg-hover-subtle border border-subtle rounded-lg p-3 mb-4 text-left">
-              <p className="text-xs text-secondary mb-1.5 font-medium uppercase tracking-widest">{t('supportedLabel')}</p>
+              <p className="text-xs text-secondary mb-1.5 font-medium">{t('supportedLabel')}</p>
               <ul className="text-xs text-secondary/80 space-y-1">
                 <li className="flex items-start gap-1.5">
-                  <span className="text-accent mt-0.5">●</span>
+                  <span className="text-accent-ink mt-0.5">●</span>
                   {t('tabAudioInfo')}
                 </li>
                 {caps.systemAudio && (
                   <li className="flex items-start gap-1.5">
-                    <span className="text-accent mt-0.5">●</span>
+                    <span className="text-accent-ink mt-0.5">●</span>
                     {t('systemAudioInfo')}
                   </li>
                 )}
@@ -292,23 +292,24 @@ export default function SystemAudioRecorder({ onRecordingComplete }) {
           {formatDuration(duration)}
         </p>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           {!isRecording ? (
-            <button
+            <Button
               type="button"
               onClick={startRecording}
-              className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors shadow-lg shadow-accent/20 hover:scale-105 transform active:scale-95"
+              variant="primary"
             >
               {t('start')}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
               onClick={stopRecording}
-              className="gradient-accent text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors shadow-lg hover:shadow-accent/20 hover:scale-105 transform active:scale-95"
+              variant="destructive-solid"
             >
+              <Square className="w-4 h-4" aria-hidden="true" />
               {t('stop')}
-            </button>
+            </Button>
           )}
         </div>
       </div>

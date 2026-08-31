@@ -18,12 +18,10 @@
       `ensureTranscriptionWorkerRunning()` on boot.
 
 ## 3. Preflight & UI
-- [ ] Meeting start: HEAD/status check against Vexa base URL + admin
-      token before bot request; typed 503 `VEXA_UNAVAILABLE` on failure.
-      — DEFERRED: out of scope for this implementation pass (not in the
-      implementation directive). Adds a network call to the meeting-start
-      hot path; the join-timeout → `rejected` path already removes the
-      "silent pending row" symptom after the fact. See status.md.
+- [x] Meeting start: authenticated HEAD/status check against Vexa base URL
+      + admin token before any transcription row or bot request; typed 503
+      `VEXA_UNAVAILABLE` on failure. Covered by
+      `tests/vexa-preflight.test.mjs`.
 - [x] Status badges for the extended `bot_status` set + degraded/stale
       surfaced through the existing transcription-events timeline (de/en
       labels; `rejected` renders a clear error with a tab-audio CTA).
