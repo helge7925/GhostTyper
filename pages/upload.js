@@ -1,13 +1,13 @@
 import Head from 'next/head';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AudioUploadForm from '../components/AudioUploadForm';
 import ProcessStatusCard from '../components/ProcessStatusCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { STATUS } from '../lib/constants';
 import { useMessageList, useTranslations } from '../lib/i18n';
+import { useJobProgress } from '../lib/use-job-progress';
 
 const TRANSCRIPTION_LOADING_MESSAGES = [
   'Wir horchen konzentriert rein und fangen jedes Wort ein.',
@@ -47,7 +47,6 @@ const UPLOAD_PRESETS = {
       autoAnalyze: true,
       diarize: false,
       template: 'generic',
-      model: 'deepseek-v4-flash',
       showAdvancedOptions: true,
     },
   },
@@ -58,7 +57,19 @@ const UPLOAD_PRESETS = {
       autoAnalyze: true,
       diarize: false,
       template: 'meeting',
-      model: 'deepseek-v4-pro',
+      showAdvancedOptions: true,
+    },
+  },
+  // Deep-link target from the Meet-blocked hint in MeetingStartForm — Google
+  // blocks meeting bots on Meet, so we route users into tab-/system-audio
+  // capture instead, preselected for a meeting-style transcript.
+  'meet-tab-audio': {
+    label: 'Tab-Audio -> Meeting-Protokoll',
+    config: {
+      uploadMode: 'system-audio',
+      autoAnalyze: true,
+      diarize: true,
+      template: 'meeting',
       showAdvancedOptions: true,
     },
   },
@@ -68,6 +79,7 @@ export default function Upload() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const tUpload = useTranslations('upload');
+  const tDetail = useTranslations('transcriptionDetailPage');
   const transcriptionMessages = useMessageList('loadingMessages.transcription');
   const analysisMessages = useMessageList('loadingMessages.transcription');
   const [result, setResult] = useState(null);
@@ -134,82 +146,35 @@ export default function Upload() {
     await triggerProcessingStart(uploadResult.id);
   }
 
-  useEffect(() => {
-    if (!result?.id) return undefined;
+  const handleProgressSnapshot = useCallback((data) => {
+    if (!result?.id) return;
     const supportsEditorAutoOpen = Boolean(result.auto_analyze && !result.diarize);
-
-    let eventSource = null;
-    let fallbackInterval = null;
-
-    const handleSnapshot = (data) => {
-      setLiveStatus((prev) => {
-        if (prev !== data.status) {
-          setStatusStartedAt(data.updated_at || new Date().toISOString());
-        }
-        return data.status;
-      });
-
-      if (
-        !redirectStateRef.current.hasAutoRedirected &&
-        autoOpenWhenReady &&
-        (data.status === STATUS.TRANSCRIBED || data.status === STATUS.COMPLETED)
-      ) {
-        redirectStateRef.current = { hasAutoRedirected: true };
-        setHasAutoRedirected(true);
-        if (supportsEditorAutoOpen && autoOpenEditorWhenReady && data.status === STATUS.COMPLETED) {
-          router.push(`/transcriptions/${result.id}?autoEditor=1`);
-        } else {
-          router.push(`/transcriptions/${result.id}`);
-        }
+    setLiveStatus((previous) => {
+      if (previous !== data.status) setStatusStartedAt(data.updated_at || new Date().toISOString());
+      return data.status;
+    });
+    if (!redirectStateRef.current.hasAutoRedirected && autoOpenWhenReady
+      && (data.status === STATUS.TRANSCRIBED || data.status === STATUS.COMPLETED)) {
+      redirectStateRef.current = { hasAutoRedirected: true };
+      setHasAutoRedirected(true);
+      if (supportsEditorAutoOpen && autoOpenEditorWhenReady && data.status === STATUS.COMPLETED) {
+        router.push(`/transcriptions/${result.id}?autoEditor=1`);
+      } else {
+        router.push(`/transcriptions/${result.id}`);
       }
-    };
-
-    const startFallbackPolling = () => {
-      if (fallbackInterval) return;
-      fallbackInterval = setInterval(async () => {
-        try {
-          const res = await fetch(`/api/transcriptions/${result.id}`);
-          if (!res.ok) return;
-          const data = await res.json();
-          handleSnapshot(data);
-        } catch {
-          // Ignore transient fallback errors.
-        }
-      }, 3000);
-    };
-
-    if (typeof window !== 'undefined' && 'EventSource' in window) {
-      eventSource = new EventSource(`/api/transcriptions/${result.id}/stream`);
-
-      eventSource.addEventListener('transcription', (event) => {
-        try {
-          handleSnapshot(JSON.parse(event.data));
-        } catch {
-          // Ignore malformed packets.
-        }
-      });
-
-      eventSource.addEventListener('missing', () => {
-        eventSource?.close();
-      });
-
-      eventSource.onerror = () => {
-        eventSource?.close();
-        startFallbackPolling();
-      };
-    } else {
-      startFallbackPolling();
     }
+  }, [autoOpenEditorWhenReady, autoOpenWhenReady, result, router]);
 
-    return () => {
-      if (eventSource) {
-        eventSource.close();
-      }
-      if (fallbackInterval) {
-        clearInterval(fallbackInterval);
-      }
-    };
-  }, [result?.id, result?.auto_analyze, result?.diarize, autoOpenWhenReady, autoOpenEditorWhenReady, router]);
+  const progressSnapshot = useMemo(() => result ? {
+    ...result,
+    status: liveStatus || result.status,
+    updated_at: statusStartedAt || result.updated_at,
+  } : null, [liveStatus, result, statusStartedAt]);
+  const jobProgress = useJobProgress(result?.id, {
+    enabled: Boolean(result?.id && [STATUS.PENDING, STATUS.QUEUED, STATUS.PROCESSING, STATUS.ANALYZING].includes(liveStatus)),
+    initialSnapshot: progressSnapshot,
+    onSnapshot: handleProgressSnapshot,
+  });
 
   if (status === 'loading' || !session) return <LoadingSpinner />;
 
@@ -225,6 +190,9 @@ export default function Upload() {
         </h1>
         <p className="text-sm text-secondary mb-6">
           {tUpload('subtitle')}
+        </p>
+        <p className="text-xs text-secondary bg-hover-subtle border border-subtle rounded-xl px-3 py-2 mb-6">
+          {tUpload('tabAudioHint')}
         </p>
         {activePreset && (
           <p className="text-xs text-info bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 mb-6">
@@ -250,20 +218,19 @@ export default function Upload() {
                       ? 'Der transkribierte Text wird ausgewertet.'
                       : `${result.original_name} wird verarbeitet.`
                 }
-                steps={
-                  result.auto_analyze && !result.diarize
-                    ? [
-                      { key: 'transcription', label: 'Audio transkribieren' },
-                      { key: 'analysis', label: 'Zusammenfassung erstellen' },
-                    ]
-                    : [
-                      { key: 'transcription', label: 'Audio transkribieren' },
-                    ]
-                }
-                activeStep={liveStatus === STATUS.ANALYZING ? 1 : 0}
-                done={liveStatus === STATUS.COMPLETED || liveStatus === STATUS.TRANSCRIBED}
-                startedAt={statusStartedAt}
-                etaSeconds={liveStatus === STATUS.ANALYZING ? 22 : 45}
+                steps={jobProgress.steps.map((step) => ({ ...step, label: tDetail(`progress.steps.${step.key}`) }))}
+                activeStep={jobProgress.activeStep}
+                done={jobProgress.done}
+                startedAt={jobProgress.startedAt}
+                etaTotalSeconds={jobProgress.etaTotalSeconds}
+                connectionLabel={['stale', 'unavailable', 'polling'].includes(jobProgress.connectionState)
+                  ? tDetail(`progress.connection.${jobProgress.connectionState}`)
+                  : ''}
+                etaLabels={{
+                  remaining: tDetail('progress.eta.remaining'),
+                  near: tDetail('progress.eta.near'),
+                  overdue: tDetail('progress.eta.overdue'),
+                }}
                 messages={liveStatus === STATUS.ANALYZING ? analysisMessages : transcriptionMessages}
               />
             </div>

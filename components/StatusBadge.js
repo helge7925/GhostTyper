@@ -4,10 +4,11 @@ import { useTranslations } from '../lib/i18n';
 const BADGE_STYLES = {
   [STATUS.PENDING]: 'bg-warning/20 text-warning',
   [STATUS.QUEUED]: 'bg-warning/20 text-warning',
-  [STATUS.PROCESSING]: 'bg-accent/20 text-accent',
+  [STATUS.PROCESSING]: 'bg-accent/20 text-accent-ink',
   [STATUS.TRANSCRIBED]: 'bg-info/20 text-info',
-  [STATUS.ANALYZING]: 'bg-accent/20 text-accent',
+  [STATUS.ANALYZING]: 'bg-accent/20 text-accent-ink',
   [STATUS.COMPLETED]: 'bg-success/20 text-success',
+  [STATUS.BUDGET_STOPPED]: 'bg-danger/20 text-danger',
   [STATUS.ERROR]: 'bg-danger/20 text-danger',
 };
 

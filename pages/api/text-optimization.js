@@ -1,27 +1,24 @@
 import { optimizeText } from '../../lib/ai-service';
 import { withOrgScope } from '../../lib/api/with-org-scope';
-import {
-  CostLimitCheckUnavailableError,
-  CostLimitExceededError,
-  enforceProjectedBudgetGuardrail,
-  estimateTextTransformCost,
-  logUsage,
-  checkCostLimit,
-  withUserCostLock,
-} from '../../lib/usage';
-import { resolveCortecsConfig } from '../../lib/settings-service';
-import { resolveChatModel } from '../../lib/model-policy';
+import { composeAbortSignals, executeReservedSpend, estimateTextUsage, requestBudgetScope } from '../../lib/budget-runtime';
+import { getSettingsRow } from '../../lib/settings-service';
+import { resolveConfiguredModel } from '../../lib/openrouter';
+import { optimizeTextEdenAi } from '../../lib/edenai-service';
+import { resolveActiveProviderConfig } from '../../lib/ai-provider-router';
 import { MAX_TEXT_OPTIMIZATION_INPUT_LENGTH, MAX_CUSTOM_PROMPT_LENGTH } from '../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { logAuditEvent } from '../../lib/audit-log';
 
+// Only `spelling_grammar` is enabled — the other five presets are
+// genuine LLM rewrites (tone/length/structure changes), and only
+// `spelling_grammar`'s prompt has been stress-tested against the
+// hardcoded EdenAI model (see hardcode-edenai-models/design.md's two
+// revision rounds: 5 German/English texts, several rerun for stability).
+// Deliberately temporary — re-enable a preset here (and in
+// pages/textoptimierung.js's PRESETS array) once it's been verified with
+// the same rigor, not before.
 const ALLOWED_PRESETS = new Set([
   'spelling_grammar',
-  'friendlier',
-  'more_formal',
-  'shorter',
-  'clearer',
-  'email_improve',
 ]);
 
 async function handler(req, res) {
@@ -42,8 +39,9 @@ async function handler(req, res) {
 
   const {
     text,
-    preset = 'clearer',
+    preset = 'spelling_grammar',
     customInstruction = '',
+    model: requestModel,
   } = req.body || {};
 
   if (!text || typeof text !== 'string') {
@@ -60,40 +58,66 @@ async function handler(req, res) {
   }
 
   try {
-    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const apiKey = cortecs.apiKey;
-    const preferredModel = resolveChatModel('deepseek-v4-flash');
+    const settingsRow = await getSettingsRow(userId);
+    const trimmedCustomInstruction = typeof customInstruction === 'string' ? customInstruction.trim() : '';
 
-    if (!apiKey) {
-      return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert' });
-    }
-    if (!preferredModel) {
-      return res.status(400).json({ message: 'Ungültiges KI-Modell' });
-    }
+    // Every preset (including spelling_grammar — see
+    // hardcode-edenai-models) resolves the `chat` capability uniformly.
+    // spelling_grammar used to route to a dedicated EdenAI grammar
+    // feature; a real comparison found EdenAI's own chat capability with
+    // this same narrow correction prompt corrects German text more
+    // reliably, so it's just another chat preset now.
+    const active = await resolveActiveProviderConfig({ userId, organizationId: orgId, capability: 'chat' });
 
-    const optimizedText = await withUserCostLock(userId, async () => {
-      const costCheck = await checkCostLimit(userId, orgId);
-      if (!costCheck.allowed) {
-        throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
+    let providerModel;
+    let callProvider;
+
+    if (active.provider === 'edenai') {
+      if (!active.apiKey) {
+        return res.status(400).json({ message: 'Kein EdenAI-API-Key konfiguriert' });
       }
-      const estimatedCost = estimateTextTransformCost(preferredModel, text, {
-        inputBufferTokens: 120,
-        outputMultiplier: 0.9,
-        outputBufferTokens: 120,
-      });
-      await enforceProjectedBudgetGuardrail(userId, estimatedCost, orgId);
-
-      const result = await optimizeText(
-        text,
-        preset,
-        typeof customInstruction === 'string' ? customInstruction.trim() : '',
-        apiKey,
-        preferredModel,
-        { baseUrl: cortecs.baseUrl, preference: cortecs.preference }
+      providerModel = active.model;
+      callProvider = (_reservation, budgetSignal) => optimizeTextEdenAi(
+        text, preset, trimmedCustomInstruction, active.apiKey, active.model,
+        { signal: composeAbortSignals(budgetSignal) },
       );
-      await logUsage(userId, result.model, 'text_optimization', result.usage, orgId);
-      return result.optimizedText;
-    });
+    } else {
+      const preferredModel = resolveConfiguredModel(active, 'chat', requestModel || settingsRow?.preferred_model);
+      if (!active.apiKey) {
+        return res.status(400).json({ message: 'Kein OpenRouter-API-Key konfiguriert' });
+      }
+      if (!preferredModel) {
+        return res.status(400).json({ message: 'Ungültiges KI-Modell' });
+      }
+      providerModel = preferredModel;
+      callProvider = (_reservation, budgetSignal) => optimizeText(
+        text, preset, trimmedCustomInstruction, active.apiKey, preferredModel,
+        {
+          baseUrl: active.baseUrl,
+          fallbackModel: active.defaultModels.chat,
+          organizationId: active.organizationId,
+          signal: composeAbortSignals(budgetSignal),
+        },
+      );
+    }
+
+    const result = await executeReservedSpend(
+      {
+        idempotencyKey: requestBudgetScope(req, 'text-optimization', { text, preset, customInstruction, providerModel }),
+        organizationId: orgId,
+        userId,
+        operation: 'text_optimization',
+        provider: active.provider,
+        model: providerModel,
+        estimatedUsage: estimateTextUsage(text, {
+          inputBufferTokens: 320,
+          outputMultiplier: 1.1,
+          outputBufferTokens: 192,
+        }),
+      },
+      callProvider,
+    );
+    const optimizedText = result.optimizedText;
 
     await logAuditEvent({
       userId,
@@ -102,17 +126,18 @@ async function handler(req, res) {
       targetType: 'text_optimization',
       metadata: {
         preset,
-        model: preferredModel,
+        provider: active.provider,
+        model: providerModel,
         inputChars: text.length,
       },
     });
 
     return res.status(200).json({ optimizedText });
   } catch (error) {
-    if (error?.code === 'COST_LIMIT_EXCEEDED' || error?.code === 'BUDGET_GUARDRAIL_EXCEEDED') {
+    if (error?.code === 'BUDGET_EXCEEDED') {
       return res.status(429).json({ message: error.message });
     }
-    if (error instanceof CostLimitCheckUnavailableError || error?.code === 'COST_CHECK_UNAVAILABLE') {
+    if (error?.code === 'BUDGET_ACCOUNTING_UNAVAILABLE' || error?.code === 'PRICING_CONFIGURATION_MISSING') {
       return res.status(503).json({ message: error.message });
     }
     logApiError('Text optimization error', error);
@@ -120,4 +145,4 @@ async function handler(req, res) {
   }
 }
 
-export default withOrgScope(handler);
+export default withOrgScope({ permission: 'paid.execute' }, handler);

@@ -1,16 +1,13 @@
 import { generateTemplate } from '../../../lib/ai-service';
+import { generateTemplateEdenAi } from '../../../lib/edenai-service';
+import { resolveActiveProviderConfig } from '../../../lib/ai-provider-router';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
-import {
-  CostLimitCheckUnavailableError,
-  CostLimitExceededError,
-  logUsage,
-  checkCostLimit,
-  withUserCostLock,
-} from '../../../lib/usage';
-import { getSettingsRow, resolveCortecsConfig } from '../../../lib/settings-service';
-import { resolveChatModel } from '../../../lib/model-policy';
+import { composeAbortSignals, executeReservedSpend, estimateTextUsage, requestBudgetScope } from '../../../lib/budget-runtime';
+import { getSettingsRow } from '../../../lib/settings-service';
+import { resolveConfiguredModel } from '../../../lib/openrouter';
 import { MAX_TEMPLATE_GENERATOR_GOAL_LENGTH } from '../../../lib/constants';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
+import { hasPermission } from '../../../lib/permissions';
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -19,6 +16,9 @@ async function handler(req, res) {
 
   const userId = req.userId;
   const orgId = req.org.id;
+  if (!hasPermission(req.role, 'paid.execute')) {
+    return res.status(403).json({ code: 'FORBIDDEN' });
+  }
 
   const allowed = await enforceRateLimit(req, res, {
     keyPrefix: 'template-generate',
@@ -38,36 +38,61 @@ async function handler(req, res) {
 
   try {
     const settingsRow = await getSettingsRow(userId);
-    const cortecs = await resolveCortecsConfig({ userId, organizationId: req.org?.id });
-    const apiKey = cortecs.apiKey;
-    const preferredModel = resolveChatModel(cortecs.chatModel || settingsRow?.preferred_model) || cortecs.chatModel;
+    const active = await resolveActiveProviderConfig({ userId, organizationId: orgId, capability: 'chat' });
 
-    if (!apiKey) {
-      return res.status(400).json({ message: 'Kein Cortecs API-Key konfiguriert.' });
+    let providerModel;
+    let callProvider;
+
+    if (active.provider === 'edenai') {
+      if (!active.apiKey) {
+        return res.status(400).json({ message: 'Kein EdenAI-API-Key konfiguriert.' });
+      }
+      providerModel = active.model;
+      callProvider = (_reservation, budgetSignal) => generateTemplateEdenAi(
+        goal, active.apiKey, active.model, { signal: composeAbortSignals(budgetSignal) },
+      );
+    } else {
+      const preferredModel = resolveConfiguredModel(active, 'chat', settingsRow?.preferred_model);
+      if (!active.apiKey) {
+        return res.status(400).json({ message: 'Kein OpenRouter-API-Key konfiguriert.' });
+      }
+      providerModel = preferredModel;
+      callProvider = (_reservation, budgetSignal) => generateTemplate(
+        goal,
+        active.apiKey,
+        preferredModel,
+        {
+          baseUrl: active.baseUrl,
+          fallbackModel: active.defaultModels.chat,
+          organizationId: active.organizationId,
+          signal: composeAbortSignals(budgetSignal),
+        },
+      );
     }
 
-    const promptText = await withUserCostLock(userId, async () => {
-      const costCheck = await checkCostLimit(userId, orgId);
-      if (!costCheck.allowed) {
-        throw new CostLimitExceededError(costCheck.currentCost, costCheck.limit);
-      }
-
-      const { promptText: value, usage, model } = await generateTemplate(
-        goal,
-        apiKey,
-        preferredModel,
-        { baseUrl: cortecs.baseUrl, preference: cortecs.preference },
-      );
-      await logUsage(userId, model, 'template_generation', usage, orgId);
-      return value;
-    });
+    const { promptText } = await executeReservedSpend(
+      {
+        idempotencyKey: requestBudgetScope(req, 'template-generation', { goal, providerModel }),
+        organizationId: orgId,
+        userId,
+        operation: 'template_generation',
+        provider: active.provider,
+        model: providerModel,
+        estimatedUsage: estimateTextUsage(goal, {
+          inputBufferTokens: 900,
+          outputMultiplier: 3,
+          outputBufferTokens: 1200,
+        }),
+      },
+      callProvider,
+    );
 
     return res.status(200).json({ promptText });
   } catch (error) {
-    if (error?.code === 'COST_LIMIT_EXCEEDED') {
+    if (error?.code === 'BUDGET_EXCEEDED') {
       return res.status(429).json({ message: error.message });
     }
-    if (error instanceof CostLimitCheckUnavailableError || error?.code === 'COST_CHECK_UNAVAILABLE') {
+    if (error?.code === 'BUDGET_ACCOUNTING_UNAVAILABLE' || error?.code === 'PRICING_CONFIGURATION_MISSING') {
       return res.status(503).json({ message: error.message });
     }
     logApiError('Error generating template', error);

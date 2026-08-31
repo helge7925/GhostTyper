@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { Building2, ChevronRight, BarChart3, Plug, Settings as SettingsIcon, ShieldCheck, Users } from 'lucide-react';
+import { BadgeDollarSign, Building2, ChevronRight, BarChart3, Landmark, Plug, Settings as SettingsIcon, ShieldCheck, Users } from 'lucide-react';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import { useCurrentOrg } from '../../../lib/use-current-org';
 import { usePermission } from '../../../lib/use-permission';
@@ -28,6 +28,9 @@ export default function OrgSettingsPage() {
   const { org, role, isLoading: orgLoading } = useCurrentOrg();
   const canManageMembers = usePermission('org.members.read');
   const canManageSettings = usePermission('org.settings');
+  const canManageBudgets = usePermission('budget.manage');
+  const canReadOrgUsage = usePermission('budget.read.org');
+  const canReadAudit = usePermission('audit.read');
   const t = useTranslations('organization');
   const tNav = useTranslations('nav');
   const tCommon = useTranslations('common');
@@ -129,6 +132,36 @@ export default function OrgSettingsPage() {
               <ChevronRight className="w-4 h-4 text-secondary" aria-hidden="true" />
             </Link>
           )}
+          {canManageBudgets && (
+            <Link
+              href="/settings/organization/budgets"
+              className="flex items-center justify-between px-5 py-4 hover:bg-hover-subtle transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Landmark className="w-5 h-5 text-secondary" aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-medium text-primary">{t('links.budgets')}</p>
+                  <p className="text-xs text-secondary">{t('links.budgetsDesc')}</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-secondary" aria-hidden="true" />
+            </Link>
+          )}
+          {canReadOrgUsage && (
+            <Link
+              href="/settings/organization/pricing"
+              className="flex items-center justify-between px-5 py-4 hover:bg-hover-subtle transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <BadgeDollarSign className="w-5 h-5 text-secondary" aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-medium text-primary">{t('links.pricing')}</p>
+                  <p className="text-xs text-secondary">{t('links.pricingDesc')}</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-secondary" aria-hidden="true" />
+            </Link>
+          )}
           <Link
             href="/settings/organization/preferences"
             className="flex items-center justify-between px-5 py-4 hover:bg-hover-subtle transition-colors"
@@ -142,7 +175,7 @@ export default function OrgSettingsPage() {
             </div>
             <ChevronRight className="w-4 h-4 text-secondary" aria-hidden="true" />
           </Link>
-          <Link
+          {canReadOrgUsage && <Link
             href="/settings/organization/usage"
             className="flex items-center justify-between px-5 py-4 hover:bg-hover-subtle transition-colors"
           >
@@ -154,8 +187,8 @@ export default function OrgSettingsPage() {
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-secondary" aria-hidden="true" />
-          </Link>
-          <Link
+          </Link>}
+          {canReadAudit && <Link
             href="/audit"
             className="flex items-center justify-between px-5 py-4 hover:bg-hover-subtle transition-colors"
           >
@@ -167,7 +200,7 @@ export default function OrgSettingsPage() {
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-secondary" aria-hidden="true" />
-          </Link>
+          </Link>}
         </nav>
 
         {!canManageSettings && (

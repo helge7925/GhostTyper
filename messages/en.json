@@ -26,12 +26,16 @@
       "title": "Transcribe a remote meeting",
       "description": "A bot joins the meeting as a participant and streams the transcript live.",
       "urlLabel": "Meeting link",
-      "urlHint": "Google Meet, Microsoft Teams, Zoom or Nextcloud Talk.",
+      "urlHint": "Microsoft Teams, Zoom or Nextcloud Talk.",
       "platform": {
-        "google_meet": "Google Meet detected.",
         "teams": "Microsoft Teams detected.",
         "zoom": "Zoom detected.",
         "nextcloud_talk": "Nextcloud Talk detected."
+      },
+      "meetBlocked": {
+        "title": "Google Meet is not supported.",
+        "hint": "Google blocks meeting bots on Meet (a dedicated rejection page, not a CAPTCHA). Use tab-/system-audio capture instead — it works for any browser-based meeting, including Meet.",
+        "cta": "Go to tab-audio capture"
       },
       "botNameLabel": "Bot display name in the meeting",
       "languageLabel": "Language",
@@ -49,7 +53,7 @@
         "languageA": "Language A",
         "languageB": "Language B",
         "sameLanguageError": "Please pick two different languages.",
-        "costWarning": "Live translation incurs extra Mistral costs (Translate + Voxtral TTS) — typically €3–€5 per meeting hour.",
+        "costWarning": "Live translation incurs additional OpenRouter costs based on the allowed models.",
         "overlay": {
           "enable": "Show subtitles in the meeting on the bot tile",
           "hint": "The bot displays the latest translation in large type on its webcam tile — visible even without the companion tab. Participants can pin the bot tile to read along."
@@ -58,11 +62,19 @@
           "enable": "Speak the translation aloud in the meeting",
           "hint": "The bot speaks translated segments in the selected language as a second voice in the meeting. Original voices remain audible.",
           "speakIn": "Speak in",
-          "costWarning": "Costs Voxtral TTS per generated audio second — typically €0.90 per meeting hour.",
+          "costWarning": "OpenRouter TTS is billed according to model pricing and actual usage.",
           "zhFallback": "Voxtral has no Chinese voice yet — the bot uses the default English voice to read Chinese text aloud."
         }
       },
-      "nextcloudTalkLobbyHint": "Note: For Nextcloud Talk the room's lobby mode must be disabled so the bot can join without moderator approval."
+      "nextcloudTalkLobbyHint": "Note: For Nextcloud Talk the room's lobby mode must be disabled so the bot can join without moderator approval.",
+      "options": "Bot settings"
+    },
+    "liveCost": {
+      "label": "Live cost",
+      "loading": "loading…",
+      "unavailable": "unavailable",
+      "stale": "delayed",
+      "finished": "final"
     },
     "detail": {
       "translation": {
@@ -73,9 +85,28 @@
         "languageBadge": "{lang}",
         "noSegmentsYet": "No segments yet."
       }
+    },
+    "botStatus": {
+      "requested": "Join requested",
+      "joining": "Joining …",
+      "awaiting_admission": "Waiting to be admitted",
+      "active": "Active in meeting",
+      "completed": "Completed",
+      "failed": "Failed",
+      "rejected": "Not admitted"
     }
   },
   "errors": {
+    "404": {
+      "title": "Page not found",
+      "message": "The requested page does not exist or has moved.",
+      "backHome": "Back home"
+    },
+    "500": {
+      "title": "Server error",
+      "message": "Something briefly lost its rhythm. Please try again in a moment.",
+      "backHome": "Back home"
+    },
     "loadFailed": "Could not load data.",
     "saveFailed": "Save failed.",
     "connection": "Connection error.",
@@ -88,14 +119,13 @@
     "translation": "Translation",
     "ocr": "OCR",
     "textOptimization": "Text Refinement",
-    "chat": "Chat",
     "files": "Files",
     "history": "Files",
     "remoteMeeting": "Remote meeting",
-    "knowledge": "Workspace Knowledge",
     "settings": "Settings",
     "workspaceAdmin": "Workspace admin",
     "admin": "Admin",
+    "priceCatalog": "Price catalog",
     "profile": "Profile",
     "logout": "Sign out",
     "ariaCurrent": "Main navigation",
@@ -106,7 +136,6 @@
     "tables": "Tables",
     "translate": "Translate",
     "ocr": "OCR",
-    "chat": "Chat",
     "files": "Files",
     "history": "Files"
   },
@@ -144,6 +173,7 @@
     }
   },
   "layout": {
+    "skipToContent": "Skip to main content",
     "footerTagline": "Your thoughts, decoded and distilled.",
     "footerCredit": "Ghost Typer 2026 · Developed by Helge Roos"
   },
@@ -159,8 +189,7 @@
     "discardConfirm": "Discard",
     "discardKeepEditing": "Keep editing",
     "saveShortcut": "Save ⌘S",
-    "savedFlash": "Saved!",
-    "chatWithDocument": "Chat with document"
+    "savedFlash": "Saved!"
   },
   "organization": {
     "label": "Workspace",
@@ -197,6 +226,10 @@
       "membersDesc": "Invite people, assign roles, remove access.",
       "integrations": "API keys & integrations",
       "integrationsDesc": "Manage Mistral and the Vexa meeting bot centrally, plus cost caps.",
+      "budgets": "Budget administration",
+      "budgetsDesc": "Set workspace, default, and individual member limits.",
+      "pricing": "Effective prices",
+      "pricingDesc": "Review effective provider prices and let owners add contract terms.",
       "preferences": "Workspace settings",
       "preferencesDesc": "Default language, retention, audit retention.",
       "usage": "Usage & cost",
@@ -210,7 +243,7 @@
       "aiProviders": "AI providers",
       "aiProvidersHint": "Keys are stored encrypted and used automatically for every workspace member.",
       "meetingBots": "Meeting bots",
-      "meetingBotsHint": "Configuration for the live transcription bot in Google Meet and Microsoft Teams.",
+      "meetingBotsHint": "Configuration for the live transcription bot in Microsoft Teams, Zoom and Nextcloud Talk. Google Meet blocks meeting bots — use tab-audio capture for Meet instead.",
       "storage": "Storage & export",
       "storageHint": "Export results to external storage.",
       "costLimits": "Cost caps",
@@ -230,17 +263,18 @@
       "noPreference": "No default",
       "retentionDays": "Transcription retention",
       "retentionDaysHint": "Days after which transcriptions are removed automatically. Empty = unlimited.",
-      "costLimit": "Workspace monthly budget",
-      "costLimitHint": "Hard cap in EUR on AI cost for this workspace. Empty = no limit.",
-      "memberBudget": "Per-member monthly budget",
-      "memberBudgetHint": "Per-member monthly cap in EUR. Combined with the workspace cap; the lower one wins. Empty = no limit.",
       "auditRetention": "Audit-log retention",
       "auditRetentionHint": "Days audit events are kept. Empty = unlimited.",
       "contextBias": "Global context terms",
       "contextBiasHint": "Comma- or line-separated; applies to every transcription of this workspace (in addition to personal lists). Improves recognition of proper nouns, jargon, and abbreviations.",
       "contextBiasPlaceholder": "Jargon, names, abbreviations…",
       "saveSuccess": "Workspace settings saved.",
-      "days": "days"
+      "saveReasonMessage": "Please provide a reason for changing the workspace settings.",
+      "days": "days",
+      "costLimit": "Workspace monthly budget",
+      "costLimitHint": "Hard cap in USD on AI cost for this workspace. Empty = no limit.",
+      "memberBudget": "Per-member monthly budget",
+      "memberBudgetHint": "Per-member monthly cap in USD. Combined with the workspace cap; the lower one wins. Empty = no limit."
     },
     "usage": {
       "title": "Workspace · Usage",
@@ -253,10 +287,16 @@
       "status": "Status",
       "budgetUsage": "Budget usage",
       "budgetSourceHint": "Effective limit derived from personal + workspace caps (the smallest wins).",
+      "statusHint": "Current-month workspace budget status.",
+      "levels": {
+        "green": "On track",
+        "yellow": "Monitor",
+        "red": "Nearly exhausted"
+      },
       "byOperation": "By operation",
       "byOperationHint": "Current month, sorted by cost.",
       "byMember": "By member",
-      "byMemberHint": "Current month. Members without activity show €0.",
+      "byMemberHint": "Current month. Members without activity show USD 0.",
       "noActivity": "No activity yet this month.",
       "noMembers": "No members.",
       "requestsSuffix": "req",
@@ -279,6 +319,13 @@
     "filterSince": "From",
     "filterUntil": "Until",
     "exportCsv": "Export CSV",
+    "exportPackage": "Export verifiable package",
+    "exportingPackage": "Creating package…",
+    "exportPackageError": "The verifiable audit package could not be created.",
+    "verifyChain": "Verify chain",
+    "verifyingChain": "Verifying chain…",
+    "chainValid": "Audit chain intact ({count} entries).",
+    "chainInvalid": "Audit chain damaged; first failure at entry {id}.",
     "noEvents": "No events for this workspace.",
     "tableAction": "Action",
     "tableTarget": "Target",
@@ -313,6 +360,26 @@
     "title": "Welcome",
     "ctaStart": "Get started",
     "decoded": "DECODED & DISTILLED"
+  },
+  "onboarding": {
+    "badge": "Getting started",
+    "title": "Welcome to GhostTyper",
+    "subtitle": "Start with one of these core features.",
+    "dismiss": "Dismiss introduction",
+    "steps": {
+      "record": {
+        "title": "Record",
+        "body": "Record speech and have it transcribed."
+      },
+      "ocr": {
+        "title": "OCR",
+        "body": "Extract text from a PDF or photo."
+      },
+      "translate": {
+        "title": "Translate",
+        "body": "Translate text and documents into other languages."
+      }
+    }
   },
   "profile": {
     "title": "Profile",
@@ -353,6 +420,7 @@
       "transcribed": "Transcribed",
       "analyzing": "Analyzing",
       "completed": "Completed",
+      "budget_stopped": "Stopped by budget",
       "error": "Error"
     }
   },
@@ -376,8 +444,13 @@
     "moveToFolder": "Move to folder"
   },
   "upload": {
+    "eyebrow": "New transcription",
     "title": "Transcription",
-    "subtitle": "Upload audio or record directly.",
+    "subtitle": "Choose an audio source. GhostTyper transcribes it and can immediately create a structured analysis.",
+    "presetActive": "Suitable settings have already been selected",
+    "openStatus": "Open status",
+    "restart": "Try again",
+    "restarting": "Starting…",
     "dropHere": "Drop file here or click to choose",
     "fileFormats": "MP3, WAV, M4A, OGG, FLAC, WebM up to 500 MB",
     "selectedFile": "Selected file",
@@ -397,8 +470,21 @@
     "submitting": "Uploading…"
   },
   "translatePage": {
+    "eyebrow": "Translate",
     "title": "Translation",
-    "subtitle": "Translate text, image or Office document.",
+    "subtitle": "Translate text directly or transfer complete documents into another language.",
+    "details": "Details",
+    "modelLabel": "AI model",
+    "modelHint": "The default offers the best balance of quality and speed for most texts.",
+    "targetLanguage": "Target language",
+    "targetLanguageHint": "The source language is detected automatically.",
+    "fileLabel": "PDF, DOCX, XLSX, or PPTX",
+    "fileTranslate": "Translate file",
+    "fileTranslating": "Translating file…",
+    "uploadDocument": "Upload a document for text recognition",
+    "takePhoto": "Take a photo and recognize text",
+    "clearInput": "Clear source text",
+    "extractingText": "Recognizing text…",
     "tabText": "Text",
     "tabFile": "File",
     "input": "Source text",
@@ -417,6 +503,10 @@
     "resultHeading": "Translation",
     "resultPlaceholder": "Translation will appear here after you click \"Translate\".",
     "openInEditor": "Open in editor",
+    "bilingualTitle": "Bilingual translation",
+    "bilingualHtml": "Bilingual HTML",
+    "bilingualPdf": "Bilingual PDF",
+    "bilingualExportError": "The bilingual export could not be created.",
     "mobileSourceTab": "Source",
     "mobileResultTab": "Translation",
     "outputFallbackLabel": "translated",
@@ -439,6 +529,31 @@
       "translationRunning": "Translating text…",
       "renderingPdf": "Generating new PDF…",
       "layoutNotice": "Note: For PDFs the layout is rebuilt from the extracted text. Images and diagrams from the original are lost; fonts and column breaks may change."
+    },
+    "terms": {
+      "title": "Glossary coverage",
+      "appliedTitle": "Applied terms",
+      "maskedTitle": "Protected terms (not translated)",
+      "violationsTitle": "Unprotected terms",
+      "violationsHint": "These terms could not be guaranteed to survive unchanged — please verify them in the result.",
+      "tierPersonal": "personal",
+      "tierWorkspace": "workspace",
+      "tmHits": "{count} from translation memory",
+      "retried": "{count}× stricter retry",
+      "suggestedTitle": "Suggested new terms",
+      "scopeLabel": "Scope",
+      "scopePersonal": "Mine",
+      "scopeWorkspace": "Workspace",
+      "addTitle": "Add to glossary",
+      "addHint": "Added as “do not translate” — refine into a fixed translation in settings.",
+      "addError": "The term could not be added.",
+      "reviewTitle": "Segment review ({count})",
+      "reviewSource": "Source",
+      "reviewTarget": "Translation",
+      "editCorrection": "Correct",
+      "saveCorrection": "Save correction",
+      "correctionSaved": "Verified",
+      "correctionError": "The correction could not be saved."
     }
   },
   "ocrPage": {
@@ -449,17 +564,25 @@
     "extracting": "Extracting…",
     "withAnalysis": "With analysis",
     "result": "Result",
-    "noResult": "No result yet."
+    "noResult": "No result yet.",
+    "savedOffline": "File was saved offline and will sync when a connection is available.",
+    "offlineScopeMissing": "Offline storage is available after the workspace session has fully loaded.",
+    "offlineStoreFailed": "File could not be saved offline."
   },
   "textOptPage": {
+    "eyebrow": "Edit text",
     "title": "Text refinement",
     "subtitle": "Correct, shorten or rephrase text.",
     "input": "Input",
+    "inputHelp": "Paste the text you want to improve.",
+    "inputPlaceholder": "Paste text here…",
     "output": "Refined text",
     "submit": "Refine",
     "submitting": "Refining…",
     "preset": "Style",
+    "presetHelp": "Choose the most important change. Add any other requests below.",
     "customInstruction": "Custom instruction",
+    "instructionHelp": "Optional: tone, audience, or specific wording preferences.",
     "customInstructionHint": "Custom instruction for the AI (optional).",
     "presets": {
       "spelling_grammar": "Spelling & grammar",
@@ -506,7 +629,27 @@
     "role": "Role",
     "createdAt": "Created at",
     "lastLogin": "Last sign-in",
-    "passwordReset": "Reset password"
+    "passwordReset": "Reset password",
+    "pricing": {
+      "eyebrow": "Platform administration",
+      "title": "Global price catalog",
+      "description": "Manage immutable provider-price versions with explicit units and effective intervals.",
+      "usersLink": "User management",
+      "newVersion": "New price version",
+      "formTitle": "Create price version",
+      "immutableHint": "Existing versions remain unchanged. A new version closes the preceding interval when needed.",
+      "reason": "Reason for change",
+      "reasonPlaceholder": "Document the source and reason for this price change",
+      "create": "Create price version",
+      "catalogTitle": "All price versions",
+      "catalogHint": "Newest version first for each provider, model, and operation.",
+      "empty": "No price versions exist yet.",
+      "saveSuccess": "Price version created.",
+      "saveError": "Price version could not be created.",
+      "loadError": "Price catalog could not be loaded.",
+      "invalidForm": "Check identifiers, prices, units, dates, and the reason for change.",
+      "overlapError": "The effective interval overlaps an existing price version."
+    }
   },
   "components": {
     "audioRecorder": {
@@ -559,10 +702,26 @@
       "tabUpload": "Upload",
       "tabRecord": "Record",
       "tabSystemAudio": "Tab/System Audio",
+      "sourceLabel": "Audio source",
+      "outputLabel": "Result",
+      "dragHint": "or drag audio here",
+      "replaceFile": "Click to replace",
+      "diarizeHint": "Assigns the text to different voices.",
+      "autoAnalyzeHint": "Creates a summary after transcription.",
+      "advancedOptions": "Details and preferences",
+      "analysisMode": "Type of analysis",
+      "analysisModeHint": "Determines the structure of the result.",
+      "modelLabel": "AI model",
+      "modelHint": "The default works for most recordings.",
+      "contextHelp": "Helps with specialist terms, names, and abbreviations.",
+      "focusHelp": "Describe only what matters most in the analysis.",
       "tabPaste": "Paste",
       "submit": "Process",
       "submitting": "Processing…",
-      "supportedFormats": "Supported formats"
+      "supportedFormats": "Supported formats",
+      "savedOffline": "Capture was saved offline and will sync when a connection is available.",
+      "offlineScopeMissing": "Offline storage is available after the workspace session has fully loaded.",
+      "offlineStoreFailed": "Capture could not be saved offline."
     },
     "process": {
       "queued": "Queued",
@@ -584,6 +743,9 @@
       "saved": "Saved!",
       "exportPdf": "Export PDF",
       "exportPdfBusy": "Generating PDF…",
+      "redactionLabel": "PDF redaction",
+      "redactionPlaceholder": "Terms to redact",
+      "redactionHint": "Comma- or newline-separated terms are completely removed before PDF rendering.",
       "exportDocx": "Export DOCX",
       "translateTo": "Translate",
       "translating": "…",
@@ -654,63 +816,18 @@
     "tabs": {
       "transcription": "Transcription",
       "textTemplates": "Text templates",
+      "tableTemplates": "Table templates",
       "ocrTranslate": "OCR & Translation",
       "integrations": "Integrations",
       "aiProviders": "AI providers",
       "meetingBots": "Meeting bots",
-      "account": "Account"
+      "account": "Account",
+      "glossary": "Glossary"
     },
     "integrations": {
-      "cortecs": {
-        "title": "Cortecs",
-        "description": "Primary provider for transcription, analysis, translation and text refinement. Defaults: deepseek-v4-pro and whisper-large-v3.",
-        "enableLabel": "Use Cortecs for AI and transcription",
-        "enableHint": "When enabled, Cortecs is used for every workspace member.",
-        "enableHintWithFallback": "A server default is configured as fallback — the workspace key overrides it.",
-        "apiKeyLabel": "API key",
-        "apiKeyHint": "Stored encrypted (AES-256-GCM); never sent back to the browser.",
-        "apiKeyPlaceholder": "Paste Cortecs API key",
-        "baseUrlLabel": "API base URL",
-        "chatModelLabel": "Chat/analysis model",
-        "transcriptionModelLabel": "Transcription model",
-        "preferenceLabel": "Routing preference",
-        "preferenceBalanced": "Balanced",
-        "preferenceSpeed": "Speed",
-        "preferenceCost": "Cost",
-        "configured": "set",
-        "testButton": "Test connection",
-        "connected": "Connected",
-        "disconnected": "Connection failed",
-        "saveSuccess": "Cortecs configuration saved.",
-        "saveError": "Save failed.",
-        "loadError": "Could not load configuration.",
-        "testSuccess": "Successfully connected to Cortecs.",
-        "testError": "Connection test failed.",
-        "readOnlyHint": "Only workspace admins can manage this integration."
-      },
-      "mistral": {
-        "title": "Mistral OCR & TTS",
-        "description": "Remains active for OCR and Voxtral TTS. Cortecs handles transcription, analysis, translation and text refinement.",
-        "enableLabel": "Use Mistral for OCR/TTS",
-        "enableHint": "When enabled, the stored key is used for OCR and TTS.",
-        "enableHintWithFallback": "A server default is configured as fallback — the workspace key overrides it.",
-        "apiKeyLabel": "API key",
-        "apiKeyHint": "Stored encrypted (AES-256-GCM); never sent back to the browser.",
-        "apiKeyPlaceholder": "Paste Mistral API key",
-        "configured": "set",
-        "testButton": "Test connection",
-        "connected": "Connected",
-        "disconnected": "Connection failed",
-        "saveSuccess": "Mistral configuration saved.",
-        "saveError": "Save failed.",
-        "loadError": "Could not load configuration.",
-        "testSuccess": "Successfully connected to Mistral.",
-        "testError": "Connection test failed.",
-        "readOnlyHint": "Only workspace admins can manage this integration."
-      },
       "vexa": {
         "title": "Remote meeting bot",
-        "description": "A bot joins Google Meet and Microsoft Teams meetings and streams live transcripts straight into the GhostTyper workflow.",
+        "description": "A bot joins Microsoft Teams, Zoom and Nextcloud Talk meetings and streams live transcripts straight into the GhostTyper workflow. Google Meet blocks meeting bots — tab-audio capture covers Meet instead.",
         "enableLabel": "Enable feature",
         "enableHintSimple": "The Vexa bot ships as part of the local install — just toggle on or off here.",
         "defaultBotNameLabel": "Bot display name in the meeting",
@@ -726,6 +843,7 @@
         "testSuccess": "Successfully connected.",
         "testError": "Connection test failed.",
         "readOnlyHint": "Only workspace admins can manage this feature.",
+        "operatorMissingHint": "Vexa is not fully configured on the server (check VEXA_BASE_URL and VEXA_ADMIN_API_TOKEN).",
         "gdprNoticeLabel": "GDPR notice in meeting chat",
         "gdprNoticeHint": "When the bot joins the meeting it posts a notice into the chat that the meeting is being transcribed. Helps satisfy the GDPR Art. 13 information duty.",
         "gdprNoticeTextLabel": "Notice text",
@@ -794,22 +912,94 @@
       "ocrModel": "OCR model",
       "translationTarget": "Default translation target"
     },
+    "glossary": {
+      "title": "Translation glossary",
+      "description": "Manage fixed translations and terms that must remain unchanged.",
+      "addEntry": "Add entry",
+      "editEntry": "Edit entry",
+      "sourceTerm": "Source term",
+      "targetLang": "Target language",
+      "targetTerm": "Target term",
+      "doNotTranslate": "Do not translate",
+      "notes": "Notes",
+      "save": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this glossary entry?",
+      "empty": "No glossary entries yet.",
+      "adminOnly": "Only workspace admins can manage glossary entries.",
+      "personalTitle": "My glossary",
+      "personalDescription": "Your personal terms — used only for your own translations and kept private.",
+      "workspaceTitle": "Workspace glossary",
+      "workspaceDescription": "Binding company terminology for everyone in the workspace.",
+      "workspaceLocked": "Only workspace admins can edit these entries.",
+      "scopeLabel": "Scope",
+      "scopePersonal": "My glossary",
+      "scopeWorkspace": "Workspace",
+      "bilingualExport": "Bilingual export is available for aligned source and target segments as HTML or PDF.",
+      "refresh": "Refresh",
+      "actions": "Actions",
+      "edit": "Edit",
+      "suggestionsLoadError": "Automatic glossary suggestions could not be loaded.",
+      "loadError": "The translation glossary could not be loaded.",
+      "saveSuccess": "Glossary entry saved.",
+      "saveError": "The glossary entry could not be saved.",
+      "deleteSuccess": "Glossary entry deleted.",
+      "deleteError": "The glossary entry could not be deleted.",
+      "tm": {
+        "title": "Translation memory",
+        "description": "Cached translations for this workspace. Verified corrections take precedence over automatically stored hits.",
+        "searchPlaceholder": "Search source text…",
+        "search": "Search",
+        "refresh": "Refresh",
+        "empty": "No entries in the translation memory.",
+        "verified": "Verified",
+        "auto": "Automatic",
+        "lastUsed": "Last used",
+        "never": "never",
+        "source": "Source",
+        "target": "Target",
+        "delete": "Delete",
+        "deleteConfirm": "Delete this translation memory entry?",
+        "deleteSuccess": "Entry deleted.",
+        "deleteError": "The entry could not be deleted.",
+        "purgeUnverified": "Clear unverified",
+        "purgeConfirm": "Delete all unverified entries from the translation memory? Verified corrections are kept.",
+        "purgeSuccess": "{count} unverified entries deleted.",
+        "purgeError": "Cleanup failed.",
+        "loadError": "The translation memory could not be loaded.",
+        "loadMore": "Load more",
+        "showing": "{count} of {total} entries"
+      },
+      "io": {
+        "exportCsv": "CSV",
+        "exportTbx": "TBX",
+        "import": "Import",
+        "exportError": "Export failed.",
+        "importError": "Import failed.",
+        "importSuccess": "{imported} imported, {skipped} skipped.",
+        "importErrorsTitle": "Skipped rows:",
+        "rowError": "Row {line}: {message}"
+      }
+    },
     "account": {
       "apiKey": "Mistral API key",
       "apiKeyConfigured": "API key is configured.",
       "apiKeyMissing": "No API key configured.",
       "apiKeyPlaceholder": "Enter Mistral API key…",
       "removeApiKey": "Remove API key",
+      "auditLog": "Audit log (recent events)",
+      "noAuditEvents": "No events yet.",
       "costLimit": "Monthly cost limit",
-      "costLimitHint": "Hard cap per month in EUR. Empty = no limit.",
+      "costLimitHint": "Hard cap per month in USD. Empty = no limit.",
       "memberBudget": "Per-member monthly budget",
-      "memberBudgetHint": "Additional per-member budget in EUR.",
+      "memberBudgetHint": "Additional per-member budget in USD.",
       "usage": "Usage",
       "totalCost": "Total cost",
-      "totalRequests": "Requests",
-      "auditLog": "Audit log (recent events)",
-      "noAuditEvents": "No events yet."
-    }
+      "totalRequests": "Requests"
+    },
+    "eyebrow": "Personal preferences",
+    "subtitle": "Set sensible defaults. Technical details are available within each section."
   },
   "transcriptionDetailPage": {
     "loading": "Loading transcription…",
@@ -839,7 +1029,31 @@
     "openTableEditor": "Open table editor",
     "exportPdf": "Export as PDF",
     "exportDocx": "Export as DOCX",
-    "exportExcel": "Export as Excel"
+    "exportExcel": "Export as Excel",
+    "budgetStoppedTitle": "Processing stopped by budget",
+    "budgetStoppedDescription": "This operation ended because an administrator triggered the cost stop or the effective monthly budget was exhausted.",
+    "progress": {
+      "transcribed": "Transcription is ready.",
+      "analyzing": "Transcription is ready. Analysis is running.",
+      "completed": "Analysis is ready.",
+      "steps": {
+        "upload": "Upload",
+        "stt": "Speech to text",
+        "diarization": "Speaker diarisation",
+        "analysis": "Analysis",
+        "done": "Done"
+      },
+      "connection": {
+        "polling": "Live connection interrupted – checking status periodically.",
+        "stale": "The latest progress update is delayed.",
+        "unavailable": "Progress is temporarily unavailable."
+      },
+      "eta": {
+        "remaining": "About {duration} remaining",
+        "near": "Almost done. Applying the finishing touches.",
+        "overdue": "Taking a little longer than usual. Processing continues."
+      }
+    }
   },
   "transcriptionsList": {
     "folders": "Folders",
@@ -858,6 +1072,31 @@
     "emptySearch": "No matches for your search.",
     "emptyFolder": "This folder is empty.",
     "deleteEntryConfirm": "Delete transcription?"
+  },
+  "emptyState": {
+    "transcriptions": {
+      "description": "Nothing here yet. Upload something or move files into this folder.",
+      "cta": "Start a recording"
+    },
+    "search": {
+      "description": "Try a different search term."
+    },
+    "audit": {
+      "title": "No audit events",
+      "description": "No events matched the selected filters."
+    },
+    "members": {
+      "title": "No members",
+      "description": "This workspace currently has no additional members."
+    },
+    "workspaces": {
+      "title": "No workspaces",
+      "description": "No workspaces have been created yet."
+    },
+    "users": {
+      "title": "No users",
+      "description": "No users have been created yet."
+    }
   },
   "tableSchemaBuilder": {
     "quickstart": "Quick start",
@@ -908,7 +1147,7 @@
     "rowHintPlaceholder": "Hint for this row",
     "validationHeading": "Please correct the following:",
     "placeholders": {
-      "currency": "0.00 €",
+      "currency": "USD 0.00",
       "number": "0",
       "date": "DD/MM/YYYY",
       "text": "Content"
@@ -1038,6 +1277,15 @@
       "processFailed": "Could not process document."
     }
   },
+  "offlineStatus": {
+    "offline": "Offline – captures are stored locally",
+    "queued": "{count} capture(s) waiting to sync",
+    "hint": "Synchronization starts automatically when a connection is available.",
+    "failed": "{count} capture(s) need another attempt.",
+    "unsupported": "Offline storage is not supported by this browser.",
+    "sync": "Sync",
+    "syncing": "Syncing…"
+  },
   "invite": {
     "title": "Workspace invitation",
     "loginNeeded": "You've been invited to a workspace. Please sign in to accept.",
@@ -1053,90 +1301,104 @@
     "errorTitle": "Invite failed",
     "errorBackHome": "Back to home"
   },
-  "chatPage": {
-    "title": "Chat",
-    "welcomeTitle": "Welcome to Chat",
-    "welcomeHint": "Start a new chat or select an existing conversation. You can also start a chat from transcriptions, OCR results, or translations.",
-    "startNewChat": "Start a new chat",
-    "newChat": "New chat",
-    "newChatDefault": "New chat",
-    "inputPlaceholder": "Type a message…",
-    "startConversation": "Ask a question or type a message.",
-    "empty": "No chats yet.",
-    "untitled": "Untitled",
-    "messagesCount": "messages",
-    "deleteChat": "Delete chat",
-    "loadError": "Could not load chat.",
-    "createError": "Could not create chat.",
-    "deleteError": "Could not delete chat.",
-    "sendError": "Could not send message.",
-    "copyError": "Could not copy message.",
-    "copyMessage": "Copy message",
-    "editMessage": "Edit message",
-    "regenerateMessage": "Regenerate response",
-    "saveEdit": "Save edit",
-    "cancelEdit": "Cancel edit",
-    "contextBanner": "Context: {label} – {title}",
-    "contextTranscription": "Transcription",
-    "contextOcr": "OCR result",
-    "contextTranslate": "Translation",
-    "contextTextopt": "Text refinement",
-    "sources": "Sources:",
-    "sourceFallback": "Source {index}",
-    "contextLabel": "Context:",
-    "contextAttach": "Add",
-    "contextAttachFile": "File",
-    "contextAttachKnowledge": "Knowledge",
-    "contextRemove": "Remove",
-    "contextSearchPlaceholder": "Search files…",
-    "contextSearchKnowledgePlaceholder": "Search knowledge bases…",
-    "contextSearching": "Searching…",
-    "contextNoResults": "No matches",
-    "sourcesLabel": "The AI sees:",
-    "attachSource": "Attach source",
-    "searchSourcesPlaceholder": "Search files or knowledge…",
-    "recentSources": "Recently used",
-    "groupDocuments": "Files",
-    "groupKnowledge": "Workspace knowledge",
-    "uploadFromComputer": "Upload file…",
-    "dropToUpload": "Drop a file here to attach it",
-    "uploadProcessing": "processing…",
-    "uploadIndexing": "indexing…",
-    "uploadFailed": "Upload failed"
+  "billing": {
+    "personal": {
+      "eyebrow": "Current month",
+      "title": "My budget",
+      "ownCost": "My cost",
+      "remaining": "Effective remaining",
+      "unlimited": "No limit",
+      "month": "Billing month: {month}",
+      "privacyHint": "This view shows only your own cost and the remaining amount effective for you.",
+      "loadError": "Your budget data could not be loaded.",
+      "levels": {
+        "green": "On track",
+        "yellow": "Monitor",
+        "red": "Nearly exhausted"
+      }
+    },
+    "budgets": {
+      "title": "Budget administration",
+      "description": "Manage monthly limits · Role: {role}",
+      "workspaceTitle": "Workspace and default limit",
+      "workspaceHint": "The workspace limit is shared by all members. The default limit applies per member unless an individual limit is set.",
+      "workspaceLimit": "Workspace limit / month",
+      "workspaceLimitHint": "Shared hard limit. Empty = no limit.",
+      "defaultMemberLimit": "Default limit per member",
+      "defaultMemberLimitHint": "Applies without an individual override. Empty = no limit.",
+      "memberTitle": "Individual member limit",
+      "memberHint": "An individual limit applies only to this member in this workspace.",
+      "member": "Member",
+      "individualLimit": "Individual limit / month",
+      "individualLimitHint": "Empty = inherit the workspace default.",
+      "currentDefault": "Current workspace default: {amount}",
+      "reason": "Reason for change",
+      "reasonPlaceholder": "Why is this budget changing?",
+      "noLimit": "No limit",
+      "saveWorkspace": "Save workspace limits",
+      "saveMember": "Save member limit",
+      "saveSuccess": "Budget updated.",
+      "saveError": "Budget could not be saved.",
+      "loadError": "Budgets could not be loaded.",
+      "invalidAmount": "Enter a positive amount or leave the field empty.",
+      "emergencyStopTitle": "Stop all paid processing",
+      "emergencyStopHint": "Stops active meetings, translation, TTS, OCR, and transcription work in this workspace and blocks new paid work until the workspace budget is saved again.",
+      "emergencyReasonPlaceholder": "Reason for the immediate workspace stop",
+      "emergencyStopAction": "Stop paid processing",
+      "emergencyStopSuccess": "The workspace emergency stop was requested.",
+      "emergencyStopError": "The workspace emergency stop could not be requested."
+    },
+    "pricing": {
+      "provider": "Provider",
+      "model": "Model",
+      "providerModel": "Provider / model",
+      "operation": "Operation",
+      "units": "Input / output unit",
+      "inputUnit": "Input unit",
+      "outputUnit": "Output unit",
+      "input": "Input",
+      "cachedInput": "Cached input",
+      "cacheWrite": "Cache write",
+      "output": "Output",
+      "rateHint": "USD per 1 million units",
+      "notSet": "Not set",
+      "effectiveFrom": "Effective from",
+      "effectiveUntil": "Effective until (optional)"
+    },
+    "workspacePricing": {
+      "title": "Workspace pricing",
+      "ownerDescription": "Review effective prices and manage contract terms · Role: {role}",
+      "adminDescription": "Read-only effective prices · Role: {role}",
+      "effectiveTitle": "Currently effective prices",
+      "effectiveHint": "Amounts are shown in USD per one million of the stated unit.",
+      "source": "Source",
+      "override": "Workspace contract",
+      "catalog": "Global catalog",
+      "empty": "No effective prices are configured.",
+      "overrideTitle": "Create contract price",
+      "overrideWarning": "Use only for BYOK credentials or negotiated provider contracts. The change applies only to this workspace and is audited.",
+      "priceVersion": "Global price version",
+      "reason": "Reason for change",
+      "reasonPlaceholder": "Document the BYOK or contract reason",
+      "createOverride": "Create contract price",
+      "historyTitle": "Workspace contract-price history",
+      "saveSuccess": "Workspace price created.",
+      "saveError": "Workspace price could not be created.",
+      "loadError": "Workspace prices could not be loaded.",
+      "invalidForm": "Check prices, dates, and the reason for change.",
+      "atLeastOneRate": "Override at least one price component.",
+      "overlapError": "The effective interval overlaps an existing workspace price."
+    }
   },
-  "knowledgePage": {
-    "title": "Workspace Knowledge",
-    "heading": "Workspace Knowledge",
-    "hint": "Group workspace documents into knowledge bases that chat can use as sources.",
-    "sharedInWorkspace": "Shared in workspace",
-    "newBase": "New knowledge base",
-    "namePlaceholder": "Knowledge base name",
-    "descPlaceholder": "Description (optional)",
-    "create": "Create",
-    "cancel": "Cancel",
-    "emptyBases": "No knowledge bases yet. Create the first one.",
-    "selectBase": "Select a knowledge base on the left.",
-    "itemsCount": "{count} documents",
-    "deleteBase": "Delete knowledge base",
-    "confirmDeleteBase": "Really delete this knowledge base?",
-    "documents": "Documents",
-    "addDocument": "Add document",
-    "searchPlaceholder": "Search your files…",
-    "privateBadge": "private",
-    "addShareHint": "Private files are shared with the workspace when added.",
-    "searching": "Searching…",
-    "noResults": "No matches",
-    "noItems": "No documents in this knowledge base yet.",
-    "removeItem": "Remove",
-    "retrievalMode": "Retrieval mode",
-    "modeFocused": "Focused",
-    "modeFullContext": "Full context",
-    "modeOff": "Off",
-    "loadError": "Knowledge bases could not be loaded.",
-    "saveError": "Action failed.",
-    "addTo": "Add to knowledge base",
-    "noBasesShort": "No knowledge bases",
-    "privateBadge": "Private",
-    "addShareHint": "Private files are shared with the workspace when added."
+  "dashboard": {
+    "budget": {
+      "title": "Workspace budget",
+      "green": "On track",
+      "yellow": "Watch",
+      "red": "Critical",
+      "noLimit": "no limit",
+      "usageLabel": "Monthly budget usage",
+      "month": "Month {month}"
+    }
   }
 }

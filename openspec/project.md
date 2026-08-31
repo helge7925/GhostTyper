@@ -10,8 +10,10 @@ GhostTyper is a self-hosted workspace product for transcription, OCR, translatio
 - PostgreSQL primary datastore.
 - Existing `transcriptions` table currently stores audio transcriptions, remote meetings, OCR outputs, translations, and data-table analyses.
 - Organizations and role-based permissions are already present.
-- Cortecs provides OpenAI-compatible chat/transcription endpoints.
-- Mistral OCR remains used for OCR.
+- OpenRouter is the sole application-facing AI provider (chat, OCR, batch/live
+  transcription, TTS) since `consolidate-ai-providers-openrouter`; Cortecs and
+  Mistral are no longer called at runtime. Models are governed dynamically
+  per organization (allowlist + defaults), never hardcoded.
 
 ## Planning Rules
 

@@ -1,19 +1,11 @@
 import pool from '../../lib/db';
 import { withOrgScope } from '../../lib/api/with-org-scope';
-import { getSettingsRow } from '../../lib/settings-service';
+import { getSettingsRow, resolveOpenRouterConfig } from '../../lib/settings-service';
 import { normalizeDefaultTemplate } from '../../lib/constants';
 import { resolveChatModel, resolveOcrModel } from '../../lib/model-policy';
+import { normalizeModelId } from '../../lib/openrouter';
 import { enforceRateLimit, logApiError, serverError } from '../../lib/api-utils';
 import { logAuditEvent } from '../../lib/audit-log';
-
-function normalizeCostLimit(costLimit) {
-  if (costLimit === null || costLimit === '') return null;
-  const value = Number(costLimit);
-  if (!Number.isFinite(value) || value < 0) {
-    return null;
-  }
-  return value;
-}
 
 function hasOwnValue(target, key) {
   return Object.prototype.hasOwnProperty.call(target || {}, key);
@@ -74,17 +66,16 @@ async function handler(req, res) {
     switch (req.method) {
       case 'GET': {
         const settings = await getSettingsRow(userId);
+        const openrouter = await resolveOpenRouterConfig({ userId, organizationId: orgId });
 
         if (!settings) {
           return res.status(200).json({
             defaultTemplate: 'generic',
             language: 'de',
             contextBias: '',
-            preferredModel: 'deepseek-v4-pro',
+            preferredModel: openrouter.defaultModels.chat || '',
             defaultTranslateLanguage: 'en',
-            ocrModel: 'mistral-ocr-latest',
-            costLimit: null,
-            memberMonthlyBudgetLimit: null,
+            ocrModel: openrouter.defaultModels.ocr || '',
             remoteMeetingEnabled: true,
           });
         }
@@ -93,11 +84,9 @@ async function handler(req, res) {
           defaultTemplate: normalizeDefaultTemplate(settings.default_template),
           language: settings.language,
           contextBias: normalizeContextBias(settings.context_bias).value || '',
-          preferredModel: resolveChatModel(settings.preferred_model) || 'deepseek-v4-pro',
+          preferredModel: resolveChatModel(settings.preferred_model, null) || openrouter.defaultModels.chat || '',
           defaultTranslateLanguage: settings.default_translate_language || 'en',
-          ocrModel: settings.ocr_model || 'mistral-ocr-latest',
-          costLimit: settings.cost_limit,
-          memberMonthlyBudgetLimit: settings.member_monthly_budget_limit,
+          ocrModel: resolveOcrModel(settings.ocr_model, null) || openrouter.defaultModels.ocr || '',
           remoteMeetingEnabled: settings.remote_meeting_enabled !== false,
         });
       }
@@ -110,18 +99,26 @@ async function handler(req, res) {
           language,
           contextBias,
           preferredModel,
-          costLimit,
-          memberMonthlyBudgetLimit,
           defaultTranslateLanguage,
           ocrModel,
           remoteMeetingEnabled,
         } = body;
 
-        if (preferredModel !== undefined && resolveChatModel(preferredModel) === null) {
+        if (hasOwnValue(body, 'costLimit') || hasOwnValue(body, 'memberMonthlyBudgetLimit')) {
+          return res.status(403).json({
+            code: 'BUDGET_MANAGED_BY_WORKSPACE',
+            message: 'Budget limits can only be changed through workspace budget administration.',
+          });
+        }
+
+        const openrouter = await resolveOpenRouterConfig({ userId, organizationId: orgId });
+        const normalizedPreferred = normalizeModelId(preferredModel);
+        const normalizedOcr = normalizeModelId(ocrModel);
+        if (preferredModel !== undefined && (!normalizedPreferred || !openrouter.allowedModels.chat.includes(normalizedPreferred))) {
           return res.status(400).json({ message: 'Ungültiges KI-Modell' });
         }
 
-        if (ocrModel !== undefined && resolveOcrModel(ocrModel) === null) {
+        if (ocrModel !== undefined && (!normalizedOcr || !openrouter.allowedModels.ocr.includes(normalizedOcr))) {
           return res.status(400).json({ message: 'Ungültiges OCR-Modell' });
         }
 
@@ -129,25 +126,9 @@ async function handler(req, res) {
         const shouldUpdateLanguage = hasOwnValue(body, 'language');
         const shouldUpdateContextBias = hasOwnValue(body, 'contextBias');
         const shouldUpdatePreferredModel = hasOwnValue(body, 'preferredModel');
-        const shouldUpdateCostLimit = hasOwnValue(body, 'costLimit');
-        const shouldUpdateMemberMonthlyBudgetLimit = hasOwnValue(body, 'memberMonthlyBudgetLimit');
         const shouldUpdateDefaultTranslateLanguage = hasOwnValue(body, 'defaultTranslateLanguage');
         const shouldUpdateOcrModel = hasOwnValue(body, 'ocrModel');
         const shouldUpdateRemoteMeetingEnabled = hasOwnValue(body, 'remoteMeetingEnabled');
-
-        const normalizedCostLimit = normalizeCostLimit(costLimit);
-        if (shouldUpdateCostLimit && costLimit !== null && costLimit !== '' && normalizedCostLimit === null) {
-          return res.status(400).json({ message: 'Ungültiges Kostenlimit' });
-        }
-        const normalizedMemberMonthlyBudgetLimit = normalizeCostLimit(memberMonthlyBudgetLimit);
-        if (
-          shouldUpdateMemberMonthlyBudgetLimit
-          && memberMonthlyBudgetLimit !== null
-          && memberMonthlyBudgetLimit !== ''
-          && normalizedMemberMonthlyBudgetLimit === null
-        ) {
-          return res.status(400).json({ message: 'Ungültiges Mitglieder-Budgetlimit' });
-        }
 
         const normalizedContextBias = shouldUpdateContextBias
           ? normalizeContextBias(contextBias)
@@ -159,8 +140,6 @@ async function handler(req, res) {
         const client = await pool.connect();
         const auditFlags = {
           preferredModelChanged: shouldUpdatePreferredModel,
-          costLimitChanged: shouldUpdateCostLimit,
-          memberBudgetChanged: shouldUpdateMemberMonthlyBudgetLimit,
           contextBiasChanged: shouldUpdateContextBias,
         };
         try {
@@ -187,12 +166,6 @@ async function handler(req, res) {
           }
           if (shouldUpdatePreferredModel) {
             addUpdate(updates, values, 'preferred_model', preferredModel || null);
-          }
-          if (shouldUpdateCostLimit) {
-            addUpdate(updates, values, 'cost_limit', normalizedCostLimit);
-          }
-          if (shouldUpdateMemberMonthlyBudgetLimit) {
-            addUpdate(updates, values, 'member_monthly_budget_limit', normalizedMemberMonthlyBudgetLimit);
           }
           if (shouldUpdateDefaultTranslateLanguage) {
             addUpdate(updates, values, 'default_translate_language', defaultTranslateLanguage || null);

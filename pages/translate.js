@@ -9,6 +9,15 @@ import ProcessStatusCard from '../components/ProcessStatusCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { saveDocument } from '../lib/api';
 import { useMessageList, useMessageObject, useTranslations } from '../lib/i18n';
+import { useModelOptions } from '../lib/use-model-options';
+import { usePermission } from '../lib/use-permission';
+import TranslationTermPanel from '../components/TranslationTermPanel';
+import { Button } from '../components/ui/button';
+import { Card, CardBody } from '../components/ui/card';
+import { Field } from '../components/ui/field';
+import { Camera, Check, ChevronDown, Copy, FileText, Pencil, Trash2, Upload } from 'lucide-react';
+import { cn } from '../lib/utils';
+import { alignBilingualText } from '../lib/bilingual-export';
 
 const LANGUAGES = [
   { code: 'German', label: 'Deutsch' },
@@ -32,11 +41,17 @@ export default function Translate() {
   const translationMessages = useMessageList('loadingMessages.translation');
   const translateOcrMessages = useMessageList('loadingMessages.ocr');
   const outputLanguageLabels = useMessageObject('translatePage.outputLanguageLabel');
+  const canManageWorkspace = usePermission('org.settings');
 
   const [text, setText] = useState('');
   const [targetLanguage, setTargetLanguage] = useState('German');
-  const [model, setModel] = useState('deepseek-v4-pro');
+  const [model, setModel] = useState('');
+  const { options: chatModelOptions, defaultModel } = useModelOptions('chat');
+  useEffect(() => { if (!model && defaultModel) setModel(defaultModel); }, [defaultModel, model]);
   const [translatedText, setTranslatedText] = useState('');
+  const [glossaryMeta, setGlossaryMeta] = useState(null);
+  const [translatedSource, setTranslatedSource] = useState('');
+  const [officeGlossaryMeta, setOfficeGlossaryMeta] = useState(null);
   const [loading, setLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [loadingStartedAt, setLoadingStartedAt] = useState(null);
@@ -49,6 +64,7 @@ export default function Translate() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState('source');
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [bilingualExportLoading, setBilingualExportLoading] = useState('');
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -117,6 +133,8 @@ export default function Translate() {
       if (!res.ok) throw new Error(data.message || 'Übersetzung fehlgeschlagen');
 
       setTranslatedText(data.translatedText);
+      setGlossaryMeta(data.glossary || null);
+      setTranslatedSource(text);
       setMobileTab('result');
     } catch (err) {
       setError(err.message);
@@ -141,6 +159,7 @@ export default function Translate() {
     setOfficeLoading(true);
     setLoadingStartedAt(new Date().toISOString());
     setOfficeResult(null);
+    setOfficeGlossaryMeta(null);
     setError('');
 
     const formData = new FormData();
@@ -178,6 +197,14 @@ export default function Translate() {
         warningCount: Number(response.headers.get('x-ghosttyper-layout-warnings') || 0),
         isPdf: isPdfOutput,
       });
+      const glossaryHeader = response.headers.get('x-ghosttyper-glossary');
+      if (glossaryHeader) {
+        try {
+          setOfficeGlossaryMeta(JSON.parse(decodeURIComponent(glossaryHeader)));
+        } catch {
+          setOfficeGlossaryMeta(null);
+        }
+      }
     } catch (err) {
       setError(err.message || 'Datei-Übersetzung fehlgeschlagen');
     } finally {
@@ -203,6 +230,42 @@ export default function Translate() {
       ta.select();
       try { document.execCommand('copy'); setCopyFeedback(true); window.setTimeout(() => setCopyFeedback(false), 2000); } catch {/* no-op */}
       document.body.removeChild(ta);
+    }
+  }
+
+  async function handleBilingualExport(format) {
+    if (!translatedSource || !translatedText || bilingualExportLoading) return;
+    setBilingualExportLoading(format);
+    setError('');
+    try {
+      const response = await fetch('/api/translate/file-bilingual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pairs: alignBilingualText(translatedSource, translatedText),
+          format,
+          title: t('bilingualTitle'),
+          sourceLabel: t('sourceHeading'),
+          targetLabel: t('resultHeading'),
+        }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || t('bilingualExportError'));
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `bilingual-translation.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      setError(err.message || t('bilingualExportError'));
+    } finally {
+      setBilingualExportLoading('');
     }
   }
 
@@ -245,18 +308,19 @@ export default function Translate() {
     <>
       <Head><title>{`${t('title')} – GhostTyper`}</title></Head>
 
-      <div className="max-w-7xl mx-auto pb-20 px-2 sm:px-0 animate-fade-in">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-primary">{t('title')}</h1>
-          <p className="text-sm text-secondary mt-1">{t('subtitle')}</p>
-        </div>
+      <div className="max-w-6xl mx-auto pb-20 animate-fade-in">
+        <header className="mb-7">
+          <p className="text-xs font-medium text-secondary mb-2">{t('eyebrow')}</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-primary">{t('title')}</h1>
+          <p className="text-sm leading-6 text-secondary mt-2 max-w-2xl">{t('subtitle')}</p>
+        </header>
 
-        <div className="mb-6 inline-flex rounded-2xl border border-subtle bg-surface p-1">
+        <div className="mb-6 inline-flex rounded-xl border border-subtle bg-surface-elevated p-1">
           <button
             type="button"
             onClick={() => setMode('text')}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
-              mode === 'text' ? 'bg-accent text-white' : 'text-secondary hover:text-primary'
+            className={`min-h-10 px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+              mode === 'text' ? 'bg-surface border-subtle text-primary' : 'border-transparent text-secondary hover:text-primary'
             }`}
           >
             {t('tabText')}
@@ -264,8 +328,8 @@ export default function Translate() {
           <button
             type="button"
             onClick={() => setMode('office')}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
-              mode === 'office' ? 'bg-accent text-white' : 'text-secondary hover:text-primary'
+            className={`min-h-10 px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+              mode === 'office' ? 'bg-surface border-subtle text-primary' : 'border-transparent text-secondary hover:text-primary'
             }`}
           >
             {t('tabFile')}
@@ -273,54 +337,62 @@ export default function Translate() {
         </div>
 
         {mode === 'office' ? (
-          <form onSubmit={handleOfficeTranslate} className="space-y-6 max-w-5xl">
-            <div className="bg-surface border border-subtle rounded-2xl p-6">
-              <label htmlFor="office-translation-file" className="block text-xs font-bold uppercase tracking-widest text-secondary mb-3">
-                PDF, DOCX, XLSX oder PPTX
-              </label>
+          <form onSubmit={handleOfficeTranslate} className="space-y-5 max-w-3xl">
+            <Card>
+              <CardBody className="p-5 sm:p-6">
+              <Field label={t('fileLabel')} htmlFor="office-translation-file" help={tPdf('uploadHint')}>
               <input
                 id="office-translation-file"
                 type="file"
                 accept=".pdf,.docx,.xlsx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                 onChange={(event) => setOfficeFile(event.target.files?.[0] || null)}
-                className="block w-full text-sm text-secondary file:mr-4 file:rounded-xl file:border-0 file:bg-hover-strong file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary hover:file:bg-hover-strong"
+                className="block w-full rounded-lg border border-dashed border-emphasis bg-surface-elevated/40 p-4 text-sm text-secondary file:mr-4 file:rounded-lg file:border file:border-subtle file:bg-surface file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-hover-subtle"
               />
-              <p className="mt-3 text-xs text-secondary">{tPdf('uploadHint')}</p>
-              <p className="mt-2 text-[11px] text-warning bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
+              </Field>
+              <p className="mt-4 text-xs text-warning border-l-2 border-warning/50 pl-3">
                 {tPdf('layoutNotice')}
               </p>
-            </div>
+              </CardBody>
+            </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-surface border border-subtle rounded-2xl p-5">
-                <label htmlFor="office-target-language" className="block text-xs font-bold uppercase tracking-widest text-secondary mb-2">
-                  Zielsprache
-                </label>
+            <Card>
+              <CardBody className="p-5 sm:p-6 space-y-4">
+              <Field label={t('targetLanguage')} htmlFor="office-target-language" help={t('targetLanguageHint')}>
                 <select
                   id="office-target-language"
                   value={targetLanguage}
                   onChange={(event) => setTargetLanguage(event.target.value)}
-                  className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none focus:ring-1 focus:ring-accent"
+                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
                 >
                   {LANGUAGES.map(lang => <option key={lang.code} value={lang.code}>{lang.label}</option>)}
                 </select>
-              </div>
-              <div className="bg-surface border border-subtle rounded-2xl p-5">
-                <label htmlFor="office-model" className="block text-xs font-bold uppercase tracking-widest text-secondary mb-2">
-                  KI-Modell
-                </label>
+              </Field>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowAdvancedOptions((prev) => !prev)}
+                className="w-full justify-between px-3"
+                aria-expanded={showAdvancedOptions}
+              >
+                <span>{t('details')}</span>
+                <ChevronDown className={cn('w-4 h-4 transition-transform', showAdvancedOptions && 'rotate-180')} aria-hidden="true" />
+              </Button>
+              {showAdvancedOptions && (
+                <Field label={t('modelLabel')} htmlFor="office-model" help={t('modelHint')}>
                 <select
                   id="office-model"
                   value={model}
                   onChange={(event) => setModel(event.target.value)}
-                  className="w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-3 text-sm text-primary outline-none focus:ring-1 focus:ring-accent"
+                  className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2.5 text-sm text-primary outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
                 >
-                  <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
-                  <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
-                  <option value="kimi-2.6">Kimi 2.6</option>
+                  {chatModelOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
-              </div>
-            </div>
+                </Field>
+              )}
+              </CardBody>
+            </Card>
 
             {officeLoading && (
               <ProcessStatusCard
@@ -336,73 +408,89 @@ export default function Translate() {
             )}
 
             {officeResult && (
-              <div className="bg-success/10 border border-success/20 text-success rounded-2xl p-4 text-sm">
+              <div className="border border-success/30 text-success rounded-xl p-4 text-sm">
                 Datei erstellt: {officeResult.filename}
                 {officeResult.warningCount > 0 ? ` (${officeResult.warningCount} mögliche Layout-Hinweise wegen längerer Übersetzungen)` : ''}
                 {officeResult.isPdf ? ' — Layout wurde aus dem Originaltext neu aufgebaut.' : ''}
               </div>
             )}
 
-            <button
+            {officeGlossaryMeta && (
+              <TranslationTermPanel
+                meta={officeGlossaryMeta}
+                canManageWorkspace={canManageWorkspace}
+                onError={(message) => setError(message)}
+              />
+            )}
+
+            <Button
               type="submit"
               disabled={officeLoading || !officeFile}
-              className="w-full max-w-md gradient-accent text-white py-4 rounded-2xl text-lg font-bold shadow-lg shadow-accent/20 disabled:opacity-30 transition-all"
+              variant="primary"
+              size="lg"
+              className="w-full"
             >
-              {officeLoading ? 'Datei wird übersetzt...' : 'Datei übersetzen'}
-            </button>
+              <FileText className="w-4 h-4" aria-hidden="true" />
+              {officeLoading ? t('fileTranslating') : t('fileTranslate')}
+            </Button>
           </form>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {/* Top toolbar: Language + Translate button (above the panels) */}
-            <div className="bg-surface border border-subtle rounded-2xl px-4 py-3 shadow-md flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <Card className="px-4 py-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="flex items-center gap-3 flex-1 min-w-0">
-                <span className="text-xs font-bold text-secondary uppercase tracking-widest whitespace-nowrap">{t('to')}:</span>
+                <label htmlFor="text-target-language" className="text-xs font-medium text-secondary whitespace-nowrap">{t('to')}</label>
                 <select
+                  id="text-target-language"
                   value={targetLanguage}
                   onChange={(e) => setTargetLanguage(e.target.value)}
-                  className="flex-1 sm:flex-none bg-hover-subtle border border-subtle text-accent font-bold text-sm rounded-xl px-4 py-2 outline-none hover:bg-hover-strong transition-all cursor-pointer"
+                  className="flex-1 sm:flex-none bg-surface-elevated border border-subtle text-primary font-medium text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent cursor-pointer"
                 >
                   {LANGUAGES.map(lang => <option key={lang.code} value={lang.code}>{lang.label}</option>)}
                 </select>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setShowAdvancedOptions((prev) => !prev)}
-                  className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl border border-subtle bg-hover-subtle text-xs text-secondary hover:text-primary transition-colors"
+                  className="inline-flex"
                   aria-expanded={showAdvancedOptions}
                 >
-                  <span>Optionen</span>
-                  <svg className={`w-3.5 h-3.5 transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+                  <span>{t('details')}</span>
+                  <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', showAdvancedOptions && 'rotate-180')} aria-hidden="true" />
+                </Button>
               </div>
-              <button
+              <Button
                 onClick={handleTranslate}
                 disabled={loading || ocrLoading || !text.trim()}
-                className="gradient-accent text-white px-8 py-3 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 hover:shadow-accent/40 disabled:opacity-30 transition-all whitespace-nowrap"
+                variant="primary"
+                className="sm:min-w-36"
               >
                 {loading ? t('translating') : t('translate')}
-              </button>
-            </div>
+              </Button>
+            </Card>
 
             {showAdvancedOptions && (
-              <div className="bg-surface border border-subtle rounded-2xl px-4 py-3 shadow">
-                <label className="text-[10px] font-bold text-secondary uppercase tracking-widest opacity-60">Modell</label>
-                <select value={model} onChange={e => setModel(e.target.value)} className="mt-2 w-full max-w-md bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-1 focus:ring-accent outline-none">
-                  <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
-                  <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
-                  <option value="kimi-2.6">Kimi 2.6</option>
+              <Card>
+                <CardBody className="p-4">
+                <Field label={t('modelLabel')} help={t('modelHint')} className="max-w-md">
+                <select value={model} onChange={e => setModel(e.target.value)} className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none">
+                  {chatModelOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
-              </div>
+                </Field>
+                </CardBody>
+              </Card>
             )}
 
             {/* Mobile tab switcher */}
-            <div className="md:hidden inline-flex rounded-xl border border-subtle bg-surface p-1 w-full">
+            <div className="md:hidden inline-flex rounded-xl border border-subtle bg-surface-elevated p-1 w-full">
               <button
                 type="button"
                 onClick={() => setMobileTab('source')}
                 className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                  mobileTab === 'source' ? 'bg-accent text-white' : 'text-secondary'
+                  mobileTab === 'source' ? 'bg-surface border border-subtle text-primary' : 'border border-transparent text-secondary'
                 }`}
               >
                 {t('mobileSourceTab')}
@@ -411,7 +499,7 @@ export default function Translate() {
                 type="button"
                 onClick={() => setMobileTab('result')}
                 className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                  mobileTab === 'result' ? 'bg-accent text-white' : 'text-secondary'
+                  mobileTab === 'result' ? 'bg-surface border border-subtle text-primary' : 'border border-transparent text-secondary'
                 }`}
               >
                 {t('mobileResultTab')}
@@ -422,32 +510,32 @@ export default function Translate() {
               {/* Source panel */}
               <div className={`space-y-3 ${mobileTab === 'source' ? '' : 'hidden md:block'}`}>
                 <div className="flex items-center justify-between px-1 min-h-[36px]">
-                  <span className="text-xs font-bold text-secondary uppercase tracking-wider">
+                  <span className="text-xs font-medium text-secondary">
                     {t('sourceHeading')}
                   </span>
                   <div className="flex items-center gap-2">
                     <input type="file" ref={fileInputRef} onChange={e => handleOcr(e.target.files[0])} accept=".pdf,image/*" className="hidden" />
                     <input type="file" ref={cameraInputRef} onChange={e => handleOcr(e.target.files[0])} accept="image/*" capture="environment" className="hidden" />
 
-                    <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 bg-hover-subtle hover:bg-hover-strong text-primary px-3 py-1.5 rounded-xl text-xs font-bold border border-subtle transition-all" title="Dokument hochladen" aria-label="Dokument für OCR hochladen">
-                      <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} title={t('uploadDocument')} aria-label={t('uploadDocument')}>
+                      <Upload className="w-4 h-4" aria-hidden="true" />
                       <span className="hidden sm:inline">Dokument</span>
-                    </button>
-                    <button type="button" onClick={() => cameraInputRef.current?.click()} className="flex items-center gap-2 bg-hover-subtle hover:bg-hover-strong text-primary px-3 py-1.5 rounded-xl text-xs font-bold border border-subtle transition-all" title="Foto machen" aria-label="Foto aufnehmen und OCR starten">
-                      <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => cameraInputRef.current?.click()} title={t('takePhoto')} aria-label={t('takePhoto')}>
+                      <Camera className="w-4 h-4" aria-hidden="true" />
                       <span className="hidden sm:inline">Kamera</span>
-                    </button>
-                    <button type="button" onClick={() => updateSourceText('')} className="p-2 text-secondary hover:text-danger bg-hover-subtle rounded-xl transition-colors" aria-label="Eingabetext leeren">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    </button>
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon-sm" onClick={() => updateSourceText('')} aria-label={t('clearInput')}>
+                      <Trash2 className="w-4 h-4" aria-hidden="true" />
+                    </Button>
                   </div>
                 </div>
 
-                <div className={`bg-surface border border-subtle rounded-2xl overflow-hidden focus-within:border-accent/30 transition-all shadow-xl relative ${ocrLoading ? 'opacity-50' : ''}`}>
+                <div className={`bg-surface border border-subtle rounded-xl overflow-hidden focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20 transition-colors relative ${ocrLoading ? 'opacity-50' : ''}`}>
                   {ocrLoading && (
                     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-overlay backdrop-blur-sm">
                       <div className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3" />
-                      <span className="text-xs font-bold text-accent uppercase tracking-widest">Extrahiere Text...</span>
+                      <span className="text-xs font-medium text-primary">{t('extractingText')}</span>
                     </div>
                   )}
                   <textarea value={text} onChange={(e) => updateSourceText(e.target.value)} placeholder={t('inputPlaceholder')} className="w-full min-h-[280px] bg-transparent p-6 text-primary placeholder-text-secondary/30 outline-none resize-y text-base leading-relaxed custom-scrollbar" />
@@ -457,49 +545,54 @@ export default function Translate() {
               {/* Result panel */}
               <div className={`space-y-3 ${mobileTab === 'result' ? '' : 'hidden md:block'}`}>
                 <div className="flex items-center justify-between px-1 min-h-[36px]">
-                  <span className="text-xs font-bold text-secondary uppercase tracking-wider">
+                  <span className="text-xs font-medium text-secondary">
                     {t('resultHeading')}
                   </span>
                   {translatedText && (
-                    <>
-                      <button
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!!bilingualExportLoading}
+                        onClick={() => handleBilingualExport('html')}
+                      >
+                        {bilingualExportLoading === 'html' ? '…' : t('bilingualHtml')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!!bilingualExportLoading}
+                        onClick={() => handleBilingualExport('pdf')}
+                      >
+                        {bilingualExportLoading === 'pdf' ? '…' : t('bilingualPdf')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => setEditorOpen(true)}
-                        className="flex items-center gap-1.5 bg-hover-subtle hover:bg-hover-strong text-primary px-3 py-1.5 rounded-xl text-xs font-bold border border-subtle transition-all"
                       >
-                        <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        <Pencil className="w-4 h-4" aria-hidden="true" />
                         {t('openInEditor')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (translatedText) {
-                            sessionStorage.setItem('chat:context:text', String(translatedText).slice(0, 300000));
-                            sessionStorage.setItem('chat:context:source', 'translate');
-                            sessionStorage.setItem('chat:context:title', (typeof inputText === 'string' ? inputText.slice(0, 80) : 'Übersetzung'));
-                            window.open('/chat?source=translate', '_blank');
-                          }
-                        }}
-                        className="flex items-center gap-1.5 border border-accent/30 text-accent hover:bg-accent/10 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
-                      >
-                        Mit Übersetzung chatten
-                      </button>
-                    </>
+                      </Button>
+                    </div>
                   )}
                 </div>
 
-                <div className={`bg-surface border border-subtle rounded-2xl overflow-hidden shadow-xl relative ${loading ? 'opacity-50' : ''}`}>
+                <div className={`bg-surface border border-subtle rounded-xl overflow-hidden relative ${loading ? 'opacity-50' : ''}`}>
                   {loading && (
                     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-overlay backdrop-blur-sm">
                       <div className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3" />
-                      <span className="text-xs font-bold text-accent uppercase tracking-widest">Übersetze...</span>
+                      <span className="text-xs font-medium text-primary">{t('translating')}</span>
                     </div>
                   )}
                   {translatedText && !loading && (
                     <button
                       type="button"
                       onClick={handleCopyTranslation}
-                      className={`absolute top-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
+                      className={`absolute top-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                         copyFeedback
                           ? 'bg-success/20 border-success/40 text-success'
                           : 'bg-surface-elevated/95 backdrop-blur-sm border-subtle text-secondary hover:text-primary hover:border-accent/40'
@@ -508,9 +601,9 @@ export default function Translate() {
                       aria-label={copyFeedback ? t('copied') : t('copy')}
                     >
                       {copyFeedback ? (
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                        <Check className="w-3.5 h-3.5" aria-hidden="true" />
                       ) : (
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                        <Copy className="w-3.5 h-3.5" aria-hidden="true" />
                       )}
                       <span>{copyFeedback ? t('copied') : t('copy')}</span>
                     </button>
@@ -530,6 +623,15 @@ export default function Translate() {
               </div>
             </div>
 
+            {translatedText && !loading && glossaryMeta && (
+              <TranslationTermPanel
+                meta={glossaryMeta}
+                sourceText={translatedSource}
+                canManageWorkspace={canManageWorkspace}
+                onError={(message) => setError(message)}
+              />
+            )}
+
             {(ocrLoading || loading) && (
               <ProcessStatusCard
                 title={ocrLoading ? 'OCR läuft' : 'Übersetzung läuft'}
@@ -548,7 +650,7 @@ export default function Translate() {
         )}
       </div>
 
-      {error && <div className="mt-8 p-4 bg-danger/10 border border-danger/20 text-danger rounded-2xl text-sm text-center animate-fade-in shadow-xl mx-auto max-w-5xl">{error}</div>}
+      {error && <div role="alert" className="mt-8 p-4 border border-danger/30 text-danger rounded-xl text-sm text-center animate-fade-in mx-auto max-w-5xl">{error}</div>}
     </>
   );
 }

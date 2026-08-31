@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import { useSession, signOut } from 'next-auth/react';
 import {
+  BadgeDollarSign,
   Building2,
   History,
   Languages,
@@ -46,6 +47,7 @@ export default function CommandPalette() {
   const { commandPaletteOpen, closeCommandPalette, setCommandPaletteOpen } = useUIStore();
   const { resolvedTheme, toggleTheme } = useTheme();
   const canReadAudit = usePermission('audit.read');
+  const canManageOrg = usePermission('org.settings');
   const t = useTranslations('command');
   const tNav = useTranslations('nav');
   const tTheme = useTranslations('theme');
@@ -87,7 +89,7 @@ export default function CommandPalette() {
             <User aria-hidden="true" />
             {tNav('profile')}
           </CommandItem>
-          {session && (
+          {canManageOrg && (
             <CommandItem
               value="workspace organisation organization team"
               onSelect={() => run(() => router.push('/settings/organization'))}
@@ -106,13 +108,22 @@ export default function CommandPalette() {
             </CommandItem>
           )}
           {session?.user?.role === 'admin' && (
-            <CommandItem
-              value={`${tNav('admin')} benutzerverwaltung user management`}
-              onSelect={() => run(() => router.push('/admin/users'))}
-            >
-              <ShieldCheck aria-hidden="true" />
-              {tNav('admin')}
-            </CommandItem>
+            <>
+              <CommandItem
+                value={`${tNav('admin')} benutzerverwaltung user management`}
+                onSelect={() => run(() => router.push('/admin/users'))}
+              >
+                <ShieldCheck aria-hidden="true" />
+                {tNav('admin')}
+              </CommandItem>
+              <CommandItem
+                value="price pricing catalog preise preiskatalog"
+                onSelect={() => run(() => router.push('/admin/prices'))}
+              >
+                <BadgeDollarSign aria-hidden="true" />
+                {tNav('priceCatalog')}
+              </CommandItem>
+            </>
           )}
         </CommandGroup>
 

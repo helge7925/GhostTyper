@@ -164,7 +164,21 @@ Abgedeckt ist aktuell:
 - API-Health:
   - `GET /api/health` -> `200`.
 
-## 9. Referenzen
+## 9. Database-backed tests
+
+Die Budget-Lifecycle- und Concurrency-Tests benötigen eine wegwerfbare
+PostgreSQL-16-Datenbank. Sie laufen ausschließlich, wenn
+`TEST_DATABASE_URL` gesetzt ist und der Datenbankname das Wort `test`
+enthält; `DATABASE_URL` wird absichtlich nie als Ersatz verwendet.
+
+```bash
+TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/ghosttyper_test npm run test:db
+```
+
+Ohne diese Variable überspringt `npm test` die beiden DB-Suites mit einem
+erklärenden Hinweis. Die Testdaten werden organisationsweise wieder gelöscht.
+
+## 10. Referenzen
 
 - `../README.md`
 - `../PROJECT_PLAN.md`

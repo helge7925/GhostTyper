@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import AudioUploadForm from './AudioUploadForm';
 import LoadingSpinner from './LoadingSpinner';
 import { useTranslations } from '../lib/i18n';
+import { useModelOptions } from '../lib/use-model-options';
 
 export default function KnowledgePrepWorkspace({
   fixedMode = null,
@@ -34,14 +35,7 @@ export default function KnowledgePrepWorkspace({
     [t]
   );
 
-  const MODEL_OPTIONS = useMemo(
-    () => [
-      { value: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
-      { value: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
-      { value: 'kimi-2.6', label: 'Kimi 2.6' },
-    ],
-    []
-  );
+  const { options: MODEL_OPTIONS, defaultModel } = useModelOptions('chat');
 
   const resolvedHeading = heading || t('defaultHeading');
 
@@ -53,13 +47,13 @@ export default function KnowledgePrepWorkspace({
   const [audioStarting, setAudioStarting] = useState(false);
 
   const [textInput, setTextInput] = useState('');
-  const [textModel, setTextModel] = useState('deepseek-v4-pro');
+  const [textModel, setTextModel] = useState('');
   const [textPrompt, setTextPrompt] = useState('');
   const [textAnalysisFocus, setTextAnalysisFocus] = useState('');
   const [textSubmitting, setTextSubmitting] = useState(false);
 
   const [documentFile, setDocumentFile] = useState(null);
-  const [documentModel, setDocumentModel] = useState('deepseek-v4-pro');
+  const [documentModel, setDocumentModel] = useState('');
   const [documentPrompt, setDocumentPrompt] = useState('');
   const [documentAnalysisFocus, setDocumentAnalysisFocus] = useState('');
   const [documentScope, setDocumentScope] = useState('');
@@ -76,6 +70,13 @@ export default function KnowledgePrepWorkspace({
     if (!fixedMode) return;
     setMode(fixedMode);
   }, [fixedMode]);
+
+  useEffect(() => {
+    if (defaultModel) {
+      if (!textModel) setTextModel(defaultModel);
+      if (!documentModel) setDocumentModel(defaultModel);
+    }
+  }, [defaultModel, documentModel, textModel]);
 
   const modeMeta = useMemo(
     () => MODE_OPTIONS.find((entry) => entry.value === effectiveMode) || MODE_OPTIONS[0],
@@ -224,7 +225,7 @@ export default function KnowledgePrepWorkspace({
             onClick={() => setSource(option.value)}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
               source === option.value
-                ? 'bg-accent/20 text-accent border border-accent/30'
+                ? 'bg-accent/20 text-accent-ink border border-accent/30'
                 : 'text-secondary hover:text-primary'
             }`}
           >
@@ -249,7 +250,7 @@ export default function KnowledgePrepWorkspace({
               autoAnalyze: true,
               diarize: false,
               template: effectiveMode,
-              model: 'deepseek-v4-pro',
+              model: defaultModel,
             }}
           />
           {audioStarting && (

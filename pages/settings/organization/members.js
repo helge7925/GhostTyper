@@ -3,19 +3,11 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { Mail, Trash2, UserPlus, Wallet } from 'lucide-react';
+import { Mail, Trash2, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import { Skeleton } from '../../../components/ui/skeleton';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../../../components/ui/dialog';
 import { useCurrentOrg } from '../../../lib/use-current-org';
 import { usePermission } from '../../../lib/use-permission';
 import { ROLES } from '../../../lib/permissions';
@@ -38,7 +30,7 @@ function RoleSelect({ value, onChange, disabled }) {
 export default function MembersPage() {
   const router = useRouter();
   const { status: authStatus } = useSession();
-  const { org, role, isLoading: orgLoading } = useCurrentOrg();
+  const { org, isLoading: orgLoading } = useCurrentOrg();
   const canManage = usePermission('org.members.write');
   const canInvite = usePermission('org.invites.create');
 
@@ -49,9 +41,7 @@ export default function MembersPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
   const [confirmRemove, setConfirmRemove] = useState(null);
-  const [editingMember, setEditingMember] = useState(null);
-  const [editCostLimit, setEditCostLimit] = useState('');
-  const [editMemberBudget, setEditMemberBudget] = useState('');
+  const [confirmRole, setConfirmRole] = useState(null);
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
@@ -80,13 +70,13 @@ export default function MembersPage() {
     refresh();
   }, [refresh]);
 
-  const handleRoleChange = async (memberUserId, newRole) => {
+  const handleRoleChange = async (memberUserId, newRole, reason) => {
     setBusy(true);
     try {
       const res = await fetch('/api/organizations/members', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ memberUserId, role: newRole }),
+        body: JSON.stringify({ memberUserId, role: newRole, reason }),
       });
       if (!res.ok) throw new Error((await res.json()).message || 'Fehler');
       toast.success('Rolle aktualisiert');
@@ -95,52 +85,16 @@ export default function MembersPage() {
       toast.error(err.message || 'Rollenänderung fehlgeschlagen');
     } finally {
       setBusy(false);
+      setConfirmRole(null);
     }
   };
 
-  const openMemberSettings = (member) => {
-    setEditingMember(member);
-    setEditCostLimit(member.personal_cost_limit ?? '');
-    setEditMemberBudget(member.personal_member_budget_limit ?? '');
-  };
-
-  const closeMemberSettings = () => {
-    setEditingMember(null);
-    setEditCostLimit('');
-    setEditMemberBudget('');
-  };
-
-  const submitMemberSettings = async (extra = {}) => {
-    if (!editingMember) return;
+  const handleRemove = async (member, reason) => {
     setBusy(true);
     try {
-      const body = { ...extra };
-      if (extra.includeLimits !== false) {
-        body.personalCostLimit = editCostLimit === '' ? null : Number(editCostLimit);
-        body.personalMemberBudgetLimit = editMemberBudget === '' ? null : Number(editMemberBudget);
-      }
-      delete body.includeLimits;
-      const res = await fetch(`/api/organizations/members/${editingMember.id}/settings`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+      const res = await fetch(`/api/organizations/members?userId=${member.id}`, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }),
       });
-      if (!res.ok) throw new Error((await res.json()).message || 'Fehler');
-      toast.success('Mitglieder-Einstellungen gespeichert.');
-      await refresh();
-    } catch (err) {
-      toast.error(err.message || 'Aktualisierung fehlgeschlagen');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleSaveLimits = () => submitMemberSettings({});
-
-  const handleRemove = async (member) => {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/organizations/members?userId=${member.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error((await res.json()).message || 'Fehler');
       toast.success(`${member.email} entfernt`);
       await refresh();
@@ -274,20 +228,10 @@ export default function MembersPage() {
                     <p className="text-[11px] text-secondary truncate">{member.email}</p>
                   </div>
 
-                  <div className="hidden md:flex items-center gap-3 text-[11px] text-secondary">
-                    <span className="inline-flex items-center gap-1 tabular-nums">
-                      <Wallet className="w-3 h-3" />
-                      {Number(member.month_cost || 0).toFixed(2)} €
-                      {member.personal_cost_limit != null && (
-                        <span className="text-secondary">/ {Number(member.personal_cost_limit).toFixed(2)} €</span>
-                      )}
-                    </span>
-                  </div>
-
                   {canManage ? (
                     <RoleSelect
                       value={member.role}
-                      onChange={(next) => handleRoleChange(member.id, next)}
+                      onChange={(next) => setConfirmRole({ member, role: next })}
                       disabled={busy}
                     />
                   ) : (
@@ -295,15 +239,6 @@ export default function MembersPage() {
                   )}
                   {canManage && (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => openMemberSettings(member)}
-                        disabled={busy}
-                        className="text-[11px] px-2 py-1 rounded-lg border border-subtle text-secondary hover:text-primary hover:border-accent transition-colors disabled:opacity-50"
-                        aria-label={`${member.email} verwalten`}
-                      >
-                        Verwalten
-                      </button>
                       <button
                         type="button"
                         onClick={() => setConfirmRemove(member)}
@@ -358,87 +293,22 @@ export default function MembersPage() {
         confirmLabel="Entfernen"
         danger
         busy={busy}
-        onConfirm={() => confirmRemove && handleRemove(confirmRemove)}
+        reasonRequired
+        onConfirm={(reason) => confirmRemove && handleRemove(confirmRemove, reason)}
         onCancel={() => setConfirmRemove(null)}
       />
 
-      <Dialog open={!!editingMember} onOpenChange={(o) => !o && closeMemberSettings()}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Mitglied verwalten</DialogTitle>
-            <DialogDescription>
-              {editingMember?.name || editingMember?.email}
-              {' · '}
-              <span className="text-secondary">{editingMember?.email}</span>
-            </DialogDescription>
-          </DialogHeader>
+      <ConfirmDialog
+        open={!!confirmRole}
+        title="Rolle ändern"
+        message={`Rolle von ${confirmRole?.member?.email || ''} auf ${confirmRole?.role || ''} ändern?`}
+        confirmLabel="Rolle ändern"
+        busy={busy}
+        reasonRequired
+        onConfirm={(reason) => confirmRole && handleRoleChange(confirmRole.member.id, confirmRole.role, reason)}
+        onCancel={() => setConfirmRole(null)}
+      />
 
-          <div className="space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-primary mb-1.5">Persönliches Kostenlimit / Monat</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={editCostLimit}
-                    onChange={(e) => setEditCostLimit(e.target.value)}
-                    placeholder="kein Limit"
-                    className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary outline-none"
-                  />
-                  <span className="text-xs text-secondary">EUR</span>
-                </div>
-                <p className="text-[10px] text-secondary mt-1 italic">Hartes Limit über alle Operationen.</p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-primary mb-1.5">Mitglieder-Budgetlimit / Monat</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={editMemberBudget}
-                    onChange={(e) => setEditMemberBudget(e.target.value)}
-                    placeholder="kein Limit"
-                    className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary outline-none"
-                  />
-                  <span className="text-xs text-secondary">EUR</span>
-                </div>
-                <p className="text-[10px] text-secondary mt-1 italic">Greift wenn Workspace-Budget noch Spielraum hätte.</p>
-              </div>
-            </div>
-
-            <div className="bg-hover-subtle border border-subtle rounded-xl px-4 py-3">
-              <p className="text-xs text-secondary">
-                Aktueller Verbrauch diesen Monat:{' '}
-                <span className="text-primary font-mono">
-                  {Number(editingMember?.month_cost || 0).toFixed(2)} €
-                </span>
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={closeMemberSettings}
-              disabled={busy}
-              className="px-4 py-2 rounded-xl text-sm border border-subtle text-primary hover:bg-hover-subtle"
-            >
-              Schließen
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveLimits}
-              disabled={busy}
-              className="px-4 py-2 rounded-xl text-sm bg-accent text-white hover:bg-accent/90 disabled:opacity-50"
-            >
-              Limits speichern
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

@@ -48,19 +48,18 @@ remote-meeting screenshots are TODO / need capture before they are embedded.
   or file upload. Large recordings are automatically compressed and split into
   overlapping chunks, so files of any length transcribe reliably despite the
   provider's per-file size limit.
-- **Remote-meeting bot** for Google Meet, Microsoft Teams and Zoom via
+- **Remote-meeting bot** for Microsoft Teams and Zoom via
   [Vexa Lite](https://github.com/Vexa-ai/vexa) — live transcript flows
   into the same editor. A community fork
   ([helge7925/vexa](https://github.com/helge7925/vexa), branch
   `feat/nextcloud-talk-adapter`) adds Nextcloud Talk as a fourth
-  platform; swap the image via `VEXA_LITE_IMAGE` to enable.
+  platform; swap the image via `VEXA_LITE_IMAGE` to enable. Google Meet
+  is not in the bot picker: Google hard-blocks meeting bots on Meet (a
+  dedicated rejection page, not a CAPTCHA), so Meet meetings are covered
+  by tab/system audio capture instead.
 - **OCR** for PDFs and images.
 - **AI analysis**: summaries, meeting minutes, action-item / to-do extraction,
   free-form prompts, custom templates and translation.
-- **AI chat over your content**: attach documents and knowledge bases as
-  context — or drop / paste / upload a file straight into the chat — and ask
-  questions; conversations are titled automatically.
-- **Workspace knowledge bases**: group documents for retrieval-augmented chat.
 - **Data tables**: structured extraction from audio, text or documents;
   Excel export.
 - **Nextcloud export**: save transcripts and analyses to a Nextcloud folder
@@ -68,8 +67,8 @@ remote-meeting screenshots are TODO / need capture before they are embedded.
 - **Multi-workspace**: org-scoped data, roles `owner`/`admin`/`member`/
   `viewer`/`auditor`, audit log.
 - **Cost tracking**: monthly breakdown per provider, operation and member.
-- **Provider management**: Mistral, Vexa and Nextcloud managed centrally per
-  workspace; secrets encrypted with AES-256-GCM.
+- **Provider management**: OpenRouter, Vexa and Nextcloud managed centrally
+  per workspace; secrets encrypted with AES-256-GCM.
 
 ## Tech Stack
 
@@ -77,7 +76,7 @@ remote-meeting screenshots are TODO / need capture before they are embedded.
 | -------- | ---------------------------------------------------------------- |
 | Frontend | Next.js 16.x (Pages Router), React 18, Tailwind, Radix, Zustand |
 | Backend  | Next.js API Routes, NextAuth, PostgreSQL 16 (`pg`)               |
-| AI       | Mistral (Chat / OCR / Voxtral batch + live), Vexa Lite           |
+| AI       | OpenRouter (Chat / OCR / batch + live transcription / TTS), Vexa Lite |
 | Infra    | Docker Compose, Traefik (optional), AES-256-GCM (`lib/secrets.js`) |
 | CI       | GitHub Actions: CodeQL, security gates, smoke tests              |
 
@@ -91,11 +90,11 @@ remote-meeting screenshots are TODO / need capture before they are embedded.
    │              │
    │ REST/SSE     │ webhook + bridge
    ▼              ▼
-┌────────┐   ┌──────────────────┐    ┌────────────────────┐
-│ Mistral│◄──┤ Vexa Lite        │───►│ Mistral Voxtral    │
-│ API    │   │ (bot container)  │    │ (via voxtral       │
-│ (batch)│   │                  │    │  translator bridge)│
-└────────┘   └──────────────────┘    └────────────────────┘
+┌──────────┐  ┌──────────────────┐    ┌────────────────────┐
+│OpenRouter│◄─┤ Vexa Lite        │───►│ OpenRouter STT     │
+│ API      │  │ (bot container)  │    │ (via bridge, same  │
+│ (batch)  │  │                  │    │  workspace key)    │
+└──────────┘  └──────────────────┘    └────────────────────┘
 ```
 
 Detailed flow: [`docs/architecture.md`](docs/architecture.md). Vexa
@@ -109,15 +108,15 @@ integration: [`docs/vexa-integration.md`](docs/vexa-integration.md).
 | With `vexa` profile   | 4 GB  | 2 vCPU   | 20 GB   | adds vexa-lite (2 GB) + bridge (256 MB) |
 | 5–10 active users     | 8 GB  | 4 vCPU   | 40 GB SSD | comfortable for daily team usage   |
 
-Speech-to-text inference runs at Mistral (Voxtral) for both batch
-uploads and the live/Vexa path, so **no GPU is required on the host**.
+Speech-to-text inference runs through OpenRouter for both batch uploads and
+the live/Vexa path, so **no GPU is required on the host**.
 Browser bots inside Vexa add roughly 1 GB transient RAM per concurrent
 live meeting. The `vexa-lite` image is `linux/amd64`-only —
 on Apple Silicon it runs under emulation and is noticeably slower.
 
 ## Quickstart
 
-Prerequisites: Docker + Docker Compose v2, a Mistral API key.
+Prerequisites: Docker + Docker Compose v2 and an OpenRouter API key.
 
 ```bash
 git clone https://github.com/helge7925/transkription_webapp.git
@@ -151,17 +150,13 @@ on `https://${DOMAIN}`).
 ### With remote-meeting bot
 
 Vexa Lite + the transcription bridge are wired up as an optional Compose
-profile. Default audio path is **Mistral Voxtral (Paris, EU)** so the
-biometric meeting audio (GDPR Art. 9) does not leave the EU. The bridge
-service is `voxtral-bridge` (it proxies to Mistral Voxtral; the legacy
-`FIREWORKS_API_KEY` env var is still honoured as a fallback) — see
-"GDPR-conformant setup" below.
+profile. The bridge obtains the organization OpenRouter key and probed live
+model from the webapp. Every request enforces ZDR and denies provider data
+collection; there is no direct legacy-provider fallback.
 
 ```bash
 COMPOSE_PROFILES=vexa
-# EU default — recommended
-VEXA_TRANSCRIPTION_URL=https://api.mistral.ai/v1/audio/transcriptions
-VEXA_TRANSCRIPTION_TOKEN=$MISTRAL_API_KEY
+OPENROUTER_API_KEY=                 # optional operator fallback
 VEXA_ADMIN_API_TOKEN=$(openssl rand -hex 32)
 BRIDGE_SHARED_SECRET=$(openssl rand -hex 32)
 ```
@@ -176,7 +171,7 @@ data-flow review and SCC/TIA implications when switching providers, see
 Per workspace, an admin manages everything under
 **Settings → Workspace verwalten**:
 
-- API keys & integrations (Mistral, Vexa)
+- API keys & integrations (OpenRouter, Vexa)
 - Members & roles (incl. per-member spend caps)
 - Retention windows
 - Usage & cost dashboard

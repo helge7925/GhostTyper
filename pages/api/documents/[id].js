@@ -29,30 +29,11 @@ function canDeleteDocument(document, req) {
 
 async function loadDocument(documentId, orgId, userId) {
   const result = await query(
-    `SELECT d.*, t.file_path, t.original_name, t.filename, t.template, t.text, t.analysis,
-            COALESCE(chunk_stats.chunk_count, 0) AS chunk_count,
-            latest_job.status AS index_job_status,
-            latest_job.error AS index_job_error,
-            latest_job.created_at AS index_job_created_at,
-            latest_job.started_at AS index_job_started_at,
-            latest_job.finished_at AS index_job_finished_at
+    `SELECT d.*, t.file_path, t.original_name, t.filename, t.template, t.text, t.analysis
        FROM documents d
        LEFT JOIN transcriptions t
          ON t.id = d.transcription_id
         AND t.organization_id = d.organization_id
-       LEFT JOIN LATERAL (
-         SELECT COUNT(*)::int AS chunk_count
-           FROM document_chunks c
-          WHERE c.document_id = d.id
-            AND c.organization_id = d.organization_id
-       ) chunk_stats ON true
-       LEFT JOIN LATERAL (
-         SELECT status, error, created_at, started_at, finished_at
-           FROM document_index_jobs j
-          WHERE j.document_id = d.id
-          ORDER BY j.created_at DESC
-          LIMIT 1
-       ) latest_job ON true
       WHERE d.id = $1
         AND d.organization_id = $2
         AND (d.visibility = 'workspace' OR d.owner_user_id = $3)`,
