@@ -442,7 +442,7 @@ export default function TranscriptionDetail() {
                 </div>
 
                 <div className="mt-5 pt-5 border-t border-subtle flex flex-col gap-2">
-                  {transcription.status === STATUS.PENDING && (
+                  {[STATUS.PENDING, STATUS.ERROR].includes(transcription.status) && (
                     <Button
                       onClick={handleStartProcessing}
                       disabled={startingProcessing}
@@ -450,7 +450,11 @@ export default function TranscriptionDetail() {
                       className="w-full"
                     >
                       <Play className="w-4 h-4" aria-hidden="true" />
-                      {startingProcessing ? 'Startet…' : 'Verarbeitung starten'}
+                      {startingProcessing
+                        ? 'Startet…'
+                        : transcription.status === STATUS.ERROR
+                          ? 'Erneut versuchen'
+                          : 'Verarbeitung starten'}
                     </Button>
                   )}
                   {(() => {

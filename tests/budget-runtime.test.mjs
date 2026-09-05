@@ -394,6 +394,18 @@ test('reserved holds ignore expiry and stale reconciliation remains terminal-job
   assert.match(service, /provider_started_at IS NULL/);
   assert.match(service, /accounting_pending_at IS NULL/);
   assert.match(service, /await isTerminal\(reservation\)\) === true/);
+
+  // Second pass: reservations stranded mid-provider-call by a crash. Releasing
+  // one forfeits the accounting for work that may really have been billed, so
+  // the gate must stay narrow — a stall clock of its own, no pending
+  // accounting, and a terminal transcription as independent evidence that
+  // nothing is still running. Reservations with no transcription must never
+  // reach this pass: they have no such evidence.
+  assert.match(service, /provider_started_at IS NOT NULL/);
+  assert.match(service, /provider_started_at < NOW\(\) - \(\$2::bigint \* interval '1 millisecond'\)/);
+  assert.match(service, /AND transcription_id IS NOT NULL/);
+  assert.match(service, /allowProviderStarted: true/);
+
   const worker = source('../lib/budget-stop-worker.js');
   assert.match(worker, /Boolean\(row\)/);
   assert.match(worker, /'transcribed'/);

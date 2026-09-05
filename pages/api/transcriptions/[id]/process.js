@@ -126,8 +126,20 @@ async function handler(req, res) {
       return res.status(202).json({ message: 'Analyse gestartet.', status: 'analyzing' });
     }
 
-    // ── File-upload branch (unchanged) ─────────────────────────────
+    // ── File-upload branch ─────────────────────────────────────────
     ensureTranscriptionWorkerRunning();
+
+    // A failed run is retryable: the source audio is still on disk, and every
+    // failure mode that lands a row in `error` (provider timeout, a 429 mid-
+    // job, a restart caught by the stale sweep) is transient. Without `error`
+    // here the detail page told users to "try again" with no way to do it —
+    // the only route back was re-uploading the file. The Vexa branch above has
+    // always allowed it; this is the same rule for uploads.
+    if (!row.file_path) {
+      return res.status(410).json({
+        message: 'Die zugehörige Audiodatei ist nicht mehr vorhanden. Bitte erneut hochladen.',
+      });
+    }
 
     const queueResult = await query(
       `UPDATE transcriptions
@@ -136,7 +148,7 @@ async function handler(req, res) {
            updated_at = NOW()
        WHERE id = $1
          AND organization_id = $2
-         AND status = 'pending'
+         AND status IN ('pending', 'error')
          AND budget_stop_state = 'none'
        RETURNING id, user_id`,
       [transcriptionId, orgId]

@@ -444,4 +444,114 @@ if (env.skip) {
     assert.equal(untouched.rows[0].status, 'cancelled');
     assert.equal(untouched.rows[0].budget_stop_state, 'stopped');
   });
+  test('a reservation stranded mid-provider-call is reconciled, but only once every guard agrees', async () => {
+    // The crash case: markProviderStarted ran, then the process died before
+    // commit or release. Every path that can finish such a hold lives inside
+    // that dead process, so without this pass the reservation counts against
+    // the workspace budget forever.
+    const { organizationId, userId, transcriptionId } = await fixture({ memberLimitMicros: 50_000 });
+
+    const isTerminal = async (candidate) => {
+      const result = await pool.query(
+        `SELECT status, budget_stop_state FROM transcriptions WHERE id = $1`,
+        [candidate.transcription_id],
+      );
+      const row = result.rows[0];
+      return Boolean(row) && (
+        ['completed', 'transcribed', 'error', 'cancelled'].includes(row.status)
+        || row.budget_stop_state === 'stopped'
+      );
+    };
+
+    const stranded = async (tag, patch = '') => {
+      const reservation = await reserveSpend({
+        idempotencyKey: `stalled:${organizationId}:${tag}`,
+        organizationId,
+        userId,
+        transcriptionId,
+        operation: 'transcription',
+        amountMicros: 10_000,
+        expiresAt: futureIso(60),
+      });
+      await pool.query(
+        `UPDATE budget_reservations
+            SET lifecycle_tracked_at = NOW(),
+                provider_started_at = NOW() - INTERVAL '24 hours'
+                ${patch}
+          WHERE id = $1`,
+        [reservation.id],
+      );
+      return reservation;
+    };
+
+    const stateOf = async (id) => {
+      const result = await pool.query(`SELECT state FROM budget_reservations WHERE id = $1`, [id]);
+      return result.rows[0].state;
+    };
+
+    // 1. The job is still running, so nothing may be touched yet — a long
+    //    transcription must never have its budget pulled out from under it.
+    const running = await stranded('running');
+    assert.equal(await releaseStaleReservations({ isTerminal }), 0);
+    assert.equal(await stateOf(running.id), 'reserved');
+
+    // 2. Outcome already known to be uncertain: accounting_pending_at means
+    //    the system knows it cannot tell whether money was spent. Guessing
+    //    there is the most expensive mistake available, so it stays held.
+    const pendingAccounting = await stranded('pending', ', accounting_pending_at = NOW()');
+
+    // 3. A hold that started recently is not stalled, however dead it looks.
+    const recent = await reserveSpend({
+      idempotencyKey: `stalled:${organizationId}:recent`,
+      organizationId,
+      userId,
+      transcriptionId,
+      operation: 'transcription',
+      amountMicros: 10_000,
+      expiresAt: futureIso(60),
+    });
+    await pool.query(
+      `UPDATE budget_reservations
+          SET lifecycle_tracked_at = NOW(), provider_started_at = NOW()
+        WHERE id = $1`,
+      [recent.id],
+    );
+
+    // Now the job reaches a terminal state: independent evidence that no
+    // provider work is still running behind these holds.
+    await pool.query(`UPDATE transcriptions SET status = 'error' WHERE id = $1`, [transcriptionId]);
+
+    const released = await releaseStaleReservations({ isTerminal });
+    assert.equal(released, 1, 'only the stalled, non-pending hold may be released');
+    assert.equal(await stateOf(running.id), 'expired');
+    assert.equal(await stateOf(pendingAccounting.id), 'reserved');
+    assert.equal(await stateOf(recent.id), 'reserved');
+  });
+
+  test('a stranded hold with no transcription is never auto-released', async () => {
+    // translate/OCR/text-optimisation reservations carry no transcription_id,
+    // so there is no independent signal that their work has stopped. Without
+    // that evidence the hold stays put rather than being guessed away.
+    const { organizationId, userId } = await fixture();
+
+    const reservation = await reserveSpend({
+      idempotencyKey: `stalled:${organizationId}:no-job`,
+      organizationId,
+      userId,
+      operation: 'translation',
+      amountMicros: 10_000,
+      expiresAt: futureIso(60),
+    });
+    await pool.query(
+      `UPDATE budget_reservations
+          SET lifecycle_tracked_at = NOW(),
+              provider_started_at = NOW() - INTERVAL '24 hours'
+        WHERE id = $1`,
+      [reservation.id],
+    );
+
+    assert.equal(await releaseStaleReservations({ isTerminal: async () => true }), 0);
+    const after = await pool.query(`SELECT state FROM budget_reservations WHERE id = $1`, [reservation.id]);
+    assert.equal(after.rows[0].state, 'reserved');
+  });
 }
