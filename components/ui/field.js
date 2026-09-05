@@ -26,19 +26,26 @@ export function Field({ label, htmlFor, help, error, required = false, children,
         </label>
       )}
       {children}
+      {/* Tied to the input via aria-describedby (see FieldInput): without the
+          id and role the error is visible but silent for screen readers. */}
       {error ? (
-        <p className="text-xs text-danger">{error}</p>
+        <p id={htmlFor ? `${htmlFor}-error` : undefined} role="alert" className="text-xs text-danger">{error}</p>
       ) : help ? (
-        <p className="text-xs text-secondary">{help}</p>
+        <p id={htmlFor ? `${htmlFor}-help` : undefined} className="text-xs text-secondary">{help}</p>
       ) : null}
     </div>
   );
 }
 
 export const FieldInput = forwardRef(function FieldInput({ className, error, ...props }, ref) {
+  const describedBy = props.id
+    ? [error ? `${props.id}-error` : null, props['aria-describedby'] || null].filter(Boolean).join(' ')
+    : props['aria-describedby'];
   return (
     <input
       ref={ref}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={describedBy || undefined}
       className={cn(
         'w-full bg-surface-elevated border rounded-lg px-3 py-2.5 text-sm text-primary placeholder:text-muted outline-none transition-colors',
         error

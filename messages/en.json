@@ -734,7 +734,9 @@
     "errorBoundary": {
       "title": "Unexpected error",
       "message": "The view could not be loaded. Please reload the page.",
-      "reload": "Reload"
+      "reload": "Reload",
+      "hideDetails": "Hide details",
+      "showDetails": "Show stack details"
     },
     "documentEditor": {
       "closeEditor": "Close editor",

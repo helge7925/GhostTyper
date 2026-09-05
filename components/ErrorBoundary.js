@@ -7,6 +7,11 @@ function ErrorFallback({ onReload, error, errorInfo }) {
   const errMessage = error?.message || String(error || 'Unknown');
   const errStack = error?.stack || '';
   const componentStack = errorInfo?.componentStack || '';
+  // A stack trace names internal paths and module structure, which is useful
+  // while developing and just noise-plus-disclosure for anyone else. The
+  // message above stays visible either way, so users still have something to
+  // quote to support.
+  const showStackDetails = process.env.NODE_ENV !== 'production';
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-4 py-8">
@@ -18,19 +23,23 @@ function ErrorFallback({ onReload, error, errorInfo }) {
           <p className="font-mono text-danger break-words">{errMessage}</p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowDetails((v) => !v)}
-          className="text-[11px] text-secondary hover:text-primary underline mb-3"
-        >
-          {showDetails ? 'Details ausblenden' : 'Stack-Details zeigen'}
-        </button>
+        {showStackDetails && (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowDetails((v) => !v)}
+              className="text-[11px] text-secondary hover:text-primary underline mb-3"
+            >
+              {showDetails ? t('hideDetails') : t('showDetails')}
+            </button>
 
-        {showDetails && (
-          <pre className="text-[10px] bg-hover-subtle border border-subtle rounded-lg p-3 overflow-auto max-h-64 mb-4 whitespace-pre-wrap break-words">
-            {errStack}
-            {componentStack ? `\n\nComponent stack:${componentStack}` : ''}
-          </pre>
+            {showDetails && (
+              <pre className="text-[10px] bg-hover-subtle border border-subtle rounded-lg p-3 overflow-auto max-h-64 mb-4 whitespace-pre-wrap break-words">
+                {errStack}
+                {componentStack ? `\n\nComponent stack:${componentStack}` : ''}
+              </pre>
+            )}
+          </>
         )}
 
         <div className="flex justify-center">

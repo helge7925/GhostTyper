@@ -301,14 +301,14 @@ export default function TableRenderer({
         <table className="w-full min-w-[720px]">
           <thead className="bg-hover-subtle">
             <tr>
-              {editable && isEditing && !includeRowTitle && <th className="w-10 px-2 py-2" />}
+              {editable && isEditing && !includeRowTitle && <th scope="col" className="w-10 px-2 py-2" />}
               {includeRowTitle && (
-                <th className="sticky left-0 z-10 bg-surface-elevated px-3 py-2 text-left text-xs font-bold text-secondary uppercase tracking-wider whitespace-nowrap border-r border-subtle">
+                <th scope="col" className="sticky left-0 z-10 bg-surface-elevated px-3 py-2 text-left text-xs font-bold text-secondary uppercase tracking-wider whitespace-nowrap border-r border-subtle">
                   {t('rowLabel')}
                 </th>
               )}
               {normalizedSchema.columns.map((column) => (
-                <th
+                <th scope="col"
                   key={column.key}
                   className={`px-3 py-2 text-left text-xs font-bold text-secondary uppercase tracking-wider whitespace-nowrap ${
                     column.type === 'currency' || column.type === 'number' ? 'text-right' : ''
@@ -340,7 +340,9 @@ export default function TableRenderer({
                   </td>
                 )}
                 {includeRowTitle && (
-                  <th className="sticky left-0 z-10 bg-surface-elevated px-3 py-2 text-left text-sm text-primary font-semibold border-r border-subtle">
+                  // Row header, not a column one: this is the label cell at the
+                  // start of each data row.
+                  <th scope="row" className="sticky left-0 z-10 bg-surface-elevated px-3 py-2 text-left text-sm text-primary font-semibold border-r border-subtle">
                     {getTableRowLabel(normalizedSchema, row, rowIndex)}
                   </th>
                 )}

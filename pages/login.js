@@ -97,7 +97,7 @@ export default function Login() {
               </Field>
 
               {error && (
-                <p className="text-sm text-danger">{error}</p>
+                <p role="alert" className="text-sm text-danger">{error}</p>
               )}
 
               <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full">

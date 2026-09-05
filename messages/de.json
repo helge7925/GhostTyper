@@ -734,7 +734,9 @@
     "errorBoundary": {
       "title": "Unerwarteter Fehler",
       "message": "Die Ansicht konnte nicht geladen werden. Bitte Seite neu laden.",
-      "reload": "Neu laden"
+      "reload": "Neu laden",
+      "hideDetails": "Details ausblenden",
+      "showDetails": "Stack-Details zeigen"
     },
     "documentEditor": {
       "closeEditor": "Editor schließen",
