@@ -50,9 +50,16 @@ export const config = {
 };
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+// formidable writes every part to disk before any size check can run, so the
+// staging directory is part of the attack surface rather than a detail. Keeping
+// it inside the app instead of the shared os.tmpdir() makes leftovers findable
+// and sweepable, and puts the temp file on the same filesystem as its final
+// destination.
+const TMP_UPLOAD_DIR = path.join(UPLOAD_DIR, '.tmp');
 
 async function ensureUploadDir() {
-  await mkdir(UPLOAD_DIR, { recursive: true });
+  // Recursive, so this creates UPLOAD_DIR as well.
+  await mkdir(TMP_UPLOAD_DIR, { recursive: true });
 }
 
 async function safeUnlink(filePath) {
@@ -61,9 +68,21 @@ async function safeUnlink(filePath) {
 }
 
 function parseForm(req) {
+  // The handler only ever reads the first file, so any further one would be
+  // written to disk and then never unlinked — nothing tracks its path. `filter`
+  // runs before formidable opens anything, so a stray part costs nothing on
+  // disk. `maxFiles` is deliberately not used here: it rejects the request but
+  // still creates the offending file, because formidable opens it after its own
+  // error cleanup has already run, leaving an orphan behind on every rejection.
+  let filePartsSeen = 0;
   const form = formidable({
     maxFileSize: MAX_FILE_SIZE,
     keepExtensions: true,
+    uploadDir: TMP_UPLOAD_DIR,
+    filter() {
+      filePartsSeen += 1;
+      return filePartsSeen === 1;
+    },
   });
 
   return new Promise((resolve, reject) => {
@@ -1026,6 +1045,12 @@ async function handler(req, res) {
     }
     if (error.code === 'LIMIT_FILE_SIZE' || error.message?.includes('maxFileSize')) {
       return res.status(413).json({ message: 'Datei ist zu groß (max. 500 MB)' });
+    }
+    // An Office archive that stays under the upload limit but expands past the
+    // decompression caps — the message names the offending part, so the user
+    // can tell this apart from a plain oversized upload.
+    if (error?.code === 'OFFICE_ARCHIVE_TOO_LARGE') {
+      return res.status(413).json({ message: error.message });
     }
     if (error?.code === 'PDF_NO_TEXT' || error?.code === 'PDF_TOO_LARGE' || error?.code === 'NO_OCR_PROVIDER' || error?.code === 'PDF_TOO_MANY_PAGES') {
       return res.status(400).json({ message: error.message });

@@ -40,9 +40,16 @@ export const config = {
 };
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+// formidable writes every part to disk before any size check can run, so the
+// staging directory is part of the attack surface rather than a detail. Keeping
+// it inside the app instead of the shared os.tmpdir() makes leftovers findable
+// and sweepable, and puts the temp file on the same filesystem as its final
+// destination.
+const TMP_UPLOAD_DIR = path.join(UPLOAD_DIR, '.tmp');
 
 async function ensureUploadDir() {
-  await mkdir(UPLOAD_DIR, { recursive: true });
+  // Recursive, so this creates UPLOAD_DIR as well.
+  await mkdir(TMP_UPLOAD_DIR, { recursive: true });
 }
 
 async function safeUnlink(filePath) {
@@ -59,9 +66,21 @@ async function estimateOcrPages(filePath, mimeType) {
 }
 
 function parseForm(req) {
+  // The handler only ever reads the first file, so any further one would be
+  // written to disk and then never unlinked — nothing tracks its path. `filter`
+  // runs before formidable opens anything, so a stray part costs nothing on
+  // disk. `maxFiles` is deliberately not used here: it rejects the request but
+  // still creates the offending file, because formidable opens it after its own
+  // error cleanup has already run, leaving an orphan behind on every rejection.
+  let filePartsSeen = 0;
   const form = formidable({
     maxFileSize: MAX_FILE_SIZE,
     keepExtensions: true,
+    uploadDir: TMP_UPLOAD_DIR,
+    filter() {
+      filePartsSeen += 1;
+      return filePartsSeen === 1;
+    },
   });
 
   return new Promise((resolve, reject) => {
