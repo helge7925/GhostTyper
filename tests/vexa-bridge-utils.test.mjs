@@ -6,6 +6,7 @@ import {
   decideJoinTimeout,
   isEarlyBotStatus,
   vexaReportsActive,
+  decideTranslationProvider,
   POLL_BACKOFF_CAP_MS,
   DEGRADED_FAILURE_THRESHOLD,
 } from '../lib/vexa-bridge-utils.js';
@@ -213,4 +214,65 @@ test('vexaReportsActive: active-ish meeting statuses only', () => {
   assert.equal(vexaReportsActive('awaiting_admission'), false);
   assert.equal(vexaReportsActive('completed'), false);
   assert.equal(vexaReportsActive(null), false);
+});
+
+// Provider choice for live in-meeting translation. The distinction that
+// matters is where the Mistral key came from: a workspace key is a decision,
+// the operator-wide fallback is a safety net. Conflating them lets one
+// operator env var silently re-route every organization's billed translation
+// traffic.
+test('a workspace Mistral key wins outright', () => {
+  assert.equal(decideTranslationProvider({
+    mistralSource: 'workspace',
+    hasMistralKey: true,
+    chatProvider: 'edenai',
+    hasChatKey: true,
+  }), 'mistral');
+});
+
+test('the operator fallback key never overrides a configured chat provider', () => {
+  // The regression this guards: an operator sets MISTRAL_API_KEY to try live
+  // STT, and every org with an activated EdenAI chat capability quietly starts
+  // translating through Mistral instead.
+  assert.equal(decideTranslationProvider({
+    mistralSource: 'operator',
+    hasMistralKey: true,
+    chatProvider: 'edenai',
+    hasChatKey: true,
+  }), 'edenai');
+
+  assert.equal(decideTranslationProvider({
+    mistralSource: 'operator',
+    hasMistralKey: true,
+    chatProvider: 'openrouter',
+    hasChatKey: true,
+  }), 'openrouter');
+});
+
+test('the operator fallback still covers a workspace with nothing configured', () => {
+  // Its actual purpose: subtitles rather than silent loss of the feature.
+  assert.equal(decideTranslationProvider({
+    mistralSource: 'operator',
+    hasMistralKey: true,
+    chatProvider: 'edenai',
+    hasChatKey: false,
+  }), 'mistral');
+});
+
+test('no key anywhere means skip the tick', () => {
+  assert.equal(decideTranslationProvider({
+    mistralSource: null,
+    hasMistralKey: false,
+    chatProvider: 'edenai',
+    hasChatKey: false,
+  }), null);
+});
+
+test('a workspace source without an actual key does not win', () => {
+  assert.equal(decideTranslationProvider({
+    mistralSource: 'workspace',
+    hasMistralKey: false,
+    chatProvider: 'edenai',
+    hasChatKey: true,
+  }), 'edenai');
 });

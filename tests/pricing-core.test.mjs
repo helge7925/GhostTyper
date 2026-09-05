@@ -108,7 +108,15 @@ test('live in-meeting translation bills the provider it actually called', () => 
   for (const provider of liveTranslationBillingProviders) {
     assert.equal(provider, 'translationProvider');
   }
-  assert.match(bridge, /const translationProvider = useMistral \? 'mistral' : active\.provider/);
+
+  // The invariant is that the billed provider and the called provider cannot
+  // diverge, so both must come from one decision. `translationProvider` is
+  // that decision (decideTranslationProvider, behaviour-tested in
+  // tests/vexa-bridge-utils.test.mjs) and `useMistral` has to be derived from
+  // it rather than computed alongside it — two independent computations are
+  // exactly how the two could drift apart.
+  assert.match(bridge, /const translationProvider = decideTranslationProvider\(/);
+  assert.match(bridge, /const useMistral = translationProvider === 'mistral'/);
 });
 
 test('provider-reported OpenRouter cost is authoritative', () => {
