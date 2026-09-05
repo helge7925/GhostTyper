@@ -2,12 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Sparkles, Loader2, ShieldCheck } from 'lucide-react';
 import { useUiFeedback } from '../../lib/use-ui-feedback';
 
-// Direct Mistral integration — bypasses both OpenRouter and EdenAI. Used
-// only for live-meeting speech-to-text so far (see lib/mistral.js): both
-// of those routed through their own async/aggregation layers too slowly
-// for a live meeting's ~2-3s audio-chunk cadence, while Mistral's own
-// realtime endpoint measured well under a second. No catalogue, no
-// per-capability activation — a saved key is used immediately.
+// Direct Mistral integration — bypasses both OpenRouter and EdenAI, for
+// the two live-meeting paths where latency is perceptible to the audience
+// (see lib/mistral.js): speech-to-text, where EdenAI's async job model
+// was too slow to be usable at all, and in-meeting translation, where the
+// aggregation hop shows up as subtitle lag. No catalogue, no
+// per-capability activation — a saved key switches on both immediately.
 export default function MistralIntegrationPanel({ canEdit }) {
   const { showToast } = useUiFeedback();
   const [loading, setLoading] = useState(true);
@@ -16,6 +16,7 @@ export default function MistralIntegrationPanel({ canEdit }) {
   const [operatorFallback, setOperatorFallback] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [liveTranscriptionModel, setLiveTranscriptionModel] = useState('');
+  const [liveTranslationModel, setLiveTranslationModel] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -27,6 +28,7 @@ export default function MistralIntegrationPanel({ canEdit }) {
       setApiKeyConfigured(Boolean(config.apiKeyConfigured));
       setOperatorFallback(Boolean(payload.operatorFallback));
       setLiveTranscriptionModel(payload.liveTranscriptionModel || '');
+      setLiveTranslationModel(payload.liveTranslationModel || '');
     } catch (error) {
       showToast(error.message, 'error');
     } finally {
@@ -78,14 +80,15 @@ export default function MistralIntegrationPanel({ canEdit }) {
       <header className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-sm font-semibold text-secondary uppercase tracking-widest flex items-center gap-2"><Sparkles className="w-4 h-4" /> Mistral (Live-Meeting)</h3>
-          <p className="text-xs text-secondary mt-1">Direkte Anbindung, unabhängig von OpenRouter/EdenAI — ausschließlich für die Live-Transkription in Meetings, da Latenz hier entscheidend ist.</p>
+          <p className="text-xs text-secondary mt-1">Direkte Anbindung, unabhängig von OpenRouter/EdenAI — für Live-Transkription und Live-Übersetzung in Meetings, da Latenz hier entscheidend ist. Ein gespeicherter Key aktiviert beides.</p>
         </div>
         {(apiKeyConfigured || operatorFallback) && <span className="inline-flex items-center gap-1 text-xs text-success"><ShieldCheck className="w-4 h-4" /> Aktiv</span>}
       </header>
       <label className="block text-xs font-medium text-secondary">API-Key {apiKeyConfigured && '(konfiguriert)'}
         <input type="password" value={apiKey} disabled={!canEdit} onChange={(event) => setApiKey(event.target.value)} placeholder={apiKeyConfigured || operatorFallback ? '••••••••' : 'Mistral-Key'} className="mt-1.5 w-full bg-surface-elevated border border-subtle rounded-xl px-4 py-2.5 text-sm text-primary" />
       </label>
-      <p className="text-xs text-secondary">Modell (Live-Transkription): <span className="font-mono text-primary">{liveTranscriptionModel || '…'}</span> — fest hinterlegt, keine Auswahl nötig.</p>
+      <p className="text-xs text-secondary">Modell (Live-Transkription): <span className="font-mono text-primary">{liveTranscriptionModel || '…'}</span></p>
+      <p className="text-xs text-secondary">Modell (Live-Übersetzung): <span className="font-mono text-primary">{liveTranslationModel || '…'}</span> — beide fest hinterlegt, keine Auswahl nötig. Ohne Key läuft die Live-Übersetzung weiter über EdenAI/OpenRouter, die Live-Transkription hingegen gar nicht.</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={!canEdit || busy} onClick={test} className="px-4 py-2 rounded-xl border border-subtle text-sm">Verbindung testen</button>
         <button type="button" disabled={!canEdit || busy} onClick={save} className="px-4 py-2 rounded-xl bg-accent-strong text-white text-sm">Speichern</button>

@@ -94,6 +94,23 @@ test('upload transcription resolves its provider dynamically (EdenAI or OpenRout
   assert.doesNotMatch(worker, /provider: inferProviderForModel/);
 });
 
+// Live translation has three possible providers (direct Mistral → EdenAI
+// → OpenRouter) but bills through a single `translationProvider`
+// variable. The failure this guards is silent and expensive: billing
+// `active.provider` (EdenAI/OpenRouter) while the call actually went to
+// Mistral would resolve the wrong price row — or none at all, taking down
+// live translation with PRICING_CONFIGURATION_MISSING mid-meeting.
+test('live in-meeting translation bills the provider it actually called', () => {
+  const bridge = readFileSync(new URL('../lib/vexa-bridge.js', import.meta.url), 'utf8');
+  const liveTranslationBillingProviders = [...bridge.matchAll(/operation: 'live_translation',\s*\n\s*provider: ([A-Za-z.]+),/g)]
+    .map((match) => match[1]);
+  assert.equal(liveTranslationBillingProviders.length, 2, 'expected both the guarded and fallback live_translation call sites');
+  for (const provider of liveTranslationBillingProviders) {
+    assert.equal(provider, 'translationProvider');
+  }
+  assert.match(bridge, /const translationProvider = useMistral \? 'mistral' : active\.provider/);
+});
+
 test('provider-reported OpenRouter cost is authoritative', () => {
   const result = calculateUsageCost(price, { inputQuantity: 99, outputQuantity: 3, cost: 0.012345 });
   assert.equal(result.actualCostMicros, 12_345);

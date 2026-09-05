@@ -3,7 +3,7 @@ import { withOrgScope } from '../../../../lib/api/with-org-scope.js';
 import { hasPermission } from '../../../../lib/permissions.js';
 import { logAuditEvent } from '../../../../lib/audit-log.js';
 import { getIntegration, redactConfig, upsertIntegration } from '../../../../lib/integrations.js';
-import { normalizeMistralConfig, MISTRAL_LIVE_TRANSCRIPTION_MODEL } from '../../../../lib/mistral.js';
+import { normalizeMistralConfig, MISTRAL_LIVE_TRANSCRIPTION_MODEL, MISTRAL_TRANSLATION_MODEL } from '../../../../lib/mistral.js';
 import { findMissingMistralPrices } from '../../../../lib/mistral-pricing.js';
 
 const PROVIDER = 'mistral';
@@ -33,9 +33,12 @@ async function handler(req, res) {
         operatorFallback: Boolean(process.env.MISTRAL_API_KEY),
         config: redactConfig(config),
         updatedAt: integration.updatedAt || null,
-        // No catalogue, no admin model choice — one hardcoded model,
-        // same "hardcode-edenai-models" philosophy applied here too.
+        // No catalogue, no admin model choice — one hardcoded model per
+        // consumer, same "hardcode-edenai-models" philosophy applied here
+        // too. Both are listed because a saved key switches on both at
+        // once (no per-capability activation for Mistral).
         liveTranscriptionModel: MISTRAL_LIVE_TRANSCRIPTION_MODEL,
+        liveTranslationModel: MISTRAL_TRANSLATION_MODEL,
       });
     } catch (error) {
       logApiError('Mistral integration GET failed', error);
