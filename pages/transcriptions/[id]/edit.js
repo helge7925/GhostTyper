@@ -6,7 +6,7 @@ import DocumentEditor from '../../../components/DocumentEditor';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import { toast } from 'sonner';
 import { getTranscription } from '../../../lib/api';
-import { analysisToHtml } from '../../../lib/export-utils';
+import { analysisToHtml } from '../../../lib/markdown-html';
 
 /**
  * Document-editor page. Renders without the standard Layout (handled in _app.js

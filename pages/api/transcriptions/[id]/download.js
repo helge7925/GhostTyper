@@ -1,4 +1,5 @@
-import { readFile } from 'fs/promises';
+import { createReadStream } from 'fs';
+import { stat } from 'fs/promises';
 import path from 'path';
 import { query } from '../../../../lib/db';
 import { enforceRateLimit, logApiError } from '../../../../lib/api-utils';
@@ -52,7 +53,10 @@ async function handler(req, res) {
       return res.status(400).json({ message: 'Ungültiger Dateipfad' });
     }
 
-    const buffer = await readFile(row.file_path);
+    // Streamed rather than read into memory: MAX_FILE_SIZE allows 500 MB
+    // recordings, and a handful of concurrent downloads of those was enough to
+    // put the whole process under memory pressure.
+    const { size } = await stat(row.file_path);
     await logAuditEvent({
       userId,
       organizationId: orgId,
@@ -67,8 +71,18 @@ async function handler(req, res) {
 
     res.setHeader('Content-Type', row.mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${safeDownloadName(row.original_name)}"`);
-    res.setHeader('Content-Length', String(buffer.length));
-    return res.status(200).send(buffer);
+    res.setHeader('Content-Length', String(size));
+
+    const stream = createReadStream(row.file_path);
+    stream.on('error', (streamError) => {
+      logApiError('Transcription download stream error', streamError);
+      // The headers are already out, so there is no honest way to turn this
+      // into an error response — dropping the connection at least stops the
+      // client from treating a truncated file as complete.
+      res.destroy(streamError);
+    });
+    stream.pipe(res);
+    return undefined;
   } catch (error) {
     if (error?.code === 'ENOENT') {
       return res.status(404).json({ message: 'Datei nicht gefunden' });

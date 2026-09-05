@@ -3,7 +3,7 @@ import { useState, useRef, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
-import { mdToHtml } from '../lib/export-utils';
+import { mdToHtml } from '../lib/markdown-html';
 import DocumentEditor from '../components/DocumentEditor';
 import ProcessStatusCard from '../components/ProcessStatusCard';
 import LoadingSpinner from '../components/LoadingSpinner';

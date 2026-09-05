@@ -154,75 +154,111 @@ async function handler(req, res) {
       }
     }
 
-    // Execute the action
+    // Execute the action. Each branch works on the whole selection in one
+    // statement per table. The previous per-document loop issued up to three
+    // queries per file and re-read tags it already had in documentMap, so a
+    // 200-file tag merge cost roughly 600 sequential round-trips.
     const results = {
       success: [],
       failed: [],
     };
 
-    for (const id of authorizedIds) {
-      const doc = documentMap.get(id);
-      try {
-        if (action === 'delete') {
-          if (doc.transcription_id) {
-            if (doc.file_path && doc.file_path !== 'INTERNAL_DOC' && isSafeUploadPath(doc.file_path)) {
-              await unlink(doc.file_path).catch(() => {});
-            }
-            await query('DELETE FROM transcriptions WHERE id = $1 AND organization_id = $2', [doc.transcription_id, orgId]);
-          } else {
-            await query('DELETE FROM documents WHERE id = $1 AND organization_id = $2', [id, orgId]);
-          }
-          results.success.push(id);
-        } else if (action === 'move') {
-          const targetFolderId = folderId === null || folderId === '' ? null : folderId;
-          await query(
-            `UPDATE documents SET folder_id = $1, updated_at = NOW() WHERE id = $2 AND organization_id = $3`,
-            [targetFolderId, id, orgId],
-          );
-          // Also update transcription if it exists
-          if (doc.transcription_id) {
-            await query(
-              `UPDATE transcriptions SET folder_id = $1, updated_at = NOW() WHERE id = $2 AND organization_id = $3`,
-              [targetFolderId, doc.transcription_id, orgId],
-            );
-          }
-          results.success.push(id);
-        } else if (action === 'tag') {
-          const normalizedTags = [...new Set(tags.map((tag) => String(tag || '').trim()).filter(Boolean))].slice(0, 30);
-          if (tagMode === 'replace') {
-            await query(
-              `UPDATE documents SET tags = $1, updated_at = NOW() WHERE id = $2 AND organization_id = $3`,
-              [normalizedTags, id, orgId],
-            );
-          } else if (tagMode === 'add') {
-            // Merge existing tags with new ones
-            const existingDoc = await query(
-              `SELECT tags FROM documents WHERE id = $1 AND organization_id = $2`,
-              [id, orgId],
-            );
-            const existingTags = Array.isArray(existingDoc.rows[0]?.tags) ? existingDoc.rows[0].tags : [];
-            const mergedTags = [...new Set([...existingTags, ...normalizedTags])].slice(0, 30);
-            await query(
-              `UPDATE documents SET tags = $1, updated_at = NOW() WHERE id = $2 AND organization_id = $3`,
-              [mergedTags, id, orgId],
-            );
-          } else if (tagMode === 'remove') {
-            const existingDoc = await query(
-              `SELECT tags FROM documents WHERE id = $1 AND organization_id = $2`,
-              [id, orgId],
-            );
-            const existingTags = Array.isArray(existingDoc.rows[0]?.tags) ? existingDoc.rows[0].tags : [];
-            const filteredTags = existingTags.filter((tag) => !normalizedTags.includes(tag));
-            await query(
-              `UPDATE documents SET tags = $1, updated_at = NOW() WHERE id = $2 AND organization_id = $3`,
-              [filteredTags, id, orgId],
-            );
-          }
-          results.success.push(id);
-        }
-      } catch (error) {
-        results.failed.push({ id, error: error.message });
+    // Rows that did not come back from RETURNING were not touched — deleted or
+    // moved out from under us between the authorization read and the write.
+    // The old loop counted those as successes; reporting them is more honest.
+    const recordOutcome = (attemptedIds, succeededIds, reason) => {
+      const done = new Set(succeededIds.map(Number));
+      for (const id of attemptedIds) {
+        if (done.has(Number(id))) results.success.push(id);
+        else results.failed.push({ id, error: reason });
       }
+    };
+
+    if (action === 'delete') {
+      const viaTranscription = [];
+      const documentOnly = [];
+      for (const id of authorizedIds) {
+        if (documentMap.get(id).transcription_id) viaTranscription.push(id);
+        else documentOnly.push(id);
+      }
+
+      await Promise.all(viaTranscription.map((id) => {
+        const doc = documentMap.get(id);
+        if (!doc.file_path || doc.file_path === 'INTERNAL_DOC' || !isSafeUploadPath(doc.file_path)) return null;
+        return unlink(doc.file_path).catch(() => {});
+      }).filter(Boolean));
+
+      const succeeded = [];
+      if (viaTranscription.length > 0) {
+        const transcriptionIds = viaTranscription.map((id) => documentMap.get(id).transcription_id);
+        const deleted = await query(
+          `DELETE FROM transcriptions WHERE id = ANY($1::int[]) AND organization_id = $2 RETURNING id`,
+          [transcriptionIds, orgId],
+        );
+        const removed = new Set(deleted.rows.map((row) => Number(row.id)));
+        for (const id of viaTranscription) {
+          if (removed.has(Number(documentMap.get(id).transcription_id))) succeeded.push(id);
+        }
+      }
+      if (documentOnly.length > 0) {
+        const deleted = await query(
+          `DELETE FROM documents WHERE id = ANY($1::int[]) AND organization_id = $2 RETURNING id`,
+          [documentOnly, orgId],
+        );
+        succeeded.push(...deleted.rows.map((row) => Number(row.id)));
+      }
+      recordOutcome(authorizedIds, succeeded, 'Datei konnte nicht gelöscht werden.');
+    } else if (action === 'move') {
+      const targetFolderId = folderId === null || folderId === '' ? null : folderId;
+      const moved = await query(
+        `UPDATE documents SET folder_id = $1, updated_at = NOW()
+          WHERE id = ANY($2::int[]) AND organization_id = $3
+        RETURNING id`,
+        [targetFolderId, authorizedIds, orgId],
+      );
+      const transcriptionIds = authorizedIds
+        .map((id) => documentMap.get(id).transcription_id)
+        .filter(Boolean);
+      if (transcriptionIds.length > 0) {
+        await query(
+          `UPDATE transcriptions SET folder_id = $1, updated_at = NOW()
+            WHERE id = ANY($2::int[]) AND organization_id = $3`,
+          [targetFolderId, transcriptionIds, orgId],
+        );
+      }
+      recordOutcome(authorizedIds, moved.rows.map((row) => row.id), 'Datei konnte nicht verschoben werden.');
+    } else if (action === 'tag') {
+      const normalizedTags = [...new Set(tags.map((tag) => String(tag || '').trim()).filter(Boolean))].slice(0, 30);
+      let tagged;
+      if (tagMode === 'replace') {
+        tagged = await query(
+          `UPDATE documents SET tags = $1, updated_at = NOW()
+            WHERE id = ANY($2::int[]) AND organization_id = $3
+          RETURNING id`,
+          [normalizedTags, authorizedIds, orgId],
+        );
+      } else {
+        // add and remove produce a different array per document, so the new
+        // values travel as JSON and are joined back on id. The merge itself
+        // stays in JS to preserve the existing order (current tags first, new
+        // ones appended); SQL set operations would reorder them.
+        const payload = authorizedIds.map((id) => {
+          const existing = Array.isArray(documentMap.get(id).tags) ? documentMap.get(id).tags : [];
+          const next = tagMode === 'add'
+            ? [...new Set([...existing, ...normalizedTags])].slice(0, 30)
+            : existing.filter((tag) => !normalizedTags.includes(tag));
+          return { id, tags: next };
+        });
+        tagged = await query(
+          `UPDATE documents AS d
+              SET tags = ARRAY(SELECT jsonb_array_elements_text(v.tags)), updated_at = NOW()
+             FROM jsonb_to_recordset($1::jsonb) AS v(id int, tags jsonb)
+            WHERE d.id = v.id AND d.organization_id = $2
+          RETURNING d.id`,
+          [JSON.stringify(payload), orgId],
+        );
+      }
+      recordOutcome(authorizedIds, tagged.rows.map((row) => row.id), 'Tags konnten nicht gespeichert werden.');
     }
 
     return res.status(200).json({

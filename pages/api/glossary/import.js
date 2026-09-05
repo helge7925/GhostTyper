@@ -69,31 +69,79 @@ async function handler(req, res) {
   let imported = 0;
   let skipped = 0;
 
+  // Uniqueness is scoped per tier and, for translatable terms, per target
+  // language (see the two partial unique indexes in lib/db-init.js). Building
+  // the same key on both sides lets one multi-row INSERT report per-line
+  // outcomes without a round-trip per row: MAX_IMPORT_ROWS is 2000, so the
+  // old row-at-a-time loop could hold a pool connection for 2000 sequential
+  // statements.
+  const conflictKey = (sourceTerm, targetLang, doNotTranslate) => (doNotTranslate
+    ? `${String(sourceTerm).toLowerCase()}|dnt`
+    : `${String(sourceTerm).toLowerCase()}|${String(targetLang || '').toLowerCase()}`);
+
+  const pending = [];
+  const seenKeys = new Set();
+  for (const row of rows) {
+    const { value, error } = normalizeGlossaryPayload(row.data);
+    if (error) {
+      errors.push({ line: row.line, message: error });
+      skipped += 1;
+      continue;
+    }
+    // Duplicates inside the uploaded file collapse into a single INSERT row,
+    // so they have to be caught here to keep reporting them per line.
+    const key = conflictKey(value.sourceTerm, value.targetLang, value.doNotTranslate);
+    if (seenKeys.has(key)) {
+      errors.push({ line: row.line, message: 'Eintrag existiert bereits.' });
+      skipped += 1;
+      continue;
+    }
+    seenKeys.add(key);
+    pending.push({ line: row.line, value, key });
+  }
+
+  const IMPORT_CHUNK_SIZE = 200;
+
   try {
-    for (const row of rows) {
-      const { value, error } = normalizeGlossaryPayload(row.data);
-      if (error) {
-        errors.push({ line: row.line, message: error });
-        skipped += 1;
-        continue;
-      }
+    for (let offset = 0; offset < pending.length; offset += IMPORT_CHUNK_SIZE) {
+      const chunk = pending.slice(offset, offset + IMPORT_CHUNK_SIZE);
+      const params = [orgId, ownerUserId];
+      const tuples = chunk.map(({ value }) => {
+        const base = params.length;
+        params.push(value.sourceTerm, value.targetLang, value.targetTerm, value.doNotTranslate, value.notes);
+        return `($1, $2, $${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
+      });
+
       try {
-        await query(
+        // eslint-disable-next-line no-await-in-loop
+        const inserted = await query(
           `INSERT INTO translation_glossary (
               organization_id, user_id, source_term, target_lang, target_term, do_not_translate, notes
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [orgId, ownerUserId, value.sourceTerm, value.targetLang, value.targetTerm, value.doNotTranslate, value.notes]
+            VALUES ${tuples.join(', ')}
+            ON CONFLICT DO NOTHING
+            RETURNING source_term, target_lang, do_not_translate`,
+          params,
         );
-        imported += 1;
-      } catch (rowError) {
-        if (rowError?.code === '23505') {
-          errors.push({ line: row.line, message: 'Eintrag existiert bereits.' });
-        } else {
-          logApiError('Glossary import row error', rowError);
-          errors.push({ line: row.line, message: 'Zeile konnte nicht gespeichert werden.' });
+        const storedKeys = new Set(
+          inserted.rows.map((row) => conflictKey(row.source_term, row.target_lang, row.do_not_translate)),
+        );
+        for (const entry of chunk) {
+          if (storedKeys.has(entry.key)) {
+            imported += 1;
+          } else {
+            errors.push({ line: entry.line, message: 'Eintrag existiert bereits.' });
+            skipped += 1;
+          }
         }
-        skipped += 1;
+      } catch (chunkError) {
+        // A conflict cannot land here (ON CONFLICT DO NOTHING absorbs those),
+        // so this is a real failure and the whole chunk is lost together.
+        logApiError('Glossary import chunk error', chunkError);
+        for (const entry of chunk) {
+          errors.push({ line: entry.line, message: 'Zeile konnte nicht gespeichert werden.' });
+          skipped += 1;
+        }
       }
     }
 

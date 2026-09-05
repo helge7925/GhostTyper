@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import DocumentEditor from '../components/DocumentEditor';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { mdToHtml } from '../lib/export-utils';
+import { mdToHtml } from '../lib/markdown-html';
 import { saveDocument } from '../lib/api';
 import { useTranslations } from '../lib/i18n';
 import { Button } from '../components/ui/button';

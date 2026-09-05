@@ -8,7 +8,7 @@ import DocumentEditor from '../components/DocumentEditor';
 import ProcessStatusCard from '../components/ProcessStatusCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
-import { analysisToHtml } from '../lib/export-utils';
+import { analysisToHtml } from '../lib/markdown-html';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { useMessageList, useTranslations } from '../lib/i18n';
 import { MAX_FILE_SIZE } from '../lib/constants';

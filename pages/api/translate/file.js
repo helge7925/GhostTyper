@@ -24,7 +24,7 @@ import { scanFileForViruses } from '../../../lib/virus-scan';
 import { logAuditEvent } from '../../../lib/audit-log';
 import { addTranscriptionEvent } from '../../../lib/transcription-events';
 import { buildTranslatedFilename } from '../../../lib/translate-filename';
-import { mdToHtml } from '../../../lib/export-utils';
+import { mdToHtml } from '../../../lib/markdown-html';
 import { renderPdfBufferFromHtml } from '../../../lib/pdf-export';
 import { upsertDocumentForTranscription } from '../../../lib/documents';
 import {
