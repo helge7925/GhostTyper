@@ -2,6 +2,7 @@ node_modules
 .next
 .git
 uploads
+backups
 coverage
 playwright-report
 Dockerfile

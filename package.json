@@ -39,6 +39,8 @@
     "reencrypt-secrets": "node scripts/reencrypt-secrets.js",
     "retention:apply": "node scripts/apply-retention-policy.js",
     "audit:verify": "node scripts/verify-audit-chain.mjs",
+    "backup": "node scripts/backup.js",
+    "restore": "node scripts/restore.js",
     "drop-chat-knowledge-tables": "node scripts/drop-chat-knowledge-tables.js"
   },
   "dependencies": {

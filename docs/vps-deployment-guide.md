@@ -183,25 +183,73 @@ docker compose -f config/docker-compose.prod.yml --env-file .env -p ghosttyper u
 4. Health + Smoke-Checks aus Abschnitt 9.
 5. Fehlerfall: Rollback auf letzten stabilen Commit (Abschnitt 12).
 
-## 11) Backup/Restore (Mindeststandard)
+## 11) Backup/Restore
 
 Empfohlen täglich (inkrementell) + wöchentlich Vollbackup.
 
-DB-Dump:
+Sicherung (Datenbank + Uploads in einem Lauf):
 ```bash
-docker compose -f config/docker-compose.prod.yml exec -T transkription-db \
-  pg_dump -U "$DB_USER" -d "$DB_NAME" > backup-$(date +%F)-db.sql
+npm run backup -- --out /var/backups/ghosttyper
 ```
 
-Uploads sichern:
+Jeder Lauf legt ein Verzeichnis mit Zeitstempel an:
+
+| Datei | Inhalt |
+| --- | --- |
+| `database.dump` | `pg_dump` im Custom-Format (komprimiert, `pg_restore`-fähig) |
+| `uploads.tar.gz` | das Uploads-Verzeichnis |
+| `manifest.json` | Größen, SHA-256 je Artefakt, Node-Version, Ziel-DB (ohne Zugangsdaten) |
+
+Wiederherstellung — prüft zuerst jede Prüfsumme und ändert ohne `--confirm` nichts:
 ```bash
-docker run --rm \
-  -v transkription-uploads:/data \
-  -v "$PWD":/backup \
-  alpine tar czf /backup/backup-$(date +%F)-uploads.tar.gz -C /data .
+npm run restore -- /var/backups/ghosttyper/2026-09-06T07-41-12Z            # nur prüfen
+npm run restore -- /var/backups/ghosttyper/2026-09-06T07-41-12Z --confirm  # anwenden
 ```
 
-Restore regelmäßig in separater Umgebung testen.
+Beide Skripte geben pro Ereignis eine Zeile JSON aus und setzen einen
+Exit-Code ungleich 0 im Fehlerfall, laufen also ohne Zusatzarbeit unter Cron.
+
+**Das `.env` gehört nicht in dieses Backup** — und liegt deshalb bewusst nicht
+darin. Es enthält `SECRET_ENCRYPTION_KEY`; ohne den sind die verschlüsselten
+Provider-Zugangsdaten im Dump unlesbar, weshalb Schlüssel und Chiffrat nicht im
+selben Archiv liegen dürfen. Sichere das `.env` getrennt. Das Manifest hält
+fest, *ob* beim Backup ein Schlüssel gesetzt war, damit ein Restore warnen
+kann, wenn beide auseinandergelaufen sind.
+
+Täglich um 03:30 per systemd-Timer:
+
+`/etc/systemd/system/ghosttyper-backup.service`
+```ini
+[Unit]
+Description=GhostTyper backup
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/ghosttyper
+EnvironmentFile=/opt/ghosttyper/.env
+ExecStart=/usr/bin/npm run backup -- --out /var/backups/ghosttyper
+```
+
+`/etc/systemd/system/ghosttyper-backup.timer`
+```ini
+[Unit]
+Description=GhostTyper backup (daily)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+```bash
+systemctl enable --now ghosttyper-backup.timer
+```
+
+Restore regelmäßig in separater Umgebung testen — der `--confirm`-lose Lauf
+prüft Prüfsummen, ersetzt aber keinen echten Wiederherstellungstest.
 
 ## 12) Rollback-Plan
 

@@ -19,6 +19,9 @@ docker-data/
 # Uploads
 uploads/
 
+# Backups (scripts/backup.js) — database dumps and copies of every upload
+backups/
+
 # IDE
 .idea
 .vscode
