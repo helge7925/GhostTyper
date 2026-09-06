@@ -1406,5 +1406,31 @@
       "usageLabel": "Monthly budget usage",
       "month": "Month {month}"
     }
+  },
+  "share": {
+    "notFoundTitle": "Link unavailable",
+    "notFoundBody": "This translation link has expired or was revoked. Please ask the meeting organiser for a new one.",
+    "errorTitle": "Could not be loaded",
+    "errorBody": "Please try again in a moment.",
+    "loading": "Loading…",
+    "disabledTitle": "Translation is off",
+    "disabledBody": "The meeting organiser has not switched live translation on right now.",
+    "pageTitle": "Live translation · GhostTyper",
+    "eyebrow": "Live translation",
+    "connected": "Connected",
+    "offline": "Offline",
+    "expiresAt": "Expires {time}",
+    "listenLabel": "Listen to the translation:",
+    "columnOriginal": "Original",
+    "columnTranslation": "Translation",
+    "overlayTitle": "Live translation overlay",
+    "overlayInvalid": "Translation link invalid",
+    "overlayDisconnected": "Connection lost",
+    "overlayFollow": "FOLLOW THE TRANSLATION",
+    "overlayMeetingEnded": "Meeting ended",
+    "overlayWaiting": "Waiting for speech…",
+    "statusConnected": "Connected",
+    "statusWaiting": "Waiting",
+    "statusEnded": "Ended"
   }
 }

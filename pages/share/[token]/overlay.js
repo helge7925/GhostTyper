@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslations } from '../../../lib/i18n';
 
 /**
  * Bot-camera overlay page.
@@ -41,6 +42,9 @@ import { useEffect, useMemo, useState } from 'react';
  *     last-known subtitle visible. EventSource auto-reconnects.
  */
 export default function OverlayPage() {
+  // Opened by external meeting participants with no account and no locale
+  // cookie, so lib/i18n falls through to navigator.language.
+  const t = useTranslations('share');
   const router = useRouter();
   const token = typeof router.query.token === 'string' ? router.query.token : null;
 
@@ -119,7 +123,7 @@ export default function OverlayPage() {
     return (
       <ShellHtml>
         <div style={errorBoxStyle}>
-          <p style={{ fontSize: 64, fontWeight: 700, margin: 0 }}>Übersetzungs-Link ungültig</p>
+          <p style={{ fontSize: 64, fontWeight: 700, margin: 0 }}>{t('overlayInvalid')}</p>
           <p style={{ fontSize: 28, marginTop: 24, opacity: 0.7 }}>
             Bitte einen neuen Link generieren.
           </p>
@@ -131,7 +135,7 @@ export default function OverlayPage() {
     return (
       <ShellHtml>
         <div style={errorBoxStyle}>
-          <p style={{ fontSize: 64, fontWeight: 700, margin: 0 }}>Verbindung verloren</p>
+          <p style={{ fontSize: 64, fontWeight: 700, margin: 0 }}>{t('overlayDisconnected')}</p>
         </div>
       </ShellHtml>
     );
@@ -140,7 +144,7 @@ export default function OverlayPage() {
     return (
       <ShellHtml>
         <div style={errorBoxStyle}>
-          <p style={{ fontSize: 56, fontWeight: 400, opacity: 0.4, margin: 0 }}>Lade …</p>
+          <p style={{ fontSize: 56, fontWeight: 400, opacity: 0.4, margin: 0 }}>{t('loading')}</p>
         </div>
       </ShellHtml>
     );
@@ -161,7 +165,7 @@ export default function OverlayPage() {
         />
         <div style={qrCaptionStyle}>
           <p style={{ fontSize: 24, opacity: 0.7, margin: 0, letterSpacing: 4 }}>
-            ÜBERSETZUNG MITLESEN
+            {t('overlayFollow')}
           </p>
           <p style={{ fontSize: 32, fontWeight: 600, margin: '8px 0 0' }}>
             {shareUrlForDisplay}
@@ -175,7 +179,7 @@ export default function OverlayPage() {
           <p style={subtitleTextStyle}>{latest.text}</p>
         ) : (
           <p style={subtitleIdleStyle}>
-            {meetingEnded ? 'Meeting beendet' : 'Warte auf Sprache …'}
+            {meetingEnded ? t('overlayMeetingEnded') : t('overlayWaiting')}
           </p>
         )}
       </div>
@@ -183,7 +187,13 @@ export default function OverlayPage() {
       {/* BOTTOM BAND — language pair + connection indicator. */}
       <div style={bottomBandStyle}>
         <span style={langBadgeStyle}>{langA} ↔ {langB}</span>
-        <span style={statusDotStyle(connected, meetingEnded)} aria-hidden />
+        <span
+          style={statusDotStyle(connected, meetingEnded)}
+          role="img"
+          aria-label={meetingEnded
+            ? t('statusEnded')
+            : connected ? t('statusConnected') : t('statusWaiting')}
+        />
       </div>
     </ShellHtml>
   );
@@ -192,10 +202,11 @@ export default function OverlayPage() {
 OverlayPage.noLayout = true;
 
 function ShellHtml({ children }) {
+  const t = useTranslations('share');
   return (
     <>
       <Head>
-        <title>Live-Übersetzung Overlay</title>
+        <title>{t('overlayTitle')}</title>
         <meta name="robots" content="noindex,nofollow" />
       </Head>
       <main style={shellStyle}>{children}</main>

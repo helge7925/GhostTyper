@@ -2,6 +2,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Volume2, VolumeX, Languages, Clock, Wifi, WifiOff } from 'lucide-react';
+import { useLocale, useTranslations } from '../../lib/i18n';
 
 /**
  * Public companion view for a shared live-translation meeting.
@@ -17,6 +18,11 @@ import { Volume2, VolumeX, Languages, Clock, Wifi, WifiOff } from 'lucide-react'
  * cleanly and the UI shows the corresponding state.
  */
 export default function PublicSharePage() {
+  // Anonymous viewers have no cookie, so lib/i18n falls through to
+  // navigator.language — which is the right default for a link handed to
+  // external meeting participants.
+  const t = useTranslations('share');
+  const locale = useLocale();
   const router = useRouter();
   const token = typeof router.query.token === 'string' ? router.query.token : null;
 
@@ -97,35 +103,31 @@ export default function PublicSharePage() {
   if (error === 'NOT_FOUND') {
     return (
       <Centered>
-        <h1 className="text-xl font-semibold text-primary mb-2">Link nicht verfügbar</h1>
-        <p className="text-sm text-secondary">
-          Dieser Übersetzungs-Link ist abgelaufen oder wurde widerrufen. Bitte den Meeting-Organisator nach einem neuen Link fragen.
-        </p>
+        <h1 className="text-xl font-semibold text-primary mb-2">{t('notFoundTitle')}</h1>
+        <p className="text-sm text-secondary">{t('notFoundBody')}</p>
       </Centered>
     );
   }
   if (error) {
     return (
       <Centered>
-        <h1 className="text-xl font-semibold text-primary mb-2">Konnte nicht geladen werden</h1>
-        <p className="text-sm text-secondary">Bitte später erneut versuchen.</p>
+        <h1 className="text-xl font-semibold text-primary mb-2">{t('errorTitle')}</h1>
+        <p className="text-sm text-secondary">{t('errorBody')}</p>
       </Centered>
     );
   }
   if (!snapshot) {
     return (
       <Centered>
-        <p className="text-sm text-secondary">Lade …</p>
+        <p className="text-sm text-secondary">{t('loading')}</p>
       </Centered>
     );
   }
   if (!config?.enabled) {
     return (
       <Centered>
-        <h1 className="text-xl font-semibold text-primary mb-2">Übersetzung ist deaktiviert</h1>
-        <p className="text-sm text-secondary">
-          Der Meeting-Organisator hat die Live-Übersetzung gerade nicht aktiv.
-        </p>
+        <h1 className="text-xl font-semibold text-primary mb-2">{t('disabledTitle')}</h1>
+        <p className="text-sm text-secondary">{t('disabledBody')}</p>
       </Centered>
     );
   }
@@ -133,7 +135,7 @@ export default function PublicSharePage() {
   return (
     <>
       <Head>
-        <title>Live-Übersetzung · GhostTyper</title>
+        <title>{t('pageTitle')}</title>
         {/* This page is intentionally not indexed — share-tokens
             shouldn't end up in search-engine caches. */}
         <meta name="robots" content="noindex,nofollow" />
@@ -143,31 +145,31 @@ export default function PublicSharePage() {
           <div className="flex items-center gap-3">
             <Languages className="w-5 h-5 text-accent-ink" />
             <div>
-              <p className="text-xs uppercase tracking-widest text-secondary font-bold">Live-Übersetzung</p>
+              <p className="text-xs uppercase tracking-widest text-secondary font-bold">{t('eyebrow')}</p>
               <p className="text-sm text-primary font-medium">{langA} ↔ {langB}</p>
             </div>
           </div>
           <div className="flex items-center gap-3 text-xs text-secondary">
             {connected ? (
               <span className="inline-flex items-center gap-1 text-success">
-                <Wifi className="w-3.5 h-3.5" /> Verbunden
+                <Wifi className="w-3.5 h-3.5" /> {t('connected')}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 text-warning">
-                <WifiOff className="w-3.5 h-3.5" /> Offline
+                <WifiOff className="w-3.5 h-3.5" /> {t('offline')}
               </span>
             )}
             {snapshot.expiresAt && (
               <span className="inline-flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" />
-                Läuft ab {new Date(snapshot.expiresAt).toLocaleString()}
+                {t('expiresAt', { time: new Date(snapshot.expiresAt).toLocaleString(locale) })}
               </span>
             )}
           </div>
         </header>
 
         <div className="px-4 py-3 border-b border-subtle bg-surface flex flex-wrap items-center gap-3">
-          <span className="text-xs text-secondary">Übersetzung anhören:</span>
+          <span className="text-xs text-secondary">{t('listenLabel')}</span>
           <select
             value={listenLang || ''}
             onChange={(e) => {
@@ -224,8 +226,8 @@ export default function PublicSharePage() {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 max-w-6xl mx-auto">
-          <Column title="Original" segments={segments} fallbackLang={langA} accent="text-secondary" />
-          <Column title="Übersetzung" segments={translated} fallbackLang={langB} accent="text-accent-ink" />
+          <Column title={t('columnOriginal')} segments={segments} fallbackLang={langA} accent="text-secondary" />
+          <Column title={t('columnTranslation')} segments={translated} fallbackLang={langB} accent="text-accent-ink" />
         </div>
       </main>
     </>

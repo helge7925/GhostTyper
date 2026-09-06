@@ -1406,5 +1406,31 @@
       "usageLabel": "Monatliche Budgetauslastung",
       "month": "Monat {month}"
     }
+  },
+  "share": {
+    "notFoundTitle": "Link nicht verfügbar",
+    "notFoundBody": "Dieser Übersetzungs-Link ist abgelaufen oder wurde widerrufen. Bitte den Meeting-Organisator nach einem neuen Link fragen.",
+    "errorTitle": "Konnte nicht geladen werden",
+    "errorBody": "Bitte später erneut versuchen.",
+    "loading": "Lade …",
+    "disabledTitle": "Übersetzung ist deaktiviert",
+    "disabledBody": "Der Meeting-Organisator hat die Live-Übersetzung gerade nicht aktiv.",
+    "pageTitle": "Live-Übersetzung · GhostTyper",
+    "eyebrow": "Live-Übersetzung",
+    "connected": "Verbunden",
+    "offline": "Offline",
+    "expiresAt": "Läuft ab {time}",
+    "listenLabel": "Übersetzung anhören:",
+    "columnOriginal": "Original",
+    "columnTranslation": "Übersetzung",
+    "overlayTitle": "Live-Übersetzung Overlay",
+    "overlayInvalid": "Übersetzungs-Link ungültig",
+    "overlayDisconnected": "Verbindung verloren",
+    "overlayFollow": "ÜBERSETZUNG MITLESEN",
+    "overlayMeetingEnded": "Meeting beendet",
+    "overlayWaiting": "Warte auf Sprache …",
+    "statusConnected": "Verbunden",
+    "statusWaiting": "Wartet",
+    "statusEnded": "Beendet"
   }
 }
