@@ -52,6 +52,7 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
   const [offlineSaved, setOfflineSaved] = useState(false);
   const [fileCaptureId, setFileCaptureId] = useState(null);
   const [systemAudioCaps, setSystemAudioCaps] = useState({ tabAudio: false, systemAudio: false });
+  const uploadAbortRef = useRef(null);
   const inputRef = useRef(null);
   const textTemplates = templates.filter((entry) => !entry.template_type || entry.template_type === 'text');
   const showSystemAudioTab = systemAudioCaps.tabAudio;
@@ -204,20 +205,29 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
         await saveOffline();
         return;
       }
-      const progressInterval = setInterval(() => {
-        setProgress((prev) => Math.min(prev + 10, 90));
-      }, 200);
+      const controller = new AbortController();
+      uploadAbortRef.current = controller;
 
       let result;
       try {
-        result = await uploadAudio(file, uploadOptions);
+        result = await uploadAudio(file, {
+          ...uploadOptions,
+          signal: controller.signal,
+          onProgress: setProgress,
+        });
       } catch (uploadError) {
+        // A cancellation is a decision, not a failure: it must not be queued
+        // for a later retry the way a dropped connection is.
+        if (uploadError?.name === 'AbortError') {
+          setProgress(0);
+          return;
+        }
         const networkFailure = uploadError?.status === undefined;
         if (!networkFailure && !isRetryableResponse(uploadError.status)) throw uploadError;
         await saveOffline();
         return;
       } finally {
-        clearInterval(progressInterval);
+        uploadAbortRef.current = null;
       }
       setProgress(100);
       setFile(null);
@@ -420,11 +430,30 @@ export default function AudioUploadForm({ onSuccess, presetConfig = null, lockTe
       )}
 
       {uploading && (
-        <progress
-          className="upload-progress w-full"
-          value={Math.max(0, Math.min(progress, 100))}
-          max={100}
-        />
+        <div className="space-y-2">
+          <progress
+            className="upload-progress w-full"
+            value={Math.max(0, Math.min(progress, 100))}
+            max={100}
+            aria-label={tForm('progressLabel')}
+          />
+          <div className="flex items-center justify-between gap-3 text-xs text-secondary">
+            <span role="status" aria-live="polite">
+              {progress >= 100 ? tForm('progressProcessing') : tForm('progressPercent', { percent: progress })}
+            </span>
+            {/* Only until the bytes are on the server: after that the job is
+                queued and stopping it is a different action entirely. */}
+            {progress < 100 && (
+              <button
+                type="button"
+                onClick={() => uploadAbortRef.current?.abort()}
+                className="underline hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+              >
+                {tForm('cancelUpload')}
+              </button>
+            )}
+          </div>
+        </div>
       )}
 
       <Button type="submit" disabled={!file || uploading} variant="primary" size="lg" className="w-full">

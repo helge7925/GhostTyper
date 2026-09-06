@@ -604,13 +604,13 @@ export default function Transcriptions() {
                   key={t.id}
                   transcription={t}
                   folders={folders}
-                  onMove={(folderId) => handleMoveToFolder(t.id, folderId)}
-                  onToggleFavorite={() => handleToggleFavorite(t.id, t.is_favorite)}
-                  onDelete={() => handleDeleteTranscription(t.id)}
-                  onEditTags={() => handleEditTags(t)}
+                  onMove={handleMoveToFolder}
+                  onToggleFavorite={handleToggleFavorite}
+                  onDelete={handleDeleteTranscription}
+                  onEditTags={handleEditTags}
                   selectable
                   selected={selectedIds.has(t.id)}
-                  onSelect={(checked) => toggleSelected(t.id, checked)}
+                  onSelect={toggleSelected}
                   viewMode={viewMode}
                 />
               ))}

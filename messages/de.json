@@ -721,7 +721,11 @@
       "supportedFormats": "Unterstützte Formate",
       "savedOffline": "Aufnahme wurde offline gespeichert und wird bei Verbindung synchronisiert.",
       "offlineScopeMissing": "Offline-Speicherung ist erst nach vollständiger Workspace-Anmeldung möglich.",
-      "offlineStoreFailed": "Aufnahme konnte nicht offline gespeichert werden."
+      "offlineStoreFailed": "Aufnahme konnte nicht offline gespeichert werden.",
+      "cancelUpload": "Upload abbrechen",
+      "progressLabel": "Upload-Fortschritt",
+      "progressPercent": "{percent} % übertragen",
+      "progressProcessing": "Übertragen. Verarbeitung startet…"
     },
     "process": {
       "queued": "Wartet",

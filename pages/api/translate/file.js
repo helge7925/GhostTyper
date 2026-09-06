@@ -24,7 +24,7 @@ import { scanFileForViruses } from '../../../lib/virus-scan';
 import { logAuditEvent } from '../../../lib/audit-log';
 import { addTranscriptionEvent } from '../../../lib/transcription-events';
 import { buildTranslatedFilename } from '../../../lib/translate-filename';
-import { mdToHtml } from '../../../lib/markdown-html';
+import { mdToPrintHtml } from '../../../lib/markdown-html';
 import { renderPdfBufferFromHtml } from '../../../lib/pdf-export';
 import { upsertDocumentForTranscription } from '../../../lib/documents';
 import {
@@ -890,7 +890,9 @@ async function handler(req, res) {
         const translatedMarkdown = translationResult.translations.join('\n\n');
 
         // Step 3: Markdown → HTML → PDF via existing Chromium renderer.
-        const html = mdToHtml(translatedMarkdown);
+        // mdToPrintHtml, not mdToHtml: the browser-only sanitiser cannot run
+        // here, and the renderer below sanitises and blocks scripts itself.
+        const html = mdToPrintHtml(translatedMarkdown);
         const buffer = await renderPdfBufferFromHtml(html, {});
 
         return buffer;

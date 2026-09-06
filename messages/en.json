@@ -721,7 +721,11 @@
       "supportedFormats": "Supported formats",
       "savedOffline": "Capture was saved offline and will sync when a connection is available.",
       "offlineScopeMissing": "Offline storage is available after the workspace session has fully loaded.",
-      "offlineStoreFailed": "Capture could not be saved offline."
+      "offlineStoreFailed": "Capture could not be saved offline.",
+      "cancelUpload": "Cancel upload",
+      "progressLabel": "Upload progress",
+      "progressPercent": "{percent}% uploaded",
+      "progressProcessing": "Uploaded. Starting processing…"
     },
     "process": {
       "queued": "Queued",

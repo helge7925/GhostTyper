@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import Link from 'next/link';
 import StatusBadge from './StatusBadge';
 import { useFormatter, useLocale, useTranslations } from '../lib/i18n';
@@ -11,7 +12,10 @@ const TEMPLATE_LABELS = {
   aufmass: { de: 'Aufmaß', en: 'Measurements' },
 };
 
-export default function TranscriptionCard({
+// Handlers receive the row they act on rather than being pre-bound per card:
+// inline arrows would be new identities on every parent render, which would
+// make the memo below compare unequal every time and do nothing.
+function TranscriptionCard({
   transcription,
   folders = [],
   onMove,
@@ -97,7 +101,7 @@ export default function TranscriptionCard({
             <input
               type="checkbox"
               checked={selected}
-              onChange={(e) => onSelect?.(e.target.checked)}
+              onChange={(e) => onSelect?.(transcription.id, e.target.checked)}
               onClick={(e) => e.stopPropagation()}
               className="shrink-0 accent-accent"
               aria-label={`${displayName} auswählen`}
@@ -105,7 +109,7 @@ export default function TranscriptionCard({
           )}
           {onToggleFavorite && (
             <button 
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(transcription.id, transcription.is_favorite); }}
               className={`shrink-0 transition-colors ${is_favorite ? 'text-accent-ink' : 'text-secondary/30 hover:text-accent-ink/50'}`}
               title={is_favorite ? tDetail('unfavorite') : tDetail('favorite')}
               aria-label={is_favorite ? `${displayName} — ${tDetail('unfavorite')}` : `${displayName} — ${tDetail('favorite')}`}
@@ -154,7 +158,7 @@ export default function TranscriptionCard({
           {folders.length > 0 && (
             <select
               value={folder_id || ''}
-              onChange={(e) => onMove(e.target.value === '' ? null : parseInt(e.target.value))}
+              onChange={(e) => onMove(transcription.id, e.target.value === '' ? null : parseInt(e.target.value))}
               onClick={(e) => e.stopPropagation()}
               aria-label={`${displayName} — ${tDetail('moveToFolder')}`}
               className="bg-hover-subtle border border-subtle text-[10px] text-secondary rounded px-2 py-1 outline-none hover:border-accent/50 transition-colors cursor-pointer max-w-[120px] truncate"
@@ -169,7 +173,7 @@ export default function TranscriptionCard({
           {onEditTags && (
             <button
               type="button"
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditTags(); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditTags(transcription); }}
               className="p-2 text-secondary hover:text-accent-ink hover:bg-accent/10 rounded-lg transition-all"
               title="Tags bearbeiten"
               aria-label={`${displayName} — Tags bearbeiten`}
@@ -179,7 +183,7 @@ export default function TranscriptionCard({
           )}
           {onDelete && (
             <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(transcription.id); }}
               className="p-2 text-secondary hover:text-danger hover:bg-danger/10 rounded-lg transition-all"
               title={tDetail('delete')}
               aria-label={`${displayName} — ${tDetail('delete')}`}
@@ -194,3 +198,9 @@ export default function TranscriptionCard({
     </div>
   );
 }
+
+// The list renders up to SEARCH_LIMIT (200) of these, and every parent state
+// change — a filter keystroke, a toast, one favourite toggle — re-rendered all
+// of them. The props are flat values plus handler identities, so the default
+// shallow comparison is enough; callers already memoise their handlers.
+export default memo(TranscriptionCard);

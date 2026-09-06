@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { exportToDoc } from '../lib/export-utils';
 import DOMPurify from 'dompurify';
 import { buildPdfPrintStyles } from '../lib/pdf-print-style';
 import Toast from './Toast';
@@ -187,9 +186,14 @@ export default function DocumentEditor({
     return () => window.removeEventListener('keydown', handleShortcut);
   }, [handleSave]);
 
-  const handleExportDoc = () => {
+  const handleExportDoc = async () => {
     const currentHtml = sanitizeEditorHtml(editorRef.current?.innerHTML || html);
-    exportToDoc(currentHtml, filename);
+    // Loaded on click, not on import: this editor is rendered by pages that
+    // never export (translate, OCR, text optimisation), and a static import
+    // here puts the whole DOCX writer plus its zip dependency — around 400 KB
+    // — into those pages' initial bundle.
+    const { exportToDoc } = await import('../lib/export-utils');
+    await exportToDoc(currentHtml, filename);
   };
 
   const escapeForHtml = (value) => String(value || '')
