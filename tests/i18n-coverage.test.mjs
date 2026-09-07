@@ -47,7 +47,7 @@ const HARDCODED_GERMAN_BASELINE = {
   'pages/transcriptions/[id].js': 42,
   'pages/settings.js': 33,
   'pages/upload.js': 21,
-  'pages/transcriptions.js': 20,
+  'pages/transcriptions.js': 13,
   'pages/ocr.js': 17,
   'pages/translate.js': 13,
   'components/MeetingControlBar.js': 12,

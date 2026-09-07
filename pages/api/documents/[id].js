@@ -1,5 +1,4 @@
 import path from 'path';
-import { unlink } from 'fs/promises';
 import { query } from '../../../lib/db';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
@@ -8,12 +7,6 @@ import { logAuditEvent } from '../../../lib/audit-log';
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 const ALLOWED_VISIBILITY = new Set(['private', 'workspace']);
-
-function isSafeUploadPath(filePath) {
-  if (!filePath) return false;
-  const resolved = path.resolve(filePath);
-  return resolved.startsWith(path.resolve(UPLOADS_DIR) + path.sep);
-}
 
 function canWriteDocument(document, req) {
   if (!document) return false;
@@ -36,7 +29,8 @@ async function loadDocument(documentId, orgId, userId) {
         AND t.organization_id = d.organization_id
       WHERE d.id = $1
         AND d.organization_id = $2
-        AND (d.visibility = 'workspace' OR d.owner_user_id = $3)`,
+        AND (d.visibility = 'workspace' OR d.owner_user_id = $3)
+        AND d.deleted_at IS NULL`,
     [documentId, orgId, userId],
   );
   return result.rows[0] || null;
@@ -218,16 +212,16 @@ async function handler(req, res) {
           },
         });
 
-        if (document.transcription_id) {
-          if (document.file_path && document.file_path !== 'INTERNAL_DOC' && isSafeUploadPath(document.file_path)) {
-            await unlink(document.file_path).catch(() => {});
-          }
-          await query('DELETE FROM transcriptions WHERE id = $1 AND organization_id = $2', [document.transcription_id, orgId]);
-        } else {
-          await query('DELETE FROM documents WHERE id = $1 AND organization_id = $2', [documentId, orgId]);
-        }
+        // Trash, not destruction — same rule as the bulk endpoint: stamp the
+        // row, leave the transcription and the audio alone, and let
+        // scripts/apply-retention-policy.js do the irreversible part once the
+        // grace period has passed.
+        await query(
+          'UPDATE documents SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND organization_id = $2',
+          [documentId, orgId],
+        );
 
-        return res.status(200).json({ message: 'Datei gelöscht' });
+        return res.status(200).json({ message: 'Datei in den Papierkorb verschoben' });
       } catch (error) {
         logApiError('Document DELETE error', error);
         return serverError(res, 'Fehler beim Löschen der Datei');

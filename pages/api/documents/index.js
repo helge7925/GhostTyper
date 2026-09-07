@@ -43,6 +43,10 @@ async function handler(req, res) {
     const sourceType = String(pickFirst(req.query?.sourceType) || '').trim();
     const status = String(pickFirst(req.query?.status) || '').trim();
     const favorite = String(pickFirst(req.query?.favorite) || '').trim().toLowerCase();
+    // The trash is a separate view rather than a filter combined with the
+    // others: showing deleted and live rows together would let a bulk action
+    // span both, which neither delete nor restore has a sensible meaning for.
+    const trash = String(pickFirst(req.query?.trash) || '').trim().toLowerCase() === 'true';
     const useFullSearch = scope === 'full' && search.length >= 3;
 
     const params = [orgId, userId];
@@ -71,7 +75,8 @@ async function handler(req, res) {
                   ON t.id = d.transcription_id
                  AND t.organization_id = d.organization_id
                WHERE d.organization_id = $1
-                 AND (d.visibility = 'workspace' OR d.owner_user_id = $2)`;
+                 AND (d.visibility = 'workspace' OR d.owner_user_id = $2)
+                 AND d.deleted_at IS ${trash ? 'NOT NULL' : 'NULL'}`;
 
     if (ALLOWED_VISIBILITY.has(visibility)) {
       params.push(visibility);
@@ -106,7 +111,9 @@ async function handler(req, res) {
     const limitIdx = params.length;
     params.push(offset);
     const offsetIdx = params.length;
-    sql += ` ORDER BY d.is_favorite DESC, updated_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
+    sql += trash
+      ? ` ORDER BY d.deleted_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`
+      : ` ORDER BY d.is_favorite DESC, updated_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
 
     const result = await query(sql, params);
     await logAuditEvent({

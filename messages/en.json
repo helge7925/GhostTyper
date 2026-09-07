@@ -441,7 +441,8 @@
     "saveSpeakers": "Apply speakers",
     "noAnalysisYet": "No analysis yet.",
     "rerunAnalysis": "Run analysis again",
-    "moveToFolder": "Move to folder"
+    "moveToFolder": "Move to folder",
+    "restore": "Restore"
   },
   "upload": {
     "eyebrow": "New transcription",
@@ -1077,7 +1078,21 @@
     "loadingMore": "Loading…",
     "emptySearch": "No matches for your search.",
     "emptyFolder": "This folder is empty.",
-    "deleteEntryConfirm": "Delete transcription?"
+    "deleteEntryConfirm": "Delete transcription?",
+    "trash": {
+      "label": "Trash",
+      "confirmOneTitle": "Delete file",
+      "confirmOne": "Move this file to the trash? You can restore it from there.",
+      "confirmManyTitle": "Delete files",
+      "confirmMany": "Move {count} files to the trash? You can restore them from there.",
+      "confirmAction": "Move to trash",
+      "movedToTrash": "{count} files moved to the trash",
+      "restoreSelected": "Restore {count}",
+      "restoredOne": "File restored",
+      "restoredMany": "{count} files restored",
+      "restoreFailedOne": "File could not be restored",
+      "restoreFailedMany": "Restoring failed"
+    }
   },
   "emptyState": {
     "transcriptions": {

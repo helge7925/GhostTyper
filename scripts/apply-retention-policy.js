@@ -30,6 +30,9 @@ const pool = new Pool({
 });
 const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
 const DRY_RUN = process.argv.includes('--dry-run');
+// How long a document stays recoverable after someone deletes it. Deletion
+// only stamps documents.deleted_at; this is where it becomes irreversible.
+const TRASH_RETENTION_DAYS = toPositiveInt(process.env.TRASH_RETENTION_DAYS) || 30;
 let auditChain;
 let auditRetention;
 
@@ -132,6 +135,48 @@ async function expireFallbackTranscriptions(client, days) {
   return expired.rows.length;
 }
 
+/**
+ * Empties the trash: documents deleted longer ago than the grace period.
+ *
+ * This is the only place that still destroys a user's file. Deleting from the
+ * UI now just stamps deleted_at, which means nothing frees disk until this
+ * runs — so it runs on every invocation, including deployments that have
+ * configured no retention policy at all. A trash that never empties is a slow
+ * disk leak, and the health check would report it long before anyone connected
+ * it to a delete button.
+ */
+async function purgeTrashedDocuments(client, days) {
+  const expired = await client.query(
+    `SELECT d.id, d.transcription_id, t.file_path
+       FROM documents d
+       LEFT JOIN transcriptions t
+         ON t.id = d.transcription_id
+        AND t.organization_id = d.organization_id
+      WHERE d.deleted_at IS NOT NULL
+        AND d.deleted_at < NOW() - ($1::int * interval '1 day')
+      FOR UPDATE OF d`,
+    [days],
+  );
+
+  if (DRY_RUN) {
+    log('retention.trash.dry_run', { days, would_delete: expired.rows.length });
+    return expired.rows.length;
+  }
+
+  for (const row of expired.rows) {
+    if (row.transcription_id) {
+      // The audio first, then the row: documents.transcription_id cascades, so
+      // deleting the transcription removes the document with it.
+      await safeUnlink(row.file_path);
+      await client.query('DELETE FROM transcriptions WHERE id = $1', [row.transcription_id]);
+    } else {
+      await client.query('DELETE FROM documents WHERE id = $1', [row.id]);
+    }
+  }
+  log('retention.trash.applied', { days, deleted: expired.rows.length });
+  return expired.rows.length;
+}
+
 async function expireOrgAudit(client, organizationId, days) {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   if (DRY_RUN) {
@@ -190,6 +235,20 @@ async function main() {
   auditRetention = await import('../lib/audit-retention.js');
   const tenant = await loadTenantPolicy();
   const orgs = await loadOrgPolicies();
+
+  // Runs first and unconditionally: emptying the trash is not a retention
+  // policy anyone opts into, it is the second half of the delete button.
+  const trashClient = await pool.connect();
+  try {
+    await trashClient.query('BEGIN');
+    await purgeTrashedDocuments(trashClient, TRASH_RETENTION_DAYS);
+    await trashClient.query(DRY_RUN ? 'ROLLBACK' : 'COMMIT');
+  } catch (error) {
+    await trashClient.query('ROLLBACK').catch(() => {});
+    log('retention.trash.failed', { error: error.message });
+  } finally {
+    trashClient.release();
+  }
 
   if (!tenant && orgs.length === 0) {
     log('retention.skipped', { reason: 'no policies configured' });

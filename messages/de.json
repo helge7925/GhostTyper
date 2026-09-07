@@ -441,7 +441,8 @@
     "saveSpeakers": "Sprecher übernehmen",
     "noAnalysisYet": "Noch keine Analyse vorhanden.",
     "rerunAnalysis": "Analyse neu durchführen",
-    "moveToFolder": "In Ordner verschieben"
+    "moveToFolder": "In Ordner verschieben",
+    "restore": "Wiederherstellen"
   },
   "upload": {
     "eyebrow": "Neue Transkription",
@@ -1077,7 +1078,21 @@
     "loadingMore": "Wird geladen…",
     "emptySearch": "Keine Treffer für Ihre Suche.",
     "emptyFolder": "Dieser Ordner ist leer.",
-    "deleteEntryConfirm": "Transkription wirklich löschen?"
+    "deleteEntryConfirm": "Transkription wirklich löschen?",
+    "trash": {
+      "label": "Papierkorb",
+      "confirmOneTitle": "Datei löschen",
+      "confirmOne": "Datei in den Papierkorb verschieben? Sie lässt sich von dort wiederherstellen.",
+      "confirmManyTitle": "Dateien löschen",
+      "confirmMany": "{count} Dateien in den Papierkorb verschieben? Sie lassen sich von dort wiederherstellen.",
+      "confirmAction": "In den Papierkorb",
+      "movedToTrash": "{count} Dateien im Papierkorb",
+      "restoreSelected": "{count} wiederherstellen",
+      "restoredOne": "Datei wiederhergestellt",
+      "restoredMany": "{count} Dateien wiederhergestellt",
+      "restoreFailedOne": "Datei konnte nicht wiederhergestellt werden",
+      "restoreFailedMany": "Fehler beim Wiederherstellen"
+    }
   },
   "emptyState": {
     "transcriptions": {

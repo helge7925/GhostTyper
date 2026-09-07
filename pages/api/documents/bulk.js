@@ -1,18 +1,8 @@
-import path from 'path';
-import { unlink } from 'fs/promises';
 import { query } from '../../../lib/db';
 import { withOrgScope } from '../../../lib/api/with-org-scope';
 import { enforceRateLimit, logApiError, serverError } from '../../../lib/api-utils';
 import { hasPermission } from '../../../lib/permissions';
 import { logAuditEvent } from '../../../lib/audit-log';
-
-const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
-
-function isSafeUploadPath(filePath) {
-  if (!filePath) return false;
-  const resolved = path.resolve(filePath);
-  return resolved.startsWith(path.resolve(UPLOADS_DIR) + path.sep);
-}
 
 function canWriteDocument(document, req) {
   if (!document) return false;
@@ -41,7 +31,10 @@ async function loadDocument(documentId, orgId, userId) {
   return result.rows[0] || null;
 }
 
-async function loadDocuments(documentIds, orgId, userId) {
+// `restore` is the one action that operates on trashed rows; every other one
+// must not see them, or a delete could be applied twice or a tag written to
+// something the user believes is gone.
+async function loadDocuments(documentIds, orgId, userId, { trashed = false } = {}) {
   if (documentIds.length === 0) return [];
   const result = await query(
     `SELECT d.*, t.file_path, t.original_name, t.filename, t.template, t.text, t.analysis
@@ -51,7 +44,8 @@ async function loadDocuments(documentIds, orgId, userId) {
         AND t.organization_id = d.organization_id
       WHERE d.id = ANY($1::int[])
         AND d.organization_id = $2
-        AND (d.visibility = 'workspace' OR d.owner_user_id = $3)`,
+        AND (d.visibility = 'workspace' OR d.owner_user_id = $3)
+        AND d.deleted_at IS ${trashed ? 'NOT NULL' : 'NULL'}`,
     [documentIds, orgId, userId],
   );
   return result.rows;
@@ -93,12 +87,12 @@ async function handler(req, res) {
     return res.status(400).json({ message: 'documentIds must be a non-empty array' });
   }
 
-  if (!['delete', 'move', 'tag'].includes(action)) {
+  if (!['delete', 'move', 'tag', 'restore'].includes(action)) {
     return res.status(400).json({ message: 'Invalid action. Must be delete, move, or tag.' });
   }
 
   try {
-    const documents = await loadDocuments(documentIds, orgId, userId);
+    const documents = await loadDocuments(documentIds, orgId, userId, { trashed: action === 'restore' });
     const documentMap = new Map(documents.map((d) => [d.id, d]));
 
     // Check permissions for each document
@@ -110,6 +104,7 @@ async function handler(req, res) {
       if (action === 'delete' && !canDeleteDocument(doc, req)) continue;
       if (action === 'move' && !canWriteDocument(doc, req)) continue;
       if (action === 'tag' && !canWriteDocument(doc, req)) continue;
+      if (action === 'restore' && !canDeleteDocument(doc, req)) continue;
 
       authorizedIds.push(id);
     }
@@ -175,39 +170,25 @@ async function handler(req, res) {
     };
 
     if (action === 'delete') {
-      const viaTranscription = [];
-      const documentOnly = [];
-      for (const id of authorizedIds) {
-        if (documentMap.get(id).transcription_id) viaTranscription.push(id);
-        else documentOnly.push(id);
-      }
-
-      await Promise.all(viaTranscription.map((id) => {
-        const doc = documentMap.get(id);
-        if (!doc.file_path || doc.file_path === 'INTERNAL_DOC' || !isSafeUploadPath(doc.file_path)) return null;
-        return unlink(doc.file_path).catch(() => {});
-      }).filter(Boolean));
-
-      const succeeded = [];
-      if (viaTranscription.length > 0) {
-        const transcriptionIds = viaTranscription.map((id) => documentMap.get(id).transcription_id);
-        const deleted = await query(
-          `DELETE FROM transcriptions WHERE id = ANY($1::int[]) AND organization_id = $2 RETURNING id`,
-          [transcriptionIds, orgId],
-        );
-        const removed = new Set(deleted.rows.map((row) => Number(row.id)));
-        for (const id of viaTranscription) {
-          if (removed.has(Number(documentMap.get(id).transcription_id))) succeeded.push(id);
-        }
-      }
-      if (documentOnly.length > 0) {
-        const deleted = await query(
-          `DELETE FROM documents WHERE id = ANY($1::int[]) AND organization_id = $2 RETURNING id`,
-          [documentOnly, orgId],
-        );
-        succeeded.push(...deleted.rows.map((row) => Number(row.id)));
-      }
-      recordOutcome(authorizedIds, succeeded, 'Datei konnte nicht gelöscht werden.');
+      // Trash, not destruction: the row is stamped, the transcription is left
+      // alone and the audio stays on disk. A mis-clicked bulk action used to
+      // unlink files immediately, which nothing could undo.
+      // scripts/apply-retention-policy.js does the irreversible part later.
+      const trashed = await query(
+        `UPDATE documents SET deleted_at = NOW(), updated_at = NOW()
+          WHERE id = ANY($1::int[]) AND organization_id = $2 AND deleted_at IS NULL
+        RETURNING id`,
+        [authorizedIds, orgId],
+      );
+      recordOutcome(authorizedIds, trashed.rows.map((row) => row.id), 'Datei konnte nicht gelöscht werden.');
+    } else if (action === 'restore') {
+      const restored = await query(
+        `UPDATE documents SET deleted_at = NULL, updated_at = NOW()
+          WHERE id = ANY($1::int[]) AND organization_id = $2 AND deleted_at IS NOT NULL
+        RETURNING id`,
+        [authorizedIds, orgId],
+      );
+      recordOutcome(authorizedIds, restored.rows.map((row) => row.id), 'Datei konnte nicht wiederhergestellt werden.');
     } else if (action === 'move') {
       const targetFolderId = folderId === null || folderId === '' ? null : folderId;
       const moved = await query(

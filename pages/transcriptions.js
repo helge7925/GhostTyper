@@ -47,6 +47,7 @@ export default function Transcriptions() {
   const tSidebar = useTranslations('transcriptionsList');
   const tMeeting = useTranslations('meeting.start');
   const tEmpty = useTranslations('emptyState');
+  const tTrash = useTranslations('transcriptionsList.trash');
   const canStartMeeting = usePermission('meeting.start');
   const canCreateTranscription = usePermission('transcription.write');
   const {
@@ -83,6 +84,7 @@ export default function Transcriptions() {
   const [visibilityFilter, setVisibilityFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [favoriteOnly, setFavoriteOnly] = useState(false);
+  const [trashView, setTrashView] = useState(false);
   const [viewMode, setViewMode] = useState('list');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const searchTimeoutRef = useRef(null);
@@ -165,6 +167,7 @@ export default function Transcriptions() {
       ...(visibilityFilter ? { visibility: visibilityFilter } : {}),
       ...(statusFilter ? { status: statusFilter } : {}),
       ...(favoriteOnly ? { favorite: 'true' } : {}),
+      ...(trashView ? { trash: true } : {}),
     };
     if (query === '') {
       setSearching(true);
@@ -199,7 +202,7 @@ export default function Transcriptions() {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchQuery, sourceFilter, visibilityFilter, statusFilter, favoriteOnly]);
+  }, [searchQuery, sourceFilter, visibilityFilter, statusFilter, favoriteOnly, trashView]);
 
   const handleCreateFolder = useCallback(async (e) => {
     if (e) e.preventDefault();
@@ -263,9 +266,9 @@ export default function Transcriptions() {
 
   const handleDeleteTranscription = useCallback(async (id) => {
     const approved = await confirm({
-      title: 'Datei löschen',
-      message: 'Datei unwiderruflich löschen?',
-      confirmLabel: 'Datei löschen',
+      title: tTrash('confirmOneTitle'),
+      message: tTrash('confirmOne'),
+      confirmLabel: tTrash('confirmAction'),
       danger: true,
     });
     if (!approved) return;
@@ -275,7 +278,7 @@ export default function Transcriptions() {
     } catch (err) {
       showToast('Fehler beim Löschen: ' + (err.message || 'Unbekannter Fehler'), 'error');
     }
-  }, [confirm, showToast]);
+  }, [confirm, showToast, tTrash]);
 
   const handleEditTags = useCallback(async (entry) => {
     const current = Array.isArray(entry.tags) ? entry.tags.join(', ') : '';
@@ -308,9 +311,9 @@ export default function Transcriptions() {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     const approved = await confirm({
-      title: 'Dateien löschen',
-      message: `${ids.length} Dateien unwiderruflich löschen?`,
-      confirmLabel: 'Dateien löschen',
+      title: tTrash('confirmManyTitle'),
+      message: tTrash('confirmMany', { count: ids.length }),
+      confirmLabel: tTrash('confirmAction'),
       danger: true,
     });
     if (!approved) return;
@@ -321,12 +324,41 @@ export default function Transcriptions() {
       if (result.failed.length > 0) {
         showToast(`${result.failed.length} Dateien konnten nicht gelöscht werden`, 'error');
       } else {
-        showToast(`${result.success.length} Dateien gelöscht`, 'success');
+        showToast(tTrash('movedToTrash', { count: result.success.length }), 'success');
       }
     } catch (err) {
       showToast('Fehler beim Löschen der Dateien', 'error');
     }
-  }, [confirm, selectedIds, showToast]);
+  }, [confirm, selectedIds, showToast, tTrash]);
+
+  const handleRestore = useCallback(async (id) => {
+    try {
+      const result = await bulkDocuments('restore', [id]);
+      if (result.success.length === 0) {
+        showToast(tTrash('restoreFailedOne'), 'error');
+        return;
+      }
+      // The trash list is the only place this action exists, so a restored
+      // row leaves the current view.
+      setTranscriptions((prev) => prev.filter((entry) => entry.id !== id));
+      showToast(tTrash('restoredOne'), 'success');
+    } catch (err) {
+      showToast(tTrash('restoreFailedOne'), 'error');
+    }
+  }, [showToast, tTrash]);
+
+  const handleBulkRestore = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    try {
+      const result = await bulkDocuments('restore', ids);
+      setTranscriptions((prev) => prev.filter((entry) => !result.success.includes(entry.id)));
+      setSelectedIds(new Set());
+      showToast(tTrash('restoredMany', { count: result.success.length }), 'success');
+    } catch (err) {
+      showToast(tTrash('restoreFailedMany'), 'error');
+    }
+  }, [selectedIds, showToast, tTrash]);
 
   const handleBulkMove = useCallback(async () => {
     const ids = Array.from(selectedIds);
@@ -569,19 +601,35 @@ export default function Transcriptions() {
             <button type="button" onClick={() => setViewMode((value) => value === 'list' ? 'grid' : 'list')} className="px-3 py-1.5 rounded-lg text-xs border border-subtle text-secondary hover:text-primary">
               {viewMode === 'list' ? 'Grid' : 'Liste'}
             </button>
+            <button
+              type="button"
+              onClick={() => { setTrashView((value) => !value); setSelectedIds(new Set()); }}
+              aria-pressed={trashView}
+              className={`px-3 py-1.5 rounded-lg text-xs border ${trashView ? 'bg-accent-strong text-white border-accent' : 'border-subtle text-secondary hover:text-primary'}`}
+            >
+              {tTrash('label')}
+            </button>
             {selectedIds.size > 0 && (
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={handleBulkDelete} className="px-3 py-1.5 rounded-lg text-xs bg-danger/10 text-danger border border-danger/30">
-                  {selectedIds.size} löschen
-                </button>
-                <button type="button" onClick={handleBulkMove} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-accent/10 text-accent-ink border border-accent/30">
-                  <Folder className="w-3.5 h-3.5" />
-                  Verschieben
-                </button>
-                <button type="button" onClick={handleBulkTag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-accent/10 text-accent-ink border border-accent/30">
-                  <Tag className="w-3.5 h-3.5" />
-                  Tags
-                </button>
+                {trashView ? (
+                  <button type="button" onClick={handleBulkRestore} className="px-3 py-1.5 rounded-lg text-xs bg-accent/10 text-accent-ink border border-accent/30">
+                    {tTrash('restoreSelected', { count: selectedIds.size })}
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" onClick={handleBulkDelete} className="px-3 py-1.5 rounded-lg text-xs bg-danger/10 text-danger border border-danger/30">
+                      {selectedIds.size} löschen
+                    </button>
+                    <button type="button" onClick={handleBulkMove} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-accent/10 text-accent-ink border border-accent/30">
+                      <Folder className="w-3.5 h-3.5" />
+                      Verschieben
+                    </button>
+                    <button type="button" onClick={handleBulkTag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-accent/10 text-accent-ink border border-accent/30">
+                      <Tag className="w-3.5 h-3.5" />
+                      Tags
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -604,10 +652,11 @@ export default function Transcriptions() {
                   key={t.id}
                   transcription={t}
                   folders={folders}
-                  onMove={handleMoveToFolder}
-                  onToggleFavorite={handleToggleFavorite}
-                  onDelete={handleDeleteTranscription}
-                  onEditTags={handleEditTags}
+                  onMove={trashView ? undefined : handleMoveToFolder}
+                  onToggleFavorite={trashView ? undefined : handleToggleFavorite}
+                  onDelete={trashView ? undefined : handleDeleteTranscription}
+                  onEditTags={trashView ? undefined : handleEditTags}
+                  onRestore={trashView ? handleRestore : undefined}
                   selectable
                   selected={selectedIds.has(t.id)}
                   onSelect={toggleSelected}

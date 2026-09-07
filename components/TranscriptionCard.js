@@ -21,6 +21,7 @@ function TranscriptionCard({
   onMove,
   onToggleFavorite,
   onDelete,
+  onRestore,
   selectable = false,
   selected = false,
   onSelect,
@@ -179,6 +180,19 @@ function TranscriptionCard({
               aria-label={`${displayName} — Tags bearbeiten`}
             >
               <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M3 11l8.5 8.5a2.121 2.121 0 003 0L21 13V3h-10L3 11z" /></svg>
+            </button>
+          )}
+          {onRestore && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRestore(transcription.id); }}
+              className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-hover-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              title={tDetail('restore')}
+              aria-label={`${displayName} — ${tDetail('restore')}`}
+            >
+              <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6M20 9A8 8 0 006 5.3L4 7M4 15a8 8 0 0014 3.7l2-1.7" />
+              </svg>
             </button>
           )}
           {onDelete && (
