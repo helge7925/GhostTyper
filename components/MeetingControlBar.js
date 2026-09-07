@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Square, Languages, ArrowLeftRight, Share2, Copy, Check, Tv, Volume2 } from 'lucide-react';
+import ConfirmDialog from './ConfirmDialog';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { usePermission } from '../lib/use-permission';
 import { useFormatter, useTranslations } from '../lib/i18n';
@@ -18,15 +19,16 @@ export default function MeetingControlBar({
   audioInjectionLang = null,
   onChanged,
 }) {
-  // `useUiFeedback().confirm()` requires the consumer to render <ConfirmDialog />
-  // locally — this component does not, so the promise from `confirm()` would
-  // never resolve and the Stop button would silently hang. We use the browser
-  // native confirm here; it also lets us spell out the Whisper-chunk caveat.
-  const { showToast } = useUiFeedback();
+  // confirm() only resolves if its <ConfirmDialog /> is rendered, which this
+  // component now does at the bottom of its own tree. It previously used the
+  // browser's native confirm to sidestep that, which meant the one dialog that
+  // appears mid-meeting was unthemed and untranslatable.
+  const { showToast, confirmDialog, confirm, acceptConfirm, closeConfirm } = useUiFeedback();
   const canViewCost = usePermission('org.read');
   const { currency } = useFormatter();
   const tLiveCost = useTranslations('meeting.liveCost');
   const tBotStatus = useTranslations('meeting.botStatus');
+  const tStopBot = useTranslations('meeting.stopBot');
   const rawBotStatus = String(botStatus || '').toLowerCase();
   const botStatusLabel = KNOWN_BOT_STATUSES.includes(rawBotStatus)
     ? tBotStatus(rawBotStatus)
@@ -266,16 +268,19 @@ export default function MeetingControlBar({
   };
 
   const handleStop = async () => {
-    if (typeof window !== 'undefined' && !window.confirm(
-      'Bot jetzt aus dem Meeting entfernen?\n\n' +
-      'Wichtig: Whisper transkribiert in 20–30-Sekunden-Blöcken. Ein Block, der gerade läuft, ' +
-      'wenn der Bot stoppt, geht verloren – bis zu ~30 Sekunden Audio am Ende fehlen dann ' +
-      'eventuell im Transkript.\n\n' +
-      'Für ein vollständiges Transkript: das Meeting natürlich beenden lassen, der Bot verlässt ' +
-      'es dann automatisch nach Verarbeitung des letzten Blocks.'
-    )) {
-      return;
-    }
+    const approved = await confirm({
+      title: tStopBot('title'),
+      confirmLabel: tStopBot('confirmLabel'),
+      danger: true,
+      message: (
+        <div className="space-y-3">
+          <p>{tStopBot('message')}</p>
+          <p className="text-warning">{tStopBot('caveat')}</p>
+          <p>{tStopBot('advice')}</p>
+        </div>
+      ),
+    });
+    if (!approved) return;
     setStopping(true);
     try {
       const res = await fetch(`/api/meetings/${transcriptionId}`, {
@@ -479,6 +484,16 @@ export default function MeetingControlBar({
           )}
         </div>
       )}
+      <ConfirmDialog
+        open={Boolean(confirmDialog)}
+        title={confirmDialog?.title}
+        message={confirmDialog?.message}
+        confirmLabel={confirmDialog?.confirmLabel}
+        cancelLabel={confirmDialog?.cancelLabel}
+        danger={confirmDialog?.danger}
+        onConfirm={acceptConfirm}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 }

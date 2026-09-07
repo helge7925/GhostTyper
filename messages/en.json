@@ -94,6 +94,13 @@
       "completed": "Completed",
       "failed": "Failed",
       "rejected": "Not admitted"
+    },
+    "stopBot": {
+      "title": "Remove bot",
+      "confirmLabel": "Remove bot",
+      "message": "Remove the bot from the meeting now?",
+      "caveat": "Whisper transcribes in 20–30 second blocks. A block still running when the bot stops is lost — up to ~30 seconds of audio may be missing from the end of the transcript.",
+      "advice": "For a complete transcript, let the meeting end normally: the bot leaves on its own once it has processed the last block."
     }
   },
   "errors": {
@@ -1447,5 +1454,25 @@
     "statusConnected": "Connected",
     "statusWaiting": "Waiting",
     "statusEnded": "Ended"
+  },
+  "documentDetail": {
+    "back": "Back to files",
+    "openTranscript": "Open transcript",
+    "tags": "Tags",
+    "preview": "Preview",
+    "noPreview": "No preview available.",
+    "private": "Private",
+    "workspace": "Workspace",
+    "untitled": "File {id}",
+    "loadFailed": "The file could not be loaded.",
+    "deleteTitle": "Delete file",
+    "deleteMessage": "Move this file to the trash? You can restore it from there.",
+    "deleteConfirm": "Move to trash",
+    "deleteFailed": "The file could not be deleted.",
+    "tagsDialogTitle": "Edit tags",
+    "tagsLabel": "Tags (comma separated)",
+    "tagsPlaceholder": "e.g. important, project-x",
+    "tagsSave": "Save",
+    "tagsSaveFailed": "Tags could not be saved."
   }
 }

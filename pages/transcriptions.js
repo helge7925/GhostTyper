@@ -85,6 +85,8 @@ export default function Transcriptions() {
   const [statusFilter, setStatusFilter] = useState('');
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [trashView, setTrashView] = useState(false);
+  const [tagEditTarget, setTagEditTarget] = useState(null);
+  const [tagEditInput, setTagEditInput] = useState('');
   const [viewMode, setViewMode] = useState('list');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const searchTimeoutRef = useRef(null);
@@ -280,18 +282,26 @@ export default function Transcriptions() {
     }
   }, [confirm, showToast, tTrash]);
 
-  const handleEditTags = useCallback(async (entry) => {
-    const current = Array.isArray(entry.tags) ? entry.tags.join(', ') : '';
-    const next = window.prompt('Tags kommagetrennt bearbeiten', current);
-    if (next === null) return;
-    const tags = next.split(',').map((tag) => tag.trim()).filter(Boolean);
+  // Opens the same dialog shape the bulk tag action uses. It was a
+  // window.prompt, which could not be themed or translated and looked nothing
+  // like the rest of the app.
+  const handleEditTags = useCallback((entry) => {
+    setTagEditTarget(entry);
+    setTagEditInput(Array.isArray(entry.tags) ? entry.tags.join(', ') : '');
+  }, []);
+
+  const saveEditedTags = useCallback(async () => {
+    const entry = tagEditTarget;
+    if (!entry) return;
+    const tags = tagEditInput.split(',').map((tag) => tag.trim()).filter(Boolean);
+    setTagEditTarget(null);
     try {
       const updated = await updateDocument(entry.id, { tags });
       setTranscriptions((prev) => prev.map((item) => (item.id === entry.id ? { ...item, tags: updated.tags || tags } : item)));
     } catch (err) {
       showToast('Tags konnten nicht gespeichert werden', 'error');
     }
-  }, [showToast]);
+  }, [showToast, tagEditInput, tagEditTarget]);
 
   const toggleSelected = useCallback((id, checked) => {
     setSelectedIds((prev) => {
@@ -690,6 +700,28 @@ export default function Transcriptions() {
         danger={confirmDialog?.danger}
         onConfirm={acceptConfirm}
         onCancel={closeConfirm}
+      />
+      <ConfirmDialog
+        open={Boolean(tagEditTarget)}
+        title="Tags bearbeiten"
+        message={(
+          <div className="space-y-2">
+            <label htmlFor="edit-tags" className="text-xs text-secondary uppercase tracking-widest font-bold">
+              Tags (kommagetrennt)
+            </label>
+            <input
+              id="edit-tags"
+              type="text"
+              value={tagEditInput}
+              onChange={(event) => setTagEditInput(event.target.value)}
+              placeholder="z. B. wichtig, projekt-x"
+              className="w-full bg-surface-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-primary"
+            />
+          </div>
+        )}
+        confirmLabel="Speichern"
+        onConfirm={saveEditedTags}
+        onCancel={() => setTagEditTarget(null)}
       />
       {bulkActionDialog?.type === 'move' && (
         <ConfirmDialog

@@ -94,6 +94,13 @@
       "completed": "Abgeschlossen",
       "failed": "Fehlgeschlagen",
       "rejected": "Nicht eingelassen"
+    },
+    "stopBot": {
+      "title": "Bot entfernen",
+      "confirmLabel": "Bot entfernen",
+      "message": "Bot jetzt aus dem Meeting entfernen?",
+      "caveat": "Whisper transkribiert in 20–30-Sekunden-Blöcken. Ein Block, der beim Stoppen gerade läuft, geht verloren — am Ende können bis zu ~30 Sekunden Audio im Transkript fehlen.",
+      "advice": "Für ein vollständiges Transkript das Meeting natürlich beenden lassen: der Bot verlässt es dann von selbst, nachdem er den letzten Block verarbeitet hat."
     }
   },
   "errors": {
@@ -1447,5 +1454,25 @@
     "statusConnected": "Verbunden",
     "statusWaiting": "Wartet",
     "statusEnded": "Beendet"
+  },
+  "documentDetail": {
+    "back": "Zurück zu Dateien",
+    "openTranscript": "Transkript öffnen",
+    "tags": "Tags",
+    "preview": "Vorschau",
+    "noPreview": "Keine Vorschau verfügbar.",
+    "private": "Privat",
+    "workspace": "Workspace",
+    "untitled": "Datei {id}",
+    "loadFailed": "Datei konnte nicht geladen werden.",
+    "deleteTitle": "Datei löschen",
+    "deleteMessage": "Datei in den Papierkorb verschieben? Sie lässt sich von dort wiederherstellen.",
+    "deleteConfirm": "In den Papierkorb",
+    "deleteFailed": "Datei konnte nicht gelöscht werden.",
+    "tagsDialogTitle": "Tags bearbeiten",
+    "tagsLabel": "Tags (kommagetrennt)",
+    "tagsPlaceholder": "z. B. wichtig, projekt-x",
+    "tagsSave": "Speichern",
+    "tagsSaveFailed": "Tags konnten nicht gespeichert werden."
   }
 }
