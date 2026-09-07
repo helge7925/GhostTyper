@@ -4,7 +4,6 @@ import { useSession } from 'next-auth/react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import TranscriptionCard from '../components/TranscriptionCard';
 import LoadingSpinner from '../components/LoadingSpinner';
-import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import MeetingStartForm from '../components/MeetingStartForm';
 import EmptyState from '../components/EmptyState';
@@ -91,9 +90,7 @@ export default function Transcriptions() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const searchTimeoutRef = useRef(null);
   const {
-    toast,
     showToast,
-    clearToast,
     confirmDialog,
     confirm,
     closeConfirm,
@@ -690,7 +687,6 @@ export default function Transcriptions() {
           )}
         </div>
       </div>
-      {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
       <ConfirmDialog
         open={Boolean(confirmDialog)}
         title={confirmDialog?.title}

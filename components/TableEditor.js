@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import TableRenderer from './TableRenderer';
-import Toast from './Toast';
+import { toast } from 'sonner';
 import ConfirmDialog from './ConfirmDialog';
 import { useTranslations } from '../lib/i18n';
 import {
@@ -32,7 +32,6 @@ export default function TableEditor({
   const [saving, setSaving] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState(false);
   const [showSourceContent, setShowSourceContent] = useState(false);
-  const [toast, setToast] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
 
@@ -71,7 +70,7 @@ export default function TableEditor({
       setSaveFeedback(true);
       setTimeout(() => setSaveFeedback(false), 2000);
     } catch (error) {
-      setToast({ message: error?.message || t('saveFailed'), type: 'error' });
+      toast.error(error?.message || t('saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -170,7 +169,6 @@ export default function TableEditor({
           )}
         </div>
       </main>
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       <ConfirmDialog
         open={confirmDiscardOpen}

@@ -4,7 +4,6 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useState, useEffect, useCallback } from 'react';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import Toast from '../../components/Toast';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import EmptyState from '../../components/EmptyState';
 import { useUiFeedback } from '../../lib/use-ui-feedback';
@@ -24,9 +23,7 @@ export default function AdminUsers() {
   const [retentionEnabled, setRetentionEnabled] = useState(false);
   const [retentionDays, setRetentionDays] = useState('');
   const {
-    toast,
     showToast,
-    clearToast,
     confirmDialog,
     confirm,
     closeConfirm,
@@ -439,7 +436,6 @@ export default function AdminUsers() {
       {users.length === 0 && !loading && (
         <EmptyState title={tEmpty('title')} description={tEmpty('description')} />
       )}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
       <ConfirmDialog
         open={Boolean(confirmDialog)}
         title={confirmDialog?.title}

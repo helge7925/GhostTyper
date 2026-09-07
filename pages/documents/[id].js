@@ -5,7 +5,6 @@ import { useSession } from 'next-auth/react';
 import { useEffect, useState, useCallback } from 'react';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import Toast from '../../components/Toast';
 import { useUiFeedback } from '../../lib/use-ui-feedback';
 import { useFormatter, useTranslations } from '../../lib/i18n';
 import { deleteDocument, getDocument, updateDocument } from '../../lib/api';
@@ -17,7 +16,7 @@ export default function DocumentDetailPage() {
   const t = useTranslations('documentDetail');
   const tCommon = useTranslations('common');
   const { dateTime } = useFormatter();
-  const { toast, showToast, clearToast, confirmDialog, confirm, acceptConfirm, closeConfirm } = useUiFeedback();
+  const { showToast, confirmDialog, confirm, acceptConfirm, closeConfirm } = useUiFeedback();
 
   // Named `doc`, not `document`: the previous name shadowed the global inside
   // every handler on this page.
@@ -116,8 +115,6 @@ export default function DocumentDetailPage() {
           <div className="text-sm text-secondary leading-relaxed whitespace-pre-wrap max-h-[65vh] overflow-y-auto custom-scrollbar">{body}</div>
         </div>
       </div>
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
 
       <ConfirmDialog
         open={Boolean(confirmDialog)}

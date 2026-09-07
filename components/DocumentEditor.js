@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import DOMPurify from 'dompurify';
 import { buildPdfPrintStyles } from '../lib/pdf-print-style';
-import Toast from './Toast';
+import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,7 +62,6 @@ export default function DocumentEditor({
   const [focusMode, setFocusMode] = useState(false);
   const [focusPreset, setFocusPreset] = useState('paper');
   const [showSourceContent, setShowSourceContent] = useState(false);
-  const [toast, setToast] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
   const [extrasOpen, setExtrasOpen] = useState(false);
@@ -132,7 +131,7 @@ export default function DocumentEditor({
 
   const execCommand = useCallback((command, value = null) => {
     if (typeof document.execCommand !== 'function') {
-      setToast({ message: t('browserUnsupported'), type: 'error' });
+      toast.error(t('browserUnsupported'));
       return;
     }
     if (editorRef.current) {
@@ -405,7 +404,7 @@ export default function DocumentEditor({
       if (!res.ok) throw new Error(data.message);
       setHtml(sanitizeEditorHtml(data.translatedText));
     } catch (err) {
-      setToast({ message: `${tErrors('connection')}: ${err.message}`, type: 'error' });
+      toast.error(`${tErrors('connection')}: ${err.message}`);
     } finally {
       setIsTranslating(false);
     }
@@ -883,7 +882,6 @@ export default function DocumentEditor({
           margin-top: 3rem !important;
         }
       `}</style>
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       <AlertDialog open={confirmCancelOpen} onOpenChange={setConfirmCancelOpen}>
         <AlertDialogContent>

@@ -4,7 +4,6 @@ import { useSession } from 'next-auth/react';
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { Mic, FileText, Table as TableIcon, Languages, KeyRound, BookOpen } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
-import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { usePermission } from '../lib/use-permission';
 import { invalidateVexaIntegrationCache } from '../lib/use-vexa-integration';
@@ -154,9 +153,7 @@ export default function Settings() {
   const glossaryImportInputRef = useRef(null);
   const glossaryImportScopeRef = useRef('personal');
   const {
-    toast,
     showToast,
-    clearToast,
     confirmDialog,
     confirm,
     closeConfirm,
@@ -1899,7 +1896,6 @@ export default function Settings() {
           </main>
         </div>
       )}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
       <ConfirmDialog
         open={Boolean(confirmDialog)}
         title={confirmDialog?.title}

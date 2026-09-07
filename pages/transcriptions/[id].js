@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import StatusBadge from '../../components/StatusBadge';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import Toast from '../../components/Toast';
+import { toast } from 'sonner';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import TableRenderer from '../../components/TableRenderer';
 import ProcessStatusCard from '../../components/ProcessStatusCard';
@@ -128,7 +128,6 @@ export default function TranscriptionDetail() {
   const [savingSpeakers, setSavingSpeakers] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisFocus, setAnalysisFocus] = useState('');
-  const [toast, setToast] = useState(null);
   const [startingProcessing, setStartingProcessing] = useState(false);
   const [processingStartError, setProcessingStartError] = useState('');
   const statusRef = useRef(null);
@@ -170,9 +169,9 @@ export default function TranscriptionDetail() {
   const handleProgressSnapshot = useCallback((updated) => {
     const previousStatus = statusRef.current;
     if (previousStatus !== updated.status) {
-      if (updated.status === STATUS.TRANSCRIBED) setToast({ message: t('progress.transcribed'), type: 'success' });
-      else if (updated.status === STATUS.ANALYZING) setToast({ message: t('progress.analyzing'), type: 'info' });
-      else if (updated.status === STATUS.COMPLETED) setToast({ message: t('progress.completed'), type: 'success' });
+      if (updated.status === STATUS.TRANSCRIBED) toast.success(t('progress.transcribed'));
+      else if (updated.status === STATUS.ANALYZING) toast(t('progress.analyzing'));
+      else if (updated.status === STATUS.COMPLETED) toast.success(t('progress.completed'));
     }
     statusRef.current = updated.status;
     setTranscription(updated);
@@ -221,9 +220,9 @@ export default function TranscriptionDetail() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.message || 'Export nach Nextcloud fehlgeschlagen.');
-      setToast({ message: `Nach Nextcloud gespeichert: ${data.remotePath}`, type: 'success' });
+      toast.success(`Nach Nextcloud gespeichert: ${data.remotePath}`);
     } catch (err) {
-      setToast({ message: err.message || 'Export nach Nextcloud fehlgeschlagen.', type: 'error' });
+      toast.error(err.message || 'Export nach Nextcloud fehlgeschlagen.');
     } finally {
       setExportingNc(false);
     }
@@ -244,7 +243,7 @@ export default function TranscriptionDetail() {
         nextStatus === STATUS.QUEUED || nextStatus === STATUS.PROCESSING || nextStatus === STATUS.ANALYZING
           ? 'Verarbeitung läuft.'
           : 'Verarbeitung ist bereits abgeschlossen.';
-      setToast({ message: toastMessage, type: 'success' });
+      toast.success(toastMessage);
       setTranscription((prev) => prev ? { ...prev, status: nextStatus, updated_at: new Date().toISOString() } : prev);
     } catch {
       setProcessingStartError('Verarbeitung konnte nicht gestartet werden.');
@@ -263,7 +262,7 @@ export default function TranscriptionDetail() {
       await deleteTranscription(id);
       router.push('/transcriptions');
     } catch (err) {
-      setToast({ message: err.message || 'Eintrag konnte nicht gelöscht werden.', type: 'error' });
+      toast.error(err.message || 'Eintrag konnte nicht gelöscht werden.');
     } finally {
       setDeleting(false);
       setConfirmDialogOpen(false);
@@ -719,8 +718,6 @@ export default function TranscriptionDetail() {
           </div>
         </div>
       )}
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <ConfirmDialog
         open={confirmDialogOpen}
         title={`${typeLabel} löschen`}

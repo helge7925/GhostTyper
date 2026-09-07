@@ -7,7 +7,6 @@ import { getTemplates } from '../lib/api';
 import DocumentEditor from '../components/DocumentEditor';
 import ProcessStatusCard from '../components/ProcessStatusCard';
 import LoadingSpinner from '../components/LoadingSpinner';
-import Toast from '../components/Toast';
 import { analysisToHtml } from '../lib/markdown-html';
 import { useUiFeedback } from '../lib/use-ui-feedback';
 import { useMessageList, useTranslations } from '../lib/i18n';
@@ -98,7 +97,7 @@ export default function OCR() {
 
   // Editor state
   const [showEditor, setShowEditor] = useState(false);
-  const { toast, showToast, clearToast } = useUiFeedback();
+  const { showToast } = useUiFeedback();
   const activePreset = useMemo(() => {
     const presetId = typeof router.query.preset === 'string' ? router.query.preset : '';
     return OCR_PRESETS[presetId] || null;
@@ -458,7 +457,6 @@ export default function OCR() {
 
       {error && <div role="alert" className="mt-8 p-4 border border-danger/30 text-danger rounded-xl text-sm text-center animate-fade-in">{error}</div>}
       {offlineSaved && <div role="status" className="mt-8 p-4 border border-success/30 bg-success/10 text-success rounded-xl text-sm text-center animate-fade-in">{t('savedOffline')}</div>}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
     </>
   );
 }
