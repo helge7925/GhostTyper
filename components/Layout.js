@@ -19,7 +19,7 @@ export default function Layout({ children }) {
     <>
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="description" content="Audio-Transkription und KI-Analyse" />
+        <meta name="description" content={tFooter('metaDescription')} />
         <meta
           name="theme-color"
           content={resolvedTheme === 'dark' ? '#1e1e21' : '#f7f6f4'}

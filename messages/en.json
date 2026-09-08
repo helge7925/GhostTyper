@@ -182,7 +182,8 @@
   "layout": {
     "skipToContent": "Skip to main content",
     "footerTagline": "Your thoughts, decoded and distilled.",
-    "footerCredit": "Ghost Typer 2026 · Developed by Helge Roos"
+    "footerCredit": "Ghost Typer 2026 · Developed by Helge Roos",
+    "metaDescription": "Audio transcription and AI analysis"
   },
   "confirmDialog": {
     "title": "Please confirm",
@@ -1067,7 +1068,51 @@
         "near": "Almost done. Applying the finishing touches.",
         "overdue": "Taking a little longer than usual. Processing continues."
       }
-    }
+    },
+    "deleteFailed": "The entry could not be deleted.",
+    "alreadyRunning": "Processing is already running.",
+    "stepSpeakers": "Review and assign speakers",
+    "queuedTitle": "Queued",
+    "queuedDescription": "The job is scheduled and starts automatically in a moment.",
+    "processingTitle": "Transcribing",
+    "speakersPendingDescription": "Please review the speakers. The analysis can start after that.",
+    "readyForEditorDescription": "You can open the result in the editor now.",
+    "analyzingTitle": "AI analysis running",
+    "availableDescription": "Transcript and analysis are available.",
+    "extraInstruction": "Additional instruction",
+    "downloadTranslated": "Download translated file",
+    "deleteBusy": "Deleting {type}…",
+    "deleteAction": "Delete {type}",
+    "deleteMessage": "Delete this {type}? This cannot be undone.",
+    "speakerCheckHint": "Check the names before the analysis starts.",
+    "analysisFocusHelp": "Optional: anything the analysis should pay particular attention to?",
+    "startAnalysis": "Start analysis",
+    "analysisRunning": "Analysis running…",
+    "editFullAnalysis": "Edit the full analysis in the editor",
+    "transcribedAnalysisRunning": "Transcription done. Analysis running…",
+    "transcriptionRunning": "Transcribing…",
+    "vexaDegraded": "Connection degraded",
+    "eventStages": {
+      "queued": "Queued",
+      "processing": "Transcribing",
+      "speaker_assignment": "Speakers",
+      "analyzing": "AI analysis",
+      "completed": "Done",
+      "error": "Error",
+      "vexa_degraded": "Connection degraded",
+      "vexa_stale": "No speech detected",
+      "vexa_recovered": "Connection restored"
+    },
+    "templateLabels": {
+      "generic": "Summary",
+      "meeting": "Meeting",
+      "action_items": "To-dos",
+      "data_table": "Data table",
+      "aufmass": "Measurements"
+    },
+    "rawTextOffice": "File note",
+    "rawTextOcr": "Extracted text",
+    "rawTextTranscript": "Transcript"
   },
   "transcriptionsList": {
     "folders": "Folders",
@@ -1453,7 +1498,8 @@
     "overlayWaiting": "Waiting for speech…",
     "statusConnected": "Connected",
     "statusWaiting": "Waiting",
-    "statusEnded": "Ended"
+    "statusEnded": "Ended",
+    "noSegments": "No segments yet."
   },
   "documentDetail": {
     "back": "Back to files",

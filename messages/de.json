@@ -182,7 +182,8 @@
   "layout": {
     "skipToContent": "Zum Hauptinhalt",
     "footerTagline": "Your thoughts, decoded and distilled.",
-    "footerCredit": "Ghost Typer 2026 · Developed by Helge Roos"
+    "footerCredit": "Ghost Typer 2026 · Developed by Helge Roos",
+    "metaDescription": "Audio-Transkription und KI-Analyse"
   },
   "confirmDialog": {
     "title": "Bitte bestätigen",
@@ -1067,7 +1068,51 @@
         "near": "Fast fertig. Letzter Feinschliff läuft.",
         "overdue": "Dauert etwas länger als üblich. Wir bleiben dran."
       }
-    }
+    },
+    "deleteFailed": "Eintrag konnte nicht gelöscht werden.",
+    "alreadyRunning": "Verarbeitung läuft.",
+    "stepSpeakers": "Sprecher prüfen und zuweisen",
+    "queuedTitle": "In Warteschlange",
+    "queuedDescription": "Der Auftrag ist eingeplant und startet in Kürze automatisch.",
+    "processingTitle": "Transkription läuft",
+    "speakersPendingDescription": "Bitte Sprecher prüfen. Danach kann die Analyse gestartet werden.",
+    "readyForEditorDescription": "Sie können das Ergebnis jetzt im Editor öffnen.",
+    "analyzingTitle": "KI-Analyse läuft",
+    "availableDescription": "Transkription und Analyse sind verfügbar.",
+    "extraInstruction": "Zusätzliche Anweisung",
+    "downloadTranslated": "Übersetzte Datei herunterladen",
+    "deleteBusy": "{type} wird gelöscht…",
+    "deleteAction": "{type} löschen",
+    "deleteMessage": "{type} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "speakerCheckHint": "Prüfe die Namen, bevor die Auswertung startet.",
+    "analysisFocusHelp": "Optional: Was soll in der Auswertung besonders berücksichtigt werden?",
+    "startAnalysis": "Analyse starten",
+    "analysisRunning": "Analyse läuft…",
+    "editFullAnalysis": "Vollständige Analyse im Editor bearbeiten",
+    "transcribedAnalysisRunning": "Transkription abgeschlossen. Auswertung läuft…",
+    "transcriptionRunning": "Transkription läuft…",
+    "vexaDegraded": "Verbindung gestört",
+    "eventStages": {
+      "queued": "Warteschlange",
+      "processing": "Transkription",
+      "speaker_assignment": "Sprecher",
+      "analyzing": "KI-Analyse",
+      "completed": "Fertig",
+      "error": "Fehler",
+      "vexa_degraded": "Verbindung gestört",
+      "vexa_stale": "Keine Wortmeldungen",
+      "vexa_recovered": "Verbindung wiederhergestellt"
+    },
+    "templateLabels": {
+      "generic": "Zusammenfassung",
+      "meeting": "Meeting",
+      "action_items": "To-Dos",
+      "data_table": "Datentabelle",
+      "aufmass": "Aufmaß"
+    },
+    "rawTextOffice": "Datei-Hinweis",
+    "rawTextOcr": "Extrahierter Text",
+    "rawTextTranscript": "Transkription"
   },
   "transcriptionsList": {
     "folders": "Ordner",
@@ -1453,7 +1498,8 @@
     "overlayWaiting": "Warte auf Sprache …",
     "statusConnected": "Verbunden",
     "statusWaiting": "Wartet",
-    "statusEnded": "Beendet"
+    "statusEnded": "Beendet",
+    "noSegments": "Noch keine Segmente."
   },
   "documentDetail": {
     "back": "Zurück zu Dateien",

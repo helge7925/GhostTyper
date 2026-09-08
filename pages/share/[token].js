@@ -237,12 +237,13 @@ export default function PublicSharePage() {
 PublicSharePage.noLayout = true;
 
 function Column({ title, segments, fallbackLang, accent }) {
+  const t = useTranslations('share');
   return (
     <section>
       <p className="text-[10px] uppercase tracking-widest text-secondary font-bold mb-3">{title}</p>
       <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-2">
         {segments.length === 0 ? (
-          <p className="text-xs text-secondary italic">Noch keine Segmente.</p>
+          <p className="text-xs text-secondary italic">{t('noSegments')}</p>
         ) : (
           segments.map((seg, idx) => (
             <p key={`${title}-${idx}-${seg.start}`} className="text-sm text-primary leading-relaxed">

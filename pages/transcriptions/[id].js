@@ -20,56 +20,6 @@ import { Card, CardBody } from '../../components/ui/card';
 import { Field } from '../../components/ui/field';
 import { ArrowLeft, CloudUpload, Download, Pencil, Play, Trash2 } from 'lucide-react';
 
-const TRANSCRIPTION_LOADING_MESSAGES = [
-  'Wir lauschen tief konzentriert und schreiben fleißig mit.',
-  'Der Audio-Decoder trinkt gerade einen Espresso und legt los.',
-  'Wörter werden aus dem Klang gefischt und sauber abgelegt.',
-  'Unser Notizgeist schreibt schneller als jeder Stenograf.',
-  'Das Audio wird gerade in Klartext verwandelt - Buchstabe für Buchstabe.',
-  'Kurzer Moment: Wir entwirren gerade alle Satzfäden.',
-  'Wir parken jedes Wort sauber in der richtigen Zeile.',
-  'Die Tonspur wird gerade textlich auf Hochglanz poliert.',
-  'Ein kleines Team aus Bits macht gerade große Notizen.',
-  'Wir geben jedem Halbsatz ein liebevolles Zuhause.',
-  'Audio rein, Klartext raus - läuft.',
-  'Wir sortieren gerade Klang in klare Aussagen.',
-];
-
-const ANALYSIS_LOADING_MESSAGES = [
-  'Die KI macht aus Rohtext gerade ein Ergebnis mit Hand und Fuß.',
-  'Gedanken werden sortiert. Prioritäten bekommen gerade Helme und Warnwesten.',
-  'Virtueller Redakteur aktiv: kürzt, bündelt und strukturiert.',
-  'To-dos werden eingefangen, bevor sie wieder weglaufen.',
-  'Unser Struktur-Bot verteilt gerade Überschriften und Klarheit.',
-  'Feinschliff läuft: aus viel Text wird kompakte Übersicht.',
-  'Wir ziehen gerade den roten Faden straff und ordentlich.',
-  'Kernaussagen werden markiert, geglättet und in Reih und Glied gestellt.',
-  'Der KI-Lektor setzt gerade semantische Leitplanken.',
-  'Mehr Überblick in Arbeit: wichtige Punkte kommen nach vorne.',
-  'Das Ergebnis bekommt gerade ein aufgeräumtes Layout im Kopf.',
-  'Wir verwandeln gerade Gesprächswolken in klare Checklisten.',
-];
-
-const QUEUE_LOADING_MESSAGES = [
-  'Ihr Auftrag steht bereit und wird als Nächstes gestartet.',
-  'Wir verteilen gerade Rechenzeit und schieben Ihren Job nach vorne.',
-  'Kurz eingeplant: Die Verarbeitung startet in wenigen Augenblicken.',
-  'Die Pipeline wärmt bereits die Motoren für diesen Auftrag auf.',
-];
-
-const EVENT_STAGE_LABELS = {
-  queued: 'Warteschlange',
-  processing: 'Transkription',
-  speaker_assignment: 'Sprecher',
-  analyzing: 'KI-Analyse',
-  completed: 'Fertig',
-  error: 'Fehler',
-  // Vexa bridge health events (backoff / stale detector).
-  vexa_degraded: 'Verbindung gestört',
-  vexa_stale: 'Keine Wortmeldungen',
-  vexa_recovered: 'Verbindung wiederhergestellt',
-};
-
 function eventDotClass(stage) {
   if (stage === 'completed' || stage === 'vexa_recovered') return 'bg-success';
   if (stage === 'error') return 'bg-danger';
@@ -241,7 +191,7 @@ export default function TranscriptionDetail() {
       const nextStatus = payload?.status || STATUS.PROCESSING;
       const toastMessage =
         nextStatus === STATUS.QUEUED || nextStatus === STATUS.PROCESSING || nextStatus === STATUS.ANALYZING
-          ? 'Verarbeitung läuft.'
+          ? t('alreadyRunning')
           : 'Verarbeitung ist bereits abgeschlossen.';
       toast.success(toastMessage);
       setTranscription((prev) => prev ? { ...prev, status: nextStatus, updated_at: new Date().toISOString() } : prev);
@@ -250,7 +200,7 @@ export default function TranscriptionDetail() {
     } finally {
       setStartingProcessing(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   const handleSpeakerChange = useCallback((sid, name) => {
     setSpeakerNames(prev => ({ ...prev, [sid]: name }));
@@ -262,12 +212,12 @@ export default function TranscriptionDetail() {
       await deleteTranscription(id);
       router.push('/transcriptions');
     } catch (err) {
-      toast.error(err.message || 'Eintrag konnte nicht gelöscht werden.');
+      toast.error(err.message || t('deleteFailed'));
     } finally {
       setDeleting(false);
       setConfirmDialogOpen(false);
     }
-  }, [id, router]);
+  }, [id, router, t]);
 
   // Check if this is a table analysis
   const isTableAnalysis = useMemo(() => {
@@ -296,7 +246,7 @@ export default function TranscriptionDetail() {
 
     const steps = [{ key: 'transcription', label: 'Audio wird transkribiert' }];
     if (needsSpeakerAssignment) {
-      steps.push({ key: 'speakers', label: 'Sprecher prüfen und zuweisen' });
+      steps.push({ key: 'speakers', label: t('stepSpeakers') });
     }
     if (hasAutoAnalysis) {
       steps.push({ key: 'analysis', label: 'KI erstellt Zusammenfassung' });
@@ -310,10 +260,10 @@ export default function TranscriptionDetail() {
     if (transcription.status === STATUS.QUEUED) {
       activeStep = 0;
       title = 'In Warteschlange';
-      description = 'Der Auftrag ist eingeplant und startet in Kürze automatisch.';
+      description = t('queuedDescription');
     } else if (transcription.status === STATUS.PROCESSING) {
       activeStep = 0;
-      title = 'Transkription läuft';
+      title = t('processingTitle');
       description = 'Das Audio wird gerade in Text umgewandelt.';
     } else if (transcription.status === STATUS.PENDING) {
       activeStep = 0;
@@ -323,49 +273,37 @@ export default function TranscriptionDetail() {
       if (needsSpeakerAssignment) {
         activeStep = 1;
         title = 'Transkription ist fertig';
-        description = 'Bitte Sprecher prüfen. Danach kann die Analyse gestartet werden.';
+        description = t('speakersPendingDescription');
       } else {
         done = !hasAutoAnalysis;
         activeStep = hasAutoAnalysis ? Math.max(steps.length - 1, 0) : steps.length;
         title = hasAutoAnalysis ? 'Transkription ist fertig' : 'Transkription abgeschlossen';
         description = hasAutoAnalysis
           ? 'Die Analyse wurde noch nicht gestartet.'
-          : 'Sie können das Ergebnis jetzt im Editor öffnen.';
+          : t('readyForEditorDescription');
       }
     } else if (transcription.status === STATUS.ANALYZING) {
       activeStep = Math.max(steps.length - 1, 1);
-      title = 'KI-Analyse läuft';
+      title = t('analyzingTitle');
       description = 'Der transkribierte Text wird jetzt zusammengefasst und strukturiert.';
     } else if (transcription.status === STATUS.COMPLETED) {
       done = true;
       activeStep = steps.length;
       title = 'Verarbeitung abgeschlossen';
-      description = 'Transkription und Analyse sind verfügbar.';
+      description = t('availableDescription');
     }
 
     return { title, description, steps, activeStep, done };
-  }, [transcription]);
+  }, [transcription, t]);
 
   const processMessages = useMemo(() => {
     if (!transcription) return [];
     // All states share the same translated transcription pool — the
     // ProcessStatusCard's own status label already disambiguates the
-    // user-facing distinction.
+    // user-facing distinction. The per-status German pools that used to sit
+    // behind this return were unreachable from the moment that decision was
+    // made, and are gone with it.
     return transcriptionMessages;
-    // eslint-disable-next-line no-unreachable
-    if (transcription.status === STATUS.ANALYZING) {
-      return ANALYSIS_LOADING_MESSAGES;
-    }
-
-    if (transcription.status === STATUS.QUEUED) {
-      return QUEUE_LOADING_MESSAGES;
-    }
-
-    if (transcription.status === STATUS.PROCESSING || transcription.status === STATUS.PENDING) {
-      return TRANSCRIPTION_LOADING_MESSAGES;
-    }
-
-    return [];
   }, [transcription, transcriptionMessages]);
 
   if (authStatus === 'loading' || loading) return <LoadingSpinner />;
@@ -374,17 +312,12 @@ export default function TranscriptionDetail() {
   const isOCR = transcription.mime_type?.startsWith('image/') || transcription.mime_type === 'application/pdf';
   const isOfficeDocument = isDownloadableOfficeDocument(transcription.mime_type);
   const typeLabel = isOfficeDocument ? 'Datei' : isOCR ? 'Dokument' : 'Transkription';
-  const rawTextLabel = isOfficeDocument ? 'Datei-Hinweis' : isOCR ? 'Extrahierter Text' : 'Transkription';
-  // `aufmass` is kept here as a legacy label for pre-existing rows; it
-  // is no longer offered as a new template choice in the UI.
-  const TEMPLATE_DETAIL_LABELS = {
-    generic: 'Zusammenfassung',
-    meeting: 'Meeting',
-    action_items: 'To-Dos',
-    data_table: 'Datentabelle',
-    aufmass: 'Aufmaß',
-  };
-  const templateLabel = TEMPLATE_DETAIL_LABELS[transcription.template] || transcription.template;
+  const rawTextLabel = isOfficeDocument
+    ? t('rawTextOffice')
+    : isOCR ? t('rawTextOcr') : t('rawTextTranscript');
+  // `aufmass` is still translated here as a legacy label for pre-existing
+  // rows; it is no longer offered as a new template choice in the UI.
+  const templateLabel = t(`templateLabels.${transcription.template}`) || transcription.template;
   const timelineEvents = Array.isArray(transcription.events) ? transcription.events : [];
 
   return (
@@ -401,7 +334,7 @@ export default function TranscriptionDetail() {
             className="-ml-3 mb-5"
           >
             <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-            Zurück zu Dateien
+            {t('backToList')}
           </Button>
 
           <header className="mb-7">
@@ -434,7 +367,7 @@ export default function TranscriptionDetail() {
                   </div>
                   {transcription.custom_prompt && (
                     <div>
-                      <p className="text-xs font-medium text-secondary">Zusätzliche Anweisung</p>
+                      <p className="text-xs font-medium text-secondary">{t('extraInstruction')}</p>
                       <p className="text-xs leading-5 text-primary mt-1">&quot;{transcription.custom_prompt}&quot;</p>
                     </div>
                   )}
@@ -458,7 +391,7 @@ export default function TranscriptionDetail() {
                   )}
                   {(() => {
                     const canOpen = !isOfficeDocument && (transcription.text || transcription.analysis);
-                    const label = isTableAnalysis ? 'Tabelle im Editor öffnen' : 'Im Editor öffnen';
+                    const label = isTableAnalysis ? t('openTableEditor') : t('openInEditor');
                     if (!canOpen || !editorHref) {
                       return (
                         <Button disabled variant="primary" className="w-full">
@@ -493,7 +426,7 @@ export default function TranscriptionDetail() {
                     <Button asChild variant="primary" className="w-full">
                       <a href={`/api/transcriptions/${transcription.id}/download`}>
                         <Download className="w-4 h-4" aria-hidden="true" />
-                        Übersetzte Datei herunterladen
+                        {t('downloadTranslated')}
                       </a>
                     </Button>
                   )}
@@ -509,7 +442,7 @@ export default function TranscriptionDetail() {
                       disabled={deleting}
                     >
                       <Trash2 className="w-4 h-4" aria-hidden="true" />
-                      {deleting ? `${typeLabel} wird gelöscht...` : `${typeLabel} löschen`}
+                      {deleting ? t('deleteBusy', { type: typeLabel }) : t('deleteAction', { type: typeLabel })}
                     </Button>
                   </details>
                 </div>
@@ -526,7 +459,7 @@ export default function TranscriptionDetail() {
                 <Card>
                   <CardBody className="p-5">
                   <h3 className="text-sm font-semibold text-primary mb-1">{t('speakerHeading')}</h3>
-                  <p className="text-xs text-secondary mb-4">Prüfe die Namen, bevor die Auswertung startet.</p>
+                  <p className="text-xs text-secondary mb-4">{t('speakerCheckHint')}</p>
                   <div className="space-y-3">
                     {speakerIds.map(sid => (
                       <SpeakerInput
@@ -539,7 +472,7 @@ export default function TranscriptionDetail() {
                   </div>
                   <Field
                     label="Fokus der Analyse"
-                    help="Optional: Was soll in der Auswertung besonders berücksichtigt werden?"
+                    help={t('analysisFocusHelp')}
                     className="mt-4"
                   >
                     <textarea
@@ -551,7 +484,7 @@ export default function TranscriptionDetail() {
                     />
                   </Field>
                   <Button onClick={handleStartAnalysis} disabled={analyzing} variant="primary" className="w-full mt-4">
-                    {analyzing ? 'Analyse läuft...' : 'Analyse starten'}
+                    {analyzing ? t('analysisRunning') : t('startAnalysis')}
                   </Button>
                   </CardBody>
                 </Card>
@@ -628,7 +561,7 @@ export default function TranscriptionDetail() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-primary font-medium">
-                              {EVENT_STAGE_LABELS[event.stage] || event.stage}
+                              {t(`eventStages.${event.stage}`) || event.stage}
                             </span>
                             <span className="text-[10px] text-secondary">
                               {new Date(event.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -676,7 +609,7 @@ export default function TranscriptionDetail() {
                         href={editorHref}
                         className="text-xs text-secondary hover:text-primary transition-colors font-medium flex items-center gap-1"
                       >
-                        Vollständige Analyse im Editor bearbeiten &rarr;
+                        {t('editFullAnalysis')} &rarr;
                       </Link>
                     )}
                   </div>
@@ -708,8 +641,8 @@ export default function TranscriptionDetail() {
                     <div className="whitespace-pre-wrap">{transcription.text}</div>
                   ) : (
                     transcription.status === STATUS.ANALYZING
-                      ? 'Transkription abgeschlossen. Auswertung läuft...'
-                      : 'Transkription läuft...'
+                      ? t('transcribedAnalysisRunning')
+                      : t('transcriptionRunning')
                   )}
                 </div>
                 </CardBody>
@@ -720,9 +653,9 @@ export default function TranscriptionDetail() {
       )}
       <ConfirmDialog
         open={confirmDialogOpen}
-        title={`${typeLabel} löschen`}
-        message={`${typeLabel} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`}
-        confirmLabel={`${typeLabel} löschen`}
+        title={t('deleteAction', { type: typeLabel })}
+        message={t('deleteMessage', { type: typeLabel })}
+        confirmLabel={t('deleteAction', { type: typeLabel })}
         danger
         busy={deleting}
         onConfirm={handleDeleteTranscription}

@@ -38,40 +38,74 @@ test('the locale files describe exactly the same set of keys', () => {
 
 // --- Hardcoded-German ratchet -------------------------------------------
 //
-// 32 files still carry German text inline. Migrating them is its own piece of
+// 52 files still carry German text inline. Migrating them is its own piece of
 // work, so this does not demand zero — it freezes today's numbers. A file may
 // improve (then lower its number here, or delete the entry) but never get
 // worse, and a file that is not listed must contain none at all. That way the
 // debt can only shrink, and no newly written page joins it unnoticed.
 const HARDCODED_GERMAN_BASELINE = {
-  'pages/transcriptions/[id].js': 42,
-  'pages/settings.js': 33,
-  'pages/upload.js': 21,
-  'pages/transcriptions.js': 13,
-  'pages/ocr.js': 17,
-  'pages/translate.js': 13,
-  'components/MeetingControlBar.js': 10,
-  'pages/admin/users.js': 9,
-  'pages/settings/organization/members.js': 9,
+  'pages/settings.js': 54,
+  'pages/settings.js': 54,
+  'pages/ocr.js': 35,
+  'pages/ocr.js': 35,
+  'pages/upload.js': 32,
+  'pages/upload.js': 32,
+  'pages/transcriptions.js': 30,
+  'pages/transcriptions.js': 30,
+  'pages/translate.js': 17,
+  'components/MeetingControlBar.js': 17,
+  'pages/translate.js': 17,
+  'components/MeetingControlBar.js': 17,
+  'pages/admin/users.js': 16,
+  'pages/admin/users.js': 16,
+  'components/settings/OpenRouterIntegrationPanel.js': 13,
+  'components/settings/OpenRouterIntegrationPanel.js': 13,
+  'pages/transcriptions/[id].js': 11,
+  'pages/transcriptions/[id].js': 11,
+  'pages/settings/organization/members.js': 10,
+  'pages/settings/organization/members.js': 10,
   'pages/profile.js': 7,
-  'components/settings/OpenRouterIntegrationPanel.js': 7,
-  'components/DocumentEditor.js': 3,
-  'components/TableSchemaBuilder.js': 3,
-  'components/settings/EdenAiIntegrationPanel.js': 3,
-  'pages/admin/workspaces.js': 2,
-  'components/AudioUploadForm.js': 2,
+  'components/settings/EdenAiIntegrationPanel.js': 7,
+  'pages/profile.js': 7,
+  'components/settings/EdenAiIntegrationPanel.js': 7,
+  'components/DocumentEditor.js': 5,
+  'components/TableSchemaBuilder.js': 5,
+  'components/DocumentEditor.js': 5,
+  'components/TableSchemaBuilder.js': 5,
+  'pages/transcriptions/[id]/table.js': 4,
+  'components/WorkspaceSwitcher.js': 4,
+  'pages/transcriptions/[id]/table.js': 4,
+  'components/WorkspaceSwitcher.js': 4,
+  'pages/admin/workspaces.js': 3,
+  'pages/transcriptions/[id]/edit.js': 3,
+  'components/AudioUploadForm.js': 3,
+  'components/TranscriptionCard.js': 3,
+  'components/settings/MistralIntegrationPanel.js': 3,
+  'pages/admin/workspaces.js': 3,
+  'pages/transcriptions/[id]/edit.js': 3,
+  'components/AudioUploadForm.js': 3,
+  'components/TranscriptionCard.js': 3,
+  'components/settings/MistralIntegrationPanel.js': 3,
   'components/MeetingStartForm.js': 2,
   'components/ProcessStatusCard.js': 2,
-  'components/TranscriptionCard.js': 2,
-  'components/settings/MistralIntegrationPanel.js': 2,
-  'pages/transcriptions/[id]/edit.js': 1,
-  'pages/transcriptions/[id]/table.js': 1,
+  'components/MeetingStartForm.js': 2,
+  'components/ProcessStatusCard.js': 2,
   'components/AudioRecorder.js': 1,
   'components/CommandPalette.js': 1,
-  'components/WorkspaceSwitcher.js': 1,
+  'components/AudioRecorder.js': 1,
+  'components/CommandPalette.js': 1,
 };
 
 const GERMAN_CHARS = /[äöüßÄÖÜ]/;
+// Umlauts alone miss plenty of German — "Datei-Hinweis", "To-Dos" and
+// "Zusammenfassung" all slipped past this check until a page that was fully
+// migrated still read as German on screen. These are function words with no
+// English homograph, so a whole-word match is a safe second signal.
+const GERMAN_WORDS = new RegExp(
+  '\\b(und|oder|nicht|wurde|wurden|werden|wird|kann|konnte|muss|sollte|bitte|keine'
+  + '|diese|dieser|dieses|beim|zum|zur|vom|sind|haben|wenn|dass|auch|noch|schon'
+  + '|bereits|jetzt|immer|Datei|Dateien|Einstellungen|Zusammenfassung|Hinweis)\\b',
+);
 
 function collectSourceFiles(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -86,7 +120,7 @@ function countGermanLines(file) {
   let count = 0;
   for (const raw of readFileSync(file, 'utf8').split('\n')) {
     const line = raw.trim();
-    if (!GERMAN_CHARS.test(line)) continue;
+    if (!GERMAN_CHARS.test(line) && !GERMAN_WORDS.test(line)) continue;
     // Comments are documentation, not user-facing copy — including the JSX
     // form, which is how most explanatory notes inside markup are written.
     if (line.startsWith('//') || line.startsWith('*') || line.startsWith('/*')) continue;
