@@ -14,8 +14,8 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-orange" />
-    <img alt="Stack" src="https://img.shields.io/badge/Next.js-15.5.x-black" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.4.0-orange" />
+    <img alt="Stack" src="https://img.shields.io/badge/Next.js-16.x-black" />
     <img alt="Node" src="https://img.shields.io/badge/Node-18%2B-success" />
     <img alt="Postgres" src="https://img.shields.io/badge/Postgres-16-blue" />
     <img alt="Tests" src="https://img.shields.io/badge/tests-139%20passing-success" />
@@ -93,7 +93,7 @@ Vollständige Liste und Capture-Hinweise: [`docs/screenshots/README.md`](docs/sc
 | -------- | ---------------------------------------------------------------- |
 | Frontend | Next.js 16.x (Pages Router), React 18, Tailwind, Radix, Zustand |
 | Backend  | Next.js API Routes, NextAuth, PostgreSQL 16 (`pg`)               |
-| AI       | OpenRouter (Chat / OCR / Batch- & Live-Transkription / TTS), Vexa Lite |
+| AI       | EdenAI (Chat / OCR / Batch-STT / TTS), Mistral Voxtral (Live-STT), Vexa Lite |
 | Infra    | Docker Compose, Traefik (optional), AES-256-GCM (`lib/secrets.js`) |
 | CI       | GitHub Actions: CodeQL, Security-Gates, Smoke                    |
 
@@ -102,13 +102,13 @@ Vollständige Liste und Capture-Hinweise: [`docs/screenshots/README.md`](docs/sc
 ```
 ┌─────────────────────────┐    ┌──────────────────────────┐
 │ GhostTyper Webapp       │    │ Postgres 16              │
-│ Next.js 15.5.x + Worker │◄──►│ Workspaces · Audit · Logs│
+│ Next.js 16.x + Worker │◄──►│ Workspaces · Audit · Logs│
 └──┬──────────────┬───────┘    └──────────────────────────┘
    │              │
    │ REST/SSE     │ Webhook + Bridge
    ▼              ▼
 ┌──────────┐  ┌──────────────────┐    ┌────────────────────┐
-│OpenRouter│◄─┤ Vexa Lite        │───►│ OpenRouter STT     │
+│EdenAI    │◄─┤ Vexa Lite        │───►│ Mistral Voxtral       │
 │ API      │  │ (Bot-Container)  │    │ (über Bridge,      │
 │ (Batch)  │  │                  │    │  gleicher Key)     │
 └──────────┘  └──────────────────┘    └────────────────────┘
@@ -126,14 +126,16 @@ Vexa-Integration: [`docs/vexa-integration.md`](docs/vexa-integration.md).
 | 5–10 aktive Nutzer      | 8 GB  | 4 vCPU   | 40 GB SSD | komfortabel für tägliche Team-Nutzung |
 
 Speech-to-Text-Inferenz läuft für Batch-Uploads und den Vexa-Live-Pfad über
-OpenRouter; **eine GPU auf dem Host ist nicht nötig**. Browser-Bots belegen pro paralleles
+EdenAI (Batch-Uploads) bzw. Mistral Voxtral (Live/Vexa); **eine GPU auf dem
+Host ist nicht nötig**. Browser-Bots belegen pro paralleles
 Live-Meeting kurzzeitig zusätzlich ~1 GB RAM. Das `vexa-lite`-Image ist
 `linux/amd64`-only — auf Apple Silicon läuft es per Emulation und ist
 spürbar langsamer.
 
 ## Schnellstart
 
-Voraussetzungen: Docker + Docker Compose v2 und ein OpenRouter-API-Key.
+Voraussetzungen: Docker + Docker Compose v2 und ein KI-Provider-API-Key
+(OpenRouter; EdenAI-Fähigkeiten werden laufend nach `openspec/changes/` migriert).
 
 ```bash
 git clone https://github.com/helge7925/transkription_webapp.git
@@ -189,7 +191,7 @@ Datenfluss-Review und SCC/TIA-Implikationen bei Provider-Wechsel:
 Pro Workspace verwaltet der Admin in
 **Settings → Workspace verwalten**:
 
-- API-Keys & Integrationen (OpenRouter, Vexa)
+- API-Keys & Integrationen (OpenRouter/EdenAI, Vexa)
 - Mitglieder & Rollen (inkl. per-Member-Kostenlimits)
 - Aufbewahrungsfristen
 - Nutzung & Kosten-Dashboard

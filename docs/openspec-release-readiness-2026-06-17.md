@@ -70,10 +70,12 @@ documentation with the implemented product surface.
 
 ## Verification
 
-- `npm test` passes: 139/139 tests.
+- `npm test` passes: 139/139 tests. (Historic count at the time of that
+  2026-06-17 cleanup; the suite has since grown — see `docs/testing.md`.)
 - `npm run lint` passes. Note: `next lint` is deprecated and should be
   migrated before Next.js 16.
-- `npm run build` passes on Next.js 15.5.19. Remaining warnings are existing
+- `npm run build` passes on Next.js 15.5.19 (since upgraded to Next.js 16.x).
+  Remaining warnings are existing
   operational warnings: `_app.getInitialProps` disables automatic static
   optimisation and Chromium logs `--localstorage-file` without a valid path.
 - `npm audit --audit-level=high --omit=dev` passes. Full
