@@ -1,5 +1,5 @@
-const { Pool } = require('pg');
-const crypto = require('crypto');
+import { Pool } from 'pg';
+import crypto from 'node:crypto';
 
 const ENCRYPTION_PREFIX = 'v1';
 const IV_LENGTH = 12; // AES-GCM nonce size

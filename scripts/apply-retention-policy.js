@@ -20,9 +20,9 @@
  * JSON for log shippers.
  */
 
-const { unlink } = require('fs/promises');
-const path = require('path');
-const { Pool } = require('pg');
+import { unlink } from 'node:fs/promises';
+import path from 'node:path';
+import { Pool } from 'pg';
 
 const DEFAULT_DATABASE_URL = 'postgresql://transkription:transkription@localhost:5432/transkription';
 const pool = new Pool({

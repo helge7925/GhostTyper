@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
+import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import {
   createCaptureId,
@@ -13,12 +13,22 @@ import {
   uploadQueuedCapture,
 } from '../lib/offline-queue.js';
 
-const require = createRequire(import.meta.url);
+// The service worker loads sw-policy.js as a classic script via
+// `importScripts('/sw-policy.js')`, where it registers the policy on the
+// global (`self.GhostTyperServiceWorkerPolicy`). Load it the same way here —
+// evaluate the script text in a sandbox context and read the global — so the
+// test exercises the exact runtime shape the service worker sees, and stays
+// independent of whether Node treats the file as CJS or ESM after the
+// `"type": "module"` consolidation.
+const policySource = readFileSync(new URL('../public/sw-policy.js', import.meta.url), 'utf8');
+const policyContext = { console, URL, Object };
+vm.createContext(policyContext);
+new vm.Script(policySource, { filename: 'sw-policy.js' }).runInContext(policyContext);
 const {
   STATIC_SHELL_PATHS,
   isApiRequest,
   shouldCacheStaticRequest,
-} = require('../public/sw-policy.js');
+} = policyContext.GhostTyperServiceWorkerPolicy;
 
 test('capture records get stable idempotency IDs and initial retry metadata', () => {
   const capture = normalizeCapture({

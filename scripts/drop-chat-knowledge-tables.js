@@ -31,7 +31,7 @@
  * the run.
  */
 
-const { Pool } = require('pg');
+import { Pool } from 'pg';
 
 const DEFAULT_DATABASE_URL = 'postgresql://transkription:transkription@localhost:5432/transkription';
 const pool = new Pool({

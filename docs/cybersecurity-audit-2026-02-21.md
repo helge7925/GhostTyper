@@ -127,13 +127,15 @@ Auditiert wurden:
 ### M-04: ESM/CJS-Mischwarnungen in Tests
 - Risiko: kein direkter Exploit, aber Wartungs-/Tooling-Risiko.
 - Severity: **Low-Medium**
-- Status: **Partially Fixed**
+- Status: **Fixed** (2026-09-30, `consolidate-esm-module-strategy`)
 - Fix:
-  - Test-Runner blendet Module-Type-Warnungen aus, um CI-Noise zu reduzieren.
+  - `package.json` hat jetzt `"type": "module"`; Configs und Operator-Scripts sind ESM.
+  - `--no-warnings` aus den Test-Scripts entfernt; Suite läuft warnungsfrei.
 - Referenzen:
   - `package.json`
+  - `openspec/changes/consolidate-esm-module-strategy/`
 - Rest-Risiko:
-  - Ursachenbehebung (konsequente Modulstrategie) bleibt als separates Refactoring offen.
+  - Keines — die konsequente Modulstrategie ist umgesetzt (siehe Fix oben).
 
 ## Direkt umgesetzte Maßnahmen (Code)
 - `middleware.js`: globales CSRF/Same-Origin Enforcement für mutierende API-Requests.
