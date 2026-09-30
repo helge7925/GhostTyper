@@ -15,6 +15,10 @@ documentation with the implemented product surface.
   Next.js Pages Router stack.
 - Stabilise DNS-dependent unit tests so the suite runs without external network
   access.
+  Verified 2026-09-30: every outbound guard reject path (metadata host block,
+  allowlist, protocol, private IP) fires before any DNS lookup, and the full
+  suite passes without external DNS resolution (`tests/network-guard.test.mjs`
+  17/17).
 - Align versions, test counts, framework references, screenshots, and feature
   claims across README, changelog, memory, and docs.
 - Tighten CI security gates so high-severity production advisories are visible.

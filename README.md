@@ -35,8 +35,23 @@ audit trail are part of the baseline.
 <details>
 <summary>More screenshots</summary>
 
-Currently available: `docs/screenshots/01-login.png`. Dashboard and
-remote-meeting screenshots are TODO / need capture before they are embedded.
+<p align="center">
+  <img src="docs/screenshots/02-dashboard.png" alt="GhostTyper dashboard" width="49%" />
+  <img src="docs/screenshots/03-transcriptions.png" alt="Transcriptions history" width="49%" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/04-editor.png" alt="Transcription editor with summary" width="49%" />
+  <img src="docs/screenshots/05-table-extract.png" alt="Table extraction view" width="49%" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/06-workspace-admin.png" alt="Workspace integrations admin panel" width="49%" />
+  <img src="docs/screenshots/07-remote-meeting.png" alt="Remote meeting start dialog" width="49%" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/08-usage.png" alt="Workspace usage and cost breakdown" width="49%" />
+</p>
+
+Full list and capture notes: [`docs/screenshots/README.md`](docs/screenshots/README.md).
 
 </details>
 
