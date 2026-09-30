@@ -21,7 +21,7 @@
  * lib drifts away from the format used to encrypt existing data, the
  * self-check fails fast and aborts before producing unreadable rows.
  */
-const { Pool } = require('pg');
+import { Pool } from 'pg';
 
 const DEFAULT_DATABASE_URL = 'postgresql://transkription:transkription@localhost:5432/transkription';
 const DRY_RUN = process.argv.includes('--dry-run');

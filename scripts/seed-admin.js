@@ -1,6 +1,6 @@
-const { Pool } = require('pg');
-const bcrypt = require('bcryptjs');
-const readline = require('readline');
+import { Pool } from 'pg';
+import bcrypt from 'bcryptjs';
+import readline from 'readline';
 
 function validatePassword(password) {
   if (password.length < 8) return 'Passwort muss mindestens 8 Zeichen lang sein.';

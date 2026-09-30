@@ -12,7 +12,7 @@
  *    directly in the variable; no alpha modifier in Tailwind.
  */
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+const config = {
   content: [
     './pages/**/*.{js,ts,jsx,tsx}',
     './components/**/*.{js,ts,jsx,tsx}',
@@ -57,5 +57,7 @@ module.exports = {
       },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: ['tailwindcss-animate'],
 };
+
+export default config;
