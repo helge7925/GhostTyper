@@ -36,8 +36,23 @@ Audit-Trail sind Teil der Basis.
 <details>
 <summary>Weitere Screenshots</summary>
 
-Aktuell vorhanden: `docs/screenshots/01-login.png`. Dashboard- und
-Remote-Meeting-Screenshots sind TODO / need capture, bevor sie eingebettet werden.
+<p align="center">
+  <img src="docs/screenshots/02-dashboard.png" alt="GhostTyper Dashboard" width="49%" />
+  <img src="docs/screenshots/03-transcriptions.png" alt="Transkriptions-Historie" width="49%" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/04-editor.png" alt="Transkriptions-Editor mit Zusammenfassung" width="49%" />
+  <img src="docs/screenshots/05-table-extract.png" alt="Tabellen-Extraktion" width="49%" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/06-workspace-admin.png" alt="Workspace-Integrationen (Admin)" width="49%" />
+  <img src="docs/screenshots/07-remote-meeting.png" alt="Remote-Meeting-Startdialog" width="49%" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/08-usage.png" alt="Workspace-Nutzung und Kosten" width="49%" />
+</p>
+
+Vollständige Liste und Capture-Hinweise: [`docs/screenshots/README.md`](docs/screenshots/README.md).
 
 </details>
 

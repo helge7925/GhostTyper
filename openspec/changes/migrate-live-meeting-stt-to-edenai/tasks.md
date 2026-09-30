@@ -137,13 +137,16 @@ original plan" rather than silently rewritten.
   (`voxtral-mini-transcribe-realtime-2602`) and nothing else, not the
   old Cortecs/legacy-model regression this test was originally guarding
   against being reintroduced.
-- [ ] 6.4 No dedicated test for `resolveBridgeTranscriptionConfig()`
+- [x] 6.4 No dedicated test for `resolveBridgeTranscriptionConfig()`
   itself (Mistral branch) — its structure requires a real database
   connection even for the "operator fallback" path (unlike
   `resolveOpenRouterConfig`/`resolveEdenAiConfig`, which short-circuit
   before any query when no organizationId is given). Flagged as a
-  pre-existing test-coverage gap this change did not introduce, not
-  fixed here.
+  pre-existing test-coverage gap this change did not introduce; now
+  closed by `tests/db/bridge-transcription-config.test.mjs` (DB-backed
+  suite, real rows: meeting-coordinate org resolution, workspace config
+  decryption + context-bias join, operator ENV fallback, disabled
+  fallback, unknown-meeting resolution).
 
 ## 7. Verification
 
