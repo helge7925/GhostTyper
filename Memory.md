@@ -4,7 +4,7 @@
 
 **GhostTyper** ist eine sichere, selbstgehostete KI-Webapp für Audio-Transkription, OCR, Textanalyse und strukturierte Datenextraktion.
 
-### Aktuelle Version: 0.3.0
+### Aktuelle Version: 0.4.0
 
 ---
 
@@ -12,7 +12,7 @@
 
 | Component | Technology |
 |-----------|-----------|
-| Frontend | Next.js 15.5.x (Pages Router), React 18, Tailwind CSS 3 |
+| Frontend | Next.js 16.x (Pages Router), React 18, Tailwind CSS 3 |
 | Backend | Next.js API Routes |
 | Authentication | NextAuth Credentials + JWT |
 | Database | PostgreSQL 16 |
@@ -68,7 +68,7 @@
 ## Technical Stack
 
 ### Frontend
-- Next.js 15.5.x with Pages Router
+- Next.js 16.x with Pages Router
 - React 18 with Hooks
 - Tailwind CSS 3 with custom theme
 - next-auth for Authentication
@@ -225,7 +225,7 @@ curl -X POST http://localhost:3000/api/db-init \
 
 See [CHANGELOG.md](./CHANGELOG.md) for detailed version history.
 
-### Latest: v0.3.0
+### Latest: v0.4.0
 **Major Feature**: Public beta baseline with remote-meeting capture,
 workspace/org scoping, table extraction, audit logging and encrypted
 provider configuration.

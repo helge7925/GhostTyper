@@ -14,8 +14,8 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-orange" />
-    <img alt="Stack" src="https://img.shields.io/badge/Next.js-15.5.x-black" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.4.0-orange" />
+    <img alt="Stack" src="https://img.shields.io/badge/Next.js-16.x-black" />
     <img alt="Node" src="https://img.shields.io/badge/Node-18%2B-success" />
     <img alt="Postgres" src="https://img.shields.io/badge/Postgres-16-blue" />
     <img alt="Tests" src="https://img.shields.io/badge/tests-139%20passing-success" />
@@ -82,8 +82,8 @@ Full list and capture notes: [`docs/screenshots/README.md`](docs/screenshots/REA
 - **Multi-workspace**: org-scoped data, roles `owner`/`admin`/`member`/
   `viewer`/`auditor`, audit log.
 - **Cost tracking**: monthly breakdown per provider, operation and member.
-- **Provider management**: OpenRouter, Vexa and Nextcloud managed centrally
-  per workspace; secrets encrypted with AES-256-GCM.
+- **Provider management**: OpenRouter/EdenAI, Vexa and Nextcloud managed
+  centrally per workspace; secrets encrypted with AES-256-GCM.
 
 ## Tech Stack
 
@@ -91,7 +91,7 @@ Full list and capture notes: [`docs/screenshots/README.md`](docs/screenshots/REA
 | -------- | ---------------------------------------------------------------- |
 | Frontend | Next.js 16.x (Pages Router), React 18, Tailwind, Radix, Zustand |
 | Backend  | Next.js API Routes, NextAuth, PostgreSQL 16 (`pg`)               |
-| AI       | OpenRouter (Chat / OCR / batch + live transcription / TTS), Vexa Lite |
+| AI       | EdenAI (chat / OCR / batch STT / TTS), Mistral Voxtral (live STT), Vexa Lite |
 | Infra    | Docker Compose, Traefik (optional), AES-256-GCM (`lib/secrets.js`) |
 | CI       | GitHub Actions: CodeQL, security gates, smoke tests              |
 
@@ -100,15 +100,15 @@ Full list and capture notes: [`docs/screenshots/README.md`](docs/screenshots/REA
 ```
 ┌─────────────────────────┐    ┌──────────────────────────┐
 │ GhostTyper webapp       │    │ Postgres 16              │
-│ Next.js 15.5.x + worker │◄──►│ workspaces · audit · logs│
+│ Next.js 16.x + worker │◄──►│ workspaces · audit · logs│
 └──┬──────────────┬───────┘    └──────────────────────────┘
    │              │
    │ REST/SSE     │ webhook + bridge
    ▼              ▼
 ┌──────────┐  ┌──────────────────┐    ┌────────────────────┐
-│OpenRouter│◄─┤ Vexa Lite        │───►│ OpenRouter STT     │
+│EdenAI    │◄─┤ Vexa Lite        │───►│ Mistral Voxtral       │
 │ API      │  │ (bot container)  │    │ (via bridge, same  │
-│ (batch)  │  │                  │    │  workspace key)    │
+│ (live)   │  │                  │    │  workspace key)   │
 └──────────┘  └──────────────────┘    └────────────────────┘
 ```
 
@@ -123,15 +123,16 @@ integration: [`docs/vexa-integration.md`](docs/vexa-integration.md).
 | With `vexa` profile   | 4 GB  | 2 vCPU   | 20 GB   | adds vexa-lite (2 GB) + bridge (256 MB) |
 | 5–10 active users     | 8 GB  | 4 vCPU   | 40 GB SSD | comfortable for daily team usage   |
 
-Speech-to-text inference runs through OpenRouter for both batch uploads and
-the live/Vexa path, so **no GPU is required on the host**.
+Speech-to-text inference runs through EdenAI (batch uploads) and Mistral's
+Voxtral API (live/Vexa path), so **no GPU is required on the host**.
 Browser bots inside Vexa add roughly 1 GB transient RAM per concurrent
 live meeting. The `vexa-lite` image is `linux/amd64`-only —
 on Apple Silicon it runs under emulation and is noticeably slower.
 
 ## Quickstart
 
-Prerequisites: Docker + Docker Compose v2 and an OpenRouter API key.
+Prerequisites: Docker + Docker Compose v2 and an AI-provider API key
+(OpenRouter, with EdenAI capabilities migrating in per `openspec/changes/`).
 
 ```bash
 git clone https://github.com/helge7925/transkription_webapp.git
@@ -165,8 +166,8 @@ on `https://${DOMAIN}`).
 ### With remote-meeting bot
 
 Vexa Lite + the transcription bridge are wired up as an optional Compose
-profile. The bridge obtains the organization OpenRouter key and probed live
-model from the webapp. Every request enforces ZDR and denies provider data
+profile. The bridge obtains the organization Mistral key and the live-transcription
+model from the webapp (see `docs/vexa-integration.md`). Every request enforces ZDR and denies provider data
 collection; there is no direct legacy-provider fallback.
 
 ```bash
@@ -186,7 +187,7 @@ data-flow review and SCC/TIA implications when switching providers, see
 Per workspace, an admin manages everything under
 **Settings → Workspace verwalten**:
 
-- API keys & integrations (OpenRouter, Vexa)
+- API keys & integrations (OpenRouter/EdenAI, Vexa)
 - Members & roles (incl. per-member spend caps)
 - Retention windows
 - Usage & cost dashboard

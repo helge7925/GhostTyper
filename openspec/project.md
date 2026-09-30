@@ -10,10 +10,13 @@ GhostTyper is a self-hosted workspace product for transcription, OCR, translatio
 - PostgreSQL primary datastore.
 - Existing `transcriptions` table currently stores audio transcriptions, remote meetings, OCR outputs, translations, and data-table analyses.
 - Organizations and role-based permissions are already present.
-- OpenRouter is the sole application-facing AI provider (chat, OCR, batch/live
-  transcription, TTS) since `consolidate-ai-providers-openrouter`; Cortecs and
-  Mistral are no longer called at runtime. Models are governed dynamically
-  per organization (allowlist + defaults), never hardcoded.
+- AI providers are in transition per the `migrate-*-to-edenai` OpenSpec
+  changes: EdenAI (hardcoded per-capability models) is being activated
+  capability-by-capability on top of OpenRouter, which remains the fallback
+  provider for chat/OCR/batch STT/TTS; live-meeting STT runs exclusively on
+  Mistral's Voxtral realtime API via the `voxtral-bridge` container. EdenAI
+  models are hardcoded in `lib/edenai.js` (not admin-configured); OpenRouter
+  models stay org-governed (allowlist + defaults).
 
 ## Planning Rules
 
