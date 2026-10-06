@@ -61,7 +61,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "docx": "^8.2.2",
-    "dompurify": "^3.4.10",
+    "dompurify": "^3.4.16",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "fluent-ffmpeg": "^2.1.2",
